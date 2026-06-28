@@ -1,0 +1,6 @@
+{
+  "name": "AI Infra Watch",
+  "description": "Interactive build-out progress tracker and stock price milestone monitor for global AI infrastructure operators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

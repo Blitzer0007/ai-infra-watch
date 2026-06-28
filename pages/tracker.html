@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en" class="h-full bg-[#090A0C]">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Infrastructure Stock Tracker & Progression Milestone Ledger</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0F1115;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2D3139;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4B5262;
+      }
+    </style>
+  </head>
+  <body class="min-h-full text-white flex flex-col justify-between">
+    
+    <!-- Outer Container -->
+    <div class="max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8 flex-1">
+      
+      <!-- Top Header Row -->
+      <div class="flex flex-col space-y-2 border-b-4 border-white pb-6">
+        <span class="text-xs font-mono uppercase tracking-[0.25em] text-[#10B981] font-bold">Independent Module / Signal Room</span>
+        <h1 class="text-4xl md:text-6xl font-black tracking-tighter uppercase italic text-white">
+          STOCKS PROGRESSION TRACKER
+        </h1>
+        <p class="text-sm md:text-base text-gray-400 max-w-3xl leading-relaxed">
+          Interactive historical validation ledger tracking disclosed strategic milestones, capital allocations, and infrastructure benchmarks. Mentioning precise stock prices at the exact epoch of each milestone occurrence.
+        </p>
+      </div>
+
+      <!-- Quick Back Nav Link -->
+      <div class="flex items-center space-x-2">
+        <a href="/" class="inline-flex items-center space-x-2 px-4 py-2 bg-white/5 border border-white/10 rounded font-mono text-xs hover:bg-white hover:text-black hover:border-white transition uppercase font-bold">
+          <span>&larr; Return to Central Cockpit</span>
+        </a>
+      </div>
+
+      <!-- Main Layout Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Side: Stock Selection Rail -->
+        <div class="lg:col-span-4 space-y-4">
+          <div class="bg-[#15181E]/40 border-2 border-white/10 p-4 md:p-5 rounded">
+            <h3 class="text-xs font-mono uppercase tracking-widest text-white/40 mb-3 font-bold">Select Asset to View</h3>
+            
+            <div class="space-y-2 max-h-[480px] overflow-y-auto pr-1" id="stockListContainer">
+              <!-- Dynamically populated stock button list -->
+            </div>
+          </div>
+
+          <!-- Description Box -->
+          <div class="bg-[#15181E]/40 border-2 border-white/10 p-5 rounded space-y-3">
+            <h4 class="text-xs font-mono uppercase tracking-widest text-white/40 font-bold" id="descSector">SECTOR</h4>
+            <h2 class="text-xl font-black uppercase italic text-white" id="descName">STOCK NAME</h2>
+            <p class="text-xs text-gray-400 leading-relaxed mb-1" id="descContent">Description here...</p>
+            <div class="border-t border-white/5 pt-3 space-y-1 bg-emerald-500/5 p-3 rounded border border-emerald-500/10">
+              <span class="text-[9px] font-mono uppercase tracking-[0.1em] text-[#10B981] font-black block">🔌 LAYMAN CONNECTION &amp; BENEFIT</span>
+              <p class="text-xs text-emerald-100/80 leading-normal" id="descLayman">Connection details here...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Interactive Chart & Milestones -->
+        <div class="lg:col-span-8 space-y-6">
+          
+          <!-- Interactive Chart Block -->
+          <div class="bg-[#15181E]/40 border-2 border-white/10 p-5 rounded space-y-4">
+            <div class="flex justify-between items-center border-b border-white/10 pb-3">
+              <div>
+                <span class="text-[9px] font-mono uppercase tracking-widest text-[#3B82F6] font-bold">Visualization Stage</span>
+                <h3 class="text-lg font-black uppercase tracking-tight text-white" id="chartHeaderSymbol">NVDA HISTORICAL PROGRESS</h3>
+              </div>
+              <div class="bg-black/40 px-3 py-1 border border-white/10 rounded font-mono text-xs">
+                <span>Current Quote: </span>
+                <span id="currentLiveQuote" class="text-[#10B981] font-bold">$165.00</span>
+              </div>
+            </div>
+
+            <!-- Chart Canvas Container -->
+            <div class="relative h-[280px] md:h-[320px] bg-black/20 rounded p-2 flex items-center justify-center border border-white/5">
+              <canvas id="progressionChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Milestones Progression List -->
+          <div class="bg-[#15181E]/40 border-2 border-white/10 p-5 rounded space-y-4">
+            <div class="border-b border-white/10 pb-3">
+              <span class="text-[9px] font-mono uppercase tracking-widest text-amber-500 font-bold">Milestones Timeline</span>
+              <h3 class="text-lg font-black uppercase tracking-tight text-white">CHRONOLOGICAL PROGRESSION PATHWAYS</h3>
+            </div>
+
+            <div class="space-y-4" id="milestonesTimelineContainer">
+              <!-- Dynamically populated milestones -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 text-center border-t border-white/10 text-[10px] font-mono text-white/30 uppercase tracking-widest">
+      AI INFRASTRUCTURE PORTAL &bull; STOCKS TRACKER PAGE &bull; METADATA LOGS PROVISIONED
+    </footer>
+
+    <!-- Embedded Stock Data from src/data.ts -->
+    <script>
+      const STOCK_METADATA = {
+        NVDA: { 
+          name: 'NVIDIA Corporation', 
+          sector: 'Semiconductors', 
+          desc: 'Designs high-performance GPUs and AI compute clusters powering modern AI workloads.', 
+          logoColor: '#76B900',
+          laymanConnection: 'The undisputed heart of the AI boom. They design the premium chips ("brains") and write the mandatory software (CUDA) that runs them. By investing in host providers like Nebius, NVIDIA guarantees a dedicated customer base that is locked into their technology ecosystem.'
+        },
+        NBIS: { 
+          name: 'Nebius Group N.V.', 
+          sector: 'AI Cloud Hosting', 
+          desc: 'Large-scale AI cloud infrastructure operator delivering NVIDIA-powered high-performance computing.', 
+          logoColor: '#10B981',
+          laymanConnection: 'A specialized supercomputer landlord. They buy thousands of scarce, expensive NVIDIA chips, cluster them together with massive power grids, and lease them on long-term contracts to tech giants like Meta. This saves Meta from spending years and billions building their own physical datacenters.'
+        },
+        DGXX: { 
+          name: 'Digi Power X Inc.', 
+          sector: 'AI Cloud / Power Infrastructure', 
+          desc: 'Micro/small-cap power-to-compute operator pivoting from Bitcoin mining to AI colocation and bare-metal GPU rental.', 
+          logoColor: '#3B82F6',
+          laymanConnection: 'An energy-to-compute converter. They take local power infrastructure and convert it into high-density computer centers. By offering secure power, they attract chip developers like Cerebras and rent bare-metal Blackwell servers to custom AI companies like SubQ.'
+        },
+        MU: { 
+          name: 'Micron Technology', 
+          sector: 'Semiconductors (Memory)', 
+          desc: 'Supplies ultra-fast High-Bandwidth Memory (HBM3E) essential for GPU memory data rates.', 
+          logoColor: '#EC4899',
+          laymanConnection: 'High-speed memory behaves like lanes on a highway. Super-fast AI chips (like NVIDIA\'s) are like race cars; without Micron\'s high-bandwidth memory lanes to feed them data, they get stuck in traffic and idle. This makes Micron a critical supplier that every chipmaker needs.'
+        },
+        AMD: { 
+          name: 'Advanced Micro Devices', 
+          sector: 'Semiconductors', 
+          desc: 'Designs high-performance Instinct AI accelerators, competing with NVIDIA in compute infrastructure.', 
+          logoColor: '#F59E0B',
+          laymanConnection: 'The essential challenger. They design rival chips so that tech giants (like Microsoft) have an alternative supplier. This competition gives buyers leverage to negotiate better prices and prevents NVIDIA from holding an absolute monopoly.'
+        },
+        META: { 
+          name: 'Meta Platforms Inc.', 
+          sector: 'Consumer Technology / AI Dev', 
+          desc: 'Major developer of open Llama models and a massive consumer of AI infrastructure rentals.', 
+          logoColor: '#06B6D4',
+          laymanConnection: 'The open-source AI developer. Since building giant datacenters takes years, Meta leases massive chunks of Nebius\'s already-built supercomputer cloud. This allows Meta to train next-generation Llama models immediately to stay ahead of closed competitors.'
+        },
+        MSFT: { 
+          name: 'Microsoft Corporation', 
+          sector: 'Cloud Platform & Software', 
+          desc: 'Anchor AI platform reselling compute via Azure and integrating AI across its massive software suite.', 
+          logoColor: '#8B5CF6',
+          laymanConnection: 'The commercial pioneer of AI. They integrate virtual assistants (Copilot) into Office and Windows. Because demand is growing faster than their own datacenters can expand, Microsoft leases billions in external cloud capacity from Nebius and Digi Power X to keep services running smoothly.'
+        },
+        GOOG: { 
+          name: 'Alphabet Inc. (Google)', 
+          sector: 'Cloud Platform & AI Dev', 
+          desc: 'Dual strategy of designing proprietary TPU hardware and offering commercial Gemini AI services.', 
+          logoColor: '#EF4444',
+          laymanConnection: 'A dual-strategy giant. They design their own custom Google processors (TPUs) to bypass paying NVIDIA\'s high profit margins, but they also buy extensive NVIDIA equipment. They rent extra cloud capacity to keep Gemini processing billions of user questions daily.'
+        },
+        CERE: { 
+          name: 'Cerebras Systems', 
+          sector: 'AI Chip Innovator', 
+          desc: 'Designs the revolutionary Wafer-Scale Engine and rents high-density compute clusters.', 
+          logoColor: '#6366F1',
+          laymanConnection: 'A radical hardware innovator. They build giant computer processors the size of a dinner plate. Rather than managing physical warehouses, they lease space and secure power from Digi Power X to host their service, creating a highly efficient symbiotic relationship.'
+        },
+        NOW: { 
+          name: 'ServiceNow Inc.', 
+          sector: 'Enterprise AI Software', 
+          desc: 'Integrates GenAI workflow automation agents into everyday enterprise systems.', 
+          logoColor: '#14B8A6',
+          laymanConnection: 'The office automatons. They build specialized virtual workers to automate IT support, HR, and customer service. Since they run purely as software, they pay Microsoft and Google for cloud hosting space, meaning ServiceNow\'s growth directly boosts cloud revenues.'
+        },
+        SUBQ: { 
+          name: 'SubQ AI', 
+          sector: 'Enterprise AI Partner', 
+          desc: 'Leases high-end GPU power to deliver customized, secure AI workloads for business clients.', 
+          logoColor: '#F43F5E',
+          laymanConnection: 'A custom AI operator for corporations. They help companies run advanced data analytics but do not own physical servers. Instead, they rent premium bare-metal NVIDIA Blackwell chips directly from Digi Power X\'s NeoCloudz platform to run their models.'
+        },
+        SNDK: { 
+          name: 'SanDisk / WD', 
+          sector: 'Enterprise Storage', 
+          desc: 'Provides large-capacity PCIe enterprise SSD storage arrays used to train massive model datasets.', 
+          logoColor: '#10B981',
+          laymanConnection: 'AI models learn by reading billions of text files, images, and documents. SanDisk builds the physical enterprise "libraries" (high-capacity, ultra-fast SSD arrays) where this massive learning material is stored. Rapid drive speeds prevent expensive chips from waiting for data.'
+        },
+        AMPG: { 
+          name: 'AmpliTech Group', 
+          sector: 'Telecom RF Hardware', 
+          desc: 'Designs low-noise radio amplifiers; showcased in NVIDIA AI-RAN cellular networking demonstrations.', 
+          logoColor: '#D97706',
+          laymanConnection: 'They design precision wireless amplifiers. While they collaborated with NVIDIA to demonstrate futuristic, AI-driven cellular towers (AI-RAN), they do not feed the raw computing cloud itself, making them an indirect, thematic play.'
+        }
+      };
+
+      const STOCK_HISTORY = {
+        NVDA: [
+          { date: 'Jan 2025', price: 115.0 },
+          { date: 'Mar 2025', price: 122.0 },
+          { date: 'May 2025', price: 130.0 },
+          { date: 'Jul 2025', price: 135.0 },
+          { date: 'Aug 2025', price: 142.0 },
+          { date: 'Oct 2025', price: 150.0 },
+          { date: 'Nov 2025', price: 158.0 },
+          { date: 'Jan 2026', price: 168.0 },
+          { date: 'Mar 2026', price: 175.0 },
+          { date: 'May 2026', price: 184.0 },
+          { date: 'Jun 2026', price: 192.53 }
+        ],
+        NBIS: [
+          { date: 'Jan 2025', price: 15.2 },
+          { date: 'Mar 2025', price: 18.5 },
+          { date: 'May 2025', price: 24.0 },
+          { date: 'Jul 2025', price: 32.0 },
+          { date: 'Sep 2025', price: 48.0 },
+          { date: 'Nov 2025', price: 72.0 },
+          { date: 'Dec 2025', price: 105.0 },
+          { date: 'Jan 2026', price: 140.0 },
+          { date: 'Mar 2026', price: 178.0 },
+          { date: 'May 2026', price: 212.0 },
+          { date: 'Jun 2026', price: 240.30 }
+        ],
+        DGXX: [
+          { date: 'Jan 2025', price: 0.95 },
+          { date: 'Mar 2025', price: 1.20 },
+          { date: 'May 2025', price: 1.15 },
+          { date: 'Jul 2025', price: 1.45 },
+          { date: 'Sep 2025', price: 1.30 },
+          { date: 'Nov 2025', price: 1.65 },
+          { date: 'Jan 2026', price: 1.80 },
+          { date: 'Mar 2026', price: 1.95 },
+          { date: 'Apr 2026', price: 2.10 },
+          { date: 'May 2026', price: 3.80 },
+          { date: 'Jun 2026', price: 4.50 }
+        ],
+        MU: [
+          { date: 'Jan 2025', price: 75.61 },
+          { date: 'Mar 2025', price: 92.50 },
+          { date: 'Jun 2025', price: 110.0 },
+          { date: 'Sep 2025', price: 118.0 },
+          { date: 'Dec 2025', price: 122.5 },
+          { date: 'Mar 2026', price: 125.0 },
+          { date: 'May 2026', price: 129.5 },
+          { date: 'Jun 2026', price: 132.0 }
+        ],
+        AMD: [
+          { date: 'Jan 2025', price: 114.74 },
+          { date: 'Mar 2025', price: 130.00 },
+          { date: 'Jul 2025', price: 145.0 },
+          { date: 'Oct 2025', price: 155.0 },
+          { date: 'Jan 2026', price: 168.0 },
+          { date: 'Mar 2026', price: 171.2 },
+          { date: 'May 2026', price: 175.0 },
+          { date: 'Jun 2026', price: 178.50 }
+        ],
+        META: [
+          { date: 'Jan 2025', price: 450.0 },
+          { date: 'Jul 2025', price: 480.0 },
+          { date: 'Sep 2025', price: 502.0 },
+          { date: 'Dec 2025', price: 515.0 },
+          { date: 'Mar 2026', price: 535.0 },
+          { date: 'May 2026', price: 542.5 },
+          { date: 'Jun 2026', price: 550.00 }
+        ],
+        MSFT: [
+          { date: 'Jan 2025', price: 320.0 },
+          { date: 'May 2025', price: 335.0 },
+          { date: 'Sep 2025', price: 350.0 },
+          { date: 'Nov 2025', price: 362.0 },
+          { date: 'Jan 2026', price: 368.0 },
+          { date: 'Mar 2026', price: 370.0 },
+          { date: 'May 2026', price: 371.5 },
+          { date: 'Jun 2026', price: 372.97 }
+        ],
+        GOOG: [
+          { date: 'Jan 2025', price: 155.0 },
+          { date: 'Mar 2025', price: 180.0 },
+          { date: 'Aug 2025', price: 210.0 },
+          { date: 'Dec 2025', price: 245.0 },
+          { date: 'Mar 2026', price: 285.0 },
+          { date: 'May 2026', price: 315.0 },
+          { date: 'Jun 2026', price: 334.69 }
+        ],
+        CERE: [
+          { date: 'Jan 2025', price: 12.5 },
+          { date: 'May 2025', price: 15.0 },
+          { date: 'Oct 2025', price: 18.0 },
+          { date: 'Mar 2026', price: 21.5 },
+          { date: 'May 2026', price: 24.0 },
+          { date: 'Jun 2026', price: 28.50 }
+        ],
+        NOW: [
+          { date: 'Jan 2025', price: 65.0 },
+          { date: 'Jul 2025', price: 72.0 },
+          { date: 'Oct 2025', price: 80.0 },
+          { date: 'Jan 2026', price: 88.0 },
+          { date: 'Apr 2026', price: 94.0 },
+          { date: 'Jun 2026', price: 98.34 }
+        ],
+        SUBQ: [
+          { date: 'Jan 2025', price: 1.10 },
+          { date: 'Aug 2025', price: 1.50 },
+          { date: 'Jan 2026', price: 1.85 },
+          { date: 'Apr 2026', price: 2.20 },
+          { date: 'May 2026', price: 2.80 },
+          { date: 'Jun 2026', price: 3.10 }
+        ],
+        SNDK: [
+          { date: 'Jan 2025', price: 1250.0 },
+          { date: 'Sep 2025', price: 1480.0 },
+          { date: 'Dec 2025', price: 1650.0 },
+          { date: 'Mar 2026', price: 1850.0 },
+          { date: 'Jun 2026', price: 2090.71 }
+        ],
+        AMPG: [
+          { date: 'Jan 2025', price: 1.55 },
+          { date: 'Jul 2025', price: 2.40 },
+          { date: 'Nov 2025', price: 3.80 },
+          { date: 'Mar 2026', price: 5.10 },
+          { date: 'Jun 2026', price: 6.55 }
+        ]
+      };
+
+      const INITIAL_MILESTONES = [
+        { id: 'm1_nvda', stockSymbol: 'NVDA', date: 'Mar 2025', title: 'Blackwell production ramp begins', description: 'Production ramp-up for the Blackwell GPU architecture starts at TSMC, laying the groundwork for severe demand supply queues.', priceAtTime: 122.0, status: 'done' },
+        { id: 'm2_nvda', stockSymbol: 'NVDA', date: 'May 2025', title: 'Q1 earnings guide beat', description: 'Reports exceptional datacenter revenue growth, validating massive AI capex commitments by primary hyperscalers.', priceAtTime: 130.0, status: 'done' },
+        { id: 'm3_nvda', stockSymbol: 'NVDA', date: 'Aug 2025', title: 'Blackwell shipments to Tier-1 cloud providers', description: 'First batches of Blackwell samples and development nodes ship to key cloud builders for initial evaluation and clustering.', priceAtTime: 142.0, status: 'done' },
+        { id: 'm4_nvda', stockSymbol: 'NVDA', date: 'Nov 2025', title: 'Datacenter segment hits record revenue', description: 'Revenues surge as AI server deployments grow globally, driving strategic dependencies across suppliers.', priceAtTime: 158.0, status: 'done' },
+        { id: 'm5_nvda', stockSymbol: 'NVDA', date: 'Mar 2026', title: '$2.0B Strategic Investment in Nebius', description: 'Strategic backing signals confidence in Nebius as a vital alternative cloud host for NVIDIA architectures.', priceAtTime: 175.0, status: 'done' },
+        { id: 'm6_nvda', stockSymbol: 'NVDA', date: 'Jun 2026', title: 'Vera Rubin architecture details unveiled', description: 'Unveils roadmap for the next-generation Vera Rubin platform, targeting Q1 2027 early access with selected partners.', priceAtTime: 192.53, status: 'active' },
+
+        { id: 'm1_nbis', stockSymbol: 'NBIS', date: 'Sep 2025', title: 'Microsoft dedicated capacity contract signed', description: 'Up to $19.4B dedicated GPU capacity contract over 5 years. Power and infrastructure to be served out of Vineland, NJ.', priceAtTime: 48.0, status: 'done' },
+        { id: 'm2_nbis', stockSymbol: 'NBIS', date: 'Dec 2025', title: 'Original Meta AI compute agreement', description: 'Signs a $3.0B, 5-year GPU infrastructure hosting agreement, focusing on high-density data cluster development.', priceAtTime: 105.0, status: 'done' },
+        { id: 'm3_nbis', stockSymbol: 'NBIS', date: 'Mar 2026', title: 'NVIDIA strategic investment closes', description: 'Direct equity backing of $2B from NVIDIA secures priority silicon pipeline allocations for next-gen products.', priceAtTime: 178.0, status: 'done' },
+        { id: 'm4_nbis', stockSymbol: 'NBIS', date: 'May 2026', title: 'Meta contract expanded to $27.0B', description: 'Gigantic expansion incorporating dedicated Vera Rubin GPU capacity. Day of announcement sees stock rally heavily (+14%).', priceAtTime: 212.0, status: 'done' },
+        { id: 'm5_nbis', stockSymbol: 'NBIS', date: 'Jun 2026', title: 'Connected capacity reaches 170MW', description: 'Current connected capacity reaches 170MW, tracking towards the company\'s ambitious 800MW-1GW year-end target.', priceAtTime: 240.30, status: 'active' },
+
+        { id: 'm1_dgxx', stockSymbol: 'DGXX', date: 'Mar 2025', title: 'Pivot from Bitcoin mining & corporate re-brand', description: 'Renamed from Digihost Technology to Digi Power X, shifting focus to high-performance AI hosting and power procurement.', priceAtTime: 1.20, status: 'done' },
+        { id: 'm2_dgxx', stockSymbol: 'DGXX', date: 'Apr 2026', title: 'SubQ AI contract signed ($19.6M)', description: 'Signs a 24-month contract for bare-metal Blackwell GPU-as-a-Service on the NeoCloudz platform with SubQ AI.', priceAtTime: 2.10, status: 'done' },
+        { id: 'm3_dgxx', stockSymbol: 'DGXX', date: 'May 2026', title: 'Cerebras Systems $2.5B colocation deal', description: 'Signs anchor 10-year, 40MW colocation contract for its Columbiana, Alabama campus. Stock rallies +29% same-day on volume.', priceAtTime: 3.80, status: 'done' },
+        { id: 'm4_dgxx', stockSymbol: 'DGXX', date: 'Jun 2026', title: 'NVIDIA Vera Rubin access secured', description: 'Secures placement in NVIDIA\'s early-access target list for Rubin systems, positioning NeoCloudz as a key niche provider.', priceAtTime: 4.50, status: 'active' },
+
+        { id: 'm1_mu', stockSymbol: 'MU', date: 'Jun 2025', title: 'HBM3E qualification with NVIDIA Blackwell', description: 'High-Bandwidth Memory (HBM3E) passes strict validation trials, securing high-margin supply slots on next-gen boards.', priceAtTime: 110.0, status: 'done' },
+        { id: 'm2_mu', stockSymbol: 'MU', date: 'Sep 2025', title: 'Mass production shipment of 24GB HBM3E', description: 'Volume deliveries commence for high-density 24GB units, crucial for addressing larger token contexts natively in memory.', priceAtTime: 118.0, status: 'done' },
+        { id: 'm3_mu', stockSymbol: 'MU', date: 'Mar 2026', title: 'DRAM revenue hits record highs on AI demand', description: 'AI datacenter demand drives margins and sales, leading to a massive earnings beat and upward guidance revision.', priceAtTime: 125.0, status: 'done' },
+        { id: 'm4_mu', stockSymbol: 'MU', date: 'Jun 2026', title: '36GB 12H HBM3E sample distribution', description: 'Commences sample distribution of next-generation 36GB stacked memory layers, aiming to reduce cluster-wide memory latency.', priceAtTime: 132.0, status: 'active' },
+
+        { id: 'm1_amd', stockSymbol: 'AMD', date: 'Jul 2025', title: 'ROCm 6.2 open-source stack released', description: 'Major optimization update for Instinct MI300X software ecosystem, narrowing the developer experience gap with CUDA.', priceAtTime: 145.0, status: 'done' },
+        { id: 'm2_amd', stockSymbol: 'AMD', date: 'Oct 2025', title: 'Azure expands MI300X instance footprint', description: 'Microsoft expands commercial availability of MI300X instances, validating competitive compute pricing metrics.', priceAtTime: 155.0, status: 'done' },
+        { id: 'm3_amd', stockSymbol: 'AMD', date: 'Jan 2026', title: 'Instinct MI325X mass production launch', description: 'Volume manufacturing begins for MI325X, featuring expanded memory capacities to compete directly with Blackwell systems.', priceAtTime: 168.0, status: 'done' },
+        { id: 'm4_amd', stockSymbol: 'AMD', date: 'May 2026', title: 'Next-gen Instinct MI350 timeline confirmed', description: 'Confirms timeline and architecture specs for CDNA 4-based MI350 series, targeting a massive 35x jump in inference efficiency.', priceAtTime: 175.0, status: 'active' },
+
+        { id: 'm1_meta', stockSymbol: 'META', date: 'Jul 2025', title: 'Llama 3.1 open-weights model family debuts', description: 'Launches flagship 405B model, establishing open-weights leadership and fueling hyper-scale compute demand.', priceAtTime: 480.0, status: 'done' },
+        { id: 'm2_meta', stockSymbol: 'META', date: 'Dec 2025', title: '$3B infrastructure lease with Nebius', description: 'Leases GPU capacity to supplement internal computing facilities and secure training resources for upcoming models.', priceAtTime: 515.0, status: 'done' },
+        { id: 'm3_meta', stockSymbol: 'META', date: 'Mar 2026', title: 'Nebius lease expanded to $27B', description: 'Secures massive block of Nebius\'s planned Vera Rubin and Blackwell datacenter capacity to anchor open-weights training models.', priceAtTime: 535.0, status: 'done' },
+        { id: 'm4_meta', stockSymbol: 'META', date: 'Jun 2026', title: 'Llama 4 cluster construction and training launch', description: 'Builds massive high-speed cluster fabrics, putting Llama 4 on a fast-track training regimen to beat closed model peers.', priceAtTime: 550.0, status: 'active' },
+
+        { id: 'm1_msft', stockSymbol: 'MSFT', date: 'Sep 2025', title: 'Vineland capacity deal with Nebius ($19.4B)', description: 'Leases large portion of planned Nebius NJ capacity to maintain Azure commercial dominance amid silicon supply tightness.', priceAtTime: 350.0, status: 'done' },
+        { id: 'm2_msft', stockSymbol: 'MSFT', date: 'Nov 2025', title: 'Azure Maia 100 processor deployment', description: 'Deployments of proprietary silicon begin in selected regional hubs to alleviate high GPU procurement costs.', priceAtTime: 362.0, status: 'done' },
+        { id: 'm3_msft', stockSymbol: 'MSFT', date: 'Mar 2026', title: 'Enterprise Copilot Pro monetization accelerates', description: 'Reports heavy recurring seat licenses for enterprise GenAI integrations, driving long-term infrastructure demand.', priceAtTime: 370.0, status: 'done' },
+        { id: 'm4_msft', stockSymbol: 'MSFT', date: 'May 2026', title: 'AI energy grid infrastructure procurement', description: 'Secures gigawatts of nuclear and renewable PPAs to support upcoming datacenter power requirements through 2030.', priceAtTime: 371.5, status: 'active' },
+
+        { id: 'm1_goog', stockSymbol: 'GOOG', date: 'Aug 2025', title: 'TPU v5p hardware globally available', description: 'Makes highest-end proprietary Tensor Processing Units commercially rentable, expanding internal training capability.', priceAtTime: 210.0, status: 'done' },
+        { id: 'm2_goog', stockSymbol: 'GOOG', date: 'Dec 2025', title: 'Gemini 1.5 Ultra model released', description: 'Releases top-tier Gemini architecture featuring a massive 2 million token context window, setting standard.', priceAtTime: 245.0, status: 'done' },
+        { id: 'm3_goog', stockSymbol: 'GOOG', date: 'Mar 2026', title: 'Gemini API traffic exceeds 10B tokens daily', description: 'Sees heavy developer and enterprise API usage growth, driving heavy inference datacenter deployment workloads.', priceAtTime: 285.0, status: 'done' },
+        { id: 'm4_goog', stockSymbol: 'GOOG', date: 'May 2026', title: 'TPU v6 (Trillium) chip architecture unveiled', description: 'Reveals sixth-generation hardware boasting up to 4.7x performance density compared to prior TPU models.', priceAtTime: 315.0, status: 'active' },
+
+        { id: 'm1_cere', stockSymbol: 'CERE', date: 'May 2025', title: 'Wafer-Scale Engine 3 benchmarked', description: 'Demonstrates industry-leading AI training throughput with a massive single-silicon wafer engine containing 4 trillion transistors.', priceAtTime: 15.0, status: 'done' },
+        { id: 'm2_cere', stockSymbol: 'CERE', date: 'Oct 2025', title: 'Confidential IPO prospectus filed', description: 'Prepares for public market listing, showcasing heavy growth in dedicated hardware platform leasing.', priceAtTime: 18.0, status: 'done' },
+        { id: 'm3_cere', stockSymbol: 'CERE', date: 'May 5, 2026', title: '$2.5B Alabama hosting contract signed', description: 'Signs pivotal 40MW colocation agreement with Digi Power X to establish hardware facilities inside their secure campus.', priceAtTime: 24.0, status: 'done' },
+        { id: 'm4_cere', stockSymbol: 'CERE', date: 'Jun 2026', title: 'WSE-3 cloud deployment launches', description: 'Launches public wafer-scale cloud services, enabling near-instantaneous scaling for training large LLM parameters.', priceAtTime: 28.5, status: 'active' },
+
+        { id: 'm1_now', stockSymbol: 'NOW', date: 'Jul 2025', title: 'Now Assist workflow automation rollout', description: 'Commercial release of IT service, HR, and customer agent workflows using embedded generative models.', priceAtTime: 72.0, status: 'done' },
+        { id: 'm2_now', stockSymbol: 'NOW', date: 'Oct 2025', title: 'SaaS recurring revenue jumps 30%', description: 'Generative software modules drive rapid expansion in contract values and premium tier upgrades.', priceAtTime: 80.0, status: 'done' },
+        { id: 'm3_now', stockSymbol: 'NOW', date: 'Jan 2026', title: 'NVIDIA partnership for custom agent avatars', description: 'Expands partnership to build customized avatar agents that automate customer-facing service desks.', priceAtTime: 88.0, status: 'done' },
+        { id: 'm4_now', stockSymbol: 'NOW', date: 'Apr 2026', title: 'Autonomous IT agent suite deployed', description: 'Releases zero-touch IT troubleshooting agents, shifting from co-pilot assistants to fully autonomous software.', priceAtTime: 94.0, status: 'active' },
+
+        { id: 'm1_subq', stockSymbol: 'SUBQ', date: 'Aug 2025', title: 'Series B funding round closes', description: 'Secures funding to expand its rentable bare-metal GPU node inventory with high-end NVIDIA chips.', priceAtTime: 1.50, status: 'done' },
+        { id: 'm2_subq', stockSymbol: 'SUBQ', date: 'Apr 20, 2026', title: '$19.6M Blackwell rental lease signed', description: 'Signs rental agreement with Digi Power X to host specialized workloads on their NeoCloudz Blackwell systems.', priceAtTime: 2.20, status: 'done' },
+        { id: 'm3_subq', stockSymbol: 'SUBQ', date: 'May 15, 2026', title: 'NeoCloudz bare-metal GPU beta launches', description: 'Launches service to its client base, with primary capacity allocated to high-performance analytics pipelines.', priceAtTime: 2.80, status: 'active' },
+
+        { id: 'm1_sndk', stockSymbol: 'SNDK', date: 'Sep 2025', title: 'Ultrastar 24TB PCIe Gen5 SSD launch', description: 'Unveils high-density solid-state drives specifically engineered to deliver training dataset speeds.', priceAtTime: 1480.0, status: 'done' },
+        { id: 'm2_sndk', stockSymbol: 'SNDK', date: 'Dec 2025', title: 'Hyperscaler datacenter storage volume ship', description: 'Commences heavy volume deliveries to primary cloud operators struggling with data-ingest speed bottlenecks.', priceAtTime: 1650.0, status: 'done' },
+        { id: 'm3_sndk', stockSymbol: 'SNDK', date: 'Mar 2026', title: 'NAND segment record profitability', description: 'Record-setting demand for high-capacity enterprise storage lines drives high segment operating margins.', priceAtTime: 1850.0, status: 'done' },
+
+        { id: 'm1_ampg', stockSymbol: 'AMPG', date: 'Jul 2025', title: 'Low-noise amplifier production ramp', description: 'Ramps manufacturing of custom amplifiers for high-throughput satellite communications systems.', priceAtTime: 2.40, status: 'done' },
+        { id: 'm2_ampg', stockSymbol: 'AMPG', date: 'Nov 2025', title: 'Next-gen O-RAN radio designs finalized', description: 'Completes designs for 6G radio modules incorporating high-speed signal noise mitigation layers.', priceAtTime: 3.80, status: 'done' },
+        { id: 'm3_ampg', stockSymbol: 'AMPG', date: 'Mar 2026', title: 'NVIDIA AI Aerial RAN showcase participation', description: 'Radio hardware is selected for showcasing in NVIDIA\'s high-speed AI-RAN network trials at Northeastern University.', priceAtTime: 5.10, status: 'done' }
+      ];
+
+      let activeSymbol = 'NVDA';
+      let myChart = null;
+
+      function renderStockList() {
+        const container = document.getElementById('stockListContainer');
+        container.innerHTML = '';
+
+        Object.keys(STOCK_METADATA).forEach(symbol => {
+          const meta = STOCK_METADATA[symbol];
+          const history = STOCK_HISTORY[symbol] || [];
+          const currentPrice = history.length > 0 ? history[history.length - 1].price : 0;
+          
+          const isActive = symbol === activeSymbol;
+          const button = document.createElement('button');
+          button.className = `w-full text-left p-3 border transition rounded flex justify-between items-center cursor-pointer ${
+            isActive 
+              ? 'bg-white text-black border-white' 
+              : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+          }`;
+          
+          button.innerHTML = `
+            <div class="font-sans">
+              <div class="font-black text-sm tracking-tight">${symbol}</div>
+              <div class="text-[10px] uppercase font-mono tracking-wider ${isActive ? 'text-black/60' : 'text-white/40'}">${meta.name}</div>
+            </div>
+            <div class="font-mono text-xs font-bold ${isActive ? 'text-black' : 'text-[#10B981]'}">
+              $${currentPrice.toFixed(2)}
+            </div>
+          `;
+
+          button.onclick = () => {
+            activeSymbol = symbol;
+            renderAll();
+          };
+
+          container.appendChild(button);
+        });
+      }
+
+      function renderDetails() {
+        const meta = STOCK_METADATA[activeSymbol];
+        if (!meta) return;
+
+        document.getElementById('descSector').innerText = meta.sector;
+        document.getElementById('descName').innerText = `${activeSymbol} / ${meta.name}`;
+        document.getElementById('descContent').innerText = meta.desc;
+        document.getElementById('descLayman').innerText = meta.laymanConnection || 'No layman connection logged.';
+        document.getElementById('chartHeaderSymbol').innerText = `${activeSymbol} PROGRESSION VALUATION LINE`;
+
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const currentPrice = history.length > 0 ? history[history.length - 1].price : 0;
+        document.getElementById('currentLiveQuote').innerText = `$${currentPrice.toFixed(2)}`;
+      }
+
+      function renderMilestones() {
+        const container = document.getElementById('milestonesTimelineContainer');
+        container.innerHTML = '';
+
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        if (milestones.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-white/40 text-xs font-mono">
+              No milestones cataloged for this symbol.
+            </div>
+          `;
+          return;
+        }
+
+        milestones.forEach(m => {
+          const isDone = m.status === 'done';
+          const milestoneCard = document.createElement('div');
+          milestoneCard.className = 'bg-black/20 border border-white/5 p-4 rounded flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-white/10 transition';
+          
+          milestoneCard.innerHTML = `
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="text-[9px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded ${
+                  isDone ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }">
+                  ${m.date}
+                </span>
+                <span class="text-[9px] font-mono tracking-widest uppercase text-white/40">ID: ${m.id}</span>
+              </div>
+              <h4 class="text-sm font-black text-white uppercase mt-1">${m.title}</h4>
+              <p class="text-xs text-gray-400 leading-normal">${m.description}</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded px-4 py-2 font-mono text-right shrink-0">
+              <span class="text-[8px] uppercase tracking-widest text-white/40 block">Price At Event</span>
+              <span class="text-sm font-bold text-white">$${m.priceAtTime.toFixed(2)}</span>
+            </div>
+          `;
+          container.appendChild(milestoneCard);
+        });
+      }
+
+      function renderChart() {
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const labels = history.map(h => h.date);
+        const prices = history.map(h => h.price);
+
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+        const ctx = document.getElementById('progressionChart').getContext('2d');
+
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${activeSymbol} Share Price ($)`,
+                data: prices,
+                borderColor: '#FFFFFF',
+                borderWidth: 3,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                fill: true,
+                tension: 0.1,
+                pointBackgroundColor: '#10B981',
+                pointBorderColor: '#FFFFFF',
+                pointHoverRadius: 8,
+                pointRadius: 6,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: '#0F1115',
+                titleColor: '#FFFFFF',
+                titleFont: { family: 'JetBrains Mono', size: 10 },
+                bodyColor: '#10B981',
+                bodyFont: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    const price = context.parsed.y;
+                    const date = context.label;
+                    const m = milestones.find(ms => ms.date === date);
+                    if (m) {
+                      return [`Price: $${price.toFixed(2)}`, `Event: ${m.title}`];
+                    }
+                    return `Price: $${price.toFixed(2)}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function renderAll() {
+        renderStockList();
+        renderDetails();
+        renderMilestones();
+        renderChart();
+      }
+
+      window.addEventListener('load', () => {
+        renderAll();
+      });
+    </script>
+  </body>
+</html>
