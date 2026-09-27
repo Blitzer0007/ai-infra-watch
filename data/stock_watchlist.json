@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "description": "Customizable AI Infra Watch stock universe. Edit this file to change the default dashboard universe; backend users can additionally override it with AI_INFRA_WATCH_STOCKS_WATCHLIST.",
+  "watchlist": [
+    {
+      "symbol": "000660.KS",
+      "name": "SK Hynix",
+      "group": "Memory",
+      "theme": "HBM / DRAM",
+      "peers": [
+        "MU",
+        "SNDK"
+      ],
+      "geo": "Korea + Taiwan"
+    },
+    {
+      "symbol": "SNDK",
+      "name": "SanDisk",
+      "group": "Storage",
+      "theme": "Enterprise SSD / NAND",
+      "peers": [
+        "MU",
+        "WDC"
+      ],
+      "geo": "US + Asia supply chain"
+    },
+    {
+      "symbol": "MU",
+      "name": "Micron",
+      "group": "Memory",
+      "theme": "HBM / DRAM",
+      "peers": [
+        "000660.KS",
+        "NVDA"
+      ],
+      "geo": "US + Taiwan + Korea"
+    },
+    {
+      "symbol": "TEAM",
+      "name": "Atlassian",
+      "group": "Enterprise Software",
+      "theme": "AI software",
+      "peers": [
+        "CRM",
+        "NOW"
+      ],
+      "geo": "Enterprise software spend"
+    },
+    {
+      "symbol": "SOFI",
+      "name": "SoFi",
+      "group": "Fintech",
+      "theme": "Rates / consumer credit",
+      "peers": [
+        "HOOD",
+        "NU"
+      ],
+      "geo": "US rates + consumer credit"
+    },
+    {
+      "symbol": "CRM",
+      "name": "Salesforce",
+      "group": "Enterprise Software",
+      "theme": "Agentic CRM / AI",
+      "peers": [
+        "NOW",
+        "MSFT"
+      ],
+      "geo": "Enterprise software spend"
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon",
+      "group": "AI Platform",
+      "theme": "AWS / capex",
+      "peers": [
+        "MSFT",
+        "GOOGL"
+      ],
+      "geo": "Cloud capex + rates"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet",
+      "group": "AI Platform",
+      "theme": "Gemini / TPU / Cloud",
+      "peers": [
+        "MSFT",
+        "AMZN"
+      ],
+      "geo": "AI capex + regulation"
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "group": "AI Software",
+      "theme": "AIP / government AI",
+      "peers": [
+        "MSFT",
+        "SNOW"
+      ],
+      "geo": "Government + enterprise AI"
+    },
+    {
+      "symbol": "CBRS",
+      "name": "Cerebras",
+      "group": "AI Compute",
+      "theme": "AI accelerators",
+      "peers": [
+        "NVDA",
+        "AMD"
+      ],
+      "geo": "US AI compute supply chain"
+    },
+    {
+      "symbol": "RUM",
+      "name": "Rumble",
+      "group": "Media",
+      "theme": "Video / cloud",
+      "peers": [
+        "META",
+        "GOOGL"
+      ],
+      "geo": "US media + cloud"
+    },
+    {
+      "symbol": "QCOM",
+      "name": "Qualcomm",
+      "group": "Semiconductors",
+      "theme": "Edge AI / connectivity",
+      "peers": [
+        "NVDA",
+        "AMD"
+      ],
+      "geo": "US + Asia semiconductor supply chain"
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel",
+      "group": "Semiconductors",
+      "theme": "Foundry / x86 / AI",
+      "peers": [
+        "AMD",
+        "TSM"
+      ],
+      "geo": "US + Taiwan manufacturing"
+    },
+    {
+      "symbol": "SOXX",
+      "name": "iShares Semiconductor ETF",
+      "group": "Semiconductors",
+      "theme": "Sector breadth",
+      "peers": [
+        "SOXL",
+        "SMH"
+      ],
+      "geo": "Broad semiconductor exposure"
+    },
+    {
+      "symbol": "IREN",
+      "name": "IREN",
+      "group": "AI Infrastructure",
+      "theme": "Data centers / power",
+      "peers": [
+        "NBIS",
+        "DGXX"
+      ],
+      "geo": "US power + data centers"
+    },
+    {
+      "symbol": "TSM",
+      "name": "TSMC",
+      "group": "Semiconductors",
+      "theme": "Foundry / advanced nodes",
+      "peers": [
+        "NVDA",
+        "AMD"
+      ],
+      "geo": "Taiwan foundry exposure"
+    },
+    {
+      "symbol": "AMD",
+      "name": "AMD",
+      "group": "AI Compute",
+      "theme": "Instinct accelerators",
+      "peers": [
+        "NVDA",
+        "AVGO"
+      ],
+      "geo": "US + Taiwan supply chain"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "group": "AI / Robotics",
+      "theme": "FSD / robotics",
+      "peers": [
+        "NVDA",
+        "META"
+      ],
+      "geo": "US + China supply chain"
+    },
+    {
+      "symbol": "AAPL",
+      "name": "Apple",
+      "group": "AI Platform",
+      "theme": "Device AI / ecosystem",
+      "peers": [
+        "MSFT",
+        "GOOGL"
+      ],
+      "geo": "Global hardware supply chain"
+    },
+    {
+      "symbol": "ONDS",
+      "name": "Ondas",
+      "group": "AI / Autonomy",
+      "theme": "Wireless / autonomy",
+      "peers": [
+        "QCOM",
+        "NOK"
+      ],
+      "geo": "US + telecom"
+    },
+    {
+      "symbol": "CIFR",
+      "name": "Cipher Mining",
+      "group": "AI Infrastructure",
+      "theme": "Power / data centers",
+      "peers": [
+        "IREN",
+        "DGXX"
+      ],
+      "geo": "US power + data centers"
+    },
+    {
+      "symbol": "IONQ",
+      "name": "IonQ",
+      "group": "Quantum",
+      "theme": "Quantum computing",
+      "peers": [
+        "NVDA",
+        "IBM"
+      ],
+      "geo": "US technology + government"
+    },
+    {
+      "symbol": "NOK",
+      "name": "Nokia",
+      "group": "Networking",
+      "theme": "AI-RAN / telecom",
+      "peers": [
+        "QCOM",
+        "AMPG"
+      ],
+      "geo": "Europe + global telecom"
+    },
+    {
+      "symbol": "TRT",
+      "name": "Trio-Tech",
+      "group": "Semiconductor Services",
+      "theme": "Testing / manufacturing",
+      "peers": [
+        "AMKR",
+        "INTC"
+      ],
+      "geo": "US + Asia manufacturing"
+    },
+    {
+      "symbol": "AMPG",
+      "name": "AmpliTech",
+      "group": "RF Hardware",
+      "theme": "AI-RAN / RF",
+      "peers": [
+        "NOK",
+        "QCOM"
+      ],
+      "geo": "US + telecom"
+    },
+    {
+      "symbol": "DELL",
+      "name": "Dell",
+      "group": "AI Hardware",
+      "theme": "AI servers / storage",
+      "peers": [
+        "NVDA",
+        "HPE"
+      ],
+      "geo": "Global servers + supply chain"
+    },
+    {
+      "symbol": "IBM",
+      "name": "IBM",
+      "group": "Enterprise AI",
+      "theme": "watsonx / hybrid cloud",
+      "peers": [
+        "MSFT",
+        "ORCL"
+      ],
+      "geo": "Enterprise IT + cloud"
+    }
+  ]
+}
