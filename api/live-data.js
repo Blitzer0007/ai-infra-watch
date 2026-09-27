@@ -96,7 +96,8 @@ export default async function handler(req, res) {
     news: currentNews,
     contracts: [],
     macroRisks,
-    marketSentiment:'Live quotes + AI-infrastructure news feed active.'
+    marketSentiment:'Live quotes + AI-infrastructure news feed active.',
+    sources:['Yahoo Finance chart data','GDELT news']
   };
   cached = data;
   cachedAt = Date.now();
