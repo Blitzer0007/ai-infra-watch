@@ -1,0 +1,12 @@
+META PLATFORMS, INC. — FORM 10-K (Fiscal Year 2025 Excerpt)
+
+Item 1. Business.
+Meta builds technologies that help people connect, find communities, and grow businesses. Our products include Facebook, Instagram, Messenger, WhatsApp, and Threads. We generate substantially all of our revenue from advertising, showing ads to users across our family of apps and to businesses that purchase advertising space.
+
+Item 7. Management's Discussion and Analysis.
+Revenue for fiscal 2025 was 165 billion dollars, an increase of 22 percent from the prior year. Advertising revenue was 161 billion dollars. The average price per ad increased 12 percent while ad impressions delivered increased 9 percent. Our family of apps daily active people reached 3.4 billion.
+
+We are investing significantly in artificial intelligence and virtual reality. Capital expenditures for AI infrastructure, including data centers and custom silicon, increased substantially year over year. Reality Labs, our segment focused on virtual and augmented reality, recorded an operating loss of 16 billion dollars. We believe these investments position us for long-term growth but expect Reality Labs losses to continue.
+
+Item 1A. Risk Factors.
+Our advertising business is subject to regulatory and platform changes that could reduce ad targeting effectiveness or increase compliance costs. Substantial AI infrastructure investment may not yield expected returns. We face competition for both advertising budgets and user attention from other platforms.

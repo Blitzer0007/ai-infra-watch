@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"AI data center demand stays strong, with new GPU launches and capacity deals across NVIDIA, Nebius, and Digi Power X.\", \"insights\": [{\"ticker\": \"NVDA\", \"move_pct\": 3.2, \"reason\": \"NVIDIA's data center GPU pipeline is expanding.\"}, {\"ticker\": \"NBIS\", \"move_pct\": 0.8, \"reason\": \"Nebius is adding GPU capacity in Europe.\"}, {\"ticker\": \"DGXX\", \"move_pct\": 4.2, \"reason\": \"Digi Power X is building new data center capacity in Texas.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

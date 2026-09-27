@@ -1,0 +1,9 @@
+MICROSOFT CORPORATION — FORM 10-Q (Third Quarter Fiscal 2025 Excerpt)
+
+Item 2. Management's Discussion and Analysis.
+Microsoft Cloud revenue was 42 billion dollars for the third quarter of fiscal 2025, up 20 percent year over year. Azure and other cloud services revenue grew 33 percent, with AI services contributing a growing share as Copilot adoption expanded across commercial customers. Total quarterly revenue was 70 billion dollars.
+
+Capital expenditures rose sharply as we expanded data center capacity for AI training and inference. We expect elevated capital spending to continue while demand for AI infrastructure remains strong.
+
+Item 1A. Risk Factors.
+If AI demand does not scale in line with our data center investments, the returns on our capital expenditures may fall short. Competition among hyperscale cloud providers remains intense.

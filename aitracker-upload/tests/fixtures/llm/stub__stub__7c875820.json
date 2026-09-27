@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"In Texas.\", \"insights\": [{\"ticker\": \"DGXX\", \"move_pct\": 4.2, \"reason\": \"Digi Power X is building new data center capacity in Texas.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

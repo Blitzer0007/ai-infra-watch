@@ -1,0 +1,12 @@
+NVIDIA CORPORATION — FORM 10-K (Fiscal Year 2025 Excerpt)
+
+Item 1. Business.
+NVIDIA is a full-stack accelerated computing company. We pioneered the graphics processing unit, or GPU, and have since evolved it into a platform for artificial intelligence, high-performance computing, and data center acceleration. Our reportable segments are Compute & Networking and Graphics.
+
+Item 7. Management's Discussion and Analysis of Financial Condition and Results of Operations.
+Data Center revenue for fiscal 2025 was a record 47.5 billion dollars, an increase of 217 percent from the prior year, driven by strong demand for our Hopper and Blackwell architecture GPUs from cloud service providers and enterprises building large language models. Gaming revenue was 11.4 billion dollars. Total revenue grew to 60.9 billion dollars. Gross margin expanded to 75 percent, reflecting a favorable product mix weighted toward high-end data center platforms.
+
+Demand for the Blackwell platform substantially exceeded supply during the fourth quarter. We expect supply constraints to ease as we ramp production with our foundry partners. Our networking products, including InfiniBand and Spectrum-X Ethernet, grew as customers built large AI training clusters.
+
+Item 1A. Risk Factors.
+Our business depends on a small number of foundry partners, and any disruption to their operations could materially harm our ability to supply products. Export control regulations restricting sales of advanced chips to certain countries have reduced our addressable market in those regions. Competition in AI accelerators is intensifying from both established semiconductor companies and cloud providers designing custom silicon.

@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contracts — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 02 / Markets</div>
+      <h1>Contract ledger</h1>
+      <p class="page-dek">Disclosed capacity and infrastructure agreements for the AI infrastructure names in the interactive chart. The ledger below is manually compiled from company press releases and SEC filings. The live tools further down help you search for new filings and headlines yourself — they surface candidates, they do not verify anything automatically.</p>
+    </div>
+
+    <div class="notice mt-16">
+      <span class="ic">i</span>
+      <div>A contract is only "confirmed" here once a human (us, or you) has opened the actual press release or SEC filing and read the terms. The badges below distinguish three different confidence levels — read the legend before trusting any row.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">What the verification badges actually mean</div>
+          <div class="card-sub">Three honest categories, replacing the old "Verified" / "Unverified" split</div>
+        </div>
+      </div>
+      <div class="grid grid-3">
+        <div>
+          <span class="badge badge-buy">Confirmed from primary source</span>
+          <p class="muted mt-8" style="font-size:12.5px">Someone has opened the actual press release, 6-K, or 8-K and read the contract terms directly. The "Source" column links to the specific filing or release, not a search query.</p>
+        </div>
+        <div>
+          <span class="badge badge-amber">Reported, not yet opened</span>
+          <p class="muted mt-8" style="font-size:12.5px">Multiple reputable outlets (CNBC, Reuters, TipRanks, etc.) report this figure consistently, but nobody has cross-checked it against the underlying filing yet. Treat terms as probably right, not certain.</p>
+        </div>
+        <div>
+          <span class="badge badge-hold">Unverified headline signal</span>
+          <p class="muted mt-8" style="font-size:12.5px">Surfaced by the live scanners below from news headlines or filing titles. Could be a real new deal, could be a rumor, could be noise. Nothing here is confirmed until you open the source.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Ledger filters</div>
+          <div class="card-sub">Filter by company or by confidence level</div>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label>Company / counterparty</label>
+          <select id="contract-company-filter" onchange="applyContractFilters()">
+            <option value="all">All chart companies</option>
+            <option value="NVDA">NVIDIA (NVDA)</option>
+            <option value="MU">Micron (MU)</option>
+            <option value="SNDK">SanDisk (SNDK)</option>
+            <option value="AMD">AMD</option>
+            <option value="NBIS">Nebius (NBIS)</option>
+            <option value="DGXX">Digi Power X (DGXX)</option>
+            <option value="META">Meta (META)</option>
+            <option value="MSFT">Microsoft (MSFT)</option>
+            <option value="GOOG">Google (GOOG)</option>
+            <option value="NOW">ServiceNow (NOW)</option>
+            <option value="CEREBRAS">Cerebras</option>
+            <option value="SUBQ">SubQ AI</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Confidence level</label>
+          <select id="contract-verification-filter" onchange="applyContractFilters()">
+            <option value="all">All confidence levels</option>
+            <option value="confirmed">Confirmed from primary source only</option>
+            <option value="reported">Reported, not yet opened</option>
+            <option value="rumour">Unverified headline signals only</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">★ Biggest market mover, per company</div>
+          <div class="card-sub">Ranked by reported stock-price reaction on announcement day — the closest real proxy for "share-value impact" available without a paid market-data feed</div>
+        </div>
+      </div>
+      <div class="grid grid-2" id="top-mover-cards">
+        <!-- filled by JS, falls back to static content below if JS fails -->
+      </div>
+      <div class="quote-meta mt-16">Methodology: this ranks contracts by the stock's reported single-day move on the announcement, sourced from financial press coverage (CNBC, TipRanks, Stocktwits) at the time. It is not derived from a live market-data feed and is not the same as long-run value created — a 30% pop on a $700M market cap and a 14% pop on a $25B market cap are very different in dollar terms. Where no reported price-move figure exists for a contract, it falls back to "largest disclosed deal value" instead, labeled accordingly.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Live SEC filing search</div>
+          <div class="card-sub">Searches SEC EDGAR's full-text index directly — free, no key required, official government source</div>
+        </div>
+        <button class="btn secondary" onclick="searchEdgar()">Search filings</button>
+      </div>
+      <div class="grid grid-2 mt-16">
+        <div class="field"><label>Search term</label><input type="text" id="edgar-query" value="Digi Power X Cerebras" placeholder="e.g. Nebius Meta capacity"></div>
+        <div class="field"><label>Form type</label>
+          <select id="edgar-form">
+            <option value="">All forms</option>
+            <option value="8-K">8-K</option>
+            <option value="6-K">6-K</option>
+            <option value="10-Q">10-Q</option>
+            <option value="10-K">10-K</option>
+          </select>
+        </div>
+      </div>
+      <div id="edgar-status" class="quote-meta">Ready to search EDGAR's full-text index directly from your browser.</div>
+      <div id="edgar-results" class="mt-16"></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Live news headline scanner</div>
+          <div class="card-sub">Scans public interactive-chart tickers for contract, capacity, partnership, order, lease, and data-center headlines via Finnhub</div>
+        </div>
+        <button class="btn secondary" onclick="scanContractSignals()">Refresh signals</button>
+      </div>
+      <div class="notice mt-16">
+        <span class="ic">i</span>
+        <div>Uses your Finnhub key from Settings. This scans <strong>news coverage</strong>, not SEC filings — use the EDGAR search above for the primary-source record. Public tickers scanned: NVDA, MU, SNDK, AMD, NBIS, DGXX, META, MSFT, GOOG, NOW. Private companies such as Cerebras and SubQ AI don't have public tickers, so they only appear when a public company's headline mentions them.</div>
+      </div>
+      <div id="live-contract-status" class="quote-meta mt-16">Ready to scan the last 90 days of headlines.</div>
+      <div id="live-contract-results" class="mt-16"></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Nebius (NBIS) disclosed agreements</div>
+          <div class="card-sub">Sorted by announcement date, most recent first</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Counterparty</th>
+            <th>Value</th>
+            <th>Term</th>
+            <th>Nature</th>
+            <th>Source</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="contract-row" data-companies="NBIS META NVDA" data-verification="reported" data-mover-pct="14" data-mover-symbol="NBIS">
+            <td class="mono">2026-03-16</td>
+            <td><strong>Meta Platforms</strong></td>
+            <td class="num-cell">Up to $27.0B</td>
+            <td>5 years</td>
+            <td>Expanded AI infra supply deal — $12B dedicated capacity (Vera Rubin platform) + up to $15B additional capacity. Delivery starts early 2027.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.cnbc.com/2026/03/16/meta-nebius-ai-infrastructure.html" target="_blank" rel="noopener" style="color:var(--amber)">CNBC report ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / pending delivery</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="NBIS NVDA" data-verification="reported">
+            <td class="mono">2026-03-09</td>
+            <td><strong>NVIDIA</strong></td>
+            <td class="num-cell">$2.0B equity</td>
+            <td>—</td>
+            <td>Direct strategic equity investment in Nebius, alongside continued Nebius hardware deployment of NVIDIA GPUs.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=nebius&type=6-K&dateb=&owner=include&count=40" target="_blank" rel="noopener" style="color:var(--amber)">Nebius 6-K filings ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Closed</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="NBIS BLOOM" data-verification="reported">
+            <td class="mono">2026-05 (approx.)</td>
+            <td><strong>Bloom Energy</strong></td>
+            <td class="num-cell">Up to $2.6B</td>
+            <td>10 years</td>
+            <td>Fuel cell deployment across Nebius U.S. data centers — targeting 250MW power capacity by year-end.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=nebius&type=6-K&dateb=&owner=include&count=40" target="_blank" rel="noopener" style="color:var(--amber)">Nebius 6-K filings ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / in progress</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="NBIS META" data-verification="reported">
+            <td class="mono">2025-12</td>
+            <td><strong>Meta Platforms</strong></td>
+            <td class="num-cell">$3.0B (original)</td>
+            <td>5 years</td>
+            <td>Original AI infrastructure capacity agreement — later expanded in March 2026 (see above).</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=nebius&type=6-K&dateb=&owner=include&count=40" target="_blank" rel="noopener" style="color:var(--amber)">Nebius 6-K filings ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Superseded by expansion</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="NBIS MSFT" data-verification="reported">
+            <td class="mono">2025-09-08</td>
+            <td><strong>Microsoft</strong></td>
+            <td class="num-cell">Up to $19.4B</td>
+            <td>5 years</td>
+            <td>Dedicated GPU capacity from Nebius's new Vineland, New Jersey data center.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=nebius&type=6-K&dateb=&owner=include&count=40" target="_blank" rel="noopener" style="color:var(--amber)">Nebius 6-K filings ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / delivering</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Total disclosed backlog referenced across recent coverage: approximately <strong>$46–50B</strong> for the 2027–2031 period, against 2025 full-year revenue of roughly $530M. Source figures vary slightly by outlet and filing date — treat as directional, not exact. <strong>Note:</strong> the links above point to Nebius's full 6-K filing list on EDGAR rather than the single specific filing, because we have not yet pinned down the exact accession number for each deal — use the live EDGAR search above to find it, then we'll swap in the direct link.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="section-title">Why the Microsoft and Meta deals matter for Nebius</div>
+      <p class="muted" style="font-size:13px">Multi-year, multi-billion-dollar capacity contracts from hyperscalers convert speculative growth into contracted, if back-loaded, revenue. The gap between Nebius's contracted backlog ($46B+) and trailing revenue (~$530M) is the entire bull/bear debate on the stock — see the Progress Tracker page for how that gap is closing.</p>
+    </div>
+
+    <div class="notice mt-24">
+      <span class="ic">i</span>
+      <div>No public record of a direct contract <strong>between</strong> Nebius and Digi Power X was found. They're tracked side by side here as comparable neoclouds at very different scale and maturity — not as counterparties.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Digi Power X (DGXX) disclosed agreements</div>
+          <div class="card-sub">Sorted by announcement date, most recent first</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Counterparty</th>
+            <th>Value</th>
+            <th>Term</th>
+            <th>Nature</th>
+            <th>Source</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="contract-row" data-companies="DGXX NVDA" data-verification="reported">
+            <td class="mono">2026-06-03</td>
+            <td><strong>NVIDIA</strong></td>
+            <td class="num-cell">Not disclosed</td>
+            <td>—</td>
+            <td>Secured access to NVIDIA Vera Rubin systems for its NeoCloudz platform — early access target of Q1 2027, positioning DGXX among earlier operators deploying the next-gen Rubin/Vera architecture.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.digipowerx.com/press-releases" target="_blank" rel="noopener" style="color:var(--amber)">Company press releases ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Secured / pre-deployment</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="DGXX CEREBRAS" data-verification="confirmed" data-mover-pct="29" data-mover-symbol="DGXX">
+            <td class="mono">2026-05-05</td>
+            <td><strong>Cerebras Systems</strong></td>
+            <td class="num-cell">$1.1B (10-yr) / up to $2.5B w/ renewals</td>
+            <td>10 years + renewal options</td>
+            <td>Master Services Agreement for a purpose-built 40MW AI data center campus in Columbiana, Alabama. Phase 1: 15MW IT load, targeted online Dec 15 2026; Phase 2: +25MW by end Q1 2027. DGXX's largest disclosed contract to date — stock closed up ~29% same day (intraday spike higher).</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://www.digipowerx.com/press-releases" target="_blank" rel="noopener" style="color:var(--amber)">Company press release, May 5 2026 ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / building Phase 1</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="DGXX SUBQ NVDA" data-verification="confirmed">
+            <td class="mono">2026-04-20</td>
+            <td><strong>SubQ AI</strong></td>
+            <td class="num-cell">~$19.6M</td>
+            <td>24 months</td>
+            <td>First contracted AI revenue and commercial launch of the NeoCloudz bare-metal GPU-as-a-Service platform. Dedicated, non-virtualized access to NVIDIA Blackwell GPUs. ~15% (~$2.95M) paid upfront, non-refundable. Effective May 15, 2026.</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://www.digipowerx.com/press-releases" target="_blank" rel="noopener" style="color:var(--amber)">Company press release, Apr 20 2026 ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Company FY2027 revenue guidance (as of May 2026): <strong>$250M–$300M</strong>, up from Q1 FY2026 revenue of $9.35M — almost entirely dependent on the Cerebras and SubQ AI contracts above converting to delivered, billed capacity. Treat this as a much earlier-stage, higher-risk story than Nebius. The Cerebras and SubQ AI rows are marked "Confirmed" because their terms match Digi Power X's own published press releases (linked above) word for word — not because every number has been cross-checked against the SEC 8-K text itself yet.</div>
+    </div>
+
+    <div class="notice mt-24">
+      <span class="ic">i</span>
+      <div>The remaining six companies in the interactive chart — Micron, SanDisk, AMD, Microsoft, Google, and ServiceNow — are covered below as <strong>primary subjects</strong> (their own disclosed AI deals), not just as counterparties listed under Nebius or DGXX above. Cerebras and SubQ AI don't have their own sections since both already appear fully under the Digi Power X table — they're private companies with no separate public disclosures of their own.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Micron (MU) disclosed agreements</div>
+          <div class="card-sub">Strategic Customer Agreements (SCAs) — take-or-pay supply contracts, individual customers not disclosed</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="MU" data-verification="reported">
+            <td class="mono">2026-06 (Q3 FY26 call)</td>
+            <td><strong>16 customers (4 large + ~12 mid), unnamed</strong></td>
+            <td class="num-cell">~$100B minimum + $22B upfront cash</td>
+            <td>Mostly 5-year</td>
+            <td>16 Strategic Customer Agreements, structured as take-or-pay contracts. Covers roughly 20% of DRAM volume and a third of NAND volume through 2030. Individual customer names not disclosed in the earnings call.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://investors.micron.com" target="_blank" rel="noopener" style="color:var(--amber)">Micron investor relations ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / supply locked through 2030</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Unlike the Nebius/DGXX rows, these are aggregate disclosures from an earnings call rather than a single named-counterparty filing — Micron has not (as of this writing) named which hyperscalers signed which SCA. Treat the $100B figure as a real, company-disclosed total, but not attributable to any single chart node.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">SanDisk (SNDK) disclosed agreements</div>
+          <div class="card-sub">Five AI infrastructure supply partnerships, aggregate figures disclosed</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="SNDK" data-verification="reported">
+            <td class="mono">2026-05 (Q-end disclosure)</td>
+            <td><strong>5 data-center customers, unnamed</strong></td>
+            <td class="num-cell">$42B+ contracted, $11B+ financial guarantees</td>
+            <td>Multi-year</td>
+            <td>Five separate AI infrastructure supply partnerships tied to data-center buyers, shifting SanDisk from spot-priced NAND sales toward contracted, hyperscaler-style revenue visibility.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.sandisk.com/investor-relations" target="_blank" rel="noopener" style="color:var(--amber)">SanDisk investor relations ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / multi-year</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">As with Micron, customer identities aren't individually disclosed — this is reported as a basket of five partnerships, not five separate named contracts.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">AMD disclosed agreements</div>
+          <div class="card-sub">OpenAI and Oracle deals — the two named, dollar-quantified deals behind the AMD node</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="AMD" data-verification="reported">
+            <td class="mono">2025-10-06</td>
+            <td><strong>OpenAI</strong></td>
+            <td class="num-cell">~$90B cumulative hardware revenue potential</td>
+            <td>Multi-generation, 6GW total</td>
+            <td>OpenAI commits to purchasing 6 gigawatts of AMD Instinct GPUs across multiple chip generations; first 1GW deployment targeted H2 2026. AMD issued OpenAI warrants for up to ~10% of AMD shares as part of the deal.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.cnbc.com/2025/10/06/openai-amd-chip-deal-ai.html" target="_blank" rel="noopener" style="color:var(--amber)">CNBC report ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / first deployment H2 2026</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="AMD" data-verification="reported">
+            <td class="mono">2025-10-13 (approx.)</td>
+            <td><strong>Oracle</strong></td>
+            <td class="num-cell">50,000 GPUs (MI450)</td>
+            <td>Into 2027 and beyond</td>
+            <td>Oracle deploys AMD's future MI450 AI chip via AMD Helios rack servers, alongside next-gen Epyc Venice CPUs and Pensando Vulcano networking, starting H2 2026.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.ciodive.com/news/oracle-amd-nvidia-AI-infrastructure/802772/" target="_blank" rel="noopener" style="color:var(--amber)">CIO Dive report ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / pending H2 2026 deployment</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">The OpenAI deal is the single largest disclosed AMD agreement on this page by potential value, though "potential" hardware revenue over multiple chip generations is a much softer figure than a fixed-term capacity contract like Nebius's Microsoft deal.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Microsoft (MSFT) disclosed agreements</div>
+          <div class="card-sub">As a buyer of AI capacity and capex spender — separate from the Nebius row already covered above</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="MSFT" data-verification="reported">
+            <td class="mono">2025-10 / amended 2026-04-27</td>
+            <td><strong>OpenAI</strong></td>
+            <td class="num-cell">$250B incremental Azure commitment</td>
+            <td>~6 years (2025–2030)</td>
+            <td>OpenAI committed to an incremental $250B in Azure cloud services. April 2026 amendment caps Microsoft's revenue-share payments and removes Azure exclusivity, while the spending commitment continues through 2030.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.cnbc.com/2026/04/27/openai-microsoft-partnership-revenue-cap.html" target="_blank" rel="noopener" style="color:var(--amber)">CNBC report ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / amended terms</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Microsoft's total commercial backlog (remaining performance obligation) was reported at $627B, up 99% year over year, with roughly 45% tied to OpenAI specifically — that aggregate figure is broader than just this one contract and isn't itself a single signed deal amount.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Google / Alphabet (GOOG) disclosed agreements</div>
+          <div class="card-sub">TPU capacity leases — Google as the chip/capacity supplier, not just a Nebius/DGXX counterparty</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="GOOG META" data-verification="reported">
+            <td class="mono">2026-02-27 (approx.)</td>
+            <td><strong>Meta Platforms</strong></td>
+            <td class="num-cell">Multi-billion (exact figure not disclosed)</td>
+            <td>Multi-year</td>
+            <td>Meta to lease Google Cloud TPUs in 2026 for training next-gen AI models, with talks to purchase TPUs outright starting 2027. Diversifies Meta's hardware beyond NVIDIA and AMD.</td>
+            <td>
+              <span class="badge badge-hold">Unverified headline signal</span>
+              <div class="quote-meta"><a href="https://mlq.ai/news/meta-inks-multi-billion-deal-to-lease-googles-tpus-for-ai-development/" target="_blank" rel="noopener" style="color:var(--amber)">Reporting based on The Information ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Reported / terms not fully disclosed</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="GOOG" data-verification="reported">
+            <td class="mono">2026 (reported)</td>
+            <td><strong>Anthropic</strong></td>
+            <td class="num-cell">Up to $40B</td>
+            <td>—</td>
+            <td>TPU capacity deal covering 5 gigawatts — large enough that Google's own DeepMind researchers reportedly compete with paying customers for TPU access.</td>
+            <td>
+              <span class="badge badge-hold">Unverified headline signal</span>
+              <div class="quote-meta"><a href="https://www.metaintro.com/blog/google-tpu-squeeze-2026-ai-researchers" target="_blank" rel="noopener" style="color:var(--amber)">Bloomberg-sourced reporting ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Reported / terms not fully disclosed</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Both rows are marked as headline signals rather than "reported, not yet opened" for the other tables, because neither deal's exact dollar figure has been confirmed by either company directly — these numbers come from press reporting citing unnamed sources, one step further from the primary source than the Meta-Nebius or AMD-OpenAI deals above.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">ServiceNow (NOW) disclosed agreements</div>
+          <div class="card-sub">Technology/governance partnership with NVIDIA — no disclosed dollar value</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="NOW NVDA" data-verification="confirmed">
+            <td class="mono">2026-03-16, expanded 2026-05-05</td>
+            <td><strong>NVIDIA</strong></td>
+            <td class="num-cell">Not disclosed</td>
+            <td>Ongoing partnership</td>
+            <td>Expanded partnership to deploy governed autonomous AI agents across enterprise environments — combines ServiceNow's AI Control Tower with NVIDIA's Enterprise AI Factory and Blackwell infrastructure. May 2026 expansion ("Project Arc") extends governance from desktops to data centers via NVIDIA's OpenShell runtime.</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-extends-agentic-AI-governance-from-desktops-to-data-centers-with-NVIDIA/default.aspx" target="_blank" rel="noopener" style="color:var(--amber)">ServiceNow newsroom press release ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Active partnership, no contract value disclosed</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">This is genuinely different in kind from every other row on this page: it's a confirmed, primary-sourced technology partnership, but neither company has disclosed a dollar figure attached to it. Don't read the "Confirmed" badge here as meaning there's a contract value to point to — it means the partnership itself is confirmed, not that there's a number behind it.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Meta (META) disclosed agreements</div>
+          <div class="card-sub">As an AI capex spender and AMD customer — separate from the Nebius row already covered above</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="META AMD" data-verification="confirmed">
+            <td class="mono">2026-02-24</td>
+            <td><strong>AMD</strong></td>
+            <td class="num-cell">6GW capacity (value undisclosed)</td>
+            <td>Multi-generation, starting H2 2026</td>
+            <td>Meta and AMD expanded their strategic partnership to deploy 6 gigawatts of AMD Instinct GPUs, starting with a custom MI450-based chip and 6th-gen EPYC "Venice" CPUs on the AMD Helios rack architecture. AMD issued Meta a performance-based warrant for up to 160 million AMD shares, vesting on shipment and stock-price milestones.</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://www.amd.com/en/newsroom/press-releases/2026-2-24-amd-and-meta-announce-expanded-strategic-partnersh.html" target="_blank" rel="noopener" style="color:var(--amber)">AMD press release ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / first deployment H2 2026</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="META NBIS" data-verification="reported">
+            <td class="mono">2026-03-16</td>
+            <td><strong>Nebius</strong></td>
+            <td class="num-cell">Up to $27.0B</td>
+            <td>5 years</td>
+            <td>Meta-side counterparty to the Nebius row already covered in the Nebius table above — included here too so this row shows up when filtering by "Meta" specifically.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.cnbc.com/2026/03/16/meta-nebius-ai-infrastructure.html" target="_blank" rel="noopener" style="color:var(--amber)">CNBC report ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / pending delivery</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Meta's FY2026 AI capex guidance runs up to $135B — both rows above are individual pieces of that much larger spending program, not separate from it.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Cerebras Systems disclosed agreements</div>
+          <div class="card-sub">Private company (pre-IPO at time of writing) — no public ticker, tracked here as a chart node</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="CEREBRAS" data-verification="reported">
+            <td class="mono">2026-04-16 (reported)</td>
+            <td><strong>OpenAI</strong></td>
+            <td class="num-cell">$20B+ (potentially $30B)</td>
+            <td>3 years</td>
+            <td>OpenAI committed to pay Cerebras over $20B for AI server capacity built on Cerebras's wafer-scale chips, with the figure potentially rising to $30B as spending scales. OpenAI also receives warrants for roughly a 10% equity stake in Cerebras and separately committed about $1B to help fund the data centers housing the chips. Reported just ahead of Cerebras's IPO, targeting a ~$35B valuation.</td>
+            <td>
+              <span class="badge badge-amber">Reported, not yet opened</span>
+              <div class="quote-meta"><a href="https://www.theinformation.com/articles/openai-spend-20-billion-cerebras-chips-receive-equity-stake" target="_blank" rel="noopener" style="color:var(--amber)">The Information ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Reported / not yet confirmed via Cerebras or OpenAI filing</span></td>
+          </tr>
+          <tr class="contract-row" data-companies="CEREBRAS DGXX" data-verification="confirmed" data-mover-pct="29" data-mover-symbol="DGXX">
+            <td class="mono">2026-05-05</td>
+            <td><strong>Digi Power X</strong></td>
+            <td class="num-cell">$1.1B (10-yr) / up to $2.5B w/ renewals</td>
+            <td>10 years + renewal options</td>
+            <td>Cerebras-side counterparty to the DGXX row already covered in the Digi Power X table above — included here too so it shows up when filtering by "Cerebras" specifically.</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://www.digipowerx.com/press-releases" target="_blank" rel="noopener" style="color:var(--amber)">Company press release, May 5 2026 ↗</a></div>
+            </td>
+            <td><span class="badge badge-amber">Contracted / building Phase 1</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Cerebras had not completed its IPO as of this page's last update — figures above come from press reporting on private-company terms, which is inherently less verifiable than a public company's SEC filing. The OpenAI deal, if it holds, would be roughly 8–18x larger than the DGXX deal in dollar terms.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">SubQ AI disclosed agreements</div>
+          <div class="card-sub">Private company, no public ticker — a 13-person AI startup, tracked here as a chart node</div>
+        </div>
+        <span class="fresh manual"><span class="dot"></span>updated Jun 2026</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Counterparty</th><th>Value</th><th>Term</th><th>Nature</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="contract-row" data-companies="SUBQ DGXX NVDA" data-verification="confirmed" data-mover-pct="19" data-mover-symbol="DGXX">
+            <td class="mono">2026-04-20</td>
+            <td><strong>Digi Power X</strong></td>
+            <td class="num-cell">~$19.6M</td>
+            <td>24 months</td>
+            <td>SubQ AI's bare-metal GPU rental from Digi Power X's NeoCloudz platform — DGXX's first contracted AI revenue. Same underlying deal already covered in the Digi Power X table above, included here so it surfaces when filtering by "SubQ AI." DGXX stock rose roughly 19% on the announcement.</td>
+            <td>
+              <span class="badge badge-buy">Confirmed from primary source</span>
+              <div class="quote-meta"><a href="https://www.digipowerx.com/press-releases" target="_blank" rel="noopener" style="color:var(--amber)">Company press release, Apr 20 2026 ↗</a></div>
+            </td>
+            <td><span class="badge badge-buy">Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">SubQ AI (formally "Subquadratic") is this page's smallest and least-established node by far — a 13-person startup that emerged from stealth on May 5, 2026 with $29M in seed funding. Its only disclosed infrastructure contract is the DGXX deal above; it has not signed or disclosed any other capacity agreement as of this page's last update. Its own AI model claims (a 12-million-token context window) are unrelated to infrastructure spend and are unverified by third parties — not something this page tracks.</div>
+    </div>
+
+    <div class="grid grid-2 mt-24">
+      <div class="card">
+        <div class="section-title">Why the Cerebras deal matters most</div>
+
+        <p class="muted" style="font-size:13px">At up to $2.5B, the Cerebras agreement dwarfs everything else DGXX has signed and is the main reason FY2027 guidance jumped to $250–300M. The stock closed up roughly 29% the day it was announced (intraday highs near +40%) — by far the largest single-day move of any contract tracked on this page. It also validates the company's pivot from Bitcoin mining into "vertically integrated" AI infra — owning its own power and land, not just leasing space.</p>
+      </div>
+      <div class="card">
+        <div class="section-title">Execution risk to watch</div>
+        <p class="muted" style="font-size:13px">DGXX is a micro/small-cap with high share-price volatility — shares have moved from roughly $1.86 to north of $9 over the 2026 rally. Phase 1 of the Alabama campus (targeted online mid-December 2026), NVIDIA Vera Rubin early-access delivery, and further customer announcements are the near-term catalysts to watch.</p>
+      </div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="section-title">Add a contract manually</div>
+      <p class="faint" style="font-size:12px;margin-top:-6px">This form is local-only — it stores entries in your browser and does not publish anywhere. Useful for keeping a private running log as new deals are announced.</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Counterparty</label><input type="text" id="c-party" placeholder="e.g. CoreWeave"></div>
+        <div class="field"><label>Value (USD)</label><input type="text" id="c-value" placeholder="e.g. 5,000,000,000"></div>
+        <div class="field"><label>Date announced</label><input type="text" id="c-date" placeholder="YYYY-MM-DD"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="c-notes" rows="2" placeholder="Deal terms, source link, etc."></textarea></div>
+      <button class="btn" onclick="addContract()">Save entry</button>
+      <div id="custom-contracts" class="mt-24"></div>
+    </div>
+
+    <footer class="site-footer">
+      Nebius contract figures sourced from financial press coverage (CNBC, Motley Fool, Zacks, SeekingAlpha) as of June 2026; direct filing links point to Nebius's 6-K filing index on EDGAR pending confirmation of exact accession numbers. Digi Power X contract figures sourced from the company's own press releases at digipowerx.com/press-releases, cross-checked against StockTitan and TipRanks coverage, as of June 2026. Deal values marked "up to" represent ceiling figures negotiated into agreements and are not guaranteed to be fully realized. Stock-move figures are as reported by financial press at the time and are not derived from a live market-data feed. This is not investment advice.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const CUSTOM_KEY = 'aiw_custom_contracts_v1';
+const CONTRACT_SIGNAL_SYMBOLS = [
+  { symbol: 'NVDA', name: 'NVIDIA' },
+  { symbol: 'MU', name: 'Micron' },
+  { symbol: 'SNDK', name: 'SanDisk' },
+  { symbol: 'AMD', name: 'AMD' },
+  { symbol: 'NBIS', name: 'Nebius' },
+  { symbol: 'DGXX', name: 'Digi Power X' },
+  { symbol: 'META', name: 'Meta' },
+  { symbol: 'MSFT', name: 'Microsoft' },
+  { symbol: 'GOOG', name: 'Google' },
+  { symbol: 'NOW', name: 'ServiceNow' }
+];
+const CONTRACT_KEYWORDS = [
+  'contract', 'agreement', 'deal', 'partnership', 'partner', 'customer',
+  'capacity', 'infrastructure', 'data center', 'datacenter', 'gpu',
+  'order', 'supply', 'lease', 'services agreement', 'msa', 'secured',
+  'awarded', 'expands', 'deployment', 'collaboration'
+];
+
+function loadCustom(){
+  try{ return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function saveCustom(list){ localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); }
+
+function addContract(){
+  const party = document.getElementById('c-party').value.trim();
+  const value = document.getElementById('c-value').value.trim();
+  const date = document.getElementById('c-date').value.trim();
+  const notes = document.getElementById('c-notes').value.trim();
+  if(!party){ alert('Counterparty name is required.'); return; }
+  const list = loadCustom();
+  list.unshift({ party, value, date, notes, id: Date.now() });
+  saveCustom(list);
+  document.getElementById('c-party').value = '';
+  document.getElementById('c-value').value = '';
+  document.getElementById('c-date').value = '';
+  document.getElementById('c-notes').value = '';
+  renderCustom();
+}
+
+function removeContract(id){
+  saveCustom(loadCustom().filter(c => c.id !== id));
+  renderCustom();
+}
+
+function renderCustom(){
+  const list = loadCustom();
+  const el = document.getElementById('custom-contracts');
+  if(list.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="section-title" style="margin-top:20px">Your saved entries</div>` + list.map(c => `
+    <div class="stat-line" style="display:flex">
+      <div>
+        <strong>${c.party}</strong> ${c.value ? '— $' + c.value : ''} ${c.date ? '<span class="faint mono">(' + c.date + ')</span>' : ''}
+        ${c.notes ? '<div class="faint" style="font-size:12px;margin-top:2px">' + c.notes + '</div>' : ''}
+      </div>
+      <button class="btn secondary" style="padding:4px 10px;font-size:11px" onclick="removeContract(${c.id})">Remove</button>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str){
+  return String(str || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function isoDate(d){
+  return d.toISOString().slice(0, 10);
+}
+
+function signalScore(item){
+  const text = `${item.headline || ''} ${item.summary || ''}`.toLowerCase();
+  let score = 0;
+  CONTRACT_KEYWORDS.forEach(k => {
+    if(text.includes(k)) score += 1;
+  });
+  if(/\$|billion|million|mw|capacity|lease|agreement|contract/i.test(text)) score += 2;
+  return score;
+}
+
+function inferCompanyTokens(item){
+  const text = `${item._symbol || ''} ${item._name || ''} ${item.headline || ''} ${item.summary || ''}`.toUpperCase();
+  const aliases = [
+    ['NVDA', ['NVDA', 'NVIDIA']],
+    ['MU', ['MU', 'MICRON']],
+    ['SNDK', ['SNDK', 'SANDISK', 'WESTERN DIGITAL']],
+    ['AMD', ['AMD', 'ADVANCED MICRO DEVICES']],
+    ['NBIS', ['NBIS', 'NEBIUS']],
+    ['DGXX', ['DGXX', 'DIGI POWER X']],
+    ['META', ['META', 'META PLATFORMS']],
+    ['MSFT', ['MSFT', 'MICROSOFT']],
+    ['GOOG', ['GOOG', 'GOOGLE', 'ALPHABET']],
+    ['NOW', ['NOW', 'SERVICENOW']],
+    ['CEREBRAS', ['CEREBRAS']],
+    ['SUBQ', ['SUBQ', 'SUBQ AI']]
+  ];
+  return aliases
+    .filter(([, names]) => names.some(name => text.includes(name)))
+    .map(([token]) => token)
+    .join(' ');
+}
+
+/* ---------------- ledger filters: company + 3-tier confidence ---------------- */
+function applyContractFilters(){
+  const company = document.getElementById('contract-company-filter')?.value || 'all';
+  const verification = document.getElementById('contract-verification-filter')?.value || 'all';
+  const rows = document.querySelectorAll('.contract-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const companies = (row.dataset.companies || '').split(/\s+/);
+    const rowVerification = row.dataset.verification || 'reported';
+    const companyMatch = company === 'all' || companies.includes(company);
+    const verificationMatch = verification === 'all' || rowVerification === verification;
+    const show = companyMatch && verificationMatch;
+    row.style.display = show ? '' : 'none';
+    if(show) visibleCount++;
+  });
+
+  renderFilterEmptyState(visibleCount, company, verification);
+}
+
+function renderFilterEmptyState(visibleCount, company, verification){
+  let el = document.getElementById('filter-empty-state');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'filter-empty-state';
+    el.className = 'notice mt-16';
+    const filtersCard = document.getElementById('contract-company-filter').closest('.card');
+    filtersCard.appendChild(el);
+  }
+  if(visibleCount > 0){
+    el.style.display = 'none';
+    return;
+  }
+  const companyLabel = company === 'all' ? 'any company' : document.getElementById('contract-company-filter').selectedOptions[0].textContent;
+  const verificationLabel = verification === 'all' ? 'any confidence level' : document.getElementById('contract-verification-filter').selectedOptions[0].textContent.toLowerCase();
+  el.style.display = '';
+  el.innerHTML = `<span class="ic">i</span><div><strong>No rows match this filter combination.</strong> There are currently no contracts on this page tagged as ${companyLabel} at "${verificationLabel}". This usually means that company has no disclosed deal at that confidence tier yet — not that the filter is broken. Try "All confidence levels", or run the live SEC search / news scanner further down to look for something newer.</div>`;
+}
+
+/* ---------------- top mover cards: real, sourced price-move ranking ---------------- */
+function renderTopMovers(){
+  const el = document.getElementById('top-mover-cards');
+  // Static, sourced data — kept out of the DOM scrape so it can't silently
+  // drift if rows above are edited. Update this object when new contracts
+  // with reported price moves are confirmed.
+  const movers = {
+    NBIS: {
+      label: 'Nebius (NBIS)',
+      counterparty: 'Meta Platforms — $27.0B expansion',
+      metricLabel: 'Reported announcement-day move',
+      metricValue: '+14%',
+      source: 'CNBC, Mar 16 2026',
+      sourceUrl: 'https://www.cnbc.com/2026/03/16/meta-nebius-ai-infrastructure.html',
+      note: 'Largest reported single-day move among Nebius\'s disclosed deals.'
+    },
+    DGXX: {
+      label: 'Digi Power X (DGXX)',
+      counterparty: 'Cerebras Systems — up to $2.5B',
+      metricLabel: 'Reported announcement-day move',
+      metricValue: '+29%',
+      source: 'TipRanks / Invezz, May 5 2026',
+      sourceUrl: 'https://www.tipranks.com/news/digi-power-x-stock-dgxx-skyrockets-on-2-5-billion-deal-with-cerebras-systems',
+      note: 'Intraday spike reported as high as +36-40%; closed the day up ~29%. Largest move of any contract tracked on this page.'
+    }
+  };
+
+  el.innerHTML = Object.values(movers).map(m => `
+    <div class="card">
+      <div class="card-title">${m.label}</div>
+      <div class="card-sub">${m.counterparty}</div>
+      <div class="quote-row mt-16">
+        <span class="quote-price up" style="font-size:24px">${m.metricValue}</span>
+        <span class="muted" style="font-size:12px">${m.metricLabel}</span>
+      </div>
+      <div class="quote-meta mt-8">${m.note}</div>
+      <div class="quote-meta"><a href="${m.sourceUrl}" target="_blank" rel="noopener" style="color:var(--amber)">${m.source} ↗</a></div>
+    </div>
+  `).join('');
+}
+
+/* ---------------- live SEC EDGAR full-text search ---------------- */
+async function searchEdgar(){
+  const statusEl = document.getElementById('edgar-status');
+  const resultsEl = document.getElementById('edgar-results');
+  const query = document.getElementById('edgar-query').value.trim();
+  const form = document.getElementById('edgar-form').value;
+
+  if(!query){
+    statusEl.textContent = 'Enter a search term first.';
+    return;
+  }
+
+  const params = new URLSearchParams({ q: query, forms: form, dateRange: 'custom',
+    startdt: '2025-01-01', enddt: isoDate(new Date()) });
+  const apiUrl = `https://efts.sec.gov/LATEST/search-index?${params.toString()}`;
+  const humanUrl = `https://www.sec.gov/cgi-bin/srqsb?text=${encodeURIComponent(query)}` ; // fallback only if needed
+  const edgarUiUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${encodeURIComponent(query)}&type=${encodeURIComponent(form)}&dateb=&owner=include&count=40`;
+
+  statusEl.textContent = 'Searching SEC EDGAR full-text index…';
+  resultsEl.innerHTML = '';
+
+  try{
+    const res = await fetch(apiUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const hits = (data.hits && data.hits.hits) || [];
+
+    if(hits.length === 0){
+      statusEl.textContent = `No EDGAR filings matched "${query}" in the searched window.`;
+      resultsEl.innerHTML = `<div class="empty-state">Try a broader term, or open the search directly on <a href="https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(query)}" target="_blank" rel="noopener" style="color:var(--amber)">sec.gov/edgar/search</a>.</div>`;
+      return;
+    }
+
+    statusEl.textContent = `Found ${hits.length} matching filing(s) directly from SEC EDGAR.`;
+    resultsEl.innerHTML = `
+      <table>
+        <thead><tr><th>Filed</th><th>Company</th><th>Form</th><th>Document</th></tr></thead>
+        <tbody>
+          ${hits.map(h => {
+            const src = h._source || {};
+            const filedDate = src.file_date || '—';
+            const formType = src.form_type || src.root_form || '—';
+            const company = (src.display_names && src.display_names[0]) || '—';
+            const accession = (h._id || '').split(':')[0];
+            const cik = (src.ciks && src.ciks[0]) || '';
+            const filingUrl = accession && cik
+              ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=${formType}&dateb=&owner=include&count=10`
+              : `https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(query)}`;
+            return `
+              <tr>
+                <td class="mono">${escapeHtml(filedDate)}</td>
+                <td>${escapeHtml(company)}</td>
+                <td class="mono">${escapeHtml(formType)}</td>
+                <td><a href="${filingUrl}" target="_blank" rel="noopener" style="color:var(--amber)">Open on EDGAR ↗</a></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="quote-meta mt-16">Results come directly from efts.sec.gov, the SEC's own full-text search service — no third party in between. Open the filing and confirm the contract terms yourself before treating anything here as settled.</div>
+    `;
+  }catch(err){
+    // Likely a CORS restriction on efts.sec.gov from a pure-browser fetch.
+    // Fall back to a one-click deep link into SEC EDGAR's own search UI
+    // rather than pretending the live fetch always works.
+    statusEl.textContent = `Could not fetch results directly in this browser (${err.message}). Opening SEC EDGAR's own search instead.`;
+    resultsEl.innerHTML = `
+      <div class="notice">
+        <span class="ic">i</span>
+        <div>Your browser blocked the direct API call (this can happen due to CORS restrictions on efts.sec.gov). Click below to run the same search on SEC EDGAR's website instead — same data, official source, just one extra click.</div>
+      </div>
+      <a class="btn mt-16" style="display:inline-block" href="https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(query)}${form ? '&forms=' + encodeURIComponent(form) : ''}" target="_blank" rel="noopener">Search on sec.gov/edgar/search →</a>
+    `;
+  }
+}
+
+/* ---------------- live Finnhub news headline scanner (unverified signals) ---------------- */
+function renderContractSignals(items){
+  const el = document.getElementById('live-contract-results');
+  if(items.length === 0){
+    el.innerHTML = '<div class="empty-state">No contract-like headlines found in the scan window. Try again later or verify directly through company filings.</div>';
+    applyContractFilters();
+    return;
+  }
+
+  el.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Symbol</th>
+          <th>Signal</th>
+          <th>Source</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item => {
+          const date = item.datetime ? new Date(item.datetime * 1000).toISOString().slice(0, 10) : '—';
+          const confidence = item._score >= 5 ? 'High' : item._score >= 3 ? 'Medium' : 'Low';
+          const badge = item._score >= 5 ? 'badge-buy' : item._score >= 3 ? 'badge-amber' : 'badge-hold';
+          const summary = item.summary || '';
+          const companies = inferCompanyTokens(item);
+          return `
+            <tr class="contract-row" data-companies="${escapeHtml(companies)}" data-verification="rumour">
+              <td class="mono">${date}</td>
+              <td><strong>${escapeHtml(item._symbol)}</strong><div class="faint" style="font-size:12px">${escapeHtml(item._name)}</div></td>
+              <td>
+                <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" style="color:var(--text)"><strong>${escapeHtml(item.headline)}</strong></a>
+                ${summary ? `<div class="faint" style="font-size:12px;margin-top:4px">${escapeHtml(summary).slice(0, 220)}${summary.length > 220 ? '…' : ''}</div>` : ''}
+              </td>
+              <td>${escapeHtml(item.source || 'News')}<div class="quote-meta"><span class="badge badge-hold">Unverified headline signal</span></div></td>
+              <td><span class="badge ${badge}">${confidence}</span></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="quote-meta mt-16">These are live headline matches, not audited contract records. Open the source, then cross-check with the EDGAR search above before treating any of this as confirmed.</div>
+  `;
+  applyContractFilters();
+}
+
+async function scanContractSignals(){
+  const status = document.getElementById('live-contract-status');
+  const results = document.getElementById('live-contract-results');
+
+  if(!APP.loadConfig().finnhubKey){
+    status.textContent = 'No Finnhub key configured.';
+    results.innerHTML = `<div class="notice"><span class="ic">!</span><div>Add a free Finnhub API key in <a href="settings.html" style="color:var(--amber)">Settings</a> to scan live headlines.</div></div>`;
+    return;
+  }
+
+  const to = new Date();
+  const from = new Date();
+  from.setDate(to.getDate() - 90);
+
+  status.textContent = 'Scanning live headlines...';
+  results.innerHTML = '<div class="empty-state">Fetching company news across chart tickers...</div>';
+
+  const found = [];
+  const failures = [];
+
+  for(const entry of CONTRACT_SIGNAL_SYMBOLS){
+    try{
+      const news = await APP.fetchCompanyNews(entry.symbol, isoDate(from), isoDate(to));
+      news.forEach(item => {
+        const score = signalScore(item);
+        if(score > 0){
+          found.push({ ...item, _symbol: entry.symbol, _name: entry.name, _score: score });
+        }
+      });
+    }catch(err){
+      failures.push(entry.symbol);
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  found.sort((a, b) => (b.datetime || 0) - (a.datetime || 0) || b._score - a._score);
+  renderContractSignals(found.slice(0, 40));
+
+  const failText = failures.length ? ` Could not scan: ${failures.join(', ')}.` : '';
+  status.textContent = `Scanned ${CONTRACT_SIGNAL_SYMBOLS.length - failures.length}/${CONTRACT_SIGNAL_SYMBOLS.length} tickers for ${isoDate(from)} to ${isoDate(to)}. Showing ${Math.min(found.length, 40)} of ${found.length} matching headline signals.${failText}`;
+}
+
+renderCustom();
+renderTopMovers();
+applyContractFilters();
+if(APP.loadConfig().finnhubKey){
+  scanContractSignals();
+}
+</script>
+</body>
+</html>

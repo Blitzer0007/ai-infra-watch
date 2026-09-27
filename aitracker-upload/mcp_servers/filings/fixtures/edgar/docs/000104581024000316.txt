@@ -1,0 +1,9 @@
+NVIDIA CORPORATION — FORM 10-Q (Third Quarter Fiscal 2025 Excerpt)
+
+Item 2. Management's Discussion and Analysis.
+Data Center revenue for the third quarter of fiscal 2025 was 30.8 billion dollars, up 112 percent year over year, as cloud service providers and enterprises continued to scale AI training and inference infrastructure. Total quarterly revenue was 35.1 billion dollars. Gross margin was 75 percent.
+
+We began the production ramp of our Blackwell platform during the quarter. Demand for both Hopper and Blackwell GPUs remained well ahead of supply. Networking revenue, including InfiniBand and Spectrum-X Ethernet, grew as customers built larger AI clusters.
+
+Item 1A. Risk Factors.
+Our results depend on continued strong demand for accelerated computing in the data center. A slowdown in AI infrastructure spending by large cloud customers, or a shift toward custom silicon, could reduce demand for our products.

@@ -1,0 +1,24 @@
+{
+  "NBIS": [
+    {"date": "2025-11-18", "when": "past", "period": "2025-Q3", "hour": "amc", "eps_actual": -0.21, "eps_estimate": -0.26, "revenue_actual": 42.1, "revenue_estimate": 38.9, "price_reaction_pct": 6.8},
+    {"date": "2026-02-24", "when": "past", "period": "2025-Q4", "hour": "amc", "eps_actual": -0.15, "eps_estimate": -0.19, "revenue_actual": 55.3, "revenue_estimate": 51.0, "price_reaction_pct": 11.2},
+    {"date": "2026-05-20", "when": "past", "period": "2026-Q1", "hour": "amc", "eps_actual": -0.12, "eps_estimate": -0.18, "revenue_actual": 63.7, "revenue_estimate": 58.4, "price_reaction_pct": 8.4},
+    {"date": "2026-08-19", "when": "upcoming", "period": "2026-Q2", "hour": "amc", "eps_estimate": -0.05, "revenue_estimate": 72.0}
+  ],
+  "DGXX": [
+    {"date": "2025-11-12", "when": "past", "period": "2025-Q3", "hour": "bmo", "eps_actual": 0.02, "eps_estimate": 0.01, "revenue_actual": 9.4, "revenue_estimate": 8.8, "price_reaction_pct": 14.6},
+    {"date": "2026-03-05", "when": "past", "period": "2025-Q4", "hour": "bmo", "eps_actual": 0.03, "eps_estimate": 0.04, "revenue_actual": 11.2, "revenue_estimate": 11.5, "price_reaction_pct": -7.3},
+    {"date": "2026-05-14", "when": "past", "period": "2026-Q1", "hour": "bmo", "eps_actual": 0.05, "eps_estimate": 0.03, "revenue_actual": 13.9, "revenue_estimate": 12.1, "price_reaction_pct": 19.1},
+    {"date": "2026-08-13", "when": "upcoming", "period": "2026-Q2", "hour": "bmo", "eps_estimate": 0.06, "revenue_estimate": 16.0}
+  ],
+  "NVDA": [
+    {"date": "2026-02-25", "when": "past", "period": "2026-Q4", "hour": "amc", "eps_actual": 0.89, "eps_estimate": 0.85, "revenue_actual": 39500.0, "revenue_estimate": 38100.0, "price_reaction_pct": 3.9},
+    {"date": "2026-05-27", "when": "past", "period": "2027-Q1", "hour": "amc", "eps_actual": 0.96, "eps_estimate": 0.92, "revenue_actual": 43200.0, "revenue_estimate": 41800.0, "price_reaction_pct": 5.1},
+    {"date": "2026-08-26", "when": "upcoming", "period": "2027-Q2", "hour": "amc", "eps_estimate": 1.02, "revenue_estimate": 46000.0}
+  ],
+  "MSFT": [
+    {"date": "2026-01-27", "when": "past", "period": "2026-Q2", "hour": "amc", "eps_actual": 3.24, "eps_estimate": 3.15, "revenue_actual": 69800.0, "revenue_estimate": 68500.0, "price_reaction_pct": 2.1},
+    {"date": "2026-04-28", "when": "past", "period": "2026-Q3", "hour": "amc", "eps_actual": 3.41, "eps_estimate": 3.30, "revenue_actual": 72400.0, "revenue_estimate": 70900.0, "price_reaction_pct": -1.4},
+    {"date": "2026-07-28", "when": "past", "period": "2026-Q4", "hour": "amc", "eps_actual": 3.55, "eps_estimate": 3.48, "revenue_actual": 75100.0, "revenue_estimate": 73800.0, "price_reaction_pct": 4.3}
+  ]
+}

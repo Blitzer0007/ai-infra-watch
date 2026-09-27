@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Tracker — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 03 / Markets</div>
+      <h1>Build-out progress tracker</h1>
+      <p class="page-dek">Contracts are promises. This page tracks progress milestones across the public stocks in the interactive chart, and shows the stock price at the time each milestone happened when historical price data is available.</p>
+    </div>
+
+    <div class="section-title mt-24">Nebius (NBIS)</div>
+    <div class="grid grid-3 mt-16">
+      <div class="card">
+        <div class="card-title">Connected capacity</div>
+        <div class="card-sub">End of 2025 → year-end 2026 target</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">170MW</span><span class="muted">→</span><span class="quote-price" style="font-size:22px;color:var(--amber)">800MW–1GW</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:22%"></div></div>
+        <div class="quote-meta">~22% of low end of 2026 target reached as of last guidance update</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Contracted power capacity</div>
+        <div class="card-sub">Trailing 3 months</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">2GW</span><span class="muted">→</span><span class="quote-price" style="font-size:22px;color:var(--cyan)">3.5GW+</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:70%;background:linear-gradient(90deg,var(--cyan-dim),var(--cyan))"></div></div>
+        <div class="quote-meta">Expected to exceed 4GW by year-end 2026. 75%+ of contracted power is now company-owned.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Backlog vs. revenue gap</div>
+        <div class="card-sub">Disclosed backlog vs FY2025 revenue</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">$46–50B</span><span class="muted down" style="font-size:13px">backlog</span></div>
+        <div class="quote-meta">vs. ~$530M FY2025 revenue — the central thing this tracker exists to monitor as contracts convert to delivered, billed capacity.</div>
+      </div>
+    </div>
+
+    <div class="section-title mt-32">Digi Power X (DGXX)</div>
+    <div class="grid grid-3 mt-16">
+      <div class="card">
+        <div class="card-title">FY revenue guidance</div>
+        <div class="card-sub">Q1 FY2026 actual → FY2027 guidance</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">$9.35M</span><span class="muted">→</span><span class="quote-price" style="font-size:22px;color:var(--amber)">$250–300M</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:6%"></div></div>
+        <div class="quote-meta">Almost entirely dependent on the Cerebras and SubQ AI contracts converting to delivered capacity over the next several quarters.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Columbiana, AL campus</div>
+        <div class="card-sub">Cerebras colocation build-out</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">0MW</span><span class="muted">→</span><span class="quote-price" style="font-size:22px;color:var(--cyan)">40MW</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:8%;background:linear-gradient(90deg,var(--cyan-dim),var(--cyan))"></div></div>
+        <div class="quote-meta">Phase 1 (15MW) under construction as of the contract signing; Phase 2 (+25MW) to follow. Update this bar as the company reports construction progress.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total power capacity</div>
+        <div class="card-sub">Secured across Alabama, New York, North Carolina</div>
+        <div class="quote-row mt-16"><span class="quote-price" style="font-size:22px">~400MW</span></div>
+        <div class="quote-meta">Across all sites combined — much smaller scale than Nebius's multi-gigawatt footprint, consistent with DGXX's micro/small-cap size.</div>
+      </div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div>
+          <div class="card-title">All-stock milestone timeline</div>
+          <div class="card-sub">Auto-maintained from recent SEC 8-K material-event filings, with close price at the milestone date when available</div>
+        </div>
+        <span id="ms-source" class="fresh"><span class="dot"></span>live</span>
+      </div>
+      <div class="field mt-16" style="max-width:320px">
+        <label>Symbol scope</label>
+        <select id="ms-symbol"></select>
+      </div>
+      <div id="milestone-timeline" class="mt-16">
+        <div class="quote-meta">Loading milestones…</div>
+      </div>
+    </div>
+
+    <div class="section-title mt-32">Earnings history &amp; price reaction</div>
+    <div class="notice mt-16">
+      <span class="ic">i</span>
+      <div>Served live from the local backend (<span class="mono">/api/earnings</span>). Start it with <span class="mono">uvicorn app.main:app</span> — in fixture mode it needs no API keys. Each past report shows the EPS surprise and the day-before → day-after price reaction; the callout is the next scheduled report.</div>
+    </div>
+    <div id="earnings-panels" class="mt-16">
+      <div class="card"><div class="quote-meta">Loading earnings…</div></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="section-title">Track your own milestone</div>
+      <p class="faint" style="font-size:12px;margin-top:-6px">Stored locally in your browser only.</p>
+      <div class="grid grid-3">
+        <div class="field"><label>Milestone</label><input type="text" id="m-title" placeholder="e.g. Q3 earnings call"></div>
+        <div class="field"><label>Target date</label><input type="text" id="m-date" placeholder="YYYY-MM-DD"></div>
+        <div class="field"><label>Status</label>
+          <select id="m-status"><option value="planned">Planned</option><option value="active">In progress</option><option value="done">Done</option></select>
+        </div>
+      </div>
+      <button class="btn" onclick="addMilestone()">Add milestone</button>
+      <div id="custom-milestones" class="mt-24"></div>
+    </div>
+
+    <footer class="site-footer">
+      Capacity metric cards are curated examples for Nebius and Digi Power X; update them as new guidance is issued. The milestone timeline is auto-maintained from each company's recent SEC 8-K material-event filings, and stock prices at milestone dates come from the backend candle service when available. This page tracks execution against contracts, it does not predict stock price movement.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const M_KEY = 'aiw_milestones_v1';
+function loadM(){ try{ return JSON.parse(localStorage.getItem(M_KEY) || '[]'); }catch(e){ return []; } }
+function saveM(l){ localStorage.setItem(M_KEY, JSON.stringify(l)); }
+
+function addMilestone(){
+  const title = document.getElementById('m-title').value.trim();
+  const date = document.getElementById('m-date').value.trim();
+  const status = document.getElementById('m-status').value;
+  if(!title){ alert('Milestone title is required.'); return; }
+  const list = loadM();
+  list.push({ title, date, status, id: Date.now() });
+  saveM(list);
+  document.getElementById('m-title').value = '';
+  document.getElementById('m-date').value = '';
+  renderM();
+}
+function removeMilestone(id){ saveM(loadM().filter(m => m.id !== id)); renderM(); }
+
+function renderM(){
+  const list = loadM();
+  const el = document.getElementById('custom-milestones');
+  if(list.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="timeline">` + list.map(m => `
+    <div class="tl-item ${m.status}">
+      <div class="tl-dot"></div>
+      <div class="flex-between">
+        <div>
+          <div class="tl-date">${m.date || 'no date set'}</div>
+          <div class="tl-title">${m.title}</div>
+        </div>
+        <button class="btn secondary" style="padding:4px 10px;font-size:11px" onclick="removeMilestone(${m.id})">Remove</button>
+      </div>
+    </div>
+  `).join('') + `</div>`;
+}
+renderM();
+
+/* ---------------- auto-maintained milestone timeline (SEC 8-K) ---------------- */
+const TRACKER_SYMBOLS = ['NVDA', 'MU', 'SNDK', 'AMPG', 'AMD', 'NBIS', 'DGXX', 'META', 'MSFT', 'GOOG', 'NOW'];
+const MS_NAMES = {
+  NVDA:'NVIDIA',
+  MU:'Micron',
+  SNDK:'SanDisk',
+  AMPG:'AmpliTech Group',
+  AMD:'AMD',
+  NBIS:'Nebius',
+  DGXX:'Digi Power X',
+  META:'Meta',
+  MSFT:'Microsoft',
+  GOOG:'Google',
+  NOW:'ServiceNow'
+};
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function milestoneRow(e){
+  const link = e.url
+    ? `<a href="${esc(e.url)}" target="_blank" rel="noopener" class="tl-title" style="text-decoration:none">${esc(e.title)} ↗</a>`
+    : `<div class="tl-title">${esc(e.title)}</div>`;
+  const desc = e.description ? `<div class="tl-desc">${esc(e.description)}</div>` : '';
+  const badge = (e.form || '8-K') + (e.items && e.items.length ? ' · item ' + esc(e.items.join(', ')) : '');
+  const price = e.price_at_event == null
+    ? '<span class="badge badge-hold">price unavailable</span>'
+    : `<span class="badge badge-buy">$${APP.fmtPrice(e.price_at_event)}</span><span class="faint mono"> close${e.price_date && e.price_date !== e.date ? ' on ' + esc(e.price_date) : ''}</span>`;
+  return `
+    <div class="tl-item ${esc(e.status || 'done')}">
+      <div class="tl-dot"></div>
+      <div class="tl-date">${esc(e.date)} · ${badge}</div>
+      <div class="quote-row" style="gap:8px;margin:3px 0 2px">${price}</div>
+      ${link}
+      ${desc}
+    </div>`;
+}
+
+function milestoneCard(sym, data){
+  if(!data || !data.events || !data.events.length){
+    return `
+      <div class="card mt-16">
+        <div class="card-title">${esc(MS_NAMES[sym] || sym)} (${esc(sym)})</div>
+        <div class="quote-meta mt-8">No recent 8-K material events on record.</div>
+      </div>`;
+  }
+  return `
+    <div class="card mt-16">
+      <div class="card-head">
+        <div>
+          <div class="card-title">${esc(MS_NAMES[sym] || sym)} (${esc(sym)})</div>
+          <div class="card-sub">Recent material-event filings · price source: ${esc(data.price_source || 'unavailable')}</div>
+        </div>
+        <span class="fresh"><span class="dot"></span>${esc(data.source || 'live')}</span>
+      </div>
+      <div class="timeline mt-16">${data.events.map(milestoneRow).join('')}</div>
+    </div>`;
+}
+
+async function renderMilestones(scope){
+  const el = document.getElementById('milestone-timeline');
+  const srcEl = document.getElementById('ms-source');
+  el.innerHTML = `<div class="quote-meta">Loading milestones…</div>`;
+  const symbols = scope === 'ALL' ? TRACKER_SYMBOLS : [scope];
+  try{
+    const resp = await APP.fetchMilestones(symbols);
+    if(srcEl) srcEl.innerHTML = `<span class="dot"></span>${scope === 'ALL' ? 'all chart stocks' : esc(scope)}`;
+    const cards = symbols.map(sym => milestoneCard(sym, resp.milestones && resp.milestones[sym])).join('');
+    const missing = (resp.missing || []).length
+      ? `<div class="notice mt-16"><span class="ic">i</span><div>No milestone data returned for: ${esc(resp.missing.join(', '))}. These may be private, newly listed, unsupported by EDGAR lookup, or lacking recent 8-K events.</div></div>`
+      : '';
+    el.innerHTML = cards + missing;
+  }catch(err){
+    const msg = (err && err.message) ? err.message : 'Failed to load milestones.';
+    el.innerHTML = `<div class="notice danger"><span class="ic">!</span><div>${esc(msg)}</div></div>`;
+  }
+}
+
+(function initMilestones(){
+  const sel = document.getElementById('ms-symbol');
+  if(!sel) return;
+  sel.innerHTML = `<option value="ALL">All public chart stocks</option>` +
+    TRACKER_SYMBOLS.map(s => `<option value="${esc(s)}">${esc(s)} — ${esc(MS_NAMES[s] || s)}</option>`).join('');
+  sel.addEventListener('change', () => renderMilestones(sel.value));
+  renderMilestones(sel.value);
+})();
+
+/* ---------------- earnings history & price reaction ---------------- */
+const EARNINGS_SYMBOLS = TRACKER_SYMBOLS;
+const NAMES = MS_NAMES;
+
+function pctCell(v){
+  if(v === null || v === undefined || isNaN(v)) return '<td class="num-cell">—</td>';
+  const cls = v > 0 ? 'up' : (v < 0 ? 'down' : '');
+  return `<td class="num-cell ${cls}">${APP.fmtPct(v)}</td>`;
+}
+function epsFmt(v){
+  if(v === null || v === undefined || isNaN(v)) return '—';
+  return v.toFixed(2);
+}
+
+function earningsCard(sym, data){
+  const past = (data.past || []).slice().reverse(); // newest first
+  const rows = past.map(e => `
+    <tr>
+      <td class="mono">${e.date}</td>
+      <td>${e.period || '—'}</td>
+      <td class="num-cell">${epsFmt(e.eps_actual)}</td>
+      <td class="num-cell">${epsFmt(e.eps_estimate)}</td>
+      ${pctCell(e.surprise_pct)}
+      ${pctCell(e.price_reaction_pct)}
+    </tr>`).join('');
+  const nxt = data.next;
+  const callout = nxt ? `
+    <div class="quote-row mt-16">
+      <span class="badge badge-amber">NEXT</span>
+      <span class="mono">${nxt.date}</span>
+      <span class="muted">${nxt.period || ''}${nxt.hour ? ' · ' + nxt.hour.toUpperCase() : ''}</span>
+      <span class="muted">est. EPS ${epsFmt(nxt.eps_estimate)}</span>
+    </div>` : `<div class="quote-meta mt-16">No upcoming report scheduled.</div>`;
+  return `
+    <div class="card mt-16">
+      <div class="card-head">
+        <div><div class="card-title">${NAMES[sym] || sym} (${sym})</div><div class="card-sub">Reported EPS vs estimate · price reaction around each report</div></div>
+        <span class="fresh"><span class="dot"></span>${data.source || 'live'}</span>
+      </div>
+      ${past.length ? `<table class="mt-16">
+        <thead><tr><th>Date</th><th>Period</th><th>EPS actual</th><th>EPS est.</th><th>Surprise</th><th>Reaction</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` : `<div class="quote-meta mt-16">No reported earnings on record.</div>`}
+      ${callout}
+    </div>`;
+}
+
+async function loadEarnings(){
+  const el = document.getElementById('earnings-panels');
+  try{
+    const resp = await APP.fetchEarnings(EARNINGS_SYMBOLS);
+    const cards = EARNINGS_SYMBOLS
+      .filter(s => resp.earnings && resp.earnings[s])
+      .map(s => earningsCard(s, resp.earnings[s]))
+      .join('');
+    const missing = (resp.missing || []).length
+      ? `<div class="quote-meta mt-8">No data returned for: ${resp.missing.join(', ')}.</div>` : '';
+    el.innerHTML = cards ? cards + missing
+      : `<div class="card"><div class="quote-meta">No earnings data returned.</div></div>`;
+  }catch(err){
+    const msg = (err && err.message) ? err.message : 'Failed to load earnings.';
+    el.innerHTML = `<div class="notice danger"><span class="ic">!</span><div>${msg}</div></div>`;
+  }
+}
+loadEarnings();
+</script>
+</body>
+</html>

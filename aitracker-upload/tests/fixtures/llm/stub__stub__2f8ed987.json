@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"Nebius is adding GPU capacity in Europe.\", \"insights\": [{\"ticker\": \"NBIS\", \"move_pct\": 0.8, \"reason\": \"Nebius is adding GPU capacity in Europe.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

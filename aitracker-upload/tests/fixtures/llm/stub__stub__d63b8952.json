@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"Around $4.45 trillion.\", \"insights\": [{\"ticker\": \"NVDA\", \"move_pct\": 3.2, \"reason\": \"NVIDIA announced a new data center GPU.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

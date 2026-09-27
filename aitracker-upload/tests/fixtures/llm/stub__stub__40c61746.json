@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"NVIDIA, Nebius, Digi Power X, Microsoft, Meta, and Broadcom are tracked.\", \"insights\": [{\"ticker\": \"NVDA\", \"move_pct\": 3.2, \"reason\": \"Moved +3.2%.\"}, {\"ticker\": \"MSFT\", \"move_pct\": 0.5, \"reason\": \"Moved +0.5%.\"}, {\"ticker\": \"META\", \"move_pct\": 1.1, \"reason\": \"Moved +1.1%.\"}, {\"ticker\": \"AVGO\", \"move_pct\": 0.9, \"reason\": \"Moved +0.9%.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

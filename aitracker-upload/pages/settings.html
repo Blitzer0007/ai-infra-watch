@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html" class="active"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">System</div>
+      <h1>Settings</h1>
+      <p class="page-dek">Everything here is stored only in this browser's local storage. Nothing is sent to any server we control — your API key talks directly from your browser to Finnhub's API.</p>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Finnhub API key</div><div class="card-sub">Free tier: 60 calls/min, real-time US quotes via IEX</div></div>
+      </div>
+      <div class="field">
+        <label>API key</label>
+        <input type="password" id="s-key" placeholder="Paste your Finnhub API key">
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="saveKey()">Save key</button>
+        <button class="btn secondary" onclick="testKey()">Test connection</button>
+        <a class="btn secondary" href="https://finnhub.io/register" target="_blank" rel="noopener">Get a free key →</a>
+      </div>
+      <div id="key-test-result" class="mt-16"></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Watchlist symbols</div><div class="card-sub">Powers the ticker strip and quote checks across all pages</div></div>
+      </div>
+      <div class="field">
+        <label>Comma-separated tickers</label>
+        <input type="text" id="s-watchlist" placeholder="NVDA, NBIS, DGXX, MSFT, META, AVGO">
+      </div>
+      <button class="btn" onclick="saveWatchlist()">Save watchlist</button>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Refresh interval</div><div class="card-sub">How often the ticker re-fetches quotes</div></div>
+      </div>
+      <div class="field" style="max-width:240px">
+        <label>Seconds between refreshes (minimum 20)</label>
+        <input type="number" id="s-refresh" min="20" placeholder="60">
+      </div>
+      <button class="btn" onclick="saveRefresh()">Save</button>
+      <p class="faint mt-16" style="font-size:12px">Keep this conservative — the free Finnhub tier allows 60 calls/min total, shared across every symbol in your watchlist and every page you have open.</p>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Analyst backend URL</div><div class="card-sub">Base URL of the Python agent backend that powers "Ask the Analyst"</div></div>
+      </div>
+      <div class="field">
+        <label>Backend base URL</label>
+        <input type="text" id="s-backend" placeholder="http://localhost:8000">
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="saveBackend()">Save</button>
+        <button class="btn secondary" onclick="testBackend()">Test connection</button>
+      </div>
+      <div id="backend-test-result" class="mt-16"></div>
+      <p class="faint mt-16" style="font-size:12px">Run it locally with <span class="mono">uvicorn app.main:app --reload</span>. Unlike the Finnhub key, this is your own service — the Ask page POSTs your question to <span class="mono">/api/ask</span> and renders the routed answer.</p>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Local data</div><div class="card-sub">Everything this site has stored in this browser</div></div>
+      </div>
+      <div class="stat-line"><span class="k">Config</span><span class="v mono" id="data-config">—</span></div>
+      <div class="stat-line"><span class="k">Cached quotes</span><span class="v mono" id="data-cache">—</span></div>
+      <div class="stat-line"><span class="k">Watchlist rules</span><span class="v mono" id="data-alerts">—</span></div>
+      <button class="btn danger mt-16" onclick="clearAll()">Clear all local data</button>
+    </div>
+
+    <footer class="site-footer">
+      This site makes direct browser-to-Finnhub API calls using the key you provide. We have no server component and no visibility into your key, watchlist, or rules. Clearing your browser's local storage, or clicking "clear all local data" above, removes everything.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+function loadForm(){
+  const cfg = APP.loadConfig();
+  document.getElementById('s-key').value = cfg.finnhubKey || '';
+  document.getElementById('s-watchlist').value = cfg.watchlist.join(', ');
+  document.getElementById('s-refresh').value = cfg.refreshSeconds;
+  document.getElementById('s-backend').value = cfg.backendUrl || '';
+  refreshDataSummary();
+}
+
+function saveKey(){
+  const cfg = APP.loadConfig();
+  cfg.finnhubKey = document.getElementById('s-key').value.trim();
+  APP.saveConfig(cfg);
+  document.getElementById('key-test-result').innerHTML = `<div class="notice"><span class="ic">✓</span><div>Key saved locally. The ticker strip and other pages will use it on next load.</div></div>`;
+}
+
+async function testKey(){
+  const resEl = document.getElementById('key-test-result');
+  resEl.innerHTML = `<div class="empty-state">Testing…</div>`;
+  saveKey();
+  try{
+    const data = await APP.fetchQuote('AAPL');
+    resEl.innerHTML = `<div class="notice"><span class="ic">✓</span><div><strong>Connection works.</strong> AAPL quote returned: $${APP.fmtPrice(data.price)} (${APP.fmtPct(data.changePct)})</div></div>`;
+  }catch(err){
+    resEl.innerHTML = `<div class="notice danger"><span class="ic">!</span><div><strong>Connection failed:</strong> ${err.message || 'unknown error'}. Double check the key was copied correctly and your Finnhub account is active.</div></div>`;
+  }
+}
+
+function saveWatchlist(){
+  const cfg = APP.loadConfig();
+  const raw = document.getElementById('s-watchlist').value;
+  cfg.watchlist = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  APP.saveConfig(cfg);
+  refreshDataSummary();
+  APP.renderTicker();
+}
+
+function saveRefresh(){
+  const cfg = APP.loadConfig();
+  const val = parseInt(document.getElementById('s-refresh').value, 10);
+  cfg.refreshSeconds = isNaN(val) ? 60 : Math.max(20, val);
+  APP.saveConfig(cfg);
+  document.getElementById('s-refresh').value = cfg.refreshSeconds;
+}
+
+function saveBackend(){
+  const cfg = APP.loadConfig();
+  const raw = document.getElementById('s-backend').value.trim();
+  cfg.backendUrl = raw.replace(/\/+$/, '') || 'http://localhost:8000';
+  APP.saveConfig(cfg);
+  document.getElementById('s-backend').value = cfg.backendUrl;
+  document.getElementById('backend-test-result').innerHTML = `<div class="notice"><span class="ic">✓</span><div>Backend URL saved. The Ask the Analyst page will use it.</div></div>`;
+}
+
+async function testBackend(){
+  const resEl = document.getElementById('backend-test-result');
+  resEl.innerHTML = `<div class="empty-state">Testing…</div>`;
+  saveBackend();
+  try{
+    const data = await APP.askAgent('How did the watchlist move today?');
+    resEl.innerHTML = `<div class="notice"><span class="ic">✓</span><div><strong>Backend reachable.</strong> A test question routed to <span class="mono">${data.route}</span> and returned ${data.ok ? 'a result' : 'a response'}.</div></div>`;
+  }catch(err){
+    resEl.innerHTML = `<div class="notice danger"><span class="ic">!</span><div><strong>Connection failed:</strong> ${err.message || 'unknown error'}</div></div>`;
+  }
+}
+
+function refreshDataSummary(){
+  const cfg = APP.loadConfig();
+  const cache = APP.getCache();
+  const alerts = APP.loadAlerts();
+  document.getElementById('data-config').textContent = cfg.finnhubKey ? 'key set, ' + cfg.watchlist.length + ' symbols' : 'no key set';
+  document.getElementById('data-cache').textContent = Object.keys(cache).length + ' symbols cached';
+  document.getElementById('data-alerts').textContent = alerts.length + ' rules';
+}
+
+function clearAll(){
+  if(!confirm('This clears your API key, watchlist, cached quotes, and all logged data on every page. Continue?')) return;
+  localStorage.clear();
+  loadForm();
+  alert('Local data cleared.');
+}
+
+loadForm();
+</script>
+</body>
+</html>

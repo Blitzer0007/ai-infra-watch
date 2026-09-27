@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "description": "Curated AI-stock universe for ai-infra-watch. The enumerable set of names the Ingest Agent (Phase 3.5) fetches filings for and the Rotation Detector (Phase 3.6) resolves bucket membership from. 'All AI stocks' has no ticker flag, so membership is an explicit curated list. Provenance: hand-curated from the well-known AI-sector names across three buckets (index-style seed of semis/compute for hardware + AI/software leaders for application + data-center/power/neocloud for infra); the Ingest Agent may refresh/expand this live later. CIK is intentionally omitted here — it is resolved authoritatively at ingest time from EDGAR company_tickers.json rather than hardcoded.",
+  "buckets": ["ai_hardware", "ai_application", "ai_infra"],
+  "stocks": [
+    {"symbol": "NVDA", "name": "NVIDIA Corporation", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": true, "in_corpus": true},
+    {"symbol": "AVGO", "name": "Broadcom Inc.", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": true, "in_corpus": true},
+    {"symbol": "AMD", "name": "Advanced Micro Devices, Inc.", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "TSM", "name": "Taiwan Semiconductor Manufacturing Company Limited", "exchange": "NYSE", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "MU", "name": "Micron Technology, Inc.", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "ARM", "name": "Arm Holdings plc", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "MRVL", "name": "Marvell Technology, Inc.", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "QCOM", "name": "QUALCOMM Incorporated", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "INTC", "name": "Intel Corporation", "exchange": "NASDAQ", "bucket": "ai_hardware", "source": "curated", "in_watchlist": false, "in_corpus": false},
+
+    {"symbol": "MSFT", "name": "Microsoft Corporation", "exchange": "NASDAQ", "bucket": "ai_application", "source": "curated", "in_watchlist": true, "in_corpus": true},
+    {"symbol": "META", "name": "Meta Platforms, Inc.", "exchange": "NASDAQ", "bucket": "ai_application", "source": "curated", "in_watchlist": true, "in_corpus": true},
+    {"symbol": "GOOGL", "name": "Alphabet Inc.", "exchange": "NASDAQ", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "PLTR", "name": "Palantir Technologies Inc.", "exchange": "NASDAQ", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "CRM", "name": "Salesforce, Inc.", "exchange": "NYSE", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "NOW", "name": "ServiceNow, Inc.", "exchange": "NYSE", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "ADBE", "name": "Adobe Inc.", "exchange": "NASDAQ", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "SNOW", "name": "Snowflake Inc.", "exchange": "NYSE", "bucket": "ai_application", "source": "curated", "in_watchlist": false, "in_corpus": false},
+
+    {"symbol": "NBIS", "name": "Nebius Group N.V.", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": true, "in_corpus": false},
+    {"symbol": "DGXX", "name": "Digi Power X Inc.", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": true, "in_corpus": false},
+    {"symbol": "AMZN", "name": "Amazon.com, Inc.", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "ORCL", "name": "Oracle Corporation", "exchange": "NYSE", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "VRT", "name": "Vertiv Holdings Co", "exchange": "NYSE", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "EQIX", "name": "Equinix, Inc.", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "DLR", "name": "Digital Realty Trust, Inc.", "exchange": "NYSE", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "CEG", "name": "Constellation Energy Corporation", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false},
+    {"symbol": "SMCI", "name": "Super Micro Computer, Inc.", "exchange": "NASDAQ", "bucket": "ai_infra", "source": "curated", "in_watchlist": false, "in_corpus": false}
+  ]
+}

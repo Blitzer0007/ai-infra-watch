@@ -1,0 +1,52 @@
+# ============================================================
+# ai-infra-watch backend — RAG + MCP + agents stack
+# ------------------------------------------------------------
+# The heavy dependencies for the roadmap's later phases:
+#   - RAG over SEC filings (Chroma + embeddings + rerank)
+#   - MCP servers (stdio transport)
+#   - LangGraph multi-agent orchestration
+#   - RAGAS continuous evaluation
+#
+# Install AFTER the core set, deliberately (pulls torch, ~2GB+):
+#
+#     pip install -r requirements.txt
+#     pip install -r requirements-rag.txt
+#
+# Then set EVAL_EMBEDDING_MODEL=all-MiniLM-L6-v2 to switch the
+# assertion layer from lexical fallback to real embeddings.
+# ============================================================
+
+# --- ingestion (SEC filings / earnings-call PDFs) --------------------
+pypdf>=4.2
+pdfplumber>=0.11
+
+# --- chunking / retrieval --------------------------------------------
+# BM25 lexical retriever for the hybrid (BM25 + vector) + RRF fusion.
+rank-bm25>=0.2.2
+
+# --- embeddings + vector store ---------------------------------------
+# sentence-transformers pulls torch (~2GB). all-MiniLM-L6-v2 for
+# embeddings; a cross-encoder (ms-marco-MiniLM) for re-ranking.
+sentence-transformers>=2.7
+# chromadb is intentionally NOT installed: its native index
+# (chroma-hnswlib, a C++ extension) has no prebuilt wheel on Windows and
+# needs an MSVC toolchain to build from source. The RAG layer ships a
+# pure-Python `MemoryVectorStore` (app/rag/vector_store.py) instead, so
+# nothing imports chromadb. Re-enable ONLY on a host with a C++ compiler
+# if you later swap in the Chroma-backed VectorStore:
+# chromadb>=0.5,<0.6
+
+# --- evaluation ------------------------------------------------------
+# RAGAS: faithfulness / answer-relevance / context-precision / recall.
+# Pinned loosely; RAGAS pulls datasets + a langchain core.
+ragas>=0.2
+
+# --- MCP servers (stdio transport) -----------------------------------
+mcp>=1.2
+
+# --- multi-agent orchestration ---------------------------------------
+langgraph>=0.2
+langchain-core>=0.3
+
+# --- dashboard (observability) ---------------------------------------
+streamlit>=1.37

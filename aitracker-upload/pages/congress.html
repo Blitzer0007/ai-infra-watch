@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Congress Trades — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 04 / Signals</div>
+      <h1>Congressional stock trading tracker</h1>
+      <p class="page-dek">Members of Congress must disclose personal stock trades within 45 days under the STOCK Act. This isn't insider information — it's public, lagging, and dollar-range only — but it's a real, free, and legal data feed people watch (the "Pelosi tracker" pattern).</p>
+    </div>
+
+    <div class="notice mt-16">
+      <span class="ic">i</span>
+      <div><strong>Good to know before you read this as a signal:</strong> disclosures lag the actual trade by up to 45 days, amounts are reported as ranges (not exact dollar figures) not precise numbers, and a member's trade may be made by a spouse or through a blind trust they don't actively direct. None of this is real-time and none of it is advice to mirror.</div>
+    </div>
+
+    <div class="grid grid-2 mt-24">
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">Live source: Capitol Trades</div><div class="card-sub">Free, no signup, aggregates House + Senate filings</div></div>
+          <span class="fresh manual"><span class="dot"></span>external site</span>
+        </div>
+        <p class="muted" style="font-size:13px">The most usable free aggregator for this data — normalizes PDF disclosures into a searchable table with ticker, party, transaction type, and filing date filters.</p>
+        <a class="btn mt-16" style="display:inline-block" href="https://www.capitoltrades.com/trades" target="_blank" rel="noopener">Open Capitol Trades →</a>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">Primary source: official filings</div><div class="card-sub">No aggregation, no normalization — the raw record</div></div>
+          <span class="fresh manual"><span class="dot"></span>external site</span>
+        </div>
+        <p class="muted" style="font-size:13px">For verifying anything you see aggregated elsewhere. Slower to use, but it's the actual government record.</p>
+        <div class="mt-16" style="display:flex; gap:10px; flex-wrap:wrap">
+          <a class="btn secondary" href="https://efdsearch.senate.gov/search/" target="_blank" rel="noopener">Senate eFD search →</a>
+          <a class="btn secondary" href="https://disclosures-clerk.house.gov/PublicDisclosure/FinancialDisclosure" target="_blank" rel="noopener">House disclosures →</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Optional: pull data into this page</div><div class="card-sub">Financial Modeling Prep offers a free-tier (250 calls/day) Senate &amp; House trading API</div></div>
+      </div>
+      <p class="muted" style="font-size:13px">If you want disclosures to render directly on this page instead of linking out, add a free Financial Modeling Prep API key below. This is optional — the links above work with zero setup.</p>
+      <div class="grid grid-2">
+        <div class="field"><label>FMP API key (optional)</label><input type="password" id="fmp-key" placeholder="Paste key, stored locally only"></div>
+        <div class="field" style="align-self:end"><button class="btn secondary" onclick="saveFmpKey()">Save key</button></div>
+      </div>
+      <div id="fmp-status" class="faint" style="font-size:12px"></div>
+      <div id="fmp-results" class="mt-16"></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Your watchlist: trades involving AI infra names</div><div class="card-sub">Manually logged — paste in anything notable you find via the links above</div></div>
+      </div>
+      <div class="grid grid-3">
+        <div class="field"><label>Member name</label><input type="text" id="ct-name" placeholder="e.g. N. Pelosi"></div>
+        <div class="field"><label>Ticker</label><input type="text" id="ct-ticker" placeholder="e.g. NVDA"></div>
+        <div class="field"><label>Type</label>
+          <select id="ct-type"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div class="field"><label>Filed date</label><input type="text" id="ct-date" placeholder="YYYY-MM-DD"></div>
+        <div class="field"><label>Amount range</label><input type="text" id="ct-amount" placeholder="e.g. $250,001–$500,000"></div>
+      </div>
+      <button class="btn" onclick="addTrade()">Log trade</button>
+      <table class="mt-24" id="ct-table">
+        <thead><tr><th>Member</th><th>Ticker</th><th>Type</th><th>Filed</th><th>Amount range</th><th></th></tr></thead>
+        <tbody id="ct-body"></tbody>
+      </table>
+      <div id="ct-empty" class="empty-state" style="display:none">No trades logged yet. Browse Capitol Trades above and log anything relevant to NVDA, NBIS, DGXX, or other AI infra names.</div>
+    </div>
+
+    <footer class="site-footer">
+      Congressional trade disclosures are public record under the STOCK Act of 2012. Amounts are disclosed as ranges, not exact figures, and filings may lag the actual transaction date by up to 45 days. This page does not suggest mirroring any disclosed trade — past congressional trading performance, where reported by third parties, is not a reliable predictor of future returns and is not investment advice.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const CT_KEY = 'aiw_congress_trades_v1';
+function loadCT(){ try{ return JSON.parse(localStorage.getItem(CT_KEY) || '[]'); }catch(e){ return []; } }
+function saveCT(l){ localStorage.setItem(CT_KEY, JSON.stringify(l)); }
+
+function addTrade(){
+  const name = document.getElementById('ct-name').value.trim();
+  const ticker = document.getElementById('ct-ticker').value.trim().toUpperCase();
+  const type = document.getElementById('ct-type').value;
+  const date = document.getElementById('ct-date').value.trim();
+  const amount = document.getElementById('ct-amount').value.trim();
+  if(!name || !ticker){ alert('Member name and ticker are required.'); return; }
+  const list = loadCT();
+  list.unshift({ name, ticker, type, date, amount, id: Date.now() });
+  saveCT(list);
+  ['ct-name','ct-ticker','ct-date','ct-amount'].forEach(id => document.getElementById(id).value = '');
+  renderCT();
+}
+function removeTrade(id){ saveCT(loadCT().filter(t => t.id !== id)); renderCT(); }
+
+function renderCT(){
+  const list = loadCT();
+  document.getElementById('ct-empty').style.display = list.length ? 'none' : 'block';
+  document.getElementById('ct-body').innerHTML = list.map(t => `
+    <tr>
+      <td>${t.name}</td>
+      <td class="mono">${t.ticker}</td>
+      <td><span class="badge ${t.type === 'buy' ? 'badge-buy' : 'badge-sell'}">${t.type.toUpperCase()}</span></td>
+      <td class="mono">${t.date || '—'}</td>
+      <td>${t.amount || '—'}</td>
+      <td><button class="btn secondary" style="padding:3px 9px;font-size:11px" onclick="removeTrade(${t.id})">×</button></td>
+    </tr>
+  `).join('');
+}
+renderCT();
+
+/* optional FMP integration */
+function saveFmpKey(){
+  const key = document.getElementById('fmp-key').value.trim();
+  localStorage.setItem('aiw_fmp_key', key);
+  document.getElementById('fmp-status').textContent = key ? 'Key saved locally. Reload to fetch.' : 'Key cleared.';
+  if(key) fetchFmpSenate(key);
+}
+
+async function fetchFmpSenate(key){
+  const el = document.getElementById('fmp-results');
+  el.innerHTML = '<div class="empty-state">Loading…</div>';
+  try{
+    const res = await fetch(`https://financialmodelingprep.com/stable/senate-latest?apikey=${key}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if(!Array.isArray(data) || data.length === 0){
+      el.innerHTML = '<div class="empty-state">No data returned. Check your API key or FMP plan limits.</div>';
+      return;
+    }
+    const watchSymbols = ['NVDA','NBIS','DGXX','MSFT','META','AVGO'];
+    const relevant = data.filter(d => watchSymbols.includes((d.symbol||'').toUpperCase()));
+    const rows = (relevant.length ? relevant : data.slice(0,15));
+    el.innerHTML = `<table><thead><tr><th>Senator</th><th>Ticker</th><th>Type</th><th>Date</th></tr></thead><tbody>` +
+      rows.map(d => `<tr><td>${d.senator || d.representative || '—'}</td><td class="mono">${d.symbol || '—'}</td><td>${d.type || '—'}</td><td class="mono">${d.transactionDate || d.dateRecieved || '—'}</td></tr>`).join('') +
+      `</tbody></table>`;
+  }catch(err){
+    el.innerHTML = `<div class="empty-state">Could not load FMP data (${err.message}). This endpoint path may have changed — check financialmodelingprep.com/developer/docs for the current Senate trading route.</div>`;
+  }
+}
+
+(function initFmp(){
+  const saved = localStorage.getItem('aiw_fmp_key');
+  if(saved){
+    document.getElementById('fmp-key').value = saved;
+    fetchFmpSenate(saved);
+  }
+})();
+</script>
+</body>
+</html>

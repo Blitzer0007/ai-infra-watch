@@ -1,0 +1,9 @@
+# Default watchlist tracked by the dashboard (js/core.js) plus the
+# universe of symbols the eval suite is allowed to mention.
+symbol,name,exchange
+NVDA,NVIDIA Corporation,NASDAQ
+NBIS,Nebius Group,NYSE
+DGXX,Digi Power X Inc.,NASDAQ
+MSFT,Microsoft Corporation,NASDAQ
+META,Meta Platforms Inc.,NASDAQ
+AVGO,Broadcom Inc.,NASDAQ

@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"Broadcom rose modestly amid steady AI chip demand.\", \"insights\": [{\"ticker\": \"AVGO\", \"move_pct\": 0.9, \"reason\": \"Broadcom sees steady AI chip demand.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

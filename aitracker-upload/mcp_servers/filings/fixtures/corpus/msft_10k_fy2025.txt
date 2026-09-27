@@ -1,0 +1,12 @@
+MICROSOFT CORPORATION — FORM 10-K (Fiscal Year 2025 Excerpt)
+
+Item 1. Business.
+Microsoft develops and supports software, services, devices, and solutions. Our segments are Productivity and Business Processes, Intelligent Cloud, and More Personal Computing. The Intelligent Cloud segment includes Azure and other cloud services, server products, and enterprise services.
+
+Item 7. Management's Discussion and Analysis.
+Microsoft Cloud revenue was 137 billion dollars for fiscal 2025, up 23 percent year over year. Azure and other cloud services revenue grew 30 percent, with AI services contributing approximately 12 percentage points of that growth as customers adopted Azure OpenAI Service and Copilot offerings. Total company revenue was 270 billion dollars. Operating income increased 24 percent.
+
+We continued to invest heavily in AI infrastructure, increasing capital expenditures to expand data center capacity for training and inference workloads. Our partnership with OpenAI remains central to our AI strategy. Commercial bookings grew driven by large, long-term Azure commitments.
+
+Item 1A. Risk Factors.
+The significant capital expenditures required to build AI data center capacity may not generate returns that justify the investment if demand for AI services does not materialize as expected. We face intense competition in cloud computing from other hyperscale providers. Our reliance on third-party chip suppliers for AI accelerators exposes us to supply constraints and pricing pressure.

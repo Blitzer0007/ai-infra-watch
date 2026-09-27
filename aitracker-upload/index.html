@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overview — AI Infra Watch</title>
+<link rel="stylesheet" href="css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="index.html"><span class="num">01</span>Overview</a>
+      <a href="pages/contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="pages/tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="pages/congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="pages/macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="pages/watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="pages/ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="pages/settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 01 / Markets</div>
+      <h1>AI infrastructure stocks, at a glance</h1>
+      <p class="page-dek">Live quotes for NVIDIA and two AI neoclouds at very different scale — Nebius and the much smaller Digi Power X. Powered by your own Finnhub API key, nothing is hardcoded.</p>
+    </div>
+
+    <div id="key-notice"></div>
+
+    <div class="grid grid-3 mt-24" id="quote-cards">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Interactive Supply Chain & Contracts flowchart -->
+    <div class="card mt-24">
+      <div class="card-head flex-between">
+        <div>
+          <div class="card-title">Interactive AI Infrastructure Supply Chain</div>
+          <div class="card-sub">Trace capital and hardware flow. Click any node or connection line to inspect details. ★ marks each company's biggest market-moving contract.</div>
+        </div>
+        <div class="flowchart-filters">
+          <button class="btn secondary active" onclick="setFlowFilter('all')">All Flows</button>
+          <button class="btn secondary" onclick="setFlowFilter('hardware')">Silicon &amp; Hardware</button>
+          <button class="btn secondary" onclick="setFlowFilter('cloud')">Cloud &amp; Compute</button>
+          <button class="btn secondary" onclick="setFlowFilter('enterprise')">Enterprise AI</button>
+        </div>
+      </div>
+
+      <div class="flowchart-container">
+        <!-- Flowchart visual (SVG) -->
+        <div class="flowchart-visual">
+          <svg viewBox="0 0 640 420" width="100%" height="100%" id="flowchart-svg">
+            <defs>
+              <pattern id="flow-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M 32 0 L 0 0 0 32" class="flow-grid-line"></path>
+              </pattern>
+              <linearGradient id="flow-panel-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4FD1C5" stop-opacity="0.12"></stop>
+                <stop offset="46%" stop-color="#E8A33D" stop-opacity="0.05"></stop>
+                <stop offset="100%" stop-color="#D1495B" stop-opacity="0.09"></stop>
+              </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" width="640" height="420" class="flow-bg"></rect>
+            <rect x="0" y="0" width="640" height="420" fill="url(#flow-grid)" opacity="0.55"></rect>
+            <rect x="8" y="8" width="624" height="404" rx="10" fill="url(#flow-panel-glow)" opacity="0.75"></rect>
+
+            <g class="flow-layer-labels">
+              <text x="22" y="16">Components</text>
+              <text x="372" y="16">AI chips</text>
+              <text x="22" y="108">GPU hosts</text>
+              <text x="22" y="208">Cloud buyers</text>
+              <text x="22" y="318">AI customers</text>
+            </g>
+
+            <!-- Connecting lines (flow paths) -->
+            <!-- Component Layer to Chip Designers -->
+            <path d="M 100 42 Q 235 42 370 47" class="flow-line line-mu line-nvda" id="path-mu-nvda" onclick="selectNode('nvda')"></path>
+            <path d="M 100 42 Q 305 10 510 47" class="flow-line line-mu line-amd" id="path-mu-amd" onclick="selectNode('amd')"></path>
+            <path d="M 200 42 L 370 47" class="flow-line line-sndk line-nvda" id="path-sndk-nvda" onclick="selectNode('nvda')"></path>
+            <path d="M 200 42 Q 355 20 510 47" class="flow-line line-sndk line-amd" id="path-sndk-amd" onclick="selectNode('amd')"></path>
+            <path d="M 300 42 L 370 47" class="flow-line line-ampg line-nvda" id="path-ampg-nvda" onclick="selectNode('nvda')"></path>
+            <path d="M 300 42 L 510 47" class="flow-line line-ampg line-amd" id="path-ampg-amd" onclick="selectNode('amd')"></path>
+
+            <!-- Chip Designers to Neoclouds -->
+            <path d="M 420 75 Q 312 97 205 120" class="flow-line line-nvda line-nbis" id="path-nvda-nbis" onclick="selectNode('nbis')"></path>
+            <path d="M 420 75 L 435 120" class="flow-line line-nvda line-dgxx" id="path-nvda-dgxx" onclick="selectNode('dgxx')"></path>
+            <path d="M 560 75 Q 382 97 205 120" class="flow-line line-amd line-nbis" id="path-amd-nbis" onclick="selectNode('nbis')"></path>
+            <path d="M 560 75 Q 497 97 435 120" class="flow-line line-amd line-dgxx" id="path-amd-dgxx" onclick="selectNode('dgxx')"></path>
+
+            <!-- Neoclouds to Platforms / Customers -->
+            <path d="M 205 175 L 95 220" class="flow-line line-nbis line-meta" id="path-nbis-meta" onclick="selectNode('meta')"></path>
+            <path d="M 205 175 L 315 220" class="flow-line line-nbis line-msft" id="path-nbis-msft" onclick="selectNode('msft')"></path>
+            <path d="M 435 175 L 315 220" class="flow-line line-dgxx line-msft" id="path-dgxx-msft" onclick="selectNode('msft')"></path>
+            <path d="M 435 175 L 545 220" class="flow-line line-dgxx line-goog" id="path-dgxx-goog" onclick="selectNode('goog')"></path>
+
+            <!-- Neoclouds to direct customers -->
+            <path d="M 435 175 Q 265 240 95 330" class="flow-line line-dgxx line-cere" id="path-dgxx-cere" onclick="selectNode('cere')"></path>
+            <path d="M 435 175 Q 490 252 545 330" class="flow-line line-dgxx line-subq" id="path-dgxx-subq" onclick="selectNode('subq')"></path>
+
+            <!-- Platforms to Applications -->
+            <path d="M 315 270 L 315 330" class="flow-line line-msft line-now" id="path-msft-now" onclick="selectNode('now')"></path>
+            <path d="M 545 270 Q 432 300 320 330" class="flow-line line-goog line-now" id="path-goog-now" onclick="selectNode('now')"></path>
+
+            <!-- Nodes -->
+            <!-- Micron -->
+            <g class="node node-mu" id="node-mu" onclick="selectNode('mu')">
+              <rect x="20" y="20" width="80" height="45" rx="4" class="node-rect"></rect>
+              <text x="60" y="47" class="node-title">Micron</text>
+            </g>
+
+            <!-- SanDisk -->
+            <g class="node node-sndk" id="node-sndk" onclick="selectNode('sndk')">
+              <rect x="120" y="20" width="80" height="45" rx="4" class="node-rect"></rect>
+              <text x="160" y="47" class="node-title">SanDisk</text>
+            </g>
+
+            <!-- AMPG -->
+            <g class="node node-ampg" id="node-ampg" onclick="selectNode('ampg')">
+              <rect x="220" y="20" width="80" height="45" rx="4" class="node-rect"></rect>
+              <text x="260" y="47" class="node-title">AMPG</text>
+            </g>
+
+            <!-- NVIDIA -->
+            <g class="node node-nvda" id="node-nvda" onclick="selectNode('nvda')">
+              <rect x="370" y="20" width="100" height="55" rx="4" class="node-rect"></rect>
+              <text x="420" y="48" class="node-title">NVIDIA</text>
+              <text x="420" y="65" class="node-sub">GPUs</text>
+            </g>
+
+            <!-- AMD -->
+            <g class="node node-amd" id="node-amd" onclick="selectNode('amd')">
+              <rect x="510" y="20" width="100" height="55" rx="4" class="node-rect"></rect>
+              <text x="560" y="48" class="node-title">AMD</text>
+              <text x="560" y="65" class="node-sub">CPUs/GPUs</text>
+            </g>
+
+            <!-- Nebius -->
+            <g class="node node-nbis" id="node-nbis" onclick="selectNode('nbis')">
+              <rect x="140" y="120" width="130" height="55" rx="4" class="node-rect"></rect>
+              <text x="205" y="143" class="node-title">Nebius ★</text>
+              <text x="205" y="160" class="node-sub">Large Neocloud</text>
+            </g>
+
+            <!-- Digi Power X -->
+            <g class="node node-dgxx" id="node-dgxx" onclick="selectNode('dgxx')">
+              <rect x="370" y="120" width="130" height="55" rx="4" class="node-rect"></rect>
+              <text x="435" y="143" class="node-title">Digi Power X ★</text>
+              <text x="435" y="160" class="node-sub">Small Neocloud</text>
+            </g>
+
+            <!-- Meta -->
+            <g class="node node-customer node-meta" id="node-meta" onclick="selectNode('meta')">
+              <rect x="40" y="220" width="110" height="50" rx="4" class="node-rect"></rect>
+              <text x="95" y="249" class="node-title">Meta</text>
+            </g>
+
+            <!-- Microsoft -->
+            <g class="node node-customer node-msft" id="node-msft" onclick="selectNode('msft')">
+              <rect x="260" y="220" width="110" height="50" rx="4" class="node-rect"></rect>
+              <text x="315" y="249" class="node-title">Microsoft</text>
+            </g>
+
+            <!-- Google -->
+            <g class="node node-customer node-goog" id="node-goog" onclick="selectNode('goog')">
+              <rect x="490" y="220" width="110" height="50" rx="4" class="node-rect"></rect>
+              <text x="545" y="249" class="node-title">Google</text>
+            </g>
+
+            <!-- Cerebras -->
+            <g class="node node-customer node-cere" id="node-cere" onclick="selectNode('cere')">
+              <rect x="40" y="330" width="110" height="50" rx="4" class="node-rect"></rect>
+              <text x="95" y="359" class="node-title">Cerebras ★</text>
+            </g>
+
+            <!-- ServiceNow -->
+            <g class="node node-customer node-now" id="node-now" onclick="selectNode('now')">
+              <rect x="260" y="330" width="120" height="50" rx="4" class="node-rect"></rect>
+              <text x="320" y="359" class="node-title">ServiceNow</text>
+            </g>
+
+            <!-- SubQ AI -->
+            <g class="node node-customer node-subq" id="node-subq" onclick="selectNode('subq')">
+              <rect x="490" y="330" width="110" height="50" rx="4" class="node-rect"></rect>
+              <text x="545" y="359" class="node-title">SubQ AI</text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Dynamic Details Panel -->
+        <div class="flowchart-details" id="flowchart-details">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2 mt-24">
+      <div class="card">
+        <div class="section-title">Recent headlines</div>
+        <div id="news-feed">
+          <div class="empty-state">Add an API key in Settings to pull live headlines.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">What to check next</div>
+        <div class="stat-line"><span class="k">Contract pipeline</span><span class="v"><a href="pages/contracts.html" style="color:var(--amber)">View contracts →</a></span></div>
+        <div class="stat-line"><span class="k">Build-out milestones</span><span class="v"><a href="pages/tracker.html" style="color:var(--amber)">View tracker →</a></span></div>
+        <div class="stat-line"><span class="k">Who in Congress is trading</span><span class="v"><a href="pages/congress.html" style="color:var(--amber)">View trades →</a></span></div>
+        <div class="stat-line"><span class="k">Macro / geopolitical risk</span><span class="v"><a href="pages/macro.html" style="color:var(--amber)">View macro →</a></span></div>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Data, where live, comes from Finnhub's free API tier using a key you provide and store only in your browser's local storage — nothing is sent to any server we control. This site does not give investment advice and the watchlist/alert tools reflect rules you configure yourself, not recommendations. Markets involve risk; do your own research.
+    </footer>
+  </main>
+</div>
+
+<script src="js/core.js"></script>
+<script>
+async function renderOverview(){
+  const cfg = APP.loadConfig();
+  const noticeEl = document.getElementById('key-notice');
+  const cardsEl = document.getElementById('quote-cards');
+
+  if(!cfg.finnhubKey){
+    noticeEl.innerHTML = `
+      <div class="notice">
+        <span class="ic">!</span>
+        <div><strong>No API key configured.</strong> Quotes below are placeholders. Go to <a href="pages/settings.html" style="color:var(--amber)">Settings</a> and add a free Finnhub API key (60 calls/min free tier) to light up live prices.</div>
+      </div>`;
+  } else {
+    noticeEl.innerHTML = '';
+  }
+
+  const symbols = cfg.watchlist && cfg.watchlist.length > 0 ? cfg.watchlist : ['NVDA','NBIS','DGXX'];
+  const labels = {
+    NVDA: 'NVIDIA Corp',
+    NBIS: 'Nebius Group N.V.',
+    DGXX: 'Digi Power X Inc.',
+    MSFT: 'Microsoft Corp',
+    META: 'Meta Platforms Inc.',
+    AVGO: 'Broadcom Inc.',
+    AMZN: 'Amazon.com Inc.',
+    GOOGL: 'Alphabet Inc.',
+    GOOG: 'Alphabet Inc.',
+    AMD: 'Advanced Micro Devices',
+    MU: 'Micron Technology',
+    NOW: 'ServiceNow Inc.',
+    AMPG: 'AmpliTech Group'
+  };
+
+  cardsEl.innerHTML = symbols.map(s => quoteCardSkeleton(s, labels[s] || s)).join('');
+
+  if(!cfg.finnhubKey) return;
+
+  const results = await APP.fetchQuotes(symbols);
+  symbols.forEach(sym => {
+    const card = document.getElementById('card-' + sym);
+    if (!card) return;
+    const r = results[sym];
+    const label = labels[sym] || sym;
+    if(r.ok){
+      card.innerHTML = quoteCardBody(sym, label, r.data, APP.freshnessBadge('live', 'live'));
+    } else if(r.cached){
+      card.innerHTML = quoteCardBody(sym, label, r.cached, APP.freshnessBadge('stale', APP.timeAgo(r.cached._ts)));
+    } else {
+      card.innerHTML = quoteCardError(sym, label, r.error);
+    }
+  });
+
+  renderNews(cfg);
+}
+
+function quoteCardSkeleton(sym, label){
+  return `<div class="card" id="card-${sym}">
+    <div class="card-head">
+      <div><div class="card-title">${label}</div><div class="card-sub mono">${sym}</div></div>
+      ${APP.freshnessBadge('stale','loading…')}
+    </div>
+    <div class="quote-price faint">— . —</div>
+  </div>`;
+}
+
+function quoteCardBody(sym, label, d, badgeHtml){
+  const dir = d.changePct >= 0 ? 'up' : 'down';
+  return `
+    <div class="card-head">
+      <div><div class="card-title">${label}</div><div class="card-sub mono">${sym}</div></div>
+      ${badgeHtml}
+    </div>
+    <div class="quote-row">
+      <span class="quote-price">$${APP.fmtPrice(d.price)}</span>
+      <span class="quote-delta ${dir}">${dir==='up'?'▲':'▼'} ${APP.fmtPct(d.changePct)}</span>
+    </div>
+    <div class="quote-meta">Day range $${APP.fmtPrice(d.low)} – $${APP.fmtPrice(d.high)} · Prev close $${APP.fmtPrice(d.prevClose)}</div>
+  `;
+}
+
+function quoteCardError(sym, label, err){
+  const msg = err && err.message ? err.message : 'Unknown error';
+  return `
+    <div class="card-head">
+      <div><div class="card-title">${label}</div><div class="card-sub mono">${sym}</div></div>
+      ${APP.freshnessBadge('error','error')}
+    </div>
+    <div class="muted" style="font-size:13px">${msg}</div>
+  `;
+}
+
+async function renderNews(cfg){
+  const el = document.getElementById('news-feed');
+  if(!cfg.finnhubKey) return;
+  try{
+    const to = new Date();
+    const from = new Date(Date.now() - 7*24*3600*1000);
+    const iso = d => d.toISOString().slice(0,10);
+    const items = await APP.fetchCompanyNews('NBIS', iso(from), iso(to));
+    if(!items || items.length === 0){
+      el.innerHTML = '<div class="empty-state">No recent headlines returned.</div>';
+      return;
+    }
+    el.innerHTML = items.slice(0,6).map(n => `
+      <div class="stat-line" style="display:block">
+        <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--text)">${n.headline}</a>
+        <div class="faint" style="font-size:11px;margin-top:3px">${n.source} · ${new Date(n.datetime*1000).toLocaleDateString()}</div>
+      </div>
+    `).join('');
+  }catch(err){
+    el.innerHTML = `<div class="empty-state">Could not load headlines (${err.message || 'error'}).</div>`;
+  }
+}
+
+// Interactive flowchart relationship mapping
+const graphRelations = {
+  mu: { up: [], down: ['nvda', 'amd'] },
+  sndk: { up: [], down: ['nvda', 'amd'] },
+  ampg: { up: [], down: ['nvda', 'amd'] },
+  nvda: { up: ['mu', 'sndk', 'ampg'], down: ['nbis', 'dgxx'] },
+  amd: { up: ['mu', 'sndk', 'ampg'], down: ['nbis', 'dgxx'] },
+  nbis: { up: ['nvda', 'amd'], down: ['meta', 'msft'] },
+  dgxx: { up: ['nvda', 'amd'], down: ['msft', 'goog', 'cere', 'subq'] },
+  meta: { up: ['nbis'], down: [] },
+  msft: { up: ['nbis', 'dgxx'], down: ['now'] },
+  goog: { up: ['dgxx'], down: ['now'] },
+  now: { up: ['msft', 'goog'], down: [] },
+  cere: { up: ['dgxx'], down: [] },
+  subq: { up: ['dgxx'], down: [] }
+};
+
+// Interactive flowchart data
+const nodeData = {
+  all: {
+    title: "AI Infrastructure Supply Chain",
+    role: "The Computing Pipeline",
+    plain: "This interactive flowchart tracks how silicon chips, high-speed memory, storage, and signal amplifiers feed GPU design houses, which are hosted by neoclouds and cloud platforms to run software agents. Nodes marked ★ are each company's single biggest market-moving contract — click one to see why.",
+    metrics: [
+      { k: "Physical Hardware", v: "NVIDIA, AMD, Micron, SanDisk, AMPG" },
+      { k: "Infrastructure Hosts", v: "Nebius & Digi Power X" },
+      { k: "Enterprise Platforms", v: "Microsoft, Google, ServiceNow, Meta" }
+    ],
+    actionText: "View settings for live quotes",
+    actionLink: "pages/settings.html"
+  },
+  mu: {
+    title: "Micron Technology (MU)",
+    role: "High-Bandwidth Memory (HBM)",
+    plain: "Micron makes the ultra-fast memory used beside NVIDIA and AMD AI chips. In plain English: NVIDIA builds the brain that does the AI math, while Micron supplies the short-term memory that keeps that brain fed with data every split second. If the memory is too slow, even an expensive NVIDIA GPU has to wait around, so Micron becomes a key supplier whenever AI servers need more speed.",
+    metrics: [
+      { k: "Core Product", v: "HBM3E / DDR5 Memory" },
+      { k: "Key Downstream", v: "NVIDIA H200 & Blackwell, AMD MI300" },
+      { k: "AI Role", v: "Solves memory bandwidth bottleneck" }
+    ],
+    actionText: "Check Congress Trades",
+    actionLink: "pages/congress.html"
+  },
+  sndk: {
+    title: "SanDisk / Western Digital",
+    role: "High-Capacity Storage",
+    plain: "SanDisk provides the large SSD storage layer that holds the raw data before it reaches GPUs. In plain English: if NVIDIA GPUs are the engines and Micron is the fast memory near the engine, SanDisk is the warehouse full of books, images, video, and code that AI models learn from. Faster storage helps cloud operators keep expensive GPU clusters busy instead of waiting for data to load.",
+    metrics: [
+      { k: "Core Product", v: "PCIe Gen5 Enterprise SSDs" },
+      { k: "Capacity", v: "Up to 30.72TB per drive" },
+      { k: "AI Role", v: "Houses massive training sets" }
+    ],
+    actionText: "Check Congress Trades",
+    actionLink: "pages/congress.html"
+  },
+  ampg: {
+    title: "AmpliTech Group (AMPG)",
+    role: "5G/6G Radio Hardware — different layer than it looks",
+    plain: "AmpliTech's link to NVIDIA is real, but it's not the same kind of relationship as Micron or SanDisk. AmpliTech's radio hardware was the centerpiece of an NVIDIA AI-RAN demo at Northeastern University — that's about AI-managed 5G/6G cell-tower networks, not training GPUs inside a data center. There is no disclosed contract tying AmpliTech into the NVIDIA/AMD data-center supply chain shown on the rest of this chart. It's included here as a thematically-related AI stock, not a verified supplier to Nebius or Digi Power X.",
+    metrics: [
+      { k: "Verified link", v: "NVIDIA AI Aerial software demo (telecom radio, not GPUs)" },
+      { k: "Core Product", v: "O-RAN 64T64R Massive MIMO radios" },
+      { k: "Status", v: "Thematic AI stock — not a confirmed data-center supplier" }
+    ],
+    actionText: "View Overview live quotes",
+    actionLink: "index.html"
+  },
+  nvda: {
+    title: "NVIDIA Corp (NVDA)",
+    role: "Silicon & GPU Leader",
+    plain: "NVIDIA designs the AI GPUs that sit at the center of this whole chain. In plain English: NVIDIA sells the expensive engine that trains and runs AI models, but that engine needs Micron memory close by, SanDisk-style storage behind it, and cloud builders like Nebius or Digi Power X to turn the hardware into rentable computing power. When AI demand rises, many surrounding suppliers and hosts can benefit because they help make NVIDIA systems useful at scale.",
+    metrics: [
+      { k: "Strategic Investment", v: "$2.0B equity in Nebius" },
+      { k: "Core Platform", v: "Blackwell & Vera Rubin platforms" },
+      { k: "Partnership", v: "Supplies NBIS & DGXX platforms" }
+    ],
+    actionText: "View Overview live quotes",
+    actionLink: "index.html"
+  },
+  amd: {
+    title: "Advanced Micro Devices (AMD)",
+    role: "GPU & Processor Challenger",
+    plain: "AMD is the main public-market alternative to NVIDIA for AI accelerators. In plain English: if NVIDIA is the leading engine supplier, AMD is the rival engine maker trying to win cloud customers that want more choice, lower cost, or supply diversity. AMD also depends on fast memory, storage, and data-center hosts, so it connects to the same upstream component layer and downstream cloud buyers.",
+    metrics: [
+      { k: "Key Product", v: "Instinct MI300X AI Accelerator" },
+      { k: "Key Buyers", v: "Microsoft Azure, Google Cloud" },
+      { k: "Software Ecosystem", v: "ROCm (Open Source)" }
+    ],
+    actionText: "Check Overview live quotes",
+    actionLink: "index.html"
+  },
+  nbis: {
+    title: "Nebius Group N.V. (NBIS)",
+    role: "Large-Cap Neocloud",
+    plain: "Nebius buys high-end NVIDIA and AMD hardware, installs it in large data centers, and rents that computing power to big AI customers. In plain English: Nebius is like a landlord for AI supercomputers. Microsoft and Meta may need more GPU capacity than they can build quickly themselves, so Nebius packages NVIDIA-powered capacity and sells access under long contracts.",
+    metrics: [
+      { k: "★ Biggest mover", v: "Meta $27.0B deal — stock +14% same day" },
+      { k: "Microsoft Contract", v: "Up to $19.4B (5 years)" },
+      { k: "Disclosed Backlog", v: "$46B+ for 2027–2031" }
+    ],
+    actionText: "View Detailed Contracts Ledger",
+    actionLink: "pages/contracts.html"
+  },
+  dgxx: {
+    title: "Digi Power X Inc. (DGXX)",
+    role: "Small-Cap Neocloud / Host",
+    plain: "Digi Power X is trying to convert power assets and data-center sites into rentable AI compute. In plain English: the company wants to take electricity, land, and GPU hardware, then sell finished AI capacity to customers such as Cerebras and SubQ AI. It is much smaller and riskier than Nebius, but it sits in a similar middle layer between chip suppliers and AI users.",
+    metrics: [
+      { k: "★ Biggest mover", v: "Cerebras $2.5B deal — stock +29% same day" },
+      { k: "SubQ AI Contract", v: "$19.6M (24 months)" },
+      { k: "Revenue Guidance", v: "$250M–$300M for FY2027" }
+    ],
+    actionText: "View Build-out Milestones",
+    actionLink: "pages/tracker.html"
+  },
+  meta: {
+    title: "Meta Platforms (META)",
+    role: "AI Developer / Giant",
+    plain: "Meta is a huge end customer for AI compute. In plain English: Meta builds models such as Llama and needs enormous GPU farms to train them. Instead of relying only on its own data centers, Meta can lease NVIDIA-based capacity from Nebius, which turns hardware spending by companies like Nebius into AI model progress for Meta.",
+    metrics: [
+      { k: "Capacity Agreement", v: "Up to $27.0B (5 years)" },
+      { k: "Primary Hardware", v: "NVIDIA Vera Rubin Platform" },
+      { k: "Purpose", v: "Training open Llama models" }
+    ],
+    actionText: "Check Contracts Ledger",
+    actionLink: "pages/contracts.html"
+  },
+  msft: {
+    title: "Microsoft Corp (MSFT)",
+    role: "AI Customer & Platform",
+    plain: "Microsoft is both a buyer of AI capacity and a cloud platform that resells AI services through Azure. In plain English: Microsoft needs huge amounts of GPU power for OpenAI, Copilot, and Azure customers. When its own data centers are not enough, it can rent capacity from providers like Nebius or Digi Power X, then turn that compute into software and cloud revenue.",
+    metrics: [
+      { k: "Capacity Agreement", v: "Up to $19.4B (5 years)" },
+      { k: "Location", v: "Vineland, New Jersey" },
+      { k: "Purpose", v: "Scaling Azure AI workloads" }
+    ],
+    actionText: "Check Contracts Ledger",
+    actionLink: "pages/contracts.html"
+  },
+  goog: {
+    title: "Google LLC (GOOG)",
+    role: "AI Platform & Chipmaker",
+    plain: "Google uses both its own TPU chips and NVIDIA GPUs to power Gemini and Google Cloud AI services. In plain English: Google is one of the few companies that can build some of its own AI engines, but it still needs outside GPU capacity and partners when customer demand spikes. That links Google to GPU makers, neocloud hosts, and enterprise software companies using Google Cloud.",
+    metrics: [
+      { k: "Internal Chips", v: "TPU v5p & TPU v6 (Trillium)" },
+      { k: "Core Model", v: "Gemini 1.5 Pro & Ultra" },
+      { k: "Partnership", v: "Leases hardware from neoclouds" }
+    ],
+    actionText: "View Overview live quotes",
+    actionLink: "index.html"
+  },
+  now: {
+    title: "ServiceNow (NOW)",
+    role: "Enterprise GenAI Applications",
+    plain: "ServiceNow sells AI features inside everyday business workflows like IT tickets, HR tasks, and customer support. In plain English: ServiceNow is near the customer-facing end of the chain. It does not need to build NVIDIA servers itself; it relies on cloud platforms such as Microsoft Azure and Google Cloud, which rely on the hardware and data-center layers underneath.",
+    metrics: [
+      { k: "AI Offering", v: "Now Assist Workflow Agents" },
+      { k: "Infrastructure", v: "Multi-cloud (Azure & Google Cloud)" },
+      { k: "Business Focus", v: "Enterprise AI software automation" }
+    ],
+    actionText: "Check Buy/Sell Watchlist",
+    actionLink: "pages/watchlist.html"
+  },
+  cere: {
+    title: "Cerebras Systems",
+    role: "AI Chip Developer & Customer",
+    plain: "Cerebras builds very large AI chips and needs serious power and data-center space to deploy them. In plain English: Cerebras is both a chip company and a customer for infrastructure. By leasing capacity from Digi Power X, it can focus on its specialized AI hardware while DGXX handles the physical site, power, and hosting side. This is also the contract that moved DGXX's stock the most of anything on this chart — roughly +29% the day it was announced.",
+    metrics: [
+      { k: "★ Columbiana Lease", v: "Up to $2.5B (10 years)" },
+      { k: "DGXX stock reaction", v: "+29% same day (TipRanks, May 5 2026)" },
+      { k: "Power Target", v: "40MW total capacity" }
+    ],
+    actionText: "View Progress Tracker",
+    actionLink: "pages/tracker.html"
+  },
+  subq: {
+    title: "SubQ AI",
+    role: "Enterprise AI Partner",
+    plain: "SubQ AI rents dedicated GPU capacity from Digi Power X to run AI workloads for clients. In plain English: SubQ does not want to own the whole data center stack. It rents the finished NVIDIA-powered compute from DGXX, then uses that raw horsepower to deliver AI services to customers.",
+    metrics: [
+      { k: "GPU Lease Value", v: "$19.6M (24 months)" },
+      { k: "Upfront Payment", v: "$2.95M (non-refundable)" },
+      { k: "Launch Date", v: "Effective May 15, 2026" }
+    ],
+    actionText: "Check Contracts Ledger",
+    actionLink: "pages/contracts.html"
+  },
+  hardware_group: {
+    title: "Silicon & Component Layer",
+    role: "Foundational Inputs",
+    plain: "This layer includes the parts that make AI servers physically work: NVIDIA and AMD design the main processors, Micron supplies fast memory, and SanDisk supplies storage. AMPG is included as a thematically-related AI stock (it has a real but separate NVIDIA AI-RAN telecom partnership) rather than a confirmed data-center supplier — click its node for the distinction. In plain English: Micron, SanDisk, NVIDIA, and AMD are the engine, fuel line, and warehouse that make AI computing physically possible.",
+    metrics: [
+      { k: "GPU Leader", v: "NVIDIA Blackwell architecture" },
+      { k: "Memory Engine", v: "Micron HBM3E (High-Bandwidth)" },
+      { k: "Data Store", v: "SanDisk Enterprise SSDs" }
+    ],
+    actionText: "Overview Live Tickers",
+    actionLink: "index.html"
+  },
+  cloud_group: {
+    title: "Cloud & Compute Infrastructure",
+    role: "Hosting Platforms",
+    plain: "This layer turns chips and power into usable AI capacity. In plain English: Nebius and Digi Power X buy or host expensive hardware, connect it to data centers, and rent it out. Microsoft, Google, and Meta either buy that capacity or offer similar cloud capacity to their own customers.",
+    metrics: [
+      { k: "Total Cloud Contracts", v: "Over $48.5B combined" },
+      { k: "★ Nebius biggest mover", v: "Meta deal, stock +14% same day" },
+      { k: "★ DGXX biggest mover", v: "Cerebras deal, stock +29% same day" }
+    ],
+    actionText: "View Contracts Ledger",
+    actionLink: "pages/contracts.html"
+  },
+  enterprise_group: {
+    title: "AI Customers & Applications",
+    role: "Demand Layer",
+    plain: "This layer is where the computing power becomes products, models, and customer workloads. In plain English: ServiceNow turns AI into workplace software, Cerebras uses infrastructure to deploy its own AI systems, and SubQ AI rents GPU capacity to serve clients. They are the demand side that pulls money through the hardware and cloud layers.",
+    metrics: [
+      { k: "Software Automation", v: "ServiceNow workflows (Now Assist)" },
+      { k: "★ Specialized HW Lease", v: "Cerebras up to $2.5B Alabama deal" },
+      { k: "Enterprise Services", v: "SubQ AI Blackwell GPU bare-metal" }
+    ],
+    actionText: "View Build-out Milestones",
+    actionLink: "pages/tracker.html"
+  }
+};
+
+function selectNode(id) {
+  const svg = document.getElementById('flowchart-svg');
+  svg.classList.add('has-selection');
+  const nodes = svg.querySelectorAll('.node');
+  nodes.forEach(n => n.classList.remove('active'));
+  const lines = svg.querySelectorAll('.flow-line');
+  lines.forEach(l => l.classList.remove('active'));
+
+  const activeNode = document.getElementById('node-' + id);
+  if (activeNode) activeNode.classList.add('active');
+
+  const rels = graphRelations[id];
+  if (rels) {
+    rels.up.forEach(upId => {
+      const n = document.getElementById('node-' + upId);
+      if (n) n.classList.add('active');
+      const line = document.getElementById(`path-${upId}-${id}`) || document.getElementById(`path-${id}-${upId}`);
+      if (line) line.classList.add('active');
+    });
+    rels.down.forEach(downId => {
+      const n = document.getElementById('node-' + downId);
+      if (n) n.classList.add('active');
+      const line = document.getElementById(`path-${id}-${downId}`) || document.getElementById(`path-${downId}-${id}`);
+      if (line) line.classList.add('active');
+    });
+  }
+
+  renderDetails(id);
+}
+
+function setFlowFilter(filter) {
+  const buttons = document.querySelectorAll('.flowchart-filters button');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
+
+  if (filter === 'all') {
+    resetFlowchart();
+    return;
+  }
+
+  const svg = document.getElementById('flowchart-svg');
+  svg.classList.add('has-selection');
+  const nodes = svg.querySelectorAll('.node');
+  const lines = svg.querySelectorAll('.flow-line');
+  nodes.forEach(n => n.classList.remove('active'));
+  lines.forEach(l => l.classList.remove('active'));
+
+  if (filter === 'hardware') {
+    const hwNodes = ['node-mu', 'node-sndk', 'node-ampg', 'node-nvda', 'node-amd'];
+    hwNodes.forEach(id => {
+      const n = document.getElementById(id);
+      if (n) n.classList.add('active');
+    });
+    const hwLines = ['path-mu-nvda', 'path-mu-amd', 'path-sndk-nvda', 'path-sndk-amd', 'path-ampg-nvda', 'path-ampg-amd'];
+    hwLines.forEach(id => {
+      const l = document.getElementById(id);
+      if (l) l.classList.add('active');
+    });
+    renderDetails('hardware_group');
+  } else if (filter === 'cloud') {
+    const cloudNodes = ['node-nbis', 'node-dgxx', 'node-msft', 'node-goog', 'node-meta'];
+    cloudNodes.forEach(id => {
+      const n = document.getElementById(id);
+      if (n) n.classList.add('active');
+    });
+    const cloudLines = ['path-nvda-nbis', 'path-nvda-dgxx', 'path-amd-nbis', 'path-amd-dgxx', 'path-nbis-meta', 'path-nbis-msft', 'path-dgxx-msft', 'path-dgxx-goog'];
+    cloudLines.forEach(id => {
+      const l = document.getElementById(id);
+      if (l) l.classList.add('active');
+    });
+    renderDetails('cloud_group');
+  } else if (filter === 'enterprise') {
+    const entNodes = ['node-now', 'node-cere', 'node-subq', 'node-msft', 'node-goog', 'node-dgxx'];
+    entNodes.forEach(id => {
+      const n = document.getElementById(id);
+      if (n) n.classList.add('active');
+    });
+    const entLines = ['path-dgxx-cere', 'path-dgxx-subq', 'path-msft-now', 'path-goog-now'];
+    entLines.forEach(id => {
+      const l = document.getElementById(id);
+      if (l) l.classList.add('active');
+    });
+    renderDetails('enterprise_group');
+  }
+}
+
+function resetFlowchart() {
+  const svg = document.getElementById('flowchart-svg');
+  svg.classList.remove('has-selection');
+  const nodes = svg.querySelectorAll('.node');
+  nodes.forEach(n => n.classList.remove('active'));
+  const lines = svg.querySelectorAll('.flow-line');
+  lines.forEach(l => l.classList.remove('active'));
+
+  const buttons = document.querySelectorAll('.flowchart-filters button');
+  buttons.forEach(btn => {
+    if (btn.textContent.includes('All Flows')) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+
+  renderDetails('all');
+}
+
+function renderDetails(id) {
+  const data = nodeData[id];
+  const el = document.getElementById('flowchart-details');
+  if (!data) return;
+
+  const metricsHtml = data.metrics.map(m => `
+    <div class="stat-line">
+      <span class="k">${m.k}</span>
+      <span class="v" style="color:var(--text)">${m.v}</span>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div>
+      <div class="flow-detail-head">
+        <div>
+          <div class="flow-detail-eyebrow">Selected Node</div>
+          <div class="flow-detail-title">${data.title}</div>
+          <div class="flow-detail-role">${data.role}</div>
+        </div>
+        ${id !== 'all' ? `<button class="btn secondary flow-reset-btn" onclick="resetFlowchart()">Reset View</button>` : ''}
+      </div>
+      <p class="flow-detail-copy">
+        ${data.plain}
+      </p>
+      <div class="section-title flow-detail-section">Key Numbers &amp; Flows</div>
+      <div class="flow-metrics">
+        ${metricsHtml}
+      </div>
+    </div>
+    <div class="flow-detail-action">
+      <a href="${data.actionLink}" class="btn flow-action-link">${data.actionText} →</a>
+    </div>
+  `;
+}
+
+renderOverview();
+renderDetails('all');
+</script>
+</body>
+</html>

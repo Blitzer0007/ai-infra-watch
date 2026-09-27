@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ask the Analyst — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 07 / Signals</div>
+      <h1>Ask the Analyst</h1>
+      <p class="page-dek">A question box wired to the local agent backend. Your question is routed by a supervisor to a market agent, a filings agent, or both, and the answer comes back with the full routing trajectory so you can see exactly how it was handled. This runs against the Python service — not Finnhub — so it needs the backend running.</p>
+    </div>
+
+    <div class="notice mt-16">
+      <span class="ic">i</span>
+      <div>This talks to your own agent backend (<span class="mono">app.main:app</span>), not a hosted API. Start it with <span class="mono">uvicorn app.main:app --reload</span> and set its URL in <a href="settings.html" style="color:var(--amber)">Settings</a> if it isn't at <span class="mono">http://localhost:8000</span>. In stub mode the answers are deterministic, grounded placeholders — the point is the routing, not the prose.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Ask a question</div><div class="card-sub">Market moves, filings detail, or both — the supervisor decides</div></div>
+        <span class="fresh manual" id="ask-status"><span class="dot"></span>idle</span>
+      </div>
+      <div class="field">
+        <label>Your question</label>
+        <textarea id="q-input" rows="3" placeholder="e.g. How did the stock move today and what did the latest 10-K say about revenue growth?"></textarea>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+        <button class="btn" id="ask-btn" onclick="ask()">Ask</button>
+        <span class="faint" style="font-size:12px">Try a sample:</span>
+        <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('How did NVDA move today?')">market</button>
+        <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('What did the latest 10-K disclose about data center revenue growth?')">filings</button>
+        <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('How did the stock move and what did the filing say about revenue?')">both</button>
+      </div>
+      <div id="ask-results" class="mt-24"></div>
+    </div>
+
+    <footer class="site-footer">
+      Answers are produced by a local multi-agent pipeline running on your own machine. In stub mode they are deterministic and grounded in fixture data — not live market commentary, not investment advice. The value on this page is the routing and trajectory transparency, not price prediction.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+function sample(text){
+  document.getElementById('q-input').value = text;
+  ask();
+}
+
+function routeBadge(route){
+  const cls = route === 'both' ? 'badge-amber' : (route === 'filings' ? 'badge-teal' : 'badge');
+  return `<span class="badge ${cls}">route: ${route}</span>`;
+}
+
+function okBadge(ok){
+  return ok
+    ? '<span class="badge badge-green">ok</span>'
+    : '<span class="badge badge-red">error</span>';
+}
+
+function degradedBadge(){
+  // Shown only when the run is ok() overall but a branch failed — makes a
+  // usable-but-partial answer visually distinct from a fully clean one.
+  return '<span class="badge badge-amber">partial</span>';
+}
+
+function hallucinationBadge(){
+  // Distinct from "partial": a branch RAN and answered, but its own
+  // grounding check flagged claims that stray from the sources. The answer
+  // text is suspect even though the pipeline succeeded.
+  return '<span class="badge badge-amber" title="A branch produced claims not grounded in its sources">ungrounded</span>';
+}
+
+function groundednessLine(g){
+  // Per-card grounding verdict. Absent (null) => not checked (a refusal or a
+  // branch that didn't run) => render nothing.
+  if(!g) return '';
+  const pct = Math.round((g.score == null ? 0 : g.score) * 100);
+  if(g.grounded){
+    return `<div class="faint" style="font-size:12px; margin-top:6px">groundedness: ${pct}% — grounded</div>`;
+  }
+  const n = (g.unsupported || []).length;
+  const flagged = (g.unsupported || []).slice(0, 3).map(esc).join('; ');
+  return `<div style="font-size:12px; margin-top:6px; color:var(--amber)">groundedness: ${pct}% — ${n} unsupported claim${n === 1 ? '' : 's'}${flagged ? ': ' + flagged : ''}</div>`;
+}
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+}
+
+function fmtInsight(i){
+  // A market insight is usually {ticker, move_pct, reason}; tolerate a bare
+  // string or a partial object rather than rendering "[object Object]".
+  if(i == null) return '';
+  if(typeof i === 'string') return `<li>${esc(i)}</li>`;
+  const tkr = i.ticker ? `<strong class="mono">${esc(i.ticker)}</strong> ` : '';
+  const pct = (typeof i.move_pct === 'number')
+    ? `<span class="mono ${i.move_pct >= 0 ? 't-up' : 't-down'}">${APP.fmtPct(i.move_pct)}</span> ` : '';
+  const reason = i.reason ? esc(i.reason) : '';
+  return `<li>${tkr}${pct}${reason}</li>`;
+}
+
+function trajectoryLine(nodes){
+  if(!nodes || !nodes.length) return '';
+  return `<div class="mono faint" style="font-size:12px; margin-top:8px">trajectory: ${nodes.map(esc).join(' → ')}</div>`;
+}
+
+function subCard(title, sub){
+  if(!sub) return '';
+  let body = '';
+  if(sub.summary || sub.answer){
+    body += `<div style="margin-top:8px">${esc(sub.summary || sub.answer)}</div>`;
+  }
+  if(Array.isArray(sub.insights) && sub.insights.length){
+    body += `<ul class="mt-16">${sub.insights.map(fmtInsight).join('')}</ul>`;
+  }
+  if(Array.isArray(sub.citations) && sub.citations.length){
+    body += `<div class="faint mt-16" style="font-size:12px">citations: ${sub.citations.map(esc).join(', ')}</div>`;
+  }
+  if(Array.isArray(sub.symbols) && sub.symbols.length){
+    body += `<div class="faint" style="font-size:12px; margin-top:6px">symbols: ${sub.symbols.map(esc).join(', ')}</div>`;
+  }
+  if(sub.corrective_fallback){
+    body += `<div class="notice mt-16"><span class="ic">i</span><div>Corrective RAG fell back to an honest "insufficient evidence" answer rather than generating over weak retrieval.</div></div>`;
+  }
+  if(sub.error){
+    body += `<div class="notice danger mt-16"><span class="ic">!</span><div>${esc(sub.error)}</div></div>`;
+  }
+  const gbadge = (sub.groundedness && sub.groundedness.flagged) ? ' ' + hallucinationBadge() : '';
+  return `
+    <div class="card mt-16" style="background:var(--panel-2, transparent)">
+      <div class="card-head"><div><div class="card-title">${esc(title)}</div></div>${okBadge(sub.ok)}${gbadge}</div>
+      ${body}
+      ${groundednessLine(sub.groundedness)}
+      ${trajectoryLine(sub.trajectory)}
+    </div>`;
+}
+
+async function ask(){
+  const q = document.getElementById('q-input').value.trim();
+  const statusEl = document.getElementById('ask-status');
+  const resultsEl = document.getElementById('ask-results');
+  const btn = document.getElementById('ask-btn');
+
+  if(!q){
+    resultsEl.innerHTML = `<div class="empty-state">Type a question first.</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.innerHTML = `<span class="dot"></span>routing…`;
+  resultsEl.innerHTML = `<div class="empty-state">Asking the analyst…</div>`;
+
+  try{
+    const r = await APP.askAgent(q);
+    statusEl.innerHTML = `<span class="dot"></span>answered ${APP.fmtTime(Date.now())}`;
+
+    let html = `
+      <div class="card-head" style="border:none;padding:0">
+        <div>${routeBadge(r.route)} ${okBadge(r.ok)}${r.degraded ? ' ' + degradedBadge() : ''}</div>
+      </div>
+      <div class="section-title mt-16">Summary</div>
+      <div>${esc(r.summary) || '<span class="faint">No summary returned.</span>'}</div>
+      ${trajectoryLine(r.trajectory)}
+    `;
+    if(r.degraded){
+      html += `<div class="notice mt-16"><span class="ic">i</span><div>Partial result — one specialist couldn't complete, but a usable answer came back from the other. See the agent cards below for what failed.</div></div>`;
+    }
+    if(r.error){
+      html += `<div class="notice danger mt-16"><span class="ic">!</span><div>${esc(r.error)}</div></div>`;
+    }
+    html += subCard('Market agent', r.market);
+    html += subCard('Filings agent', r.filings);
+    resultsEl.innerHTML = html;
+  }catch(err){
+    statusEl.innerHTML = `<span class="dot"></span>failed`;
+    const hint = err.code === 'UNREACHABLE'
+      ? ' Start it with <span class="mono">uvicorn app.main:app --reload</span>, or set the URL in <a href="settings.html" style="color:var(--amber)">Settings</a>.'
+      : '';
+    resultsEl.innerHTML = `<div class="notice danger"><span class="ic">!</span><div><strong>${esc(err.code || 'ERROR')}:</strong> ${esc(err.message || 'unknown error')}${hint}</div></div>`;
+  }finally{
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

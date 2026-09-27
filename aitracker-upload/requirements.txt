@@ -1,0 +1,26 @@
+# ============================================================
+# ai-infra-watch backend — core dependencies
+# ------------------------------------------------------------
+# The LLM eval / synthesis MVP + FastAPI backend (roadmap
+# Phase 1-2). This set is intentionally light so CI and
+# first-time local installs stay hermetic and fast:
+#
+#     pip install -r requirements.txt
+#
+# Without the RAG extras (requirements-rag.txt), semantic
+# similarity + hallucination checks fall back to deterministic
+# lexical scoring (std lib only) — see app/assertions/semantic.py.
+#
+# The heavy RAG / embeddings / MCP stack lives in
+# requirements-rag.txt so it can be installed deliberately:
+#
+#     pip install -r requirements-rag.txt
+# ============================================================
+
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2.7,<3
+httpx>=0.27,<1
+
+# --- test tooling ----------------------------------------------------
+pytest>=8.2,<9

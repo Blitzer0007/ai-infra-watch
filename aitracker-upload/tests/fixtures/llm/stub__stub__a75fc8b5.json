@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"Yes, Nebius is down about 1.4%.\", \"insights\": [{\"ticker\": \"NVDA\", \"move_pct\": 3.2, \"reason\": \"NVIDIA announced a new data center GPU.\"}, {\"ticker\": \"NBIS\", \"move_pct\": -1.4, \"reason\": \"Nebius disclosed a cloud services contract.\"}, {\"ticker\": \"DGXX\", \"move_pct\": 5.1, \"reason\": \"Digi Power X secured a new data center deal.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

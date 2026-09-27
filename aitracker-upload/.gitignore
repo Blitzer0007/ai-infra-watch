@@ -1,0 +1,21 @@
+# ---- Python -----------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ---- ai-infra-watch runtime artifacts ---------------------------------
+# LLM disk cache: machine-local, non-deterministic, and can SHADOW the
+# committed stub fixtures if checked in. Never commit it.
+.cache/
+# Eval/synthesis traces are per-run observability output, not source.
+data/traces/
+# Local env / secrets.
+.env
+
+# ---- RAG artifacts (later phases) -------------------------------------
+# Chroma persistent store and any downloaded model weights.
+data/chroma/
+data/filings/*.pdf

@@ -1,0 +1,14 @@
+{
+  "cik": "789019",
+  "name": "MICROSOFT CORP",
+  "tickers": ["MSFT"],
+  "filings": {
+    "recent": {
+      "accessionNumber": ["0000950170-25-000123", "0000950170-24-000456", "0000950170-25-000789"],
+      "form": ["10-K", "10-Q", "8-K"],
+      "filingDate": ["2025-07-30", "2025-04-24", "2025-07-30"],
+      "primaryDocument": ["msft-20250630.htm", "msft-20250331.htm", "msft-8k.htm"],
+      "items": ["", "", "2.02,9.01"]
+    }
+  }
+}

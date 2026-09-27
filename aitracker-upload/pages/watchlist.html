@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watchlist — AI Infra Watch</title>
+<link rel="stylesheet" href="../css/main.css">
+<script>try{var t=localStorage.getItem('aiw_theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}</script>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker-track">
+  <span class="t-item faint">Loading ticker…</span>
+</div></div>
+
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span class="dot"></span>AI INFRA WATCH</div>
+      <div class="brand-sub">Self-hosted market monitor</div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Markets</div>
+      <a href="../index.html"><span class="num">01</span>Overview</a>
+      <a href="contracts.html"><span class="num">02</span>Contracts</a>
+      <a href="tracker.html"><span class="num">03</span>Progress Tracker</a>
+      <div class="nav-label">Signals</div>
+      <a href="congress.html"><span class="num">04</span>Congress Trades</a>
+      <a href="macro.html"><span class="num">05</span>Macro &amp; Politics</a>
+      <a href="watchlist.html"><span class="num">06</span>Buy/Sell Watchlist</a>
+      <a href="ask.html"><span class="num">07</span>Ask the Analyst</a>
+      <div class="nav-label">System</div>
+      <a href="settings.html"><span class="num">⚙</span>Settings</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <div class="eyebrow">Section 06 / Signals</div>
+      <h1>Watchlist &amp; rule-based flags</h1>
+      <p class="page-dek">A configurable flag system, not a trading signal generator. You set the rules — a price move, a news keyword — and this page tells you when a rule has been triggered. What you do with that is entirely your call.</p>
+    </div>
+
+    <div class="notice danger mt-16">
+      <span class="ic">!</span>
+      <div><strong>This is not financial advice and these are not buy/sell signals.</strong> No algorithm here predicts price direction or "correct timing." It checks rules you define against current data and shows you the result. Treat triggered flags as a prompt to go research, not as an instruction to trade. Markets involve real risk of loss.</div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Live check against your rules</div><div class="card-sub">Runs against current Finnhub quotes for the symbols below</div></div>
+        <span class="fresh manual" id="check-status"><span class="dot"></span>not run yet</span>
+      </div>
+      <button class="btn" onclick="runChecks()">Run check now</button>
+      <div id="flag-results" class="mt-24"></div>
+    </div>
+
+    <div class="card mt-24">
+      <div class="card-head">
+        <div><div class="card-title">Your rules</div><div class="card-sub">Add, edit, or disable flags</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Label</th><th>Symbol</th><th>Condition</th><th>Enabled</th><th></th></tr></thead>
+        <tbody id="rules-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card mt-24">
+      <div class="section-title">Add a new rule</div>
+      <div class="grid grid-3">
+        <div class="field"><label>Label</label><input type="text" id="r-label" placeholder="e.g. NVDA drops 5% in a day"></div>
+        <div class="field"><label>Symbol</label><input type="text" id="r-symbol" placeholder="e.g. NVDA"></div>
+        <div class="field"><label>Rule type</label>
+          <select id="r-type" onchange="toggleRuleFields()">
+            <option value="pct_change">Daily % change threshold</option>
+            <option value="price_level">Price crosses a level</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-3">
+        <div class="field"><label>Direction</label>
+          <select id="r-op"><option value="<=">Drops to / below</option><option value=">=">Rises to / above</option></select>
+        </div>
+        <div class="field"><label id="r-value-label">Threshold value (% for change, $ for price)</label><input type="number" id="r-value" placeholder="e.g. -5 or 150"></div>
+        <div class="field" style="align-self:end"><button class="btn" onclick="addRule()">Add rule</button></div>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      All rule definitions and trigger history are stored locally in your browser and evaluated against Finnhub quote data. No rule on this page constitutes investment advice, a recommendation, or a prediction — they are mechanical checks against thresholds you define yourself.
+    </footer>
+  </main>
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+function toggleRuleFields(){
+  const type = document.getElementById('r-type').value;
+  document.getElementById('r-value-label').textContent = type === 'pct_change'
+    ? 'Threshold value (% — e.g. -5 or 8)'
+    : 'Threshold value ($ price level)';
+}
+
+function addRule(){
+  const label = document.getElementById('r-label').value.trim();
+  const symbol = document.getElementById('r-symbol').value.trim().toUpperCase();
+  const type = document.getElementById('r-type').value;
+  const op = document.getElementById('r-op').value;
+  const value = parseFloat(document.getElementById('r-value').value);
+  if(!label || !symbol || isNaN(value)){ alert('Label, symbol, and a numeric threshold are required.'); return; }
+  const alerts = APP.loadAlerts();
+  alerts.push({ id: 'r' + Date.now(), symbol, type, op, value, label, enabled: true });
+  APP.saveAlerts(alerts);
+  document.getElementById('r-label').value = '';
+  document.getElementById('r-symbol').value = '';
+  document.getElementById('r-value').value = '';
+  renderRules();
+}
+
+function removeRule(id){
+  APP.saveAlerts(APP.loadAlerts().filter(a => a.id !== id));
+  renderRules();
+}
+
+function toggleRule(id){
+  const alerts = APP.loadAlerts();
+  const r = alerts.find(a => a.id === id);
+  if(r) r.enabled = !r.enabled;
+  APP.saveAlerts(alerts);
+  renderRules();
+}
+
+function renderRules(){
+  const alerts = APP.loadAlerts();
+  document.getElementById('rules-body').innerHTML = alerts.map(a => `
+    <tr>
+      <td>${a.label}</td>
+      <td class="mono">${a.symbol}</td>
+      <td class="mono">${a.type === 'news_keyword' ? `headline contains "${a.value}"` : `${a.op} ${a.value}${a.type === 'pct_change' ? '%' : ''}`}</td>
+      <td><label class="checkbox-row" style="margin:0"><input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="toggleRule('${a.id}')"></label></td>
+      <td><button class="btn secondary" style="padding:3px 9px;font-size:11px" onclick="removeRule('${a.id}')">×</button></td>
+    </tr>
+  `).join('');
+}
+renderRules();
+
+async function runChecks(){
+  const cfg = APP.loadConfig();
+  const statusEl = document.getElementById('check-status');
+  const resultsEl = document.getElementById('flag-results');
+
+  if(!cfg.finnhubKey){
+    resultsEl.innerHTML = `<div class="notice"><span class="ic">!</span><div>No API key configured. Add one in <a href="settings.html" style="color:var(--amber)">Settings</a> to run live checks.</div></div>`;
+    return;
+  }
+
+  statusEl.innerHTML = `<span class="dot"></span>checking…`;
+  const alerts = APP.loadAlerts().filter(a => a.enabled && a.type !== 'news_keyword');
+  const symbols = [...new Set(alerts.map(a => a.symbol))];
+  if(symbols.length === 0){
+    resultsEl.innerHTML = `<div class="empty-state">No active price-based rules. Add one above, or enable an existing rule.</div>`;
+    statusEl.innerHTML = `<span class="dot"></span>no active rules`;
+    return;
+  }
+
+  const quotes = await APP.fetchQuotes(symbols);
+  const triggered = [];
+  const notTriggered = [];
+
+  alerts.forEach(rule => {
+    const q = quotes[rule.symbol];
+    if(!q.ok && !q.cached){ return; }
+    const d = q.ok ? q.data : q.cached;
+    let actual, passes;
+    if(rule.type === 'pct_change'){
+      actual = d.changePct;
+      passes = rule.op === '<=' ? actual <= rule.value : actual >= rule.value;
+    } else {
+      actual = d.price;
+      passes = rule.op === '<=' ? actual <= rule.value : actual >= rule.value;
+    }
+    const entry = { rule, actual, stale: !q.ok };
+    (passes ? triggered : notTriggered).push(entry);
+  });
+
+  statusEl.innerHTML = `<span class="dot"></span>checked ${APP.fmtTime(Date.now())}`;
+
+  let html = '';
+  if(triggered.length > 0){
+    html += `<div class="section-title">Triggered (${triggered.length})</div>`;
+    html += triggered.map(e => `
+      <div class="stat-line" style="display:flex">
+        <div><span class="badge badge-amber">FLAGGED</span> <strong style="margin-left:6px">${e.rule.label}</strong>${e.stale ? ' <span class="faint">(cached data)</span>' : ''}</div>
+        <div class="mono">${e.rule.type === 'pct_change' ? APP.fmtPct(e.actual) : '$' + APP.fmtPrice(e.actual)}</div>
+      </div>
+    `).join('');
+  } else {
+    html += `<div class="empty-state">No rules triggered on this check.</div>`;
+  }
+
+  if(notTriggered.length > 0){
+    html += `<div class="section-title mt-24">Not triggered (${notTriggered.length})</div>`;
+    html += notTriggered.map(e => `
+      <div class="stat-line" style="display:flex; opacity:0.6">
+        <div>${e.rule.label}</div>
+        <div class="mono">${e.rule.type === 'pct_change' ? APP.fmtPct(e.actual) : '$' + APP.fmtPrice(e.actual)}</div>
+      </div>
+    `).join('');
+  }
+
+  resultsEl.innerHTML = html;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "text": "{\"date\": \"2026-08-03\", \"summary\": \"Geopolitical risk around the Strait of Hormuz and commodity volatility are the top risks.\", \"insights\": [{\"ticker\": \"NVDA\", \"move_pct\": 2.4, \"reason\": \"Geopolitical risk around the Strait of Hormuz is rising.\"}], \"risks\": []}",
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  }
+}

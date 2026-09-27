@@ -1,0 +1,8 @@
+{
+  "NVDA": {"price": 182.4, "change": 5.66, "change_pct": 3.2, "high": 184.0, "low": 178.1, "open": 179.0, "prev_close": 176.74, "volume": 41000000},
+  "NBIS": {"price": 41.5, "change": -0.59, "change_pct": -1.4, "high": 42.6, "low": 41.1, "open": 42.3, "prev_close": 42.09, "volume": 3200000},
+  "DGXX": {"price": 22.9, "change": 1.11, "change_pct": 5.1, "high": 23.4, "low": 21.7, "open": 21.9, "prev_close": 21.79, "volume": 1800000},
+  "MSFT": {"price": 445.0, "change": 2.21, "change_pct": 0.5, "high": 447.0, "low": 442.0, "open": 443.0, "prev_close": 442.79, "volume": 18000000},
+  "META": {"price": 690.0, "change": 7.5, "change_pct": 1.1, "high": 694.0, "low": 683.0, "open": 685.0, "prev_close": 682.5, "volume": 12000000},
+  "AVGO": {"price": 255.0, "change": 2.27, "change_pct": 0.9, "high": 257.0, "low": 252.0, "open": 253.0, "prev_close": 252.73, "volume": 9000000}
+}

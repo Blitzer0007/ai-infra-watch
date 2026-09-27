@@ -1,0 +1,12 @@
+BROADCOM INC. — FORM 10-K (Fiscal Year 2025 Excerpt)
+
+Item 1. Business.
+Broadcom is a global technology leader that designs, develops, and supplies semiconductor and infrastructure software solutions. Our semiconductor segment includes networking, wireless, storage, and broadband products. Following our acquisition of VMware, our infrastructure software segment provides virtualization and cloud management software.
+
+Item 7. Management's Discussion and Analysis.
+Total revenue for fiscal 2025 was 54 billion dollars, up 44 percent year over year, reflecting the contribution of VMware and growth in AI-related semiconductor revenue. AI-related revenue, primarily custom accelerators and networking chips sold to hyperscale customers, reached 12 billion dollars for the year. Infrastructure software revenue grew following the VMware integration.
+
+We design custom AI accelerators, known as XPUs, for a small number of large hyperscale customers building their own AI infrastructure. Demand for our Ethernet networking switches used in AI clusters was strong. We expect AI revenue to continue growing as hyperscalers scale their custom silicon deployments.
+
+Item 1A. Risk Factors.
+A significant portion of our AI revenue is concentrated among a small number of customers, and the loss of any one could materially affect results. Integration of large acquisitions such as VMware carries execution risk. Our semiconductor business is cyclical and subject to inventory corrections.
