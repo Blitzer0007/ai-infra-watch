@@ -1,25 +1,54 @@
-"""StockService — transport-independent domain logic for the stocks server.
-
-This is the layer the unit tests exercise directly (no MCP transport,
-no network). The MCP server (server.py) is a thin decorator shell that
-delegates every tool to a StockService method, so:
-
-  * tests are hermetic and fast (FixtureProvider + StockService)
-  * the MCP tool list and the tested API can't drift (contract test)
-
-The service also tracks health (consecutive errors, last poll) for the
-observability layer's server-status tile.
-"""
 from __future__ import annotations
 
+import json
+import os
 import time
 from pathlib import Path
 
 from .providers import FinnhubProvider, FixtureProvider, QuoteError, QuoteProvider, _utc_now_iso
 from .schemas import Quote, QuoteBatch, ServerHealth
 
-DEFAULT_WATCHLIST = ["NVDA", "NBIS", "DGXX", "MSFT", "META", "AVGO"]
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "stock_watchlist.json"
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "quotes.json"
+
+
+def _load_configured_watchlist() -> list[str]:
+    """Load the default monitored universe from the JSON configuration.
+
+    AI_INFRA_WATCH_STOCKS_WATCHLIST can override it with either a JSON array
+    or a comma-separated list for deployment-specific universes.
+    """
+    raw = os.getenv("AI_INFRA_WATCH_STOCKS_WATCHLIST", "").strip()
+    if raw:
+        try:
+            values = json.loads(raw)
+        except json.JSONDecodeError:
+            values = [item.strip() for item in raw.split(",")]
+        if not isinstance(values, list):
+            raise ValueError(
+                "AI_INFRA_WATCH_STOCKS_WATCHLIST must be a JSON array or comma-separated list"
+            )
+        symbols = [str(item).strip().upper() for item in values if str(item).strip()]
+        if symbols:
+            return list(dict.fromkeys(symbols))
+
+    try:
+        payload = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        rows = payload.get("watchlist", [])
+        symbols = [
+            str(row.get("symbol", "")).strip().upper()
+            for row in rows
+            if isinstance(row, dict) and row.get("symbol")
+        ]
+        if symbols:
+            return list(dict.fromkeys(symbols))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+
+    return ["NVDA", "NBIS", "DGXX", "MSFT", "META", "AVGO"]
+
+
+DEFAULT_WATCHLIST = _load_configured_watchlist()
 
 
 class StockService:
@@ -30,22 +59,25 @@ class StockService:
         clock=_utc_now_iso,
     ) -> None:
         self.provider = provider or FixtureProvider(FIXTURE_PATH, clock=clock)
-        self.watchlist = [s.strip().upper() for s in (watchlist or DEFAULT_WATCHLIST)]
+        selected = DEFAULT_WATCHLIST if watchlist is None else watchlist
+        self.watchlist = [s.strip().upper() for s in selected if s.strip()]
         self._clock = clock
         self._consecutive_errors = 0
         self._last_poll_as_of: str | None = None
 
-    # ---- construction helpers ------------------------------------------
     @classmethod
-    def from_env(cls, mode: str = "fixture", watchlist: list[str] | None = None) -> "StockService":
-        """Build a service in 'fixture' (offline) or 'live' (Finnhub) mode."""
+    def from_env(
+        cls,
+        mode: str = "fixture",
+        watchlist: list[str] | None = None,
+    ) -> "StockService":
+        """Build a service in fixture or live mode."""
         if mode == "live":
             return cls(provider=FinnhubProvider(), watchlist=watchlist)
         return cls(provider=FixtureProvider(FIXTURE_PATH), watchlist=watchlist)
 
-    # ---- core operations -----------------------------------------------
     def get_quote(self, symbol: str) -> Quote:
-        """One quote. Raises QuoteError (structured code) on failure."""
+        """Return one quote. Errors remain structured."""
         try:
             q = self.provider.get_quote(symbol)
         except QuoteError:
@@ -56,12 +88,7 @@ class StockService:
         return q
 
     def get_quotes(self, symbols: list[str]) -> QuoteBatch:
-        """Best-effort batch: symbols that error are omitted, not fatal.
-
-        A batch fails as a whole only if EVERY symbol errors (so the
-        caller/agent still gets partial data during a partial outage —
-        a graceful-degradation requirement).
-        """
+        """Best-effort batch; fail only when every requested symbol fails."""
         quotes: list[Quote] = []
         errors = 0
         for sym in symbols:
@@ -74,13 +101,12 @@ class StockService:
         return QuoteBatch(quotes=quotes, as_of=self._clock(), source=self.provider.source)
 
     def get_snapshot(self) -> QuoteBatch:
-        """Quotes for the full watchlist."""
+        """Return the current quote snapshot for the configured universe."""
         return self.get_quotes(self.watchlist)
 
     def list_watchlist(self) -> list[str]:
         return list(self.watchlist)
 
-    # ---- observability -------------------------------------------------
     def health(self) -> ServerHealth:
         mode = "live" if self.provider.source == "finnhub" else "fixture"
         return ServerHealth(
@@ -94,6 +120,4 @@ class StockService:
 
 
 def from_env(mode: str = "fixture", watchlist: list[str] | None = None) -> StockService:
-    """Module-level convenience mirror of StockService.from_env, so callers
-    can do `from .service import from_env`."""
     return StockService.from_env(mode=mode, watchlist=watchlist)
