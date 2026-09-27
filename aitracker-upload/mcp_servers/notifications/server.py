@@ -41,7 +41,6 @@ def build_server(service: NotificationService | None = None) -> MCPServer:
         name="mcp-server-notifications",
         title="Notifications",
         description="Send alerts to channels (Slack/webhook) with severity thresholds.",
-        version="0.1.0",
     )
 
     @server.tool(
