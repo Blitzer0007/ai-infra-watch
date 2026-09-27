@@ -30,6 +30,7 @@ export default function App() {
     congressTrades?: any[];
     macroRisks?: any[];
     marketSentiment?: string;
+    build?: { commit?: string | null; environment?: string };
     timestamp?: number;
   } | null>(null);
   const [isLiveLoading, setIsLiveLoading] = useState(false);
