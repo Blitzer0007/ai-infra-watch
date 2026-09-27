@@ -1,9 +1,30 @@
-const SYMBOLS = [
-  'DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS',
-  '000660.KS','SNDK','MU','TEAM','SOFI','CRM','AMZN','GOOGL','PLTR','CBRS',
-  'RUM','QCOM','INTC','SOXX','IREN','TSM','AMD','TSLA','AAPL','ONDS','CIFR',
-  'IONQ','NOK','TRT','AMPG','DELL','IBM'
-];
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+function loadConfiguredSymbols() {
+  try {
+    const watchlist = JSON.parse(
+      readFileSync(join(process.cwd(), 'data', 'stock_watchlist.json'), 'utf8')
+    ).watchlist || [];
+    const portfolio = JSON.parse(
+      readFileSync(join(process.cwd(), 'data', 'portfolio_snapshot.json'), 'utf8')
+    ).positions || [];
+    return [...new Set([
+      ...portfolio.map((item) => item.symbol),
+      ...watchlist.map((item) => item.symbol),
+    ].filter(Boolean))];
+  } catch {
+    return [
+      'DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS',
+      '000660.KS','SNDK','MU','TEAM','SOFI','CRM','AMZN','GOOGL','PLTR','CBRS',
+      'RUM','QCOM','INTC','SOXX','IREN','TSM','AMD','TSLA','AAPL','ONDS','CIFR',
+      'IONQ','NOK','TRT','AMPG','DELL','IBM'
+    ];
+  }
+}
+
+const SYMBOLS = loadConfiguredSymbols();
+
 
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
