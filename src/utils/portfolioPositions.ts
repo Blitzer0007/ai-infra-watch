@@ -33,6 +33,7 @@ export type PositionAnalysis = PortfolioPosition & {
 };
 
 export const PORTFOLIO_SNAPSHOT = snapshot.portfolio;
+export const PORTFOLIO_AS_OF = snapshot.asOf;
 export const PORTFOLIO_POSITIONS: PortfolioPosition[] = snapshot.positions;
 
 function avg(values: number[]) {
