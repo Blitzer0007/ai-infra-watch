@@ -24,6 +24,7 @@ from mcp_servers.filings.service import from_env
 EXPECTED_TOOLS = {
     "search_filings",
     "answer_question",
+    "get_milestones",
     "list_documents",
     "get_document",
     "health",
@@ -130,3 +131,10 @@ def test_health_resource_serves_json(server):
     contents = _run(server.read_resource("filings://corpus/health"))
     payload = json.loads(contents[0].content)
     assert payload["server"] == "mcp-server-filings"
+
+
+def test_get_milestones_schema_advertises_symbol(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_milestones")
+    props = (tool.input_schema or {}).get("properties", {})
+    assert "symbol" in props
