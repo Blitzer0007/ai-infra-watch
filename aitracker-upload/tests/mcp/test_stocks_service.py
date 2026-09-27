@@ -68,6 +68,20 @@ def test_get_quotes_all_fail_raises(service):
     assert exc.value.code == "NO_DATA"
 
 
+
+def test_watchlist_can_be_overridden_by_environment(monkeypatch):
+    monkeypatch.setenv("AI_INFRA_WATCH_STOCKS_WATCHLIST", '["AMD", "TSLA", "AMD"]')
+    from mcp_servers.stocks import service as stock_service
+
+    assert stock_service._load_configured_watchlist() == ["AMD", "TSLA"]
+
+
+def test_watchlist_accepts_comma_separated_environment_override(monkeypatch):
+    monkeypatch.setenv("AI_INFRA_WATCH_STOCKS_WATCHLIST", "AMD,TSLA,AMD")
+    from mcp_servers.stocks import service as stock_service
+
+    assert stock_service._load_configured_watchlist() == ["AMD", "TSLA"]
+
 def test_health_tracks_consecutive_errors(service):
     assert service.health().ok is True
     with pytest.raises(QuoteError):
