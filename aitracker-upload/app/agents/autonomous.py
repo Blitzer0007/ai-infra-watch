@@ -94,7 +94,7 @@ Recent execution history:
 
 Choose exactly one next action.
 Return JSON only:
-{"action":"tool","tool":"server.tool","arguments":{},"reason":"..."}
+{{"action":"tool","tool":"server.tool","arguments":{{}},"reason":"..."}}
 or:
 {"action":"final","answer":"..."}
 
