@@ -12,16 +12,7 @@
     },
     "api/agent-python.py": {
       "maxDuration": 60,
-      "excludeFiles": [
-        "aitracker-upload/data/filings/**",
-        "aitracker-upload/tests/**",
-        "aitracker-upload/.cache/**",
-        "aitracker-upload/data/traces/**",
-        ".github/**",
-        "*.zip",
-        "node_modules/**",
-        "dist/**"
-      ]
+      "excludeFiles": "{aitracker-upload/data/filings/**,aitracker-upload/tests/**,aitracker-upload/.cache/**,aitracker-upload/data/traces/**,.github/**,*.zip,node_modules/**,dist/**}"
     }
   }
 }
