@@ -130,3 +130,53 @@ def test_autonomous_keyword_fallback_avoids_duplicate_calls():
 
     assert result.calls
     assert len({c.tool for c in result.calls}) <= 2
+
+
+
+def test_autonomous_cross_source_research_uses_contract_earnings_rotation():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_contracts",
+                description="Extract contract-related disclosures from primary SEC 8-K filings, including material agreements and financial obligations.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_earnings",
+                description="Get past and upcoming earnings for one symbol, including EPS/revenue surprise.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_rotation",
+                description="Detect hardware versus application AI capital rotation signals over 1d, 5d, and 20d windows.",
+                input_schema={"properties": {}, "required": []},
+            ),
+        ],
+        call_returns={
+            "get_contracts": {"symbol": "AMD", "contracts": []},
+            "get_earnings": {"symbol": "AMD", "events": []},
+            "get_rotation": {"signals": [], "narrative": "No divergence fired."},
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks"), _cfg("filings")], _factory({"stocks": session, "filings": session}))
+    tb.connect()
+    try:
+        agent = AutonomousMCPAgent(tb, max_steps=3)
+        result = agent.run("Analyze AMD earnings contracts and AI hardware versus application rotation")
+    finally:
+        tb.close()
+
+    assert result.ok()
+    assert len(result.calls) == 3
+    assert {c.tool for c in result.calls} == {
+        "filings.get_contracts",
+        "stocks.get_earnings",
+        "stocks.get_rotation",
+    }
+    assert session.calls
