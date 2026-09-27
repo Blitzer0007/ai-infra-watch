@@ -14,6 +14,7 @@ on:
       - "aitracker-upload/requirements-ingest.txt"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
+      - "aitracker-upload/tests/api/**"
       - ".github/workflows/agents-python-tests.yml"
   pull_request:
     paths:
@@ -64,3 +65,9 @@ jobs:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
         run: python -m pytest -q aitracker-upload/tests/mcp/test_stocks_contract.py aitracker-upload/tests/mcp/test_filings_contract.py
+
+      - name: Run API contract tests
+        env:
+          PYTHONPATH: aitracker-upload
+          EVAL_STUB: "true"
+        run: python -m pytest -q aitracker-upload/tests/api/test_contracts_endpoint.py
