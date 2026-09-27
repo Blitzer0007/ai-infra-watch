@@ -1,0 +1,38 @@
+name: Python Agents Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "agents/**"
+      - "tests/test_agents.py"
+      - "tests/test_mcp_integration.py"
+      - "aitracker-upload/mcp_servers/**"
+      - "aitracker-upload/app/rag/**"
+      - ".github/workflows/agents-python-tests.yml"
+  pull_request:
+    paths:
+      - "agents/**"
+      - "tests/test_agents.py"
+      - "tests/test_mcp_integration.py"
+      - "aitracker-upload/mcp_servers/**"
+      - "aitracker-upload/app/rag/**"
+      - ".github/workflows/agents-python-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r agents/requirements.txt
+
+      - name: Run root LangGraph tests
+        run: python -m pytest -q tests/test_agents.py tests/test_mcp_integration.py
