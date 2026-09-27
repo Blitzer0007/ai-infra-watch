@@ -79,6 +79,16 @@ STUB_MODE: bool = _env_bool("CI_USE_STUB_LLM", False) or _env_bool("EVAL_STUB", 
 MAX_RETRIES: int = int(_env_str("EVAL_MAX_RETRIES", "4"))
 RETRY_BASE_DELAY_SEC: float = _env_float("EVAL_RETRY_BASE_DELAY", 1.0)
 
+# ---- production API security / browser access -----------------------
+# When set, /api/ask/autonomous requires Authorization: Bearer <token>.
+# Leave empty for local development / hermetic CI.
+AGENT_API_TOKEN: str = _env_str("AI_INFRA_AGENT_TOKEN", "")
+CORS_ORIGINS: tuple[str, ...] = tuple(
+    origin.strip()
+    for origin in _env_str("CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+)
+
 
 # ---- eval / tracing --------------------------------------------------
 # Trace every eval run (and every LLM call made by the app) to
@@ -101,5 +111,7 @@ def get_settings() -> dict[str, object]:
         "embedding_model": EMBEDDING_MODEL,
         "stub_mode": STUB_MODE,
         "trace_enabled": TRACE_ENABLED,
+        "agent_auth_enabled": bool(AGENT_API_TOKEN),
+        "cors_origins": list(CORS_ORIGINS),
         "golden_path": str(GOLDEN_PATH),
     }
