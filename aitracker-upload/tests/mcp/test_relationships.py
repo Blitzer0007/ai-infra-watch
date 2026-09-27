@@ -7,8 +7,8 @@ from mcp_servers.stocks.relationships import RelationshipService
 
 def test_relationship_service_resolves_peer_links():
     svc = RelationshipService()
-    out = svc.get("NVDA")
-    assert out["symbol"] == "NVDA"
+    out = svc.get("MU")
+    assert out["symbol"] == "MU"
     assert out["peers"]
     assert "AMD" in out["peers"] or "AMD" in out["related_by_peer_links"]
 
