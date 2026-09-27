@@ -42,7 +42,7 @@ sentence-transformers>=2.7
 ragas>=0.2
 
 # --- MCP servers (stdio transport) -----------------------------------
-mcp>=1.2
+mcp>=2.2,<3
 
 # --- multi-agent orchestration ---------------------------------------
 langgraph>=0.2
