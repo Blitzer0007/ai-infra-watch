@@ -123,6 +123,10 @@ export default async function handler(req, res) {
   ];
 
   const data = {
+    build: {
+      commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+      environment: process.env.VERCEL_ENV || 'local'
+    },
     stockPrices,
     news: currentNews,
     contracts: secContractsForDashboard(),
