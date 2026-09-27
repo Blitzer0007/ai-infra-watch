@@ -37,6 +37,7 @@ export default function Settings() {
         updatedWatchlist = updatedWatchlist.filter((s) => s !== symbol);
       }
     } else {
+      if (updatedWatchlist.length >= 3) return;
       updatedWatchlist.push(symbol);
     }
 
@@ -117,7 +118,7 @@ export default function Settings() {
           </div>
 
           <p className="text-xs text-slate-400 leading-relaxed">
-            Select symbols to display on the main dashboard overview cards (maximum of 3 active).
+            Select up to 3 symbols for the main dashboard overview cards ({config.watchlist.length}/3 selected).
           </p>
 
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
