@@ -44,11 +44,14 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Verify Vercel authentication
+        run: vercel whoami --token="${VERCEL_TOKEN}"
+
       - name: Pull Vercel production configuration
-        run: vercel pull --yes --environment=production --token="${VERCEL_TOKEN}" --scope="${VERCEL_ORG_ID}"
+        run: vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
 
       - name: Build Vercel deployment
-        run: vercel build --prod --token="${VERCEL_TOKEN}" --scope="${VERCEL_ORG_ID}"
+        run: vercel build --prod --token="${VERCEL_TOKEN}"
 
       - name: Deploy to Vercel production
-        run: vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}" --scope="${VERCEL_ORG_ID}"
+        run: vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}"
