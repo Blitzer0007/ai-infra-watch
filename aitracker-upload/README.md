@@ -7,7 +7,7 @@ A static, multi-page dashboard for tracking AI infrastructure stocks (NVIDIA, Ne
 | Page | Purpose |
 |---|---|
 | `index.html` | Overview — live quotes for NVDA / NBIS / DGXX, recent headlines |
-| `pages/contracts.html` | Manually-maintained ledger of disclosed Nebius (Microsoft, Meta, NVIDIA) and Digi Power X (Cerebras, SubQ AI, NVIDIA) deals, plus a local log for your own entries |
+| `pages/contracts.html` | Contract ledger; the React dashboard now consumes the structured SEC contract artifact refreshed by GitHub Actions |
 | `pages/tracker.html` | Build-out progress milestones for both companies (capacity targets vs. contract delivery) |
 | `pages/congress.html` | Links to live congressional trade disclosure sources (Capitol Trades, Senate/House filings), optional FMP API integration, local trade log |
 | `pages/macro.html` | Snapshot of Trump market commentary and the Iran/Strait of Hormuz situation, with links to live sources, plus a local event log |
