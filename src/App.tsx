@@ -338,7 +338,7 @@ export default function App() {
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">Gemini Live AI Syndicate</span>
+                  <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">Live Market Intelligence</span>
                   <span className="text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                     {isLiveLoading ? 'SYNCHRONIZING' : 'ACTIVE FEED'}
                   </span>
@@ -348,7 +348,7 @@ export default function App() {
                     ? "Compiling intelligence reports from GDELT, Alpha Vantage, and Marketaux news sources..." 
                     : liveData?.marketSentiment 
                       ? `Global AI Market: "${liveData.marketSentiment}"`
-                      : "Grounded live analytics for contract bids, micro-chip policies, and executive congress signals."}
+                      : "Live market quotes and AI-infrastructure news from the configured public data feeds."}
                 </p>
               </div>
             </div>
