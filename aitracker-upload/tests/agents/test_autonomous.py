@@ -121,6 +121,7 @@ def test_autonomous_keyword_fallback_avoids_duplicate_calls():
         },
     )
     tb = MCPToolbox([_cfg("stocks"), _cfg("filings")], _factory({"stocks": session, "filings": session}))
+    tb.connect()
     try:
         agent = AutonomousMCPAgent(tb, max_steps=2)
         result = agent.run("Analyze AMD earnings")
