@@ -26,7 +26,7 @@ from mcp_servers.stocks.providers import FixtureProvider
 from mcp_servers.stocks.schemas import Quote, QuoteBatch
 from mcp_servers.stocks.service import FIXTURE_PATH
 
-EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "list_watchlist", "health"}
+EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "list_watchlist", "health"}
 
 
 def _clock() -> str:
@@ -118,3 +118,10 @@ def test_live_resource_serves_batch_json(server):
     # read_resource returns a list of ReadResourceContents; .content is text.
     batch = QuoteBatch.model_validate_json(contents[0].content)
     assert batch.quotes
+
+
+def test_get_earnings_schema_advertises_symbol(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_earnings")
+    props = (tool.input_schema or {}).get("properties", {})
+    assert "symbol" in props
