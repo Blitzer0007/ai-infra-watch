@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, CalendarDays, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
@@ -21,7 +20,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const analyses = useMemo(() => buildPositionAnalyses(livePrices, intelligence), [livePrices, intelligence]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
-  const filtered = useMemo(() => analyses.filter(h =>
+  const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
     (group === 'All' || h.group === group) &&
     (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())
   ), [analyses, q, group]);
