@@ -20,6 +20,11 @@ export interface Contract {
   statusLevel: 'high-verified' | 'low-rumour' | 'in-progress';
   dateSigned: string;
   geminiImpactSummary?: string;
+  source?: string;
+  accession?: string;
+  url?: string;
+  items?: string[];
+  evidence?: string[];
 }
 
 export interface CongressTrade {
