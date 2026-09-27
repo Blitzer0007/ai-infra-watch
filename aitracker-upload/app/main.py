@@ -49,7 +49,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -88,10 +88,23 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # static dashboard is served from any origin
+    allow_origins=list(settings.CORS_ORIGINS),
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _require_agent_auth(authorization: str | None = Header(default=None)) -> None:
+    """Protect autonomous research when AI_INFRA_AGENT_TOKEN is configured."""
+    expected = settings.AGENT_API_TOKEN
+    if not expected:
+        return
+    prefix = "Bearer "
+    if not authorization or not authorization.startswith(prefix):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    supplied = authorization[len(prefix):].strip()
+    if not supplied or supplied != expected:
+        raise HTTPException(status_code=403, detail="invalid bearer token")
 
 _EVAL_BODY_EXAMPLE = {
     "case_id": None,
@@ -489,7 +502,10 @@ def _run_autonomous(question: str) -> dict[str, Any]:
 
 
 @app.post("/api/ask/autonomous", response_model=None)
-def post_autonomous_ask(req: AskRequest) -> dict[str, Any]:
+def post_autonomous_ask(
+    req: AskRequest,
+    _auth: None = Depends(_require_agent_auth),
+) -> dict[str, Any]:
     """Run a bounded autonomous investigation over the discovered MCP tools."""
     return _run_autonomous(req.question)
 
@@ -497,6 +513,7 @@ def post_autonomous_ask(req: AskRequest) -> dict[str, Any]:
 @app.get("/api/ask/autonomous")
 def get_autonomous_ask(
     q: str = Query(..., min_length=1, description="The question to investigate autonomously"),
+    _auth: None = Depends(_require_agent_auth),
 ) -> dict[str, Any]:
     return _run_autonomous(q)
 
