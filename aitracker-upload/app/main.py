@@ -424,6 +424,80 @@ def get_ask(
     return _run_ask(q, mcp_flag=_query_bool(mcp))
 
 
+
+# ---------------------------------------------------------------------------
+# /api/ask/autonomous — bounded autonomous MCP investigation
+#
+# Unlike /api/ask, this endpoint does not pre-classify the request into fixed
+# market/filings branches. The autonomous agent discovers the connected MCP
+# catalog, asks the configured LLM which tool to use next, observes the result,
+# and repeats until it settles or hits AUTONOMOUS_MAX_STEPS.
+# ---------------------------------------------------------------------------
+
+def _shape_autonomous_response(result: Any) -> dict[str, Any]:
+    return {
+        "mode": "autonomous-mcp",
+        "question": result.question,
+        "ok": result.ok(),
+        "degraded": result.degraded(),
+        "summary": result.summary,
+        "error": result.error,
+        "resolution": result.resolution,
+        "discovered": result.discovered,
+        "calls": [
+            {
+                "tool": call.tool,
+                "arguments": call.arguments,
+                "ok": call.ok,
+                "output": call.output if call.ok else None,
+                "error": call.error,
+            }
+            for call in result.calls
+        ],
+        "trajectory": [
+            {
+                "node": step.node,
+                "kind": step.kind,
+                "tool": step.tool,
+                "args": step.args,
+                "ok": step.ok,
+                "note": step.note,
+                "duration_ms": step.duration_ms,
+            }
+            for step in result.trajectory.steps
+        ],
+    }
+
+
+def _run_autonomous(question: str) -> dict[str, Any]:
+    q = (question or "").strip()
+    if not q:
+        raise HTTPException(status_code=422, detail="question must not be empty")
+    try:
+        from app.agents.autonomous import AutonomousMCPAgent
+        from app.mcp_client.manager import get_toolbox
+
+        result = AutonomousMCPAgent(get_toolbox()).run(q)
+    except LLMConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"autonomous ask failed: {exc}") from exc
+    return _shape_autonomous_response(result)
+
+
+@app.post("/api/ask/autonomous", response_model=None)
+def post_autonomous_ask(req: AskRequest) -> dict[str, Any]:
+    """Run a bounded autonomous investigation over the discovered MCP tools."""
+    return _run_autonomous(req.question)
+
+
+@app.get("/api/ask/autonomous")
+def get_autonomous_ask(
+    q: str = Query(..., min_length=1, description="The question to investigate autonomously"),
+) -> dict[str, Any]:
+    return _run_autonomous(q)
+
+
 # ---------------------------------------------------------------------------
 # /api/earnings — past + upcoming earnings with historical price reaction
 #
@@ -713,6 +787,7 @@ def root() -> dict[str, Any]:
         "eval": "/api/eval",
         "ask": "/api/ask",
         "ask_mcp": "/api/ask?mcp=1",
+        "ask_autonomous": "/api/ask/autonomous",
         "earnings": "/api/earnings",
         "milestones": "/api/milestones",
         "mcp_status": "/api/mcp/status",
