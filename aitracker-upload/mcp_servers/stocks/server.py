@@ -106,9 +106,9 @@ def build_server(service: StockService | None = None) -> MCPServer:
         description="Resolve a symbol's configured AI Infra Watch peer, theme, group, and geography relationships.",
     )
     def get_relationships(symbol: str) -> dict:
-        from .relationships import RelationshipService
+        from .relationships import from_env
 
-        return RelationshipService.from_env().get(symbol)
+        return from_env().get(symbol)
 
     @server.tool(name="list_watchlist", description="List the tracked watchlist symbols.")
     def list_watchlist() -> list[str]:
