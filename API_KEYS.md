@@ -123,18 +123,18 @@ No Gemini key is required for the Python autonomous path.
 
 ## 3. Vercel autonomous-agent proxy
 
-The main React dashboard now exposes the AI Research page through:
+The React dashboard includes a server-side `/api/agent-ask` proxy. In the current production architecture it calls the same deployment's native Python `/api/agent-python` function, so no separate backend URL is required.
 
-`/api/agent-ask`
-
-This Vercel function proxies requests to the separately deployed Python backend. Configure these Vercel environment variables:
+Optional configuration:
 
 ```text
-AI_INFRA_AGENT_URL=https://your-python-backend.example.com
-# optional shared bearer token
 AI_INFRA_AGENT_TOKEN=...
 ```
 
-The proxy keeps the backend URL and optional bearer token server-side. Without `AI_INFRA_AGENT_URL`, the public dashboard continues to work for live market data and shows the AI Research backend as unavailable.
+The same token is used by the proxy and Python function when bearer authentication is enabled. To use a separately hosted Python backend instead, set:
 
-Keep all server-side keys in deployment secrets or environment variables. Never commit real credentials to Git.
+```text
+AI_INFRA_AGENT_URL=https://your-python-backend.example.com
+AI_INFRA_AGENT_TOKEN=...
+```
+
