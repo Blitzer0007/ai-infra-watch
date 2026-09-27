@@ -14,6 +14,13 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
 
   const activeContracts = liveContracts && liveContracts.length > 0 ? liveContracts : CONTRACTS_LEDGER;
 
+  const parseValueB = (value: string): number => {
+    const match = value.match(/\$([0-9]+(?:\.[0-9]+)?)\s*(B|bn)/i);
+    return match ? Number(match[1]) : 0;
+  };
+  const totalDisclosedB = activeContracts.reduce((sum, c) => sum + parseValueB(c.value), 0);
+
+
   const filteredContracts = activeContracts.filter((c) => {
     const matchesCompany = filterCompany === 'all' || c.company === filterCompany;
     const matchesStatus = filterStatusLevel === 'all' || c.statusLevel === filterStatusLevel;
@@ -46,8 +53,8 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
             <DollarSign className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest block">Nebius Disclosed Backlog</span>
-            <div className="text-lg font-mono font-black text-white">$46.4B+</div>
+            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest block">Parsed Disclosed Value</span>
+            <div className="text-lg font-mono font-black text-white">{totalDisclosedB > 0 ? `${totalDisclosedB.toFixed(1)}B+` : 'Not quantified'}</div>
           </div>
         </div>
 
@@ -56,8 +63,8 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
             <DollarSign className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest block">DGXX Disclosed Backlog</span>
-            <div className="text-lg font-mono font-black text-white">$2.51B+</div>
+            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest block">SEC-Linked Records</span>
+            <div className="text-lg font-mono font-black text-white">{activeContracts.filter(c => c.source === 'sec-edgar-primary').length}</div>
           </div>
         </div>
 
@@ -159,7 +166,12 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                           Live Synthesized
                         </span>
                       )}
-                      <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Signed: {c.dateSigned}</span>
+                      <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Signed/Filed: {c.dateSigned}</span>
+                      {c.source === 'sec-edgar-primary' && (
+                        <span className="text-[8px] font-mono uppercase tracking-wider text-cyan-300 border border-cyan-400/20 bg-cyan-400/5 px-1.5 py-0.5 rounded">
+                          SEC PRIMARY
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-xl font-black uppercase tracking-tight text-white mt-2">{c.client}</h3>
                   </div>
@@ -200,6 +212,16 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                     <div className="flex items-center space-x-1.5">
                       <Info className="w-3.5 h-3.5 text-white/30" />
                       <span className="uppercase tracking-wider">Status: <span className="text-white font-bold">{c.status}</span></span>
+                    {c.source === 'sec-edgar-primary' && c.url && (
+                      <a
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border-l border-white/10 pl-3 text-cyan-300 hover:text-cyan-200 underline"
+                      >
+                        SEC filing
+                      </a>
+                    )}
                     </div>
                     <div className="flex items-center space-x-1.5 border-l border-white/10 pl-3">
                       <span className="uppercase tracking-wider">Verification: 
