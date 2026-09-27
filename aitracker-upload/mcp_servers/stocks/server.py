@@ -74,6 +74,19 @@ def build_server(service: StockService | None = None) -> MCPServer:
         history = EarningsService.from_env(mode).get_earnings(symbol)
         return history.model_dump()
 
+    @server.tool(
+        name="get_rotation",
+        description="Detect hardware-versus-application AI capital-rotation signals over 1d, 5d, and 20d windows using the curated AI universe.",
+    )
+    def get_rotation() -> dict:
+        import os
+
+        from app.agents.rotation import RotationAgent
+
+        mode = os.getenv("STOCKS_MODE", "fixture") or "fixture"
+        result = RotationAgent().run()
+        return result.model_dump()
+
     @server.tool(name="list_watchlist", description="List the tracked watchlist symbols.")
     def list_watchlist() -> list[str]:
         return svc.list_watchlist()
