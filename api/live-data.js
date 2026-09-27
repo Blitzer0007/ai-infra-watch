@@ -30,9 +30,11 @@ async function quote(symbol) {
   const result = j && j.chart && j.chart.result && j.chart.result[0];
   const meta = result && result.meta;
   const closes = result && result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close || [];
-  const prior = [...closes].reverse().find(v => typeof v === 'number');
-  const price = typeof (meta && meta.regularMarketPrice) === 'number' ? meta.regularMarketPrice : prior;
-  const prevClose = meta && meta.previousClose;
+  const validCloses = closes.filter(v => typeof v === 'number');
+  const latestClose = validCloses.length ? validCloses[validCloses.length - 1] : undefined;
+  const priorCloseFromSeries = validCloses.length > 1 ? validCloses[validCloses.length - 2] : undefined;
+  const price = typeof (meta && meta.regularMarketPrice) === 'number' ? meta.regularMarketPrice : latestClose;
+  const prevClose = typeof priorCloseFromSeries === 'number' ? priorCloseFromSeries : (meta && meta.previousClose);
   const changePct = typeof price === 'number' && typeof prevClose === 'number' && prevClose !== 0 ? ((price / prevClose) - 1) * 100 : 0;
   if (typeof price !== 'number') throw new Error('No price');
   return { price, changePct };
