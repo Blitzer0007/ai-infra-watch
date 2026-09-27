@@ -3,26 +3,13 @@ import { Activity, BarChart3, CalendarDays, FileText, Globe2, Network, Search, S
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { buildIntelligence } from '../utils/intelligence';
 import { buildPositionAnalyses, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
+import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 
 type Price = { price: number; changePct: number };
 type Props = { livePrices?: Record<string, Price> };
 
-const WATCHLIST = [
-  ['000660.KS','SK Hynix','Memory','HBM / DRAM','MU · SNDK'], ['SNDK','SanDisk','Storage','Enterprise SSD / NAND','MU · WDC'],
-  ['MU','Micron','Memory','HBM / DRAM','SK Hynix · NVDA'], ['TEAM','Atlassian','Enterprise Software','AI software','CRM · NOW'],
-  ['SOFI','SoFi','Fintech','Rates / consumer credit','HOOD · NU'], ['CRM','Salesforce','Enterprise Software','Agentic CRM / AI','NOW · MSFT'],
-  ['AMZN','Amazon','AI Platform','AWS / capex','MSFT · GOOGL'], ['GOOGL','Alphabet','AI Platform','Gemini / TPU / Cloud','MSFT · AMZN'],
-  ['PLTR','Palantir','AI Software','AIP / government AI','MSFT · SNOW'], ['CBRS','Cerebras','AI Compute','AI accelerators','NVDA · AMD'],
-  ['RUM','Rumble','Media','Video / cloud','META · GOOGL'], ['QCOM','Qualcomm','Semiconductors','Edge AI / connectivity','NVDA · AMD'],
-  ['INTC','Intel','Semiconductors','Foundry / x86 / AI','AMD · TSMC'], ['SOXX','iShares Semiconductor ETF','Semiconductors','Sector breadth','SOXL · SMH'],
-  ['IREN','IREN','AI Infrastructure','Data centers / power','NBIS · DGXX'], ['TSM','TSMC','Semiconductors','Foundry / advanced nodes','NVDA · AMD'],
-  ['AMD','AMD','AI Compute','Instinct accelerators','NVDA · AVGO'], ['TSLA','Tesla','AI / Robotics','FSD / robotics','NVDA · META'],
-  ['AAPL','Apple','AI Platform','Device AI / ecosystem','MSFT · GOOGL'], ['ONDS','Ondas','AI / Autonomy','Wireless / autonomy','QCOM · NOK'],
-  ['CIFR','Cipher Mining','AI Infrastructure','Power / data centers','IREN · DGXX'], ['IONQ','IonQ','Quantum','Quantum computing','NVDA · IBM'],
-  ['NOK','Nokia','Networking','AI-RAN / telecom','QCOM · AMPG'], ['TRT','Trio-Tech','Semiconductor Services','Testing / manufacturing','AMKR · INTC'],
-  ['AMPG','AmpliTech','RF Hardware','AI-RAN / RF','NOK · QCOM'], ['DELL','Dell','AI Hardware','AI servers / storage','NVDA · HPE'],
-  ['IBM','IBM','Enterprise AI','watsonx / hybrid cloud','MSFT · ORCL'],
-] as const;
+const WATCHLIST = STOCK_UNIVERSE;
+
 
 export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   const [tab, setTab] = useState('overview');
@@ -88,7 +75,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
                 <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search ticker, name or theme" className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs outline-none"/>
               </div>
               <select value={group} onChange={e => setGroup(e.target.value)} className="bg-[#101318] border border-white/10 rounded-lg px-3 text-xs">
-                {['All','AI Infrastructure','AI Compute','AI Platform','Enterprise Software','Memory','Semiconductors','Healthcare'].map(g => <option key={g}>{g}</option>)}
+                {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
               </select>
             </div>
             <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
@@ -100,12 +87,12 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
       {tab === 'watchlist' && (
         <Panel title="Watchlist intelligence universe" subtitle="27 names analyzed using the same market/peer/rotation framework">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-            {WATCHLIST.map(w =>
-              <button key={w[0]} onClick={() => setSelected(w[0])} className={'text-left border rounded-xl p-3 ' + (selected === w[0] ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
-                <div className="flex justify-between"><span className="font-black text-xs">{w[0]}</span><span className="text-[10px] text-white/25">analyze</span></div>
-                <div className="text-xs mt-1">{w[1]}</div>
-                <div className="text-[10px] text-white/35 mt-1">{w[2]} · {w[3]}</div>
-                <div className="text-[9px] text-white/25 mt-2">Peers: {w[4]}</div>
+            {WATCHLIST.map((w) =>
+              <button key={w.symbol} onClick={() => setSelected(w.symbol)} className={'text-left border rounded-xl p-3 ' + (selected === w.symbol ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
+                <div className="flex justify-between"><span className="font-black text-xs">{w.symbol}</span><span className="text-[10px] text-white/25">analyze</span></div>
+                <div className="text-xs mt-1">{w.name}</div>
+                <div className="text-[10px] text-white/35 mt-1">{w.group} · {w.theme}</div>
+                <div className="text-[9px] text-white/25 mt-2">Peers: {w.peers.join(' · ')}</div>
               </button>
             )}
           </div>
