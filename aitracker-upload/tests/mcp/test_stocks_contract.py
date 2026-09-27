@@ -26,7 +26,7 @@ from mcp_servers.stocks.providers import FixtureProvider
 from mcp_servers.stocks.schemas import Quote, QuoteBatch
 from mcp_servers.stocks.service import FIXTURE_PATH
 
-EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "list_watchlist", "health"}
+EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "get_rotation", "list_watchlist", "health"}
 
 
 def _clock() -> str:
@@ -125,3 +125,9 @@ def test_get_earnings_schema_advertises_symbol(server):
     tool = next(t for t in tools if t.name == "get_earnings")
     props = (tool.input_schema or {}).get("properties", {})
     assert "symbol" in props
+
+
+def test_get_rotation_tool_is_schema_discoverable(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_rotation")
+    assert (tool.input_schema or {}).get("properties", {}) == {}
