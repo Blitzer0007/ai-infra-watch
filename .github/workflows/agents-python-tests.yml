@@ -12,6 +12,7 @@ on:
       - "aitracker-upload/app/agents/**"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/requirements-ingest.txt"
+      - "aitracker-upload/scripts/**"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
       - "aitracker-upload/tests/api/**"
@@ -23,6 +24,12 @@ on:
       - "tests/test_mcp_integration.py"
       - "aitracker-upload/mcp_servers/**"
       - "aitracker-upload/app/rag/**"
+      - "aitracker-upload/app/agents/**"
+      - "aitracker-upload/app/mcp_client/**"
+      - "aitracker-upload/scripts/**"
+      - "aitracker-upload/tests/agents/**"
+      - "aitracker-upload/tests/mcp/**"
+      - "aitracker-upload/tests/api/**"
       - ".github/workflows/agents-python-tests.yml"
 
 concurrency:
@@ -64,7 +71,8 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/mcp/test_stocks_contract.py aitracker-upload/tests/mcp/test_filings_contract.py
+        run: |
+          python -m pytest -q             aitracker-upload/tests/mcp/test_stocks_contract.py             aitracker-upload/tests/mcp/test_filings_contract.py             aitracker-upload/tests/mcp/test_contracts.py             aitracker-upload/tests/mcp/test_event_study.py             aitracker-upload/tests/mcp/test_relationships.py
 
       - name: Run API contract tests
         env:
