@@ -9,6 +9,10 @@ on:
       - "tests/test_mcp_integration.py"
       - "aitracker-upload/mcp_servers/**"
       - "aitracker-upload/app/rag/**"
+      - "aitracker-upload/app/agents/**"
+      - "aitracker-upload/app/mcp_client/**"
+      - "aitracker-upload/tests/agents/**"
+      - "aitracker-upload/tests/mcp/**"
       - ".github/workflows/agents-python-tests.yml"
   pull_request:
     paths:
@@ -36,3 +40,12 @@ jobs:
 
       - name: Run root LangGraph tests
         run: python -m pytest -q tests/test_agents.py tests/test_mcp_integration.py
+
+      - name: Install backend agent dependencies
+        run: python -m pip install -r aitracker-upload/requirements.txt
+
+      - name: Run autonomous agent tests
+        env:
+          PYTHONPATH: aitracker-upload
+          EVAL_STUB: "true"
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py
