@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from statistics import mean
 from typing import Any
 
 from .state import AgentState
@@ -28,6 +27,9 @@ def synthesis_agent(state: AgentState) -> dict[str, Any]:
         for name, data in ranked
     ]
 
+    market_mcp = market.get("mcpEvidence", {})
+    risk_mcp = risk.get("mcpEvidence")
+
     return {
         "synthesis": {
             "topObservedGroup": ranked[0][0] if ranked else None,
@@ -36,6 +38,13 @@ def synthesis_agent(state: AgentState) -> dict[str, Any]:
             "portfolioBreadth": market.get("portfolioBreadth"),
             "rotationSignal": rotation,
             "riskChannels": list(risk.get("channels", {}).keys()),
+            "mcpEvidence": {
+                "marketQuotesRetrieved": bool(market_mcp.get("quotes")),
+                "riskEvidenceRetrieved": risk_mcp is not None,
+                "riskSource": risk.get("mcpEvidence") and (
+                    "filings_mcp" if risk.get("note", "").startswith("Company-specific") else "risk_mcp"
+                ),
+            },
             "interpretation": (
                 "Observed relative-strength signal from the current market snapshot; "
                 "this does not establish literal capital flows or causality."
