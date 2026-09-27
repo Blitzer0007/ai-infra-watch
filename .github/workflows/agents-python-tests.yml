@@ -24,6 +24,10 @@ on:
       - "aitracker-upload/app/rag/**"
       - ".github/workflows/agents-python-tests.yml"
 
+concurrency:
+  group: python-agents-tests
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
