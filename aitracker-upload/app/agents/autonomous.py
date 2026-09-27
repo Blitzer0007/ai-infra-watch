@@ -105,6 +105,8 @@ Rules:
 - Use explicitly named tickers when the selected schema supports symbol/symbols.
 - Do not claim current facts unless retrieved from a tool result.
 - Stop when the evidence is sufficient.
+- Do not repeat the exact same tool with the exact same arguments unless the
+  prior call failed and retrying is necessary.
 '''
 
 
@@ -143,9 +145,32 @@ class AutonomousMCPAgent:
             return self.planner(question, tools, history)
         mode = os.getenv("AUTONOMOUS_MODE", "llm").strip().lower()
         if mode == "keyword" or self.client.provider == "stub":
-            plans = keyword_router(question, tools, max_tools=1)
+            used = {
+                (str(item.get("tool", "")), json.dumps(item.get("arguments") or {}, sort_keys=True))
+                for item in history
+                if isinstance(item, dict) and item.get("tool")
+            }
+            candidates = [
+                tool for tool in tools
+                if (tool.qualified_name, json.dumps({}, sort_keys=True)) not in used
+            ]
+            # Avoid exact duplicate calls while still allowing tools with
+            # symbol/symbols arguments to be selected when the arguments differ.
+            filtered = []
+            for tool in tools:
+                candidate_args = {}
+                props = (tool.input_schema or {}).get("properties") or {}
+                symbols = extract_symbols(question)
+                if "symbol" in props and symbols:
+                    candidate_args["symbol"] = symbols[0]
+                if "symbols" in props and symbols:
+                    candidate_args["symbols"] = symbols
+                key = (tool.qualified_name, json.dumps(candidate_args, sort_keys=True))
+                if key not in used:
+                    filtered.append(tool)
+            plans = keyword_router(question, filtered, max_tools=1)
             if not plans:
-                return {"action": "final", "answer": "No available MCP tool could answer this question."}
+                return {"action": "final", "answer": "No unused MCP tool matches the question; the retrieved evidence can be finalized."}
             plan = plans[0]
             return {"action": "tool", "tool": plan.tool, "arguments": plan.arguments, "reason": "deterministic fallback router"}
         raw = self.client.generate(_planner_prompt(question, tools, history), max_tokens=800, temperature=0.0)
