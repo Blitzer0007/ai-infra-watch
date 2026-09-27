@@ -93,7 +93,7 @@ def build_report(result: IngestAgentResult) -> str:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="ingest_filings",
-        description="Fetch EDGAR filings for the ai_stocks universe into the corpus dir.",
+        description="Fetch SEC EDGAR filings into the corpus dir.",
     )
     p.add_argument(
         "--mode",
