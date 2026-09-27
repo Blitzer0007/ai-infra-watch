@@ -134,16 +134,8 @@ def test_autonomous_keyword_fallback_avoids_duplicate_calls():
 
 
 def test_autonomous_cross_source_research_uses_contract_earnings_rotation():
-    session = FakeSession(
+    stocks = FakeSession(
         specs=[
-            dict(
-                name="get_contracts",
-                description="Extract contract-related disclosures from primary SEC 8-K filings, including material agreements and financial obligations.",
-                input_schema={
-                    "properties": {"symbol": {"type": "string"}},
-                    "required": ["symbol"],
-                },
-            ),
             dict(
                 name="get_earnings",
                 description="Get past and upcoming earnings for one symbol, including EPS/revenue surprise.",
@@ -159,12 +151,26 @@ def test_autonomous_cross_source_research_uses_contract_earnings_rotation():
             ),
         ],
         call_returns={
-            "get_contracts": {"symbol": "AMD", "contracts": []},
             "get_earnings": {"symbol": "AMD", "events": []},
             "get_rotation": {"signals": [], "narrative": "No divergence fired."},
         },
     )
-    tb = MCPToolbox([_cfg("stocks"), _cfg("filings")], _factory({"stocks": session, "filings": session}))
+    filings = FakeSession(
+        specs=[
+            dict(
+                name="get_contracts",
+                description="Extract contract-related disclosures from primary SEC 8-K filings, including material agreements and financial obligations.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+        ],
+        call_returns={
+            "get_contracts": {"symbol": "AMD", "contracts": []},
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks"), _cfg("filings")], _factory({"stocks": stocks, "filings": filings}))
     tb.connect()
     try:
         agent = AutonomousMCPAgent(tb, max_steps=3)
@@ -179,4 +185,5 @@ def test_autonomous_cross_source_research_uses_contract_earnings_rotation():
         "stocks.get_earnings",
         "stocks.get_rotation",
     }
-    assert session.calls
+    assert stocks.calls
+    assert filings.calls
