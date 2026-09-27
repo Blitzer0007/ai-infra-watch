@@ -92,3 +92,40 @@ def test_autonomous_has_a_hard_step_bound():
 
     assert result.resolution in {"max_steps", "error"}
     assert len(result.trajectory.steps) <= (MAX_STEPS * 4 + 4)
+
+
+
+def test_autonomous_keyword_fallback_avoids_duplicate_calls():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_earnings",
+                description="Get past and upcoming earnings for one symbol.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="search_filings",
+                description="Search SEC filings for contracts and material agreements.",
+                input_schema={
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+        ],
+        call_returns={
+            "get_earnings": {"symbol": "AMD", "events": [{"date": "2026-09-01"}]},
+            "search_filings": {"query": "Analyze AMD earnings and contracts", "hits": []},
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks"), _cfg("filings")], _factory({"stocks": session, "filings": session}))
+    try:
+        agent = AutonomousMCPAgent(tb, max_steps=2)
+        result = agent.run("Analyze AMD earnings")
+    finally:
+        tb.close()
+
+    assert result.calls
+    assert len({c.tool for c in result.calls}) <= 2
