@@ -89,6 +89,27 @@ def build_server(service: StockService | None = None) -> MCPServer:
         result = RotationAgent(service=CandleService.from_env(mode)).run()
         return result.model_dump()
 
+    @server.tool(
+        name="get_event_study",
+        description="Compute earnings-event T+1, T+5, and T+20 session returns for one symbol, using reported earnings dates and daily candles.",
+    )
+    def get_event_study(symbol: str) -> dict:
+        import os
+
+        from .event_study import EventStudyService
+
+        mode = os.getenv("STOCKS_MODE", "fixture") or "fixture"
+        return EventStudyService.from_env(mode).get_study(symbol)
+
+    @server.tool(
+        name="get_relationships",
+        description="Resolve a symbol's configured AI Infra Watch peer, theme, group, and geography relationships.",
+    )
+    def get_relationships(symbol: str) -> dict:
+        from .relationships import RelationshipService
+
+        return RelationshipService.from_env().get(symbol)
+
     @server.tool(name="list_watchlist", description="List the tracked watchlist symbols.")
     def list_watchlist() -> list[str]:
         return svc.list_watchlist()
