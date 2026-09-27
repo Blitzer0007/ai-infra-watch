@@ -11,6 +11,7 @@ on:
       - "aitracker-upload/app/rag/**"
       - "aitracker-upload/app/agents/**"
       - "aitracker-upload/app/mcp_client/**"
+      - "aitracker-upload/requirements-ingest.txt"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
       - ".github/workflows/agents-python-tests.yml"
