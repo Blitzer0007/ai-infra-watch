@@ -84,7 +84,9 @@ def build_server(service: StockService | None = None) -> MCPServer:
         from app.agents.rotation import RotationAgent
 
         mode = os.getenv("STOCKS_MODE", "fixture") or "fixture"
-        result = RotationAgent().run()
+        from mcp_servers.stocks.candles import CandleService
+
+        result = RotationAgent(service=CandleService.from_env(mode)).run()
         return result.model_dump()
 
     @server.tool(name="list_watchlist", description="List the tracked watchlist symbols.")
