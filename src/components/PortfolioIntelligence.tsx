@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { buildIntelligence } from '../utils/intelligence';
 import { Activity, BarChart3, CalendarDays, FileText, Globe2, Network, Search, ShieldAlert, TrendingDown, TrendingUp, Zap } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 
@@ -56,16 +57,6 @@ const EVENTS = [
   { t:'PHVS', date:'2026-09-08', title:'Phase 3 clinical data', kind:'Clinical', window:[-1,2,7,4,-3,-1] },
 ];
 
-const ROTATION = [
-  { d:'T-20', infra:48, compute:54, software:61, memory:50 },
-  { d:'T-10', infra:56, compute:58, software:57, memory:55 },
-  { d:'T-5', infra:63, compute:66, software:50, memory:61 },
-  { d:'T0', infra:72, compute:79, software:44, memory:68 },
-  { d:'T+1', infra:76, compute:81, software:42, memory:71 },
-  { d:'T+5', infra:81, compute:74, software:39, memory:76 },
-  { d:'T+20', infra:84, compute:70, software:36, memory:79 },
-];
-
 export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   const [tab,setTab] = useState('overview');
   const [q,setQ] = useState('');
@@ -76,6 +67,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   const price = (t:string) => livePrices[t];
   const filtered = useMemo(() => PORTFOLIO.filter(h => (group === 'All' || h.group === group) && (h.t + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())), [q,group]);
   const breadth = PORTFOLIO.filter(h => (price(h.t)?.changePct ?? 0) >= 0).length;
+  const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const sel = PORTFOLIO.find(h => h.t === selected) || PORTFOLIO[0];
 
   return <div className="space-y-6">
@@ -85,10 +77,10 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
     </div>
 
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-      <Metric label="AI infra pulse" value="84" suffix="/100" tone="up" icon={<Zap/>}/>
-      <Metric label="Compute pulse" value="70" suffix="/100" tone="up" icon={<Activity/>}/>
-      <Metric label="Software spread" value="-18" suffix=" pts" tone="down" icon={<TrendingDown/>}/>
-      <Metric label="Geopolitical risk" value="HIGH" suffix="" tone="warn" icon={<ShieldAlert/>}/>
+      <Metric label="AI infra signal" value={String(Math.round(intelligence.groups.find(g=>g.name==="AI Infrastructure")?.score ?? 0))} suffix="/100" tone={(intelligence.groups.find(g=>g.name==="AI Infrastructure")?.score ?? 50)>=50?"up":"down"} icon={<Zap/>}/>
+      <Metric label="Compute signal" value={String(Math.round(intelligence.groups.find(g=>g.name==="AI Compute")?.score ?? 0))} suffix="/100" tone={(intelligence.groups.find(g=>g.name==="AI Compute")?.score ?? 50)>=50?"up":"down"} icon={<Activity/>}/>
+      <Metric label="Software vs universe" value={(intelligence.groups.find(g=>g.name==="Enterprise Software")?.relativeToUniverse ?? 0).toFixed(2)} suffix=" pts" tone={(intelligence.groups.find(g=>g.name==="Enterprise Software")?.relativeToUniverse ?? 0)>=0?"up":"down"} icon={<TrendingDown/>}/>
+      <Metric label="Top live group" value={intelligence.topGroup || "—"} suffix="" tone="warn" icon={<ShieldAlert/>}/>
     </div>
 
     <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
@@ -113,18 +105,22 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
 
     {tab==='rotation' && <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
       <Panel title="Money rotation engine" subtitle="Relative-strength model across infrastructure, compute, memory and software">
-        <div className="h-80"><ResponsiveContainer width="100%" height="100%"><AreaChart data={ROTATION}><CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="d" stroke="#ffffff35" tick={{fontSize:10}}/><YAxis stroke="#ffffff35" domain={[20,90]} tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}}/><Area dataKey="infra" stroke="#34d399" fill="#34d39912" strokeWidth={3}/><Area dataKey="compute" stroke="#60a5fa" fill="#60a5fa08" strokeWidth={2}/><Area dataKey="software" stroke="#fb7185" fill="#fb718508" strokeWidth={2}/><Area dataKey="memory" stroke="#fbbf24" fill="#fbbf2408" strokeWidth={2}/></AreaChart></ResponsiveContainer></div>
-        <div className="text-[10px] text-white/30">Production version should calculate this from live price/volume, sector ETFs, peer spreads and event persistence.</div>
+        <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={intelligence.groups.filter(g=>g.avgChange!==0 || g.members.some(m=>livePrices[m])).map(g=>({group:g.name,score:Math.round(g.score),avg:g.avgChange}))}><CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" domain={[0,100]} tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n,p)=> n==='score' ? [v+'/100','Signal'] : [v+'%','Avg daily return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
+        <div className="text-[10px] text-white/30">Calculated from current daily returns, breadth and relative performance versus the tracked universe. It is a signal, not a claim of literal capital flows.</div>
       </Panel>
       <Panel title="Pair monitor" subtitle="Relationships to test for factor rotation">
-        <div className="space-y-2">{[['NVDA','AMD','Accelerator competition'],['NOW','CRM','Enterprise software breadth'],['MU','000660.KS','Memory cycle'],['NBIS','IREN','AI infrastructure'],['DGXX','CIFR','Power-to-compute'],['META','GOOGL','AI platform capex']].map(x=><div key={x[0]} className="border border-white/5 rounded-xl p-3"><div className="text-xs font-bold">{x[0]} ↔ {x[1]}</div><div className="text-[10px] text-white/35 mt-1">{x[2]}</div></div>)}</div>
+        <div className="space-y-2">{intelligence.pairSignals.map(x=><div key={x.left+x.right} className="border border-white/5 rounded-xl p-3"><div className="flex justify-between"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono '+((x.spread ?? 0)>=0?'text-emerald-400':'text-rose-400')}>{x.spread==null?'—':(x.spread>=0?'+':'')+x.spread.toFixed(2)+' pts'}</div></div><div className="text-[10px] text-white/35 mt-1">{x.label}</div></div>)}</div>
       </Panel>
     </div>}
 
-    {tab==='events' && <div className="grid grid-cols-1 xl:grid-cols-[.8fr_1.2fr] gap-4">
-      <Panel title="Event library" subtitle="Historical price response around catalysts"><div className="space-y-2">{EVENTS.map(e=><button key={e.t+e.date} onClick={()=>setEvent(e)} className={'w-full text-left border rounded-xl p-3 '+(event.t===e.t&&event.date===e.date?'border-emerald-400/30 bg-emerald-400/5':'border-white/5')}><div className="flex justify-between"><b className="text-xs">{e.t}</b><span className="text-[9px] text-white/25">{e.date}</span></div><div className="text-xs mt-1">{e.title}</div><div className="text-[9px] text-white/30 mt-1">{e.kind}</div></button>)}</div></Panel>
-      <Panel title={event.t+' event window'} subtitle="T-5 → T+20 persistence test"><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={event.window.map((r,i)=>({w:['T-5','T-1','T0','T+1','T+5','T+20'][i],r}))}><CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="w" stroke="#ffffff35" tick={{fontSize:10}}/><YAxis stroke="#ffffff35" tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}}/><Bar dataKey="r" fill="#34d399" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div><div className="grid grid-cols-3 gap-2"><Metric label="T0" value={(event.window[2]>=0?'+':'')+event.window[2]} suffix="%" tone={event.window[2]>=0?'up':'down'}/><Metric label="T+5" value={(event.window[4]>=0?'+':'')+event.window[4]} suffix="%" tone={event.window[4]>=0?'up':'down'}/><Metric label="T+20" value={(event.window[5]>=0?'+':'')+event.window[5]} suffix="%" tone={event.window[5]>=0?'up':'down'}/></div></Panel>
-    </div>}
+    {tab==='events' && <Panel title="Event study" subtitle="Historical event windows will populate once catalyst dates are paired to verified price history">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <Insight title="Data status" body="Live prices are available. Verified event-date price history is the remaining input for T-5 / T0 / T+1 / T+5 / T+20 calculations." icon={<CalendarDays/>}/>
+        <Insight title="Method" body="Measure raw return and benchmark-relative return at each window, then compare persistence across repeated event types." icon={<BarChart3/>}/>
+        <Insight title="Guardrail" body="Do not treat a single catalyst reaction as causal proof; separate company-specific news from sector and macro moves." icon={<ShieldAlert/>}/>
+      </div>
+      <div className="mt-4 text-xs text-white/35">Current event examples are retained in code only as a scaffold and are not presented here as verified historical returns.</div>
+    </Panel>}
 
     {tab==='network' && <Panel title="Relationship graph" subtitle="Competition and second-order exposure — click a node"><svg viewBox="0 0 920 420" className="w-full rounded-xl bg-[#0D1015] border border-white/5">{[['NVDA',140,210],['AMD',330,100],['MU',330,320],['META',550,100],['NOW',550,320],['NBIS',790,150],['CRM',790,290]].map(n=><g key={n[0]} onClick={()=>setSelected(n[0])} style={{cursor:'pointer'}}><circle cx={n[1]} cy={n[2]} r="38" fill={selected===n[0]?'#153528':'#15181E'} stroke={selected===n[0]?'#34d399':'#334155'} strokeWidth="2"/><text x={n[1]} y={n[2]+5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700">{n[0]}</text></g>)}<line x1="178" y1="195" x2="292" y2="115" stroke="#34d399" strokeWidth="3"/><line x1="178" y1="225" x2="292" y2="305" stroke="#fbbf24" strokeWidth="2"/><line x1="368" y1="100" x2="512" y2="100" stroke="#60a5fa" strokeWidth="2"/><line x1="368" y1="320" x2="512" y2="320" stroke="#fb7185" strokeWidth="2"/><line x1="588" y1="115" x2="752" y2="145" stroke="#34d399" strokeWidth="2"/><line x1="588" y1="305" x2="752" y2="290" stroke="#fb7185" strokeWidth="2"/></svg><div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3"><Insight title="NVDA ↔ AMD" body="Direct accelerator competition." icon={<Activity/>}/><Insight title="MU ↔ SK Hynix" body="Memory-cycle relationship." icon={<Network/>}/><Insight title="NOW ↔ CRM" body="Enterprise-software relative strength." icon={<FileText/>}/></div></Panel>}
 
