@@ -30,6 +30,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r aitracker-upload/requirements.txt
+          python -m pip install -r aitracker-upload/requirements-ingest.txt
 
       - name: Validate EDGAR user agent
         env:
