@@ -23,6 +23,7 @@ Usage
     python scripts/ingest_filings.py                      # whole universe, fixture
     python scripts/ingest_filings.py --symbols NVDA MSFT  # a subset
     python scripts/ingest_filings.py --mode live          # real EDGAR
+    python scripts/ingest_filings.py --mode live --watchlist
 
 `main()` takes injectable `client` / `filings_dir` / `universe` seams so the
 test suite can drive it against a FixtureEdgarClient + a tmp dir with zero
@@ -44,6 +45,8 @@ from app.agents.ingest import IngestAgent  # noqa: E402
 from app.agents.schemas import IngestAgentResult  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.universe import Universe, get_universe  # noqa: E402
+
+WATCHLIST_PATH = ROOT.parent / "data" / "stock_watchlist.json"
 from mcp_servers.filings.edgar import EdgarClient  # noqa: E402
 from mcp_servers.filings.edgar import from_env as edgar_from_env  # noqa: E402
 
@@ -86,6 +89,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Ticker subset to ingest (default: the whole ai_stocks universe)",
     )
     p.add_argument(
+        "--watchlist",
+        action="store_true",
+        help="Use the root data/stock_watchlist.json symbols instead of ai_stocks",
+    )
+    p.add_argument(
         "--filings-dir",
         default=None,
         help="Corpus output dir (default: data/filings under DATA_DIR)",
@@ -112,8 +120,22 @@ def main(
     out_dir = Path(filings_dir or args.filings_dir or settings.DATA_DIR / "filings")
     universe = universe if universe is not None else get_universe()
 
+    symbols = args.symbols or None
+    if args.watchlist and symbols:
+        raise SystemExit("--watchlist cannot be combined with --symbols")
+    if args.watchlist:
+        import json
+
+        try:
+            raw = json.loads(WATCHLIST_PATH.read_text(encoding="utf-8"))
+            symbols = [str(row["symbol"]).strip().upper() for row in raw.get("watchlist", []) if row.get("symbol")]
+        except (OSError, json.JSONDecodeError, TypeError, KeyError) as exc:
+            raise SystemExit(f"failed to load watchlist: {WATCHLIST_PATH}: {exc}") from exc
+        if not symbols:
+            raise SystemExit(f"watchlist is empty: {WATCHLIST_PATH}")
+
     agent = IngestAgent(client=client, universe=universe, filings_dir=out_dir)
-    result = agent.run(symbols=args.symbols or None)
+    result = agent.run(symbols=symbols)
 
     print(f"corpus dir: {out_dir}")
     print(build_report(result))
