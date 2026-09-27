@@ -24,6 +24,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_servers.stocks import StockService, build_server
 from mcp_servers.stocks.providers import FixtureProvider
 from mcp_servers.stocks.schemas import Quote, QuoteBatch
+from app.agents.schemas import RotationAgentResult
 from mcp_servers.stocks.service import FIXTURE_PATH
 
 EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "get_rotation", "list_watchlist", "health"}
@@ -131,3 +132,9 @@ def test_get_rotation_tool_is_schema_discoverable(server):
     tools = _run(server.list_tools())
     tool = next(t for t in tools if t.name == "get_rotation")
     assert (tool.input_schema or {}).get("properties", {}) == {}
+
+
+def test_get_rotation_roundtrips_to_rotation_schema(server):
+    result = _run(server.call_tool("get_rotation", {}))
+    parsed = RotationAgentResult.model_validate_json(_text(result))
+    assert parsed.narrative
