@@ -70,3 +70,25 @@ def test_main_does_not_write_outside_injected_dir(tmp_path):
     after = {p.resolve() for p in Path.cwd().rglob("_index.json")}
     # The only new manifest is the one under tmp_path (outside cwd).
     assert after == before
+
+
+def test_load_watchlist_symbols_returns_dashboard_universe():
+    mod = _load_script()
+    symbols = mod._load_watchlist_symbols()
+    assert len(symbols) >= 20
+    assert "NVDA" in symbols
+    assert symbols == [s.upper() for s in symbols]
+
+
+def test_watchlist_and_symbols_cannot_be_combined(tmp_path):
+    mod = _load_script()
+    try:
+        mod.main(
+            argv=["--watchlist", "--symbols", "NVDA"],
+            client=FixtureEdgarClient(),
+            filings_dir=tmp_path,
+        )
+    except SystemExit as exc:
+        assert "cannot be combined" in str(exc)
+    else:
+        raise AssertionError("expected --watchlist/--symbols conflict")
