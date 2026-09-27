@@ -1,0 +1,7 @@
+# Lightweight dependencies for scheduled SEC EDGAR ingestion.
+# The deterministic lexical embedding fallback keeps this job independent
+# of the optional sentence-transformers / torch stack.
+numpy>=1.26,<3
+rank-bm25>=0.2.2
+langgraph>=1.0
+langchain-core>=0.3
