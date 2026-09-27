@@ -38,7 +38,7 @@
     <div class="page-head">
       <div class="eyebrow">Section 07 / Signals</div>
       <h1>Ask the Analyst</h1>
-      <p class="page-dek">A question box wired to the local agent backend. Your question is routed by a supervisor to a market agent, a filings agent, or both, and the answer comes back with the full routing trajectory so you can see exactly how it was handled. This runs against the Python service — not Finnhub — so it needs the backend running.</p>
+      <p class="page-dek">A question box wired to the local agent backend. Supervisor mode routes to market/filings specialists; Autonomous mode discovers the MCP tools at runtime and builds an evidence chain across market, SEC filings, milestones, earnings, and rotation. This runs against the Python service — not Finnhub — so it needs the backend running.</p>
     </div>
 
     <div class="notice mt-16">
@@ -63,6 +63,7 @@
         <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('How did NVDA move today?')">market</button>
         <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('What did the latest 10-K disclose about data center revenue growth?')">filings</button>
         <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('How did the stock move and what did the filing say about revenue?')">both</button>
+        <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('Analyze NVDA earnings, recent SEC filing milestones, and AI hardware vs application rotation')">research</button>
       </div>
       <div id="ask-results" class="mt-24"></div>
     </div>
