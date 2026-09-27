@@ -1,0 +1,61 @@
+name: Refresh SEC Filings Corpus
+
+on:
+  schedule:
+    # Check EDGAR hourly. The ingest agent deduplicates by accession number,
+    # so most runs only perform lightweight metadata checks.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sec-filings-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r aitracker-upload/requirements.txt
+
+      - name: Validate EDGAR user agent
+        env:
+          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT }}
+        run: |
+          test -n "$EDGAR_USER_AGENT" || {
+            echo "::error::Missing repository secret EDGAR_USER_AGENT. Set it to a descriptive app/company name plus contact information."
+            exit 1
+          }
+
+      - name: Fetch and ingest latest filings
+        working-directory: aitracker-upload
+        env:
+          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT }}
+        run: |
+          python scripts/ingest_filings.py --mode live --watchlist
+
+      - name: Commit corpus changes
+        run: |
+          if git diff --quiet -- aitracker-upload/data/filings; then
+            echo "No new SEC filing content."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aitracker-upload/data/filings
+          git commit -m "chore(data): refresh SEC filings corpus"
+          git push
