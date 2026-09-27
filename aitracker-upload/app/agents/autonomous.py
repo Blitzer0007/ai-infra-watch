@@ -145,17 +145,14 @@ class AutonomousMCPAgent:
             return self.planner(question, tools, history)
         mode = os.getenv("AUTONOMOUS_MODE", "llm").strip().lower()
         if mode == "keyword" or self.client.provider == "stub":
-            used = {
-                (str(item.get("tool", "")), json.dumps(item.get("arguments") or {}, sort_keys=True))
+            used_tools = {
+                str(item.get("tool", ""))
                 for item in history
                 if isinstance(item, dict) and item.get("tool")
             }
-            candidates = [
-                tool for tool in tools
-                if (tool.qualified_name, json.dumps({}, sort_keys=True)) not in used
-            ]
-            # Avoid exact duplicate calls while still allowing tools with
-            # symbol/symbols arguments to be selected when the arguments differ.
+            # A single investigation should use each discovered tool at most
+            # once; this prevents a keyword fallback from looping on the same
+            # tool and encourages cross-source evidence gathering.
             filtered = []
             for tool in tools:
                 candidate_args = {}
@@ -165,8 +162,7 @@ class AutonomousMCPAgent:
                     candidate_args["symbol"] = symbols[0]
                 if "symbols" in props and symbols:
                     candidate_args["symbols"] = symbols
-                key = (tool.qualified_name, json.dumps(candidate_args, sort_keys=True))
-                if key not in used:
+                if tool.qualified_name not in used_tools:
                     filtered.append(tool)
             plans = keyword_router(question, filtered, max_tools=1)
             if not plans:
