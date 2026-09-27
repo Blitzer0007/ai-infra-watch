@@ -83,6 +83,31 @@ class FilingRef(BaseModel):
         return f"{self.symbol.lower()}_{form}_{acc}"
 
 
+class ContractRecord(BaseModel):
+    """One contract-related disclosure extracted from a primary SEC filing."""
+
+    symbol: str
+    date: str
+    form: str = "8-K"
+    accession: str = ""
+    url: str = ""
+    items: list[str] = Field(default_factory=list)
+    title: str = "Material agreement / financial obligation"
+    counterparties: list[str] = Field(default_factory=list)
+    disclosed_values: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    source: str = "sec-edgar-primary"
+    confidence: str = "primary_filing"
+
+
+class ContractTimeline(BaseModel):
+    """Recent contract-related SEC disclosures for one symbol."""
+
+    symbol: str
+    source: str = "live"
+    contracts: list[ContractRecord] = Field(default_factory=list)
+
+
 class MilestoneEvent(BaseModel):
     """One entry on a symbol's milestone timeline, derived from an 8-K filing.
 
