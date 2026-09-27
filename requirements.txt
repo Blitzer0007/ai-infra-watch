@@ -1,0 +1,9 @@
+# Vercel Python Function dependencies for the autonomous MCP endpoint.
+fastapi>=0.141,<1
+pydantic>=2.13,<3
+httpx>=0.28,<1
+mcp>=2.2,<3
+langgraph>=1.2,<2
+langchain-core>=1.6,<2
+numpy>=2.5,<3
+rank-bm25>=0.2.2
