@@ -348,7 +348,7 @@ export default function App() {
                 </div>
                 <p className="text-[11px] text-white/60 leading-normal mt-0.5">
                   {isLiveLoading 
-                    ? "Compiling intelligence reports from GDELT, Alpha Vantage, and Marketaux news sources..." 
+                    ? "Compiling live market quotes from Yahoo Finance and AI-infrastructure headlines from GDELT..." 
                     : liveData?.marketSentiment 
                       ? `Global AI Market: "${liveData.marketSentiment}"`
                       : "Live market quotes and AI-infrastructure news from the configured public data feeds."}
