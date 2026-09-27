@@ -86,6 +86,46 @@ def _required_params(tool: ToolInfo) -> list[str]:
     return list(req) if isinstance(req, list) else []
 
 
+_COMMON_UPPERCASE_WORDS = frozenset({
+    "I", "AI", "US", "UK", "CEO", "CFO", "CTO", "SEC", "ETF", "IPO",
+    "EPS", "GDP", "CPI", "MCP", "LLM", "API", "RAG", "Q1", "Q2", "Q3", "Q4",
+})
+
+
+def extract_symbols(question: str, max_symbols: int = 10) -> list[str]:
+    """Extract explicit ticker symbols from natural-language questions.
+
+    Supports dollar-prefixed symbols, "ticker/symbol/stock NAME" phrases,
+    and conservative uppercase ticker tokens.
+    """
+    symbols: list[str] = []
+
+    for match in re.finditer(r"\$([A-Z][A-Z0-9.-]{0,5})\b", question):
+        sym = match.group(1).upper()
+        if sym not in symbols:
+            symbols.append(sym)
+
+    for match in re.finditer(
+        r"\b(?:ticker|symbol|stock)\s*[:#-]?\s*([A-Z][A-Z0-9.-]{0,5})\b",
+        question,
+        flags=re.IGNORECASE,
+    ):
+        sym = match.group(1).upper()
+        if sym not in _COMMON_UPPERCASE_WORDS and sym not in symbols:
+            symbols.append(sym)
+
+    for token in re.findall(r"\b[A-Z][A-Z0-9.-]{1,5}\b", question):
+        sym = token.upper().rstrip(".")
+        if (
+            sym not in _COMMON_UPPERCASE_WORDS
+            and any(ch.isalpha() for ch in sym)
+            and sym not in symbols
+        ):
+            symbols.append(sym)
+
+    return symbols[:max_symbols]
+
+
 def _build_arguments(tool: ToolInfo, question: str) -> dict[str, Any] | None:
     """Fill a tool's args from the question, or return None if we can't.
 
@@ -99,6 +139,11 @@ def _build_arguments(tool: ToolInfo, question: str) -> dict[str, Any] | None:
     for name in props:
         if name in _QUESTION_KEYS:
             args[name] = question
+    symbols = extract_symbols(question)
+    if "symbol" in props and symbols:
+        args["symbol"] = symbols[0]
+    if "symbols" in props and symbols:
+        args["symbols"] = symbols
     # Every required param must be satisfiable.
     for name in required:
         if name not in args:
