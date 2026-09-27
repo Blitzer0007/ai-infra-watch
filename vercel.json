@@ -9,6 +9,9 @@
     },
     "api/agent-ask.js": {
       "maxDuration": 30
+    },
+    "api/agent-python.py": {
+      "maxDuration": 60
     }
   }
 }
