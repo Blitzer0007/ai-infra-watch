@@ -55,6 +55,17 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
         result = svc.answer_question(question)
         return result.model_dump()
 
+    @server.tool(
+        name="get_milestones",
+        description="Get a symbol's recent material-event milestones derived from SEC 8-K filings, with accession numbers and auditable EDGAR URLs.",
+    )
+    def get_milestones(symbol: str) -> dict:
+        from .milestones import MilestoneService
+
+        mode = getattr(svc, "mode", "fixture")
+        timeline = MilestoneService.from_env(mode=mode).get_timeline(symbol)
+        return timeline.model_dump()
+
     @server.tool(name="list_documents", description="List the document IDs available in the corpus.")
     def list_documents() -> list[str]:
         return svc.list_documents()
