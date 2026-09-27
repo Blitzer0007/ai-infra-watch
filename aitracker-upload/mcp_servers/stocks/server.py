@@ -45,7 +45,6 @@ def build_server(service: StockService | None = None) -> MCPServer:
         name="mcp-server-stocks",
         title="Stocks",
         description="Real-time US stock quotes (Finnhub) + live feed resource.",
-        version="0.1.0",
     )
 
     @server.tool(name="get_quote", description="Get a real-time quote for one stock symbol.")
