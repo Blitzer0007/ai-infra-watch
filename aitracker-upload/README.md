@@ -1,6 +1,6 @@
 # AI Infra Watch
 
-A static, multi-page dashboard for tracking AI infrastructure stocks (NVIDIA, Nebius, Digi Power X), disclosed contracts for each company, congressional trading disclosures, and macro/political risk. No build step, no backend — plain HTML/CSS/JS you can host anywhere.
+A multi-page dashboard plus a production-oriented FastAPI/MCP research backend for tracking AI infrastructure stocks, SEC disclosures, contracts, earnings, event reactions, relationships, and macro/political risk. The legacy HTML pages remain static; the Python backend under `app/` powers the agentic research and MCP APIs.
 
 ## What's inside
 
@@ -14,6 +14,27 @@ A static, multi-page dashboard for tracking AI infrastructure stocks (NVIDIA, Ne
 | `pages/watchlist.html` | Rules-based flag system you configure yourself — **not trading signals** |
 | `pages/settings.html` | API key, watchlist symbols, refresh interval, local data management |
 
+## Python research backend
+
+The `app/` package exposes the FastAPI research API, including `/api/ask`, `/api/ask/autonomous`, `/api/earnings`, `/api/milestones`, and `/api/contracts`. MCP servers under `mcp_servers/` provide runtime tools for stocks, filings, contracts, event studies, relationships, and notifications.
+
+Local development:
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-ingest.txt
+PYTHONPATH=. uvicorn app.main:app --reload
+```
+
+Production container:
+
+```bash
+docker build -t ai-infra-watch-backend .
+docker run --rm -p 8000:8000 ai-infra-watch-backend
+```
+
+For the autonomous endpoint, set `AI_INFRA_AGENT_TOKEN` on the backend and send the same value from the Vercel proxy as `AI_INFRA_AGENT_TOKEN`. When the token is configured, `/api/ask/autonomous` requires a Bearer token. `CORS_ORIGINS` can be set to a comma-separated list of allowed browser origins.
+
 ## Setup (2 minutes)
 
 1. **Get a free Finnhub API key**: register at [finnhub.io/register](https://finnhub.io/register). Free tier gives you 60 API calls/minute and real-time US quotes.
@@ -26,7 +47,11 @@ That's it — the ticker strip and Overview page will start pulling live data.
 
 ## Hosting
 
-This is a static site — any of these work with zero configuration:
+The legacy HTML pages are static and can still be hosted independently. The main React dashboard in the parent repository is deployed on Vercel; its `/api/agent-ask` route proxies autonomous research requests to this Python backend when `AI_INFRA_AGENT_URL` is configured.
+
+For the Python backend, use a container-capable host or Vercel's Python/FastAPI runtime with the `aitracker-upload` directory as the backend project root.
+
+The static HTML pages also work on:
 
 - **GitHub Pages**: push this folder to a repo, enable Pages in repo settings, done.
 - **Netlify / Vercel**: drag-and-drop the folder onto their dashboard, or connect a git repo.
