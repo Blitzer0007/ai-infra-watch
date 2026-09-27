@@ -132,7 +132,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
 
       {tab === 'network' && <Panel title="Relationship graph" subtitle="Competition and second-order exposure — click a node">
         <svg viewBox="0 0 920 420" className="w-full rounded-xl bg-[#0D1015] border border-white/5">
-          {[['NVDA',140,210],['AMD',330,100],['MU',330,320],['META',550,100],['NOW',550,320],['NBIS',790,150],['CRM',790,290]].map(n => <g key={n[0]} onClick={() => setSelected(n[0])} style={{cursor:'pointer'}}>
+          {NETWORK_NODES.map(n => <g key={n[0]} onClick={() => setSelected(n[0])} style={{cursor:'pointer'}}>
             <circle cx={n[1]} cy={n[2]} r="38" fill={selected === n[0] ? '#153528' : '#15181E'} stroke={selected === n[0] ? '#34d399' : '#334155'} strokeWidth="2"/>
             <text x={n[1]} y={n[2]+5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700">{n[0]}</text>
           </g>)}
