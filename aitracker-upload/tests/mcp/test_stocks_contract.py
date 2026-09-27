@@ -36,7 +36,12 @@ def _clock() -> str:
 
 @pytest.fixture
 def server():
-    svc = StockService(provider=FixtureProvider(FIXTURE_PATH, clock=_clock), clock=_clock)
+    fixture_symbols = ["NVDA", "NBIS", "DGXX", "MSFT", "META", "AVGO"]
+    svc = StockService(
+        provider=FixtureProvider(FIXTURE_PATH, clock=_clock),
+        watchlist=fixture_symbols,
+        clock=_clock,
+    )
     return build_server(svc)
 
 
