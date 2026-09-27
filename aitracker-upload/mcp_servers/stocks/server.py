@@ -62,6 +62,18 @@ def build_server(service: StockService | None = None) -> MCPServer:
     def get_snapshot() -> dict:
         return svc.get_snapshot().model_dump()
 
+    @server.tool(
+        name="get_earnings",
+        description="Get past and upcoming earnings for one symbol, including EPS/revenue surprise and historical price reaction when available.",
+    )
+    def get_earnings(symbol: str) -> dict:
+        from .earnings import EarningsService
+        import os
+
+        mode = os.getenv("STOCKS_MODE", "fixture") or "fixture"
+        history = EarningsService.from_env(mode).get_earnings(symbol)
+        return history.model_dump()
+
     @server.tool(name="list_watchlist", description="List the tracked watchlist symbols.")
     def list_watchlist() -> list[str]:
         return svc.list_watchlist()
