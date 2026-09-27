@@ -13,6 +13,7 @@ import ProgressTracker from './components/ProgressTracker';
 import CongressTrades from './components/CongressTrades';
 import MacroPolitics from './components/MacroPolitics';
 import BuySellWatchlist from './components/BuySellWatchlist';
+import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
 
 export default function App() {
@@ -32,6 +33,36 @@ export default function App() {
   } | null>(null);
   const [isLiveLoading, setIsLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
+
+  const watchlistSymbols = [
+    '000660.KS','SNDK','TEAM','SOFI','CRM','AMZN','GOOGL','PLTR','CBRS','RUM','QCOM','INTC',
+    'SOXX','IREN','TSM','AMD','TSLA','AAPL','ONDS','CIFR','IONQ','NOK','TRT','AMPG','DELL','IBM'
+  ];
+
+  useEffect(() => {
+    if (activeView !== 'portfolio') return;
+    let cancelled = false;
+    async function updateWatchlistQuotes() {
+      const updated: Record<string, { price: number; changePct: number }> = {};
+      for (const s of watchlistSymbols) {
+        try {
+          const res = await fetchLiveQuote(s, config?.finnhubKey || '');
+          if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
+            updated[s] = { price: res.price, changePct: res.changePct };
+          }
+        } catch (e) {
+          // ignore individual quote failures
+        }
+      }
+      if (!cancelled) {
+        setTickerPrices(prev => ({ ...prev, ...updated }));
+        setLiveData(prev => ({ ...(prev || {}), stockPrices: { ...((prev && prev.stockPrices) || {}), ...updated } }));
+      }
+    }
+    updateWatchlistQuotes();
+    const interval = setInterval(updateWatchlistQuotes, 90000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [activeView, config]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
     setIsLiveLoading(true);
@@ -115,7 +146,7 @@ export default function App() {
     { id: 'tracker', label: 'Progress Tracker', index: '03', icon: Calendar },
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
-    { id: 'watchlist', label: 'Alert Targets', index: '06', icon: Bell },
+    { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
 
@@ -355,6 +386,7 @@ export default function App() {
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
               {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
+              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} />}
               {activeView === 'settings' && <Settings />}
             </motion.div>
           </AnimatePresence>
