@@ -1,3 +1,6 @@
+import portfolio from '../../data/portfolio_snapshot.json';
+import { STOCK_UNIVERSE, type StockUniverseEntry } from './stockUniverse';
+
 export type PricePoint = { price: number; changePct: number };
 export type IntelligenceGroup = {
   name: string;
@@ -25,16 +28,19 @@ export type IntelligenceSnapshot = {
   pairSignals: PairSignal[];
 };
 
-const GROUP_MEMBERS: Record<string, string[]> = {
-  'AI Infrastructure': ['DGXX', 'NBIS', 'VIVO', 'IREN', 'CIFR'],
-  'AI Compute': ['NVDA', 'AMD', 'CBRS', 'QCOM'],
-  'AI Platform': ['MSFT', 'META', 'GOOGL', 'AMZN', 'AAPL'],
-  'Enterprise Software': ['NOW', 'CRM', 'TEAM', 'IBM'],
-  'Memory': ['DRAM', 'MU', 'SNDK', '000660.KS'],
-  'Semiconductors': ['SOXL', 'SOXX', 'TSM', 'INTC'],
-  'Healthcare': ['PHVS'],
-  'Fintech': ['SOFI'],
-};
+const GROUP_MEMBERS = (() => {
+  const entries: Array<{ symbol: string; group: string }> = [
+    ...STOCK_UNIVERSE.map((item: StockUniverseEntry) => ({ symbol: item.symbol, group: item.group })),
+    ...portfolio.positions.map((item) => ({ symbol: item.symbol, group: item.group })),
+  ];
+  const groups = new Map<string, string[]>();
+  for (const entry of entries) {
+    const members = groups.get(entry.group) ?? [];
+    if (!members.includes(entry.symbol)) members.push(entry.symbol);
+    groups.set(entry.group, members);
+  }
+  return Object.fromEntries(groups.entries());
+})();
 
 const PAIRS: Array<[string,string,string]> = [
   ['NVDA','AMD','Accelerator relative strength'],
@@ -68,23 +74,13 @@ export function buildIntelligence(prices: Record<string, PricePoint>): Intellige
     const avgChange = avg(returns);
     const breadth = returns.length ? returns.filter(x => x >= 0).length / returns.length : 0;
     const relativeToUniverse = avgChange - universeAverage;
-
-    // Transparent relative-strength score:
-    // 50 baseline + return-vs-universe + breadth contribution.
     const score = clamp(50 + relativeToUniverse * 7 + (breadth - 0.5) * 30, 0, 100);
 
-    return {
-      name,
-      members,
-      avgChange,
-      breadth,
-      relativeToUniverse,
-      score,
-    };
+    return { name, members, avgChange, breadth, relativeToUniverse, score };
   });
 
-  const portfolio = ['DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS'];
-  const portfolioReturns = portfolio
+  const portfolioSymbols = portfolio.positions.map((item) => item.symbol);
+  const portfolioReturns = portfolioSymbols
     .map(t => prices[t]?.changePct)
     .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
 
