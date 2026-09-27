@@ -1,7 +1,11 @@
 const DEFAULT_TIMEOUT_MS = 25000;
 
-function backendUrl() {
-  return String(process.env.AI_INFRA_AGENT_URL || '').trim().replace(/\/+$/, '');
+function backendUrl(req) {
+  const configured = String(process.env.AI_INFRA_AGENT_URL || '').trim().replace(/\/+$/, '');
+  if (configured) return configured;
+  const host = String(req.headers?.host || '').trim();
+  const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  return host ? `${proto}://${host}` : '';
 }
 
 function backendHeaders() {
@@ -16,20 +20,20 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 }
 
 export default async function handler(req, res) {
-  const base = backendUrl();
+  const base = backendUrl(req);
 
   if (!base) {
     res.status(503).json({
       ok: false,
       error: 'Autonomous backend is not configured',
-      hint: 'Set AI_INFRA_AGENT_URL in Vercel environment variables to the deployed Python backend.',
+      hint: 'Configure AI_INFRA_AGENT_URL only when using a separate backend; the production Vercel deployment can use its native /api/agent-python route automatically.',
     });
     return;
   }
 
   if (req.method === 'GET') {
     try {
-      const upstream = await fetch(`${base}/api/health`, {
+      const upstream = await fetch(`${base}/api/agent-python`, {
         method: 'GET',
         headers: backendHeaders(),
         signal: withTimeout(8000),
@@ -53,7 +57,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch(`${base}/api/ask/autonomous`, {
+    const upstream = await fetch(`${base}/api/agent-python`, {
       method: 'POST',
       headers: backendHeaders(),
       body: JSON.stringify(req.body || {}),
