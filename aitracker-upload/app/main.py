@@ -16,6 +16,9 @@ POST /api/earnings      -> same, via {"symbols": [...]} body
 GET  /api/milestones    -> auto-maintained milestone timeline per symbol,
                            derived from recent SEC 8-K filings (?symbols=...)
 POST /api/milestones    -> same, via {"symbols": [...]} body
+GET  /api/contracts     -> primary-source contract disclosures derived from
+                           SEC 8-K item 1.01/1.02/2.03 (?symbols=...)
+POST /api/contracts     -> same, via {"symbols": [...]} body
 GET  /api/mcp/status    -> MCP toolbox pool: connected servers, discovered
                            tools, any startup errors
 POST /api/mcp/reconnect -> drop and re-open the MCP singleton connection
@@ -602,6 +605,120 @@ def get_earnings(
 ) -> dict[str, Any]:
     parsed = [s for s in (symbols or "").split(",")] if symbols else None
     return _run_earnings(parsed)
+
+
+# ---------------------------------------------------------------------------
+# /api/contracts — primary-source contract intelligence from SEC 8-K filings
+#
+# ContractService filters recent 8-Ks by material-agreement / financial-
+# obligation item codes and extracts conservative evidence fields while
+# preserving accession numbers + direct EDGAR URLs. It is best-effort per
+# symbol and follows FILINGS_MODE/EDGAR_MODE.
+# ---------------------------------------------------------------------------
+_contract_service = None
+DEFAULT_CONTRACT_SYMBOLS = [
+    "NVDA",
+    "MU",
+    "SNDK",
+    "AMD",
+    "NBIS",
+    "DGXX",
+    "META",
+    "MSFT",
+    "GOOGL",
+    "NOW",
+    "AMZN",
+    "CRM",
+    "TEAM",
+    "TSM",
+    "IREN",
+    "CIFR",
+]
+
+
+def _get_contract_service():
+    global _contract_service
+    if _contract_service is None:
+        import os
+
+        from mcp_servers.filings.contracts import ContractService
+
+        mode = os.getenv("FILINGS_MODE") or os.getenv("EDGAR_MODE") or "live"
+        _contract_service = ContractService.from_env(mode)
+    return _contract_service
+
+
+class ContractRequest(BaseModel):
+    """Body for POST /api/contracts. Omit symbols for the default scope."""
+
+    symbols: list[str] | None = Field(
+        default=None,
+        description="Symbols to fetch; defaults to the AI infrastructure contract universe",
+    )
+
+
+def _shape_contract_record(record: Any) -> dict[str, Any]:
+    return {
+        "symbol": record.symbol,
+        "date": record.date,
+        "form": record.form,
+        "accession": record.accession,
+        "url": record.url,
+        "items": record.items,
+        "title": record.title,
+        "counterparties": record.counterparties,
+        "disclosed_values": record.disclosed_values,
+        "evidence": record.evidence,
+        "source": record.source,
+        "confidence": record.confidence,
+    }
+
+
+def _run_contracts(symbols: list[str] | None) -> dict[str, Any]:
+    requested = [
+        s.strip().upper()
+        for s in (symbols or DEFAULT_CONTRACT_SYMBOLS)
+        if s and s.strip()
+    ]
+    if not requested:
+        raise HTTPException(status_code=422, detail="at least one symbol is required")
+    try:
+        timelines = _get_contract_service().get_many(requested)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"contracts failed: {exc}") from exc
+
+    contracts = {
+        symbol: {
+            "symbol": timeline.symbol,
+            "source": timeline.source,
+            "contracts": [_shape_contract_record(record) for record in timeline.contracts],
+        }
+        for symbol, timeline in timelines.items()
+    }
+    missing = [s for s in requested if s not in timelines]
+    return {
+        "symbols": list(contracts.keys()),
+        "missing": missing,
+        "contracts": contracts,
+    }
+
+
+@app.post("/api/contracts", response_model=None)
+def post_contracts(req: ContractRequest | None = None) -> dict[str, Any]:
+    """Primary-source SEC contract disclosures by symbol."""
+    req = req or ContractRequest()
+    return _run_contracts(req.symbols)
+
+
+@app.get("/api/contracts")
+def get_contracts(
+    symbols: str | None = Query(
+        default=None,
+        description="Comma-separated symbols; defaults to the AI infrastructure contract universe",
+    ),
+) -> dict[str, Any]:
+    parsed = [s for s in symbols.split(",")] if symbols else None
+    return _run_contracts(parsed)
 
 
 # ---------------------------------------------------------------------------
