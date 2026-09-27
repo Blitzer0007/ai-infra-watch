@@ -148,7 +148,8 @@ export default function App() {
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
-    { id: 'research', label: 'AI Research', index: '07', icon: Bot },
+    { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
+    { id: 'research', label: 'AI Research', index: '08', icon: Bot },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
 
