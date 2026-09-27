@@ -354,6 +354,9 @@ export default function App() {
                       ? `Global AI Market: "${liveData.marketSentiment}"`
                       : "Live market quotes and AI-infrastructure news from the configured public data feeds."}
                 </p>
+                <div className="mt-1 text-[9px] font-mono text-white/25 uppercase tracking-wider">
+                  BUILD {liveData?.build?.commit ? liveData.build.commit.slice(0, 7) : 'LOCAL'} · {liveData?.build?.environment || 'unknown'}
+                </div>
               </div>
             </div>
             
