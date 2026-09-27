@@ -9,6 +9,24 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
+      - name: Check autonomous agent health route
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20             "https://ai-infra-watch.vercel.app/api/agent-ask"             -o /tmp/agent-health.json
+          python - <<'PY'
+          import json
+
+          with open("/tmp/agent-health.json", encoding="utf-8") as f:
+              body = json.load(f)
+
+          if body.get("status") != "ok":
+              raise SystemExit(f"unexpected autonomous health response: {body}")
+
+          print("autonomous agent health check passed")
+          print("provider:", body.get("provider"))
+          print("mcp connected:", (body.get("mcp") or {}).get("connected"))
+          PY
+
       - name: Check production live-data endpoint
         run: |
           set -euo pipefail
