@@ -47,6 +47,9 @@ jobs:
       - name: Verify Vercel authentication
         run: vercel whoami --token="${VERCEL_TOKEN}" --debug
 
+      - name: Pull Vercel production configuration
+        run: vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
+
       - name: Build Vercel deployment
         run: vercel build --prod --token="${VERCEL_TOKEN}"
 
