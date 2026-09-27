@@ -55,6 +55,11 @@ jobs:
       - name: Verify Vercel authentication
         run: vercel whoami --token="${VERCEL_TOKEN}" --debug
 
+      - name: Enable Vercel Large Functions
+        shell: bash
+        run: |
+          printf '1\n' | vercel env add VERCEL_SUPPORT_LARGE_FUNCTIONS production --token="${VERCEL_TOKEN}" || true
+
       - name: Pull Vercel production configuration
         run: vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
 
