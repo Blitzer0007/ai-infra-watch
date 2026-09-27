@@ -156,7 +156,7 @@ export default function AutonomousResearch() {
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[10px] font-mono text-white/35">
-              {backendMessage || 'The backend may be configured separately from the public Vercel feed.'}
+              {backendMessage || 'Native Vercel Python agent route; a separate backend URL is optional.'}
             </span>
             <button
               type="submit"
