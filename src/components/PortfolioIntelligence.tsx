@@ -85,7 +85,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
       )}
 
       {tab === 'watchlist' && (
-        <Panel title="Watchlist intelligence universe" subtitle="27 names analyzed using the same market/peer/rotation framework">
+        <Panel title="Watchlist intelligence universe" subtitle={`${WATCHLIST.length} configured names analyzed using the same market/peer/rotation framework`}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {WATCHLIST.map((w) =>
               <button key={w.symbol} onClick={() => setSelected(w.symbol)} className={'text-left border rounded-xl p-3 ' + (selected === w.symbol ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
