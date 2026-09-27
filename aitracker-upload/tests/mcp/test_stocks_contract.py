@@ -27,7 +27,7 @@ from mcp_servers.stocks.schemas import Quote, QuoteBatch
 from app.agents.schemas import RotationAgentResult
 from mcp_servers.stocks.service import FIXTURE_PATH
 
-EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "get_rotation", "list_watchlist", "health"}
+EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "get_rotation", "get_event_study", "get_relationships", "list_watchlist", "health"}
 
 
 def _clock() -> str:
@@ -138,3 +138,23 @@ def test_get_rotation_roundtrips_to_rotation_schema(server):
     result = _run(server.call_tool("get_rotation", {}))
     parsed = RotationAgentResult.model_validate_json(_text(result))
     assert parsed.narrative
+
+
+
+def test_get_event_study_schema_advertises_symbol(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_event_study")
+    assert "symbol" in (tool.input_schema or {}).get("properties", {})
+
+
+def test_get_relationships_schema_advertises_symbol(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_relationships")
+    assert "symbol" in (tool.input_schema or {}).get("properties", {})
+
+
+def test_get_relationships_roundtrips(server):
+    result = _run(server.call_tool("get_relationships", {"symbol": "NVDA"}))
+    payload = json.loads(_text(result))
+    assert payload["symbol"] == "NVDA"
+    assert payload["peers"]
