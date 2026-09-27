@@ -48,7 +48,7 @@
 
     <div class="card mt-24">
       <div class="card-head">
-        <div><div class="card-title">Ask a question</div><div class="card-sub">Market moves, filings detail, or both — the supervisor decides</div></div>
+        <div><div class="card-title">Ask a question</div><div class="card-sub" id="ask-mode-sub">Supervisor routes to market, filings, or both</div></div>
         <span class="fresh manual" id="ask-status"><span class="dot"></span>idle</span>
       </div>
       <div class="field">
@@ -57,6 +57,8 @@
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
         <button class="btn" id="ask-btn" onclick="ask()">Ask</button>
+        <button class="btn secondary" id="mode-supervisor" onclick="setMode('supervisor')">Supervisor</button>
+        <button class="btn secondary" id="mode-autonomous" onclick="setMode('autonomous')">Autonomous</button>
         <span class="faint" style="font-size:12px">Try a sample:</span>
         <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('How did NVDA move today?')">market</button>
         <button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="sample('What did the latest 10-K disclose about data center revenue growth?')">filings</button>
@@ -73,6 +75,21 @@
 
 <script src="../js/core.js"></script>
 <script>
+let askMode = 'supervisor';
+
+function setMode(mode){
+  askMode = mode === 'autonomous' ? 'autonomous' : 'supervisor';
+  const sup = document.getElementById('mode-supervisor');
+  const aut = document.getElementById('mode-autonomous');
+  const sub = document.getElementById('ask-mode-sub');
+  if(sup) sup.classList.toggle('active', askMode === 'supervisor');
+  if(aut) aut.classList.toggle('active', askMode === 'autonomous');
+  if(sub) sub.textContent = askMode === 'autonomous'
+    ? 'Autonomous agent discovers MCP tools and chooses evidence step-by-step'
+    : 'Supervisor routes to market, filings, or both';
+}
+setMode('supervisor');
+
 function sample(text){
   document.getElementById('q-input').value = text;
   ask();
@@ -185,8 +202,36 @@ async function ask(){
   resultsEl.innerHTML = `<div class="empty-state">Asking the analyst…</div>`;
 
   try{
-    const r = await APP.askAgent(q);
+    const r = askMode === 'autonomous'
+      ? await APP.askAutonomous(q)
+      : await APP.askAgent(q);
     statusEl.innerHTML = `<span class="dot"></span>answered ${APP.fmtTime(Date.now())}`;
+
+    if(askMode === 'autonomous'){
+      let html = `
+        <div class="card-head" style="border:none;padding:0">
+          <div><span class="badge badge-amber">autonomous-mcp</span> ${okBadge(r.ok)}${r.degraded ? ' ' + degradedBadge() : ''}</div>
+        </div>
+        <div class="section-title mt-16">Summary</div>
+        <div>${esc(r.summary) || '<span class="faint">No summary returned.</span>'}</div>
+        ${r.discovered && r.discovered.length ? `<div class="faint mt-16" style="font-size:12px">tools discovered: ${r.discovered.map(esc).join(', ')}</div>` : ''}
+        ${trajectoryLine((r.trajectory || []).map(x => typeof x === 'string' ? x : x.node).filter(Boolean))}
+      `;
+      if(r.calls && r.calls.length){
+        html += `<div class="section-title mt-16">Evidence calls</div>`;
+        html += r.calls.map(c => `
+          <div class="card mt-16" style="background:var(--panel-2, transparent)">
+            <div class="card-head"><div class="mono">${esc(c.tool)}</div>${okBadge(c.ok)}</div>
+            <div class="faint" style="font-size:12px">args: ${esc(JSON.stringify(c.arguments || {}))}</div>
+            ${c.error ? `<div class="notice danger mt-16"><span class="ic">!</span><div>${esc(c.error)}</div></div>` : ''}
+          </div>`).join('');
+      }
+      if(r.error){
+        html += `<div class="notice danger mt-16"><span class="ic">!</span><div>${esc(r.error)}</div></div>`;
+      }
+      resultsEl.innerHTML = html;
+      return;
+    }
 
     let html = `
       <div class="card-head" style="border:none;padding:0">
