@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bell
+  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bell, Bot
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
@@ -15,6 +15,7 @@ import MacroPolitics from './components/MacroPolitics';
 import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
+import AutonomousResearch from './components/AutonomousResearch';
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
@@ -147,6 +148,7 @@ export default function App() {
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
+    { id: 'research', label: 'AI Research', index: '07', icon: Bot },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
 
@@ -387,6 +389,7 @@ export default function App() {
               {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} />}
+              {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
             </motion.div>
           </AnimatePresence>
