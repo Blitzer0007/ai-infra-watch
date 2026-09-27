@@ -43,7 +43,11 @@ jobs:
         run: python -m pytest -q tests/test_agents.py tests/test_mcp_integration.py
 
       - name: Install backend agent dependencies
-        run: python -m pip install -r aitracker-upload/requirements.txt
+        # RAG retrieval modules used by the backend agents import numpy and rank-bm25.
+        # Keep these lightweight dependencies explicit in CI.
+        run: |
+          python -m pip install -r aitracker-upload/requirements.txt
+          python -m pip install -r aitracker-upload/requirements-ingest.txt
 
       - name: Run autonomous agent tests
         env:
