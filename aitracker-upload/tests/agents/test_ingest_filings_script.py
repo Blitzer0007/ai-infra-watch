@@ -76,7 +76,7 @@ def test_load_watchlist_symbols_returns_dashboard_universe():
     mod = _load_script()
     symbols = mod._load_watchlist_symbols()
     assert len(symbols) >= 20
-    assert "NVDA" in symbols
+    assert "MU" in symbols
     assert symbols == [s.upper() for s in symbols]
 
 
