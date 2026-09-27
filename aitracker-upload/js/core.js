@@ -150,6 +150,30 @@ const APP = (() => {
     return res.json();
   }
 
+  // Autonomous Ask: bounded, tool-discovering investigation over the MCP
+  // toolbox. Unlike askAgent(), this does not use the fixed supervisor route.
+  async function askAutonomous(question){
+    const q = (question || '').trim();
+    if(!q) throw { code: 'EMPTY', message: 'Ask a question first' };
+    const cfg = loadConfig();
+    const base = (cfg.backendUrl || DEFAULT_CONFIG.backendUrl).replace(/\/+$/, '');
+    let res;
+    try{
+      res = await fetch(base + '/api/ask/autonomous', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q })
+      });
+    }catch(err){
+      throw { code: 'UNREACHABLE', message: 'Backend unreachable at ' + base + ' — is it running? (uvicorn app.main:app)' };
+    }
+    if(!res.ok){
+      let detail = 'Backend returned ' + res.status;
+      try{ const body = await res.json(); if(body && body.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail); }catch(e){}
+      throw { code: res.status === 422 ? 'BAD_REQUEST' : 'HTTP_ERROR', message: detail };
+    }
+    return res.json();
+  }
   // Earnings: past + upcoming reports (with historical price reaction) for a
   // set of symbols, from our own /api/earnings. Same base-URL + normalized
   // {code, message} error handling as askAgent, so the tracker page handles a
