@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from statistics import mean
 from typing import Any
 
@@ -17,10 +19,25 @@ GROUPS = {
 }
 
 
+def _load_portfolio_snapshot() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[1] / "data" / "portfolio_snapshot.json"
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def market_agent(state: AgentState) -> dict[str, Any]:
     symbols = state.get("requested_symbols") or DEFAULT_SYMBOLS
     payload = fetch_live_data(symbols)
     prices = payload["stockPrices"]
+
+    # The broker snapshot is shared with the React dashboard through one JSON file.
+    # It is contextual evidence, not a live broker API position feed.
+    portfolio_snapshot = _load_portfolio_snapshot()
+    positions = {
+        item["symbol"]: item
+        for item in portfolio_snapshot.get("positions", [])
+        if item.get("symbol") in symbols
+    }
 
     returns = [
         item["changePct"]
@@ -47,16 +64,18 @@ def market_agent(state: AgentState) -> dict[str, Any]:
             "relativeToUniverse": round(avg_change - universe_avg, 4),
         }
 
-    portfolio = ["DGXX","DRAM","SOXL","NVDA","MSFT","NBIS","VIVO","META","NOW","PHVS"]
     portfolio_values = [
         prices[s]["changePct"]
-        for s in portfolio
+        for s in positions
         if s in prices and isinstance(prices[s].get("changePct"), (int, float))
     ]
 
     evidence = {
         "prices": prices,
         "groups": groups,
+        "portfolio": portfolio_snapshot.get("portfolio", {}),
+        "positions": positions,
+        "portfolioSource": "data/portfolio_snapshot.json",
         "universeAverageChangePct": round(universe_avg, 4),
         "portfolioAverageChangePct": round(mean(portfolio_values), 4) if portfolio_values else None,
         "portfolioBreadth": (
@@ -71,11 +90,19 @@ def market_agent(state: AgentState) -> dict[str, Any]:
 
     return {
         "market_evidence": evidence,
-        "sources": [{
-            "agent": "Market Agent",
-            "type": "market_data",
-            "source": payload["source"],
-            "asOf": payload["timestamp"],
-        }],
+        "sources": [
+            {
+                "agent": "Market Agent",
+                "type": "market_data",
+                "source": payload["source"],
+                "asOf": payload["timestamp"],
+            },
+            {
+                "agent": "Market Agent",
+                "type": "portfolio_snapshot",
+                "source": "data/portfolio_snapshot.json",
+                "asOf": portfolio_snapshot.get("asOf"),
+            },
+        ],
         "trace": state.get("trace", []) + ["market_agent"],
     }
