@@ -8,7 +8,12 @@ def test_relationship_service_resolves_peer_links():
     out = svc.get("MU")
     assert out["symbol"] == "MU"
     assert out["peers"]
-    assert "AMD" in out["peers"] or "AMD" in out["related_by_peer_links"]
+    assert "000660.KS" in out["peers"]
+    assert "NVDA" in out["peers"]
+    # SNDK links back to MU in the shared watchlist, so it should resolve
+    # through the bidirectional peer-link set even though it is not a direct
+    # MU peer entry.
+    assert "SNDK" in out["related_by_peer_links"]
 
 
 def test_relationship_service_unknown_symbol_raises():
