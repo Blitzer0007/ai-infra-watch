@@ -25,6 +25,37 @@ function loadConfiguredSymbols() {
 
 const SYMBOLS = loadConfiguredSymbols();
 
+function loadSecContracts() {
+  try {
+    const payload = JSON.parse(
+      readFileSync(join(process.cwd(), 'data', 'contracts_sec.json'), 'utf8')
+    );
+    return Array.isArray(payload.contracts) ? payload.contracts : [];
+  } catch {
+    return [];
+  }
+}
+
+function secContractsForDashboard() {
+  return loadSecContracts().map((c) => ({
+    id: c.id,
+    company: c.company,
+    client: c.client,
+    value: c.value,
+    duration: c.duration,
+    hardware: c.hardware,
+    details: c.details,
+    status: c.status,
+    statusLevel: c.statusLevel || 'high-verified',
+    dateSigned: c.dateSigned,
+    source: c.source,
+    accession: c.accession,
+    url: c.url,
+    items: c.items || [],
+    evidence: c.evidence || []
+  }));
+}
+
 
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
@@ -94,7 +125,7 @@ export default async function handler(req, res) {
   const data = {
     stockPrices,
     news: currentNews,
-    contracts: [],
+    contracts: secContractsForDashboard(),
     macroRisks,
     marketSentiment:'Live quotes + AI-infrastructure news feed active.',
     sources:['Yahoo Finance chart data','GDELT news']
