@@ -48,21 +48,11 @@ const WATCHLIST = [
   ['DELL','Dell','AI Hardware','AI servers / storage','NVDA · HPE'],
   ['IBM','IBM','Enterprise AI','watsonx / hybrid cloud','MSFT · ORCL'],
 ] as const;
-
-const EVENTS = [
-  { t:'NVDA', date:'2026-06-03', title:'AI compute / Vera Rubin catalyst', kind:'AI compute', window:[-2,1,4,7,6,3] },
-  { t:'NBIS', date:'2026-03-16', title:'Meta AI infrastructure agreement', kind:'Contract', window:[-1,2,9,8,6,10] },
-  { t:'DGXX', date:'2026-04-20', title:'SubQ AI GPU contract', kind:'Contract', window:[-2,4,18,10,7,5] },
-  { t:'META', date:'2026-09-21', title:'AI-led momentum session', kind:'Market', window:[0,2,11,7,5,3] },
-  { t:'PHVS', date:'2026-09-08', title:'Phase 3 clinical data', kind:'Clinical', window:[-1,2,7,4,-3,-1] },
-];
-
 export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   const [tab,setTab] = useState('overview');
   const [q,setQ] = useState('');
   const [group,setGroup] = useState('All');
   const [selected,setSelected] = useState('NVDA');
-  const [event,setEvent] = useState(EVENTS[1]);
 
   const price = (t:string) => livePrices[t];
   const filtered = useMemo(() => PORTFOLIO.filter(h => (group === 'All' || h.group === group) && (h.t + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())), [q,group]);
