@@ -9,6 +9,7 @@ type Price = { price: number; changePct: number };
 type Props = { livePrices?: Record<string, Price> };
 
 const WATCHLIST = STOCK_UNIVERSE;
+const NETWORK_NODES: Array<[string, number, number]> = [['NVDA',140,210],['AMD',330,100],['MU',330,320],['META',550,100],['NOW',550,320],['NBIS',790,150],['CRM',790,290]];
 
 
 export default function PortfolioIntelligence({ livePrices = {} }: Props) {
@@ -147,7 +148,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
   );
 }
 
-function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void}) {
+function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
   return <button onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
     <div className="flex justify-between gap-3"><div className="min-w-0">
       <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/></div>
