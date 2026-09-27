@@ -8,7 +8,7 @@ from pathlib import Path
 from .providers import FinnhubProvider, FixtureProvider, QuoteError, QuoteProvider, _utc_now_iso
 from .schemas import Quote, QuoteBatch, ServerHealth
 
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "stock_watchlist.json"
+CONFIG_PATH = Path(__file__).resolve().parents[3] / "data" / "stock_watchlist.json"
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "quotes.json"
 
 
