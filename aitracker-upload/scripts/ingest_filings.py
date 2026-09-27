@@ -51,6 +51,25 @@ from mcp_servers.filings.edgar import EdgarClient  # noqa: E402
 from mcp_servers.filings.edgar import from_env as edgar_from_env  # noqa: E402
 
 
+def _load_watchlist_symbols(path: Path = WATCHLIST_PATH) -> list[str]:
+    """Load dashboard symbols from the root JSON watchlist."""
+    import json
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"failed to load watchlist: {path}: {exc}") from exc
+    rows = raw.get("watchlist", []) if isinstance(raw, dict) else []
+    symbols = [
+        str(row["symbol"]).strip().upper()
+        for row in rows
+        if isinstance(row, dict) and row.get("symbol")
+    ]
+    if not symbols:
+        raise ValueError(f"watchlist is empty: {path}")
+    return symbols
+
+
 def build_report(result: IngestAgentResult) -> str:
     """Render a concise, human-readable summary of an ingest run.
 
@@ -124,15 +143,10 @@ def main(
     if args.watchlist and symbols:
         raise SystemExit("--watchlist cannot be combined with --symbols")
     if args.watchlist:
-        import json
-
         try:
-            raw = json.loads(WATCHLIST_PATH.read_text(encoding="utf-8"))
-            symbols = [str(row["symbol"]).strip().upper() for row in raw.get("watchlist", []) if row.get("symbol")]
-        except (OSError, json.JSONDecodeError, TypeError, KeyError) as exc:
-            raise SystemExit(f"failed to load watchlist: {WATCHLIST_PATH}: {exc}") from exc
-        if not symbols:
-            raise SystemExit(f"watchlist is empty: {WATCHLIST_PATH}")
+            symbols = _load_watchlist_symbols()
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
 
     agent = IngestAgent(client=client, universe=universe, filings_dir=out_dir)
     result = agent.run(symbols=symbols)
