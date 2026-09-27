@@ -12,7 +12,7 @@ from .tools import DEFAULT_SYMBOLS, fetch_live_data, utc_now
 
 
 def _load_universe() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[2] / "data" / "stock_watchlist.json"
+    path = Path(__file__).resolve().parents[3] / "data" / "stock_watchlist.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         rows = payload.get("watchlist", [])
