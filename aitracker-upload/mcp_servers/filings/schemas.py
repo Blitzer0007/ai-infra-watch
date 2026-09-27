@@ -68,7 +68,7 @@ class FilingRef(BaseModel):
 
     cik: str
     symbol: str
-    form: str  # "10-K" | "10-Q" | "8-K"
+    form: str  # "10-K" | "10-Q" | "20-F" | "6-K" | "8-K"
     accession: str
     primary_doc: str = ""
     filed_date: str = ""
