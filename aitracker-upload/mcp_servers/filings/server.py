@@ -37,7 +37,6 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
         name="mcp-server-filings",
         title="Filings",
         description="RAG search + cited answers over SEC filings and company documents.",
-        version="0.1.0",
     )
 
     @server.tool(
