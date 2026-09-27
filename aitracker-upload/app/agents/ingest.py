@@ -12,9 +12,11 @@ Design notes
   via the shared loader — targets default to the full universe (superset, not
   the 6-name watchlist), or a caller-supplied subset.
 * `query_edgar` resolves each symbol's CIK from EDGAR company_tickers.json and
-  lists recent filings, keeping the LATEST 10-K and 10-Q per symbol. Per-symbol
-  failures (unknown symbol, EdgarError, malformed payload) are recorded as
-  failed tool steps and skipped — the agent degrades, it does not crash.
+  lists recent filing types relevant to both U.S. domestic issuers (10-K/10-Q)
+  and foreign private issuers (20-F/6-K). It keeps the LATEST filing of each
+  requested form per symbol. Per-symbol failures (unknown symbol, EdgarError,
+  malformed payload) are recorded as failed tool steps and skipped — the agent
+  degrades, it does not crash.
 * `dedupe` runs BEFORE download so an already-ingested accession (present in
   the corpus manifest data/filings/_index.json) never re-fetches the network —
   the roadmap's "cache-hit skips download" state-machine test.
@@ -48,6 +50,10 @@ from mcp_servers.filings.edgar import EdgarClient, from_env as edgar_from_env
 from mcp_servers.filings.schemas import FilingRef
 
 MANIFEST_NAME = "_index.json"
+
+# Cover U.S. domestic issuers plus foreign private issuers such as TSMC that
+# report annual/periodic information through 20-F and 6-K rather than 10-K/10-Q.
+RESEARCH_FORMS: tuple[str, ...] = ("10-K", "10-Q", "20-F", "6-K")
 
 
 class IngestState(TypedDict, total=False):
@@ -121,7 +127,7 @@ def build_ingest_graph(
                         tool_call("edgar.query", {"symbol": symbol}, note="no CIK", ok=False)
                     )
                     continue
-                found = client.recent_filings(cik, forms=("10-K", "10-Q"))
+                found = client.recent_filings(cik, forms=RESEARCH_FORMS)
                 refs.extend(found)
                 steps.append(
                     tool_call(
