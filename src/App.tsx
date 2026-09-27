@@ -36,10 +36,7 @@ export default function App() {
   const [isLiveLoading, setIsLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  const watchlistSymbols = [
-    '000660.KS','SNDK','TEAM','SOFI','CRM','AMZN','GOOGL','PLTR','CBRS','RUM','QCOM','INTC',
-    'SOXX','IREN','TSM','AMD','TSLA','AAPL','ONDS','CIFR','IONQ','NOK','TRT','AMPG','DELL','IBM'
-  ];
+  const watchlistSymbols = Object.keys(STOCK_METADATA);
 
   useEffect(() => {
     if (activeView !== 'portfolio') return;
