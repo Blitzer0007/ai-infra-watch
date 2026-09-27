@@ -28,27 +28,70 @@ RISK_CHANNELS = {
 }
 
 
-def _get_mcp_evidence(requested: set[str]) -> tuple[Any | None, dict[str, Any] | None, str | None]:
-    config = load_mcp_config("risk")
-    tool_name = os.getenv("AI_INFRA_WATCH_RISK_MCP_TOOL", "").strip()
-    if not config or not tool_name:
-        return None, None, None
+def _risk_question(state: AgentState, requested: set[str]) -> str:
+    user_query = (state.get("user_query") or "").strip()
+    symbols = ", ".join(sorted(requested)) if requested else "the tracked portfolio"
+    query = (
+        f"For {symbols}, identify material risk factors disclosed in the available company filings, "
+        "especially semiconductor supply-chain concentration, export controls/trade restrictions, "
+        "geopolitical exposure, data-center power constraints, customer concentration, and financing "
+        "or deployment dependencies. Return concise evidence with the filing source citations. "
+        "Do not infer current events that are not in the filings."
+    )
+    if user_query:
+        query += f" User question: {user_query}"
+    return query
+
+
+def _unwrap_mcp_payload(result: Any) -> Any:
+    if isinstance(result, dict) and set(result) == {"result"}:
+        return result["result"]
+    return result
+
+
+def _get_mcp_evidence(state: AgentState, requested: set[str]) -> tuple[Any | None, dict[str, Any] | None, str | None]:
+    # A future dedicated risk MCP can be configured explicitly. Until then,
+    # use the committed filings MCP for company-specific risk evidence.
+    risk_config = load_mcp_config("risk")
+    if risk_config:
+        namespace = "risk"
+        default_tool = "answer_question"
+        env_tool = "AI_INFRA_WATCH_RISK_MCP_TOOL"
+        env_args = "AI_INFRA_WATCH_RISK_MCP_ARGS_JSON"
+    else:
+        risk_config = load_mcp_config("filings")
+        if not risk_config:
+            return None, None, None
+        namespace = "filings"
+        default_tool = "answer_question"
+        env_tool = "AI_INFRA_WATCH_FILINGS_MCP_TOOL"
+        env_args = "AI_INFRA_WATCH_FILINGS_MCP_ARGS_JSON"
+
+    tool_name = os.getenv(env_tool, default_tool).strip() or default_tool
+    raw_args = os.getenv(env_args, "").strip()
 
     try:
-        raw_args = os.getenv("AI_INFRA_WATCH_RISK_MCP_ARGS_JSON", "{}").strip()
-        arguments = json.loads(raw_args) if raw_args else {}
-        if not isinstance(arguments, dict):
-            raise ValueError("AI_INFRA_WATCH_RISK_MCP_ARGS_JSON must be a JSON object")
-        result = call_tool_sync(config, tool_name, arguments)
+        if raw_args:
+            arguments = json.loads(raw_args)
+            if not isinstance(arguments, dict):
+                raise ValueError(f"{env_args} must be a JSON object")
+        elif tool_name == "answer_question":
+            arguments = {"question": _risk_question(state, requested)}
+        else:
+            raise ValueError(
+                f"{env_tool}={tool_name!r} requires {env_args} because the tool schema is not known locally"
+            )
+
+        result = _unwrap_mcp_payload(call_tool_sync(risk_config, tool_name, arguments))
         source = {
             "agent": "Risk Agent",
-            "type": "mcp_risk_retrieval",
-            "source": f"MCP:{config.name}/{tool_name}",
+            "type": "mcp_risk_retrieval" if namespace == "risk" else "mcp_filings_context",
+            "source": f"MCP:{risk_config.name}/{tool_name}",
             "asOf": utc_now(),
         }
         return result, source, None
     except Exception as exc:
-        return None, None, f"Risk MCP call failed: {type(exc).__name__}: {exc}"
+        return None, None, f"{namespace.capitalize()} MCP call failed: {type(exc).__name__}: {exc}"
 
 
 def risk_agent(state: AgentState) -> dict[str, Any]:
@@ -59,7 +102,7 @@ def risk_agent(state: AgentState) -> dict[str, Any]:
         if not requested or requested.intersection(value["affected"])
     }
 
-    mcp_result, mcp_source, mcp_error = _get_mcp_evidence(requested)
+    mcp_result, mcp_source, mcp_error = _get_mcp_evidence(state, requested)
 
     evidence: dict[str, Any] = {
         "channels": relevant,
@@ -68,9 +111,14 @@ def risk_agent(state: AgentState) -> dict[str, Any]:
         "asOf": utc_now(),
         "confidence": "mcp_retrieved" if mcp_result is not None else "taxonomy",
         "note": (
-            "Risk MCP evidence was retrieved and attached."
-            if mcp_result is not None
-            else "Current geopolitical facts are not available from MCP in this run; taxonomy is only a routing fallback."
+            "MCP evidence was retrieved from the configured risk server."
+            if mcp_result is not None and mcp_source and mcp_source["type"] == "mcp_risk_retrieval"
+            else (
+                "Company-specific filing risk context was retrieved from the filings MCP; "
+                "current geopolitical facts still require a current macro/policy source."
+                if mcp_result is not None
+                else "Current geopolitical facts are not available from MCP in this run; taxonomy is only a routing fallback."
+            )
         ),
     }
 
@@ -79,7 +127,7 @@ def risk_agent(state: AgentState) -> dict[str, Any]:
 
     sources = state.get("sources", []) + [{
         "agent": "Risk Agent",
-        "type": "risk_mcp" if mcp_result is not None else "risk_taxonomy",
+        "type": mcp_source["type"] if mcp_source else "risk_taxonomy",
         "source": mcp_source["source"] if mcp_source else "ai-infra-watch risk mapping",
         "asOf": evidence["asOf"],
     }]
