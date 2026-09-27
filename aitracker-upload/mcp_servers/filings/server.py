@@ -66,6 +66,18 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
         timeline = MilestoneService.from_env(mode=mode).get_timeline(symbol)
         return timeline.model_dump()
 
+    @server.tool(
+        name="get_contracts",
+        description="Extract contract-related disclosures from primary SEC 8-K filings (material agreements and financial obligations), preserving accession, EDGAR URL, values, counterparties, and evidence snippets.",
+    )
+    def get_contracts(symbol: str) -> dict:
+        from .contracts import ContractService
+        import os
+
+        mode = os.getenv("FILINGS_MODE", "fixture") or "fixture"
+        timeline = ContractService.from_env(mode=mode).get_timeline(symbol)
+        return timeline.model_dump()
+
     @server.tool(name="list_documents", description="List the document IDs available in the corpus.")
     def list_documents() -> list[str]:
         return svc.list_documents()
