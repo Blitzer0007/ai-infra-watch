@@ -47,8 +47,7 @@ That's it — the ticker strip and Overview page will start pulling live data.
 
 ## Hosting
 
-The legacy HTML pages are static and can still be hosted independently. The main React dashboard in the parent repository is deployed on Vercel; its `/api/agent-ask` route proxies autonomous research requests to this Python backend when `AI_INFRA_AGENT_URL` is configured.
-
+The legacy HTML pages are static and can still be hosted independently. The main React dashboard in the parent repository is deployed on Vercel; its `/api/agent-ask` route proxies autonomous research requests to this Python backend when 
 For the Python backend, use a container-capable host or Vercel's Python/FastAPI runtime with the `aitracker-upload` directory as the backend project root.
 
 The static HTML pages also work on:
@@ -73,3 +72,7 @@ The static HTML pages also work on:
 - The freshness-badge system (`live` / `stale` / `manual` / `error`) in `css/main.css` is reused everywhere; keep using it for any new data block so the whole site stays honest about what's current vs. cached vs. hand-maintained.
 
 This project does not provide investment advice. Markets involve risk of loss. Verify anything here against primary sources before acting on it.
+
+### Autonomous research on Vercel
+
+The Vercel frontend and the autonomous Python MCP function can run in the same project. The frontend proxy uses the native `/api/agent-python` route by default, so `AI_INFRA_AGENT_URL` is optional. Set `AI_INFRA_AGENT_TOKEN` on Vercel when bearer authentication is desired. The Python function uses the root `requirements.txt` and imports the production agent stack from `aitracker-upload/app`.
