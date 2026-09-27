@@ -1,0 +1,53 @@
+name: Backend Container CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "aitracker-upload/app/**"
+      - "aitracker-upload/mcp_servers/**"
+      - "aitracker-upload/data/**"
+      - "aitracker-upload/requirements-production.txt"
+      - "aitracker-upload/Dockerfile"
+      - ".github/workflows/backend-container-ci.yml"
+  pull_request:
+    paths:
+      - "aitracker-upload/app/**"
+      - "aitracker-upload/mcp_servers/**"
+      - "aitracker-upload/data/**"
+      - "aitracker-upload/requirements-production.txt"
+      - "aitracker-upload/Dockerfile"
+      - ".github/workflows/backend-container-ci.yml"
+
+concurrency:
+  group: backend-container-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t ai-infra-watch-backend:ci ./aitracker-upload
+
+      - name: Start backend
+        run: docker run -d --name ai-infra-watch-backend-ci -p 8000:8000 ai-infra-watch-backend:ci
+
+      - name: Wait for health endpoint
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/health > /tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs ai-infra-watch-backend-ci
+          exit 1
+
+      - name: Stop backend
+        if: always()
+        run: docker rm -f ai-infra-watch-backend-ci || true
