@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
@@ -34,14 +35,11 @@ def _get_mcp_evidence(requested: set[str]) -> tuple[Any | None, dict[str, Any] |
         return None, None, None
 
     try:
-        result = call_tool_sync(
-            config,
-            tool_name,
-            {
-                "symbols": sorted(requested),
-                "query": "current geopolitical and macro risks affecting the requested portfolio/watchlist symbols",
-            },
-        )
+        raw_args = os.getenv("AI_INFRA_WATCH_RISK_MCP_ARGS_JSON", "{}").strip()
+        arguments = json.loads(raw_args) if raw_args else {}
+        if not isinstance(arguments, dict):
+            raise ValueError("AI_INFRA_WATCH_RISK_MCP_ARGS_JSON must be a JSON object")
+        result = call_tool_sync(config, tool_name, arguments)
         source = {
             "agent": "Risk Agent",
             "type": "mcp_risk_retrieval",
