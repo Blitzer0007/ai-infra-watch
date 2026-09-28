@@ -61,10 +61,47 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
     )
     def get_milestones(symbol: str) -> dict:
         from .milestones import MilestoneService
+        import os
 
-        mode = getattr(svc, "mode", "fixture")
+        # Use FILINGS_MODE directly. FilingsService may fall back to the local
+        # RAG fixture when data/filings is absent, but milestone research must
+        # still be able to use live EDGAR in that situation.
+        mode = os.getenv("FILINGS_MODE", "fixture") or "fixture"
         timeline = MilestoneService.from_env(mode=mode).get_timeline(symbol)
         return timeline.model_dump()
+
+    @server.tool(
+        name="get_catalysts",
+        description="Get recent SEC 8-K material-event and contract evidence for several symbols in one call.",
+    )
+    def get_catalysts(symbols: list[str]) -> dict:
+        import os
+
+        from .milestones import MilestoneService
+        from .contracts import ContractService
+
+        mode = os.getenv("FILINGS_MODE", "fixture") or "fixture"
+        milestone_service = MilestoneService.from_env(mode=mode)
+        contract_service = ContractService.from_env(mode=mode)
+
+        result: dict[str, dict] = {}
+        for raw_symbol in symbols:
+            symbol = str(raw_symbol).strip().upper()
+            if not symbol:
+                continue
+            row: dict[str, object] = {"milestones": [], "contracts": []}
+            try:
+                row["milestones"] = milestone_service.get_timeline(symbol).model_dump().get("events", [])
+            except Exception as exc:
+                row["milestones_error"] = f"{type(exc).__name__}: {exc}"
+            try:
+                row["contracts"] = contract_service.get_timeline(symbol).model_dump().get("contracts", [])
+            except Exception as exc:
+                row["contracts_error"] = f"{type(exc).__name__}: {exc}"
+            result[symbol] = row
+
+        return {"symbols": result, "source": "sec-edgar-primary" if mode == "live" else "fixture"}
+
 
     @server.tool(
         name="get_contracts",
