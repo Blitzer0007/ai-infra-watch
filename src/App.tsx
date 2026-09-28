@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
+import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 
 // Component Views
 import Overview from './components/Overview';
@@ -99,7 +100,7 @@ export default function App() {
 
     async function updateTicker() {
       const updated: Record<string, { price: number; changePct: number }> = {};
-      const allSymbols = Object.keys(STOCK_METADATA);
+      const allSymbols = STOCK_UNIVERSE_SYMBOLS;
       for (const s of allSymbols) {
         try {
           const res = await fetchLiveQuote(s, loaded.finnhubKey);
