@@ -175,6 +175,49 @@ class AutonomousMCPAgent:
             raise ValueError("planner did not return a valid JSON object")
         return parsed
 
+    def _finalize(self, question: str, calls: list[ToolCallRecord], steps: list[Step]) -> AutonomousResult:
+        successful = [c for c in calls if c.ok]
+        if not successful:
+            steps.append(Step(node="finalize", kind="node", note="no successful calls"))
+            return AutonomousResult(
+                question,
+                "No MCP tool produced usable evidence.",
+                calls,
+                [tool.qualified_name for tool in self.toolbox.tools()],
+                AgentTrajectory(steps=steps),
+                error="no successful tool calls",
+                resolution="error",
+            )
+        try:
+            final_text = self.client.generate(
+                _final_prompt(question, successful),
+                max_tokens=1200,
+                temperature=0.0,
+            )
+        except Exception as exc:
+            final_text = _result_preview(successful[-1].output, 2000)
+            error = f"finalization_failed: {type(exc).__name__}: {exc}"
+            steps.append(Step(node="finalize", kind="node", note=error))
+            return AutonomousResult(
+                question,
+                final_text,
+                calls,
+                [tool.qualified_name for tool in self.toolbox.tools()],
+                AgentTrajectory(steps=steps),
+                error=error,
+                resolution="completed",
+            )
+        steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
+        steps.append(Step(node="finalize", kind="node", note="evidence sufficient"))
+        return AutonomousResult(
+            question,
+            final_text,
+            calls,
+            [tool.qualified_name for tool in self.toolbox.tools()],
+            AgentTrajectory(steps=steps),
+            resolution="completed",
+        )
+
     def run(self, question: str) -> AutonomousResult:
         tools = self.toolbox.tools()
         discovered = [tool.qualified_name for tool in tools]
@@ -190,6 +233,10 @@ class AutonomousMCPAgent:
             steps.append(Step(node="plan", kind="node", note=f"iteration={iteration}"))
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
+                # Once a tool has produced evidence, synthesize that evidence
+                # instead of returning the deterministic router's placeholder.
+                if any(c.ok for c in calls):
+                    return self._finalize(question, calls, steps)
                 answer = str(plan.get("answer", "")).strip()
                 if answer:
                     steps.append(Step(node="finalize", kind="node", note="planner settled"))
