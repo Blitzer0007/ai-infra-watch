@@ -27,8 +27,15 @@ _VALUE_RE = re.compile(
     r"(?i)(?:US\$|\$)\s?\d+(?:\.\d+)?\s?(?:million|billion|trillion|bn|mm|m|k)?"
 )
 _PERCENT_RE = re.compile(r"\b\d+(?:\.\d+)?\s?%")
-_BETWEEN_RE = re.compile(r"(?is)between\s+(.{3,120}?)\s+and\s+(.{3,120}?)(?:[\.;:,]|\n)")
-_WITH_RE = re.compile(r"(?is)\bwith\s+([A-Z][A-Za-z0-9&.,'() -]{2,100}?)(?:\s+(?:the|in|under|for|on|pursuant|dated)|[\.;:,]|\n)")
+_BETWEEN_RE = re.compile(
+    r"(?is)\bbetween\s+([A-Z][A-Za-z0-9&.,'() -]{2,100}?)\s+and\s+([A-Z][A-Za-z0-9&.,'() -]{2,100}?)(?:[\.;:,]|\n)"
+)
+_WITH_RE = re.compile(
+    r"(?is)\b(?:agreement|contract|arrangement)\s+(?:with|between)\s+([A-Z][A-Za-z0-9&.,'() -]{2,100}?)(?:\s+(?:the|in|under|for|on|pursuant|dated)|[\.;:,]|\n)"
+)
+_ENTERED_WITH_RE = re.compile(
+    r"(?is)\b(?:entered into|entered)\s+(?:a|an)\s+(?:material\s+)?(?:definitive\s+)?(?:agreement|contract|arrangement)\s+with\s+([A-Z][A-Za-z0-9&.,'() -]{2,100}?)(?:\s+(?:to|for|under|pursuant)|[\.;:,]|\n)"
+)
 
 
 def _clean(value: str) -> str:
@@ -69,16 +76,33 @@ def _extract_values(text: str) -> list[str]:
 
 def _extract_counterparties(text: str) -> list[str]:
     candidates: list[str] = []
-    for m in _BETWEEN_RE.finditer(text or ""):
+    source = text or ""
+    for m in _BETWEEN_RE.finditer(source):
         candidates.extend([m.group(1), m.group(2)])
-    for m in _WITH_RE.finditer(text or ""):
-        candidates.append(m.group(1))
+    for pattern in (_ENTERED_WITH_RE, _WITH_RE):
+        for m in pattern.finditer(source):
+            candidates.append(m.group(1))
+
+    noise = (
+        "the company",
+        "the registrant",
+        "the parties",
+        "any new or revised",
+        "financial accounting standards",
+        "accounting standards",
+        "other entities",
+        "affiliates",
+        "subsidiaries",
+    )
     cleaned: list[str] = []
     for value in candidates:
         value = _clean(value)
-        if len(value) < 3 or len(value) > 120:
+        lower = value.lower()
+        if len(value) < 3 or len(value) > 100:
             continue
-        if value.lower() in {"the company", "the registrant", "the parties"}:
+        if lower in noise or any(term in lower for term in noise[3:]):
+            continue
+        if len(value.split()) > 12 or any(ch in value for ch in "{}[]"):
             continue
         cleaned.append(value)
     return _dedupe(cleaned, limit=5)
