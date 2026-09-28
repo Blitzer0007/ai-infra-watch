@@ -3,6 +3,7 @@ import { Search, Info, ShieldCheck, DollarSign, Sparkles } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
 import ContractEventStudy from './ContractEventStudy';
+import ContractTerms from './ContractTerms';
 
 interface ContractsLedgerProps {
   liveContracts?: Contract[];
@@ -184,6 +185,8 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                 </div>
 
                 <ContractEventStudy symbol={c.company} eventDate={c.dateSigned} />
+
+                <ContractTerms symbol={c.company} accession={c.accession} url={c.url} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0F1115]/30 border border-white/5 rounded p-4 text-xs font-mono">
                   <div>
