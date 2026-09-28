@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AppConfig, loadConfig, saveConfig, formatPrice } from '../utils';
 import { STOCK_METADATA } from '../data';
-import { Bell, BellOff, Trash2, Plus, Star } from 'lucide-react';
+import { Bell, BellOff, Trash2, Plus, Star, Zap, ShieldCheck } from 'lucide-react';
+import { loadAlertEvents, requestBrowserNotifications } from '../utils/alertEngine';
 
 export default function BuySellWatchlist() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -9,8 +10,20 @@ export default function BuySellWatchlist() {
   const [newSymbol, setNewSymbol] = useState('NBIS');
   const [newTargetPrice, setNewTargetPrice] = useState('');
   const [newType, setNewType] = useState<'above' | 'below'>('above');
+  const [alertEvents, setAlertEvents] = useState(loadAlertEvents());
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+  );
 
-  useEffect(() => { setConfig(loadConfig()); }, []);
+  useEffect(() => {
+    setConfig(loadConfig());
+    setAlertEvents(loadAlertEvents());
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setAlertEvents(loadAlertEvents()), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!config) return;
@@ -48,6 +61,30 @@ export default function BuySellWatchlist() {
     const updated = { ...config, alerts: config.alerts.filter((_, i) => i !== index) };
     setConfig(updated);
     saveConfig(updated);
+  };
+
+  const handleLargeMoveToggle = () => {
+    const updated = { ...config, largeMoveEnabled: !config.largeMoveEnabled };
+    setConfig(updated);
+    saveConfig(updated);
+  };
+
+  const handleLargeMoveThreshold = (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    const updated = { ...config, largeMovePct: parsed };
+    setConfig(updated);
+    saveConfig(updated);
+  };
+
+  const handleBrowserNotifications = async () => {
+    const permission = await requestBrowserNotifications();
+    setNotificationPermission(permission);
+    if (permission === 'granted') {
+      const updated = { ...config, browserNotifications: true };
+      setConfig(updated);
+      saveConfig(updated);
+    }
   };
 
   const handleAddAlert = (e: React.FormEvent) => {
@@ -136,6 +173,45 @@ export default function BuySellWatchlist() {
             </div>
           </div>
 
+          <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Smart Move Alerts</span>
+              <button
+                type="button"
+                onClick={handleLargeMoveToggle}
+                className={config.largeMoveEnabled ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}
+              >
+                {config.largeMoveEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-[10px] text-white/50">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Alert when a watched stock moves at least</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={config.largeMovePct}
+                  onChange={e => handleLargeMoveThreshold(e.target.value)}
+                  className="w-16 px-2 py-1.5 bg-[#0F1115] border border-white/10 rounded text-white text-right"
+                />
+                <span className="text-[10px] text-white/40">%</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleBrowserNotifications}
+              disabled={notificationPermission === 'granted'}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-white/70 disabled:opacity-50"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              {notificationPermission === 'granted' ? 'Browser notifications enabled' : 'Enable browser notifications'}
+            </button>
+          </div>
+
           <form onSubmit={handleAddAlert} className="space-y-3 pt-3 border-t border-white/10 font-mono text-xs">
             <span className="text-[9px] text-white/40 uppercase tracking-widest font-black block">Add Signal Threshold</span>
             <div className="grid grid-cols-2 gap-2">
@@ -154,6 +230,32 @@ export default function BuySellWatchlist() {
               </button>
             </div>
           </form>
+
+          <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Recent Alert Events</span>
+              <span className="text-[9px] font-mono text-white/30">{alertEvents.length} stored</span>
+            </div>
+            {alertEvents.length === 0 ? (
+              <p className="text-[10px] text-white/30 py-2">No alert events yet. The monitor checks every 60 seconds.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {alertEvents.slice(0, 8).map(event => (
+                  <div key={event.id} className="p-2.5 rounded border border-white/10 bg-[#0F1115]/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-[10px] font-bold text-white truncate">{event.title}</span>
+                      </div>
+                      <span className="text-[8px] uppercase text-white/30">{event.severity}</span>
+                    </div>
+                    <p className="text-[9px] text-white/50 mt-1 leading-relaxed">{event.message}</p>
+                    <p className="text-[8px] text-white/25 mt-1 font-mono">{new Date(event.timestamp).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
