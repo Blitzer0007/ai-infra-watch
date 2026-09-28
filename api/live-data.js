@@ -100,7 +100,7 @@ async function fetchCongressTrades() {
     const results = await Promise.all(symbols.map(async symbol => {
       try {
         const response = await fetch(
-          'https://www.bargo.ai/free-apis/congress/v1/trades?ticker=' + encodeURIComponent(symbol) + '&limit=10',
+          'https://www.bargo.ai/free-apis/congress/v1/trades/' + encodeURIComponent(symbol) + '?limit=10',
           { headers: { 'User-Agent': 'AI Infra Watch/1.0' } }
         );
         if (!response.ok) return [];
