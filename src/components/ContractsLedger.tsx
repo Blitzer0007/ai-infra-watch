@@ -1,30 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Search, Info, ShieldCheck, DollarSign, Sparkles } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
-
-type HistoryPoint = { date: string; price: number };
-type EventReaction = { anchorDate: string; anchorPrice: number; t1?: number; t5?: number; t20?: number };
-
-function eventReaction(history: HistoryPoint[], eventDate: string): EventReaction | null {
-  const anchors = history.filter(p => p.date < eventDate);
-  const targets = history.filter(p => p.date > eventDate);
-  if (!anchors.length) return null;
-  const anchor = anchors[anchors.length - 1];
-  const result: EventReaction = { anchorDate: anchor.date, anchorPrice: anchor.price };
-  ([1, 5, 20] as const).forEach(horizon => {
-    const target = targets[horizon - 1];
-    if (!target || !Number.isFinite(anchor.price) || anchor.price === 0) return;
-    const key = horizon === 1 ? 't1' : horizon === 5 ? 't5' : 't20';
-    result[key] = ((target.price - anchor.price) / anchor.price) * 100;
-  });
-  return result;
-}
-
-function fmtReaction(value?: number) {
-  if (value == null || !Number.isFinite(value)) return '—';
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-}
+import ContractEventStudy from './ContractEventStudy';
 
 interface ContractsLedgerProps {
   liveContracts?: Contract[];
@@ -34,35 +12,8 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [filterStatusLevel, setFilterStatusLevel] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [priceHistory, setPriceHistory] = useState<Record<string, HistoryPoint[]>>({});
 
   const activeContracts = liveContracts || [];
-  const contractCompanies = useMemo(
-    () => [...new Set(activeContracts.map(c => c.company).filter(Boolean))],
-    [activeContracts]
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadHistories() {
-      const results: Record<string, HistoryPoint[]> = {};
-      await Promise.all(contractCompanies.map(async (symbol) => {
-        try {
-          const res = await fetch('/api/stock-history?symbol=' + encodeURIComponent(symbol) + '&range=2y');
-          if (!res.ok) return;
-          const data = await res.json();
-          if (Array.isArray(data.points)) results[symbol] = data.points;
-        } catch {
-          // One unavailable history feed must not block other contract records.
-        }
-      }));
-      if (!cancelled) setPriceHistory(results);
-    }
-
-    if (contractCompanies.length) loadHistories();
-    else setPriceHistory({});
-    return () => { cancelled = true; };
-  }, [contractCompanies]);
 
   const parseValueB = (value: string): number => {
     const match = value.match(/\$([0-9]+(?:\.[0-9]+)?)\s*(B|bn)/i);
@@ -232,87 +183,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                   </div>
                 </div>
 
-                {(() => {
-                  const reaction = eventReaction(priceHistory[c.company] || [], c.dateSigned);
-                  return (
-                    <div className="bg-cyan-400/5 border border-cyan-400/10 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">SEC filing event study</span>
-                        <span className="text-[9px] font-mono text-white/30">event date: {c.dateSigned}</span>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
-                        <div><span className="text-[8px] text-white/35 block uppercase tracking-widest">Anchor</span><span className="text-white font-bold">{reaction ? '
-                  <div>
-                    <span className="text-white/40 block uppercase text-[8px] tracking-widest">Duration</span>
-                    <span className="text-white font-bold mt-0.5 block">{c.duration}</span>
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="text-white/40 block uppercase text-[8px] tracking-widest">Hardware Spec</span>
-                    <span className="text-white font-bold mt-0.5 block truncate">{c.hardware}</span>
-                  </div>
-                </div>
-
-                <div className="text-xs text-white/60 leading-relaxed space-y-3">
-                  <p>{c.details}</p>
-                  
-                  {c.geminiImpactSummary && (
-                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 space-y-1.5">
-                      <div className="flex items-center space-x-1.5 text-emerald-400 font-mono text-[9px] font-black uppercase tracking-widest">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>🤖 Gemini Stock Impact Summary</span>
-                      </div>
-                      <p className="text-xs text-[#A7F3D0] leading-relaxed font-sans font-normal">
-                        {c.geminiImpactSummary}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/40 font-mono border-t border-white/5 pt-3">
-                    <div className="flex items-center space-x-1.5">
-                      <Info className="w-3.5 h-3.5 text-white/30" />
-                      <span className="uppercase tracking-wider">Status: <span className="text-white font-bold">{c.status}</span></span>
-                    {c.source === 'sec-edgar-primary' && c.url && (
-                      <a
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="border-l border-white/10 pl-3 text-cyan-300 hover:text-cyan-200 underline"
-                      >
-                        SEC filing
-                      </a>
-                    )}
-                    </div>
-                    <div className="flex items-center space-x-1.5 border-l border-white/10 pl-3">
-                      <span className="uppercase tracking-wider">Verification: 
-                        <span className={`ml-1 font-bold uppercase ${
-                          c.statusLevel === 'high-verified' ? 'text-emerald-400' :
-                          c.statusLevel === 'in-progress' ? 'text-yellow-400' : 'text-red-400'
-                        }`}>
-                          {c.statusLevel === 'high-verified' && '🟢 HIGH-VERIFIED'}
-                          {c.statusLevel === 'in-progress' && '🟡 IN PROGRESS'}
-                          {c.statusLevel === 'low-rumour' && '🔴 LOW-RUMOUR'}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
- + reaction.anchorPrice.toFixed(2) : '—'}</span></div>
-                        <div><span className="text-[8px] text-white/35 block uppercase tracking-widest">T+1</span><span className={reaction?.t1 != null && reaction.t1 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{fmtReaction(reaction?.t1)}</span></div>
-                        <div><span className="text-[8px] text-white/35 block uppercase tracking-widest">T+5</span><span className={reaction?.t5 != null && reaction.t5 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{fmtReaction(reaction?.t5)}</span></div>
-                        <div><span className="text-[8px] text-white/35 block uppercase tracking-widest">T+20</span><span className={reaction?.t20 != null && reaction.t20 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{fmtReaction(reaction?.t20)}</span></div>
-                      </div>
-                      <p className="text-[9px] text-white/35 leading-relaxed">Calculated from the last trading close before the SEC filing date to the 1st, 5th, and 20th subsequent trading sessions. This measures reaction around the filing date; it is not a claim that the filing caused the move.</p>
-                    </div>
-                  );
-                })()}
+                <ContractEventStudy symbol={c.company} eventDate={c.dateSigned} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0F1115]/30 border border-white/5 rounded p-4 text-xs font-mono">
                   <div>
