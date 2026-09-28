@@ -53,7 +53,22 @@ export const STOCK_HISTORY: Record<string, { date: string; price: number }[]> = 
     { date: 'Jan 2026', price: 1.80 },
     { date: 'Mar 2026', price: 1.95 },
     { date: 'Apr 2026', price: 2.10 },
-    { date: 'May 2026', price: 3.80 },
+    { date: 'May 1, 2026', price: 3.76 },
+    { date: 'May 5, 2026', price: 5.11 },
+    { date: 'May 8, 2026', price: 6.63 },
+    { date: 'May 11, 2026', price: 7.43 },
+    { date: 'May 12, 2026', price: 8.39 },
+    { date: 'May 13, 2026', price: 8.46 },
+    { date: 'May 14, 2026', price: 7.22 },
+    { date: 'May 15, 2026', price: 7.54 },
+    { date: 'May 19, 2026', price: 7.72 },
+    { date: 'May 20, 2026', price: 7.56 },
+    { date: 'May 21, 2026', price: 7.70 },
+    { date: 'May 22, 2026', price: 7.94 },
+    { date: 'May 26, 2026', price: 8.10 },
+    { date: 'May 27, 2026', price: 8.01 },
+    { date: 'May 28, 2026', price: 8.11 },
+    { date: 'May 29, 2026', price: 7.81 },
     { date: 'Jun 2026', price: 4.50 }
   ],
   MU: [
@@ -163,7 +178,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
   // Digi Power X (DGXX)
   { id: 'm1_dgxx', stockSymbol: 'DGXX', date: 'Mar 2025', title: 'Pivot from Bitcoin mining & corporate re-brand', description: 'Renamed from Digihost Technology to Digi Power X, shifting focus to high-performance AI hosting and power procurement.', priceAtTime: 1.20, status: 'done' },
   { id: 'm2_dgxx', stockSymbol: 'DGXX', date: 'Apr 2026', title: 'SubQ AI contract signed ($19.6M)', description: 'Signs a 24-month contract for bare-metal Blackwell GPU-as-a-Service on the NeoCloudz platform with SubQ AI.', priceAtTime: 2.10, status: 'done' },
-  { id: 'm3_dgxx', stockSymbol: 'DGXX', date: 'May 2026', title: 'Cerebras Systems $2.5B colocation deal', description: 'Signs anchor 10-year, 40MW colocation contract for its Columbiana, Alabama campus. Stock rallies +29% same-day on volume.', priceAtTime: 3.80, status: 'done' },
+  { id: 'm3_dgxx', stockSymbol: 'DGXX', date: 'May 5, 2026', title: 'Cerebras Systems $2.5B colocation deal', description: 'Signs anchor 10-year, 40MW colocation contract for its Columbiana, Alabama campus. DGXX closed at $5.11 on May 5, then reached an $8.46 closing peak on May 13 (+65.6% from the event-day close) before closing at $7.81 on May 29.', priceAtTime: 5.11, status: 'done' },
   { id: 'm4_dgxx', stockSymbol: 'DGXX', date: 'Jun 2026', title: 'NVIDIA Vera Rubin access secured', description: 'Secures placement in NVIDIA\'s early-access target list for Rubin systems, positioning NeoCloudz as a key niche provider.', priceAtTime: 4.50, status: 'active' },
 
   // Micron (MU)
