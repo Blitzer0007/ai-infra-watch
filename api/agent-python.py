@@ -107,7 +107,8 @@ def autonomous(
         raise HTTPException(status_code=422, detail="question must not be empty")
 
     try:
-        max_steps = int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))\n        result = AutonomousMCPAgent(get_toolbox(), max_steps=max_steps).run(question)
+        max_steps = int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))
+        result = AutonomousMCPAgent(get_toolbox(), max_steps=max_steps).run(question)
     except Exception as exc:  # noqa: BLE001 — return structured agent failures
         print(traceback.format_exc(), flush=True)
         raise HTTPException(
