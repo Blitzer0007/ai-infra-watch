@@ -6,7 +6,7 @@ import {
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
-import { evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
+import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 
 // Component Views
 import Overview from './components/Overview';
@@ -122,6 +122,16 @@ export default function App() {
         ...data,
         timestamp: data.timestamp || Date.now()
       });
+
+      if (config) {
+        const catalystEvents = evaluateFeedAlerts(config, {
+          contracts: data.contracts,
+          congressTrades: data.congressTrades
+        });
+        if (config.browserNotifications) {
+          catalystEvents.forEach(notifyBrowser);
+        }
+      }
       // Sync stockPrices to tickerPrices
       if (data.stockPrices) {
         setTickerPrices((prev) => ({
