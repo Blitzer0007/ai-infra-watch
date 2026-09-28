@@ -272,6 +272,10 @@ Requirements:
   when explaining possible catalysts.
 - For each named ticker, identify what is directly observed and label any driver
   not directly supported by retrieved evidence as a hypothesis.
+- Return only the final user-facing answer. Do not restate these instructions,
+  the question, or the full retrieved-evidence payload.
+- Keep the answer concise but complete, with a clear Facts section followed by
+  Interpretation/Hypotheses.
 '''
 
 
@@ -345,7 +349,7 @@ class AutonomousMCPAgent:
         try:
             final_text = self.client.generate(
                 _final_prompt(question, successful),
-                max_tokens=1200,
+                max_tokens=2400,
                 temperature=0.0,
             )
         except Exception as exc:
