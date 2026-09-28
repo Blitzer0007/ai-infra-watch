@@ -27,10 +27,10 @@ const SYMBOLS = loadConfiguredSymbols();
 
 function stripSecHtml(html) {
   return String(html || '')
-    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')
-    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')
-    .replace(/<br\\s*\\/?>(?=.)/gi, '\\n')
-    .replace(/<\\/(?:p|div|tr|li|h[1-6]|section|article)>/gi, '\\n')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>(?=.)/gi, '\n')
+    .replace(/<\/(?:p|div|tr|li|h[1-6]|section|article)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -38,21 +38,21 @@ function stripSecHtml(html) {
     .replace(/&#39;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
-    .replace(/[ \\t\\r]+/g, ' ')
-    .replace(/\\n[ \\t]+/g, '\\n')
+    .replace(/[ \t\r]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
     .trim();
 }
 
 function cleanSecPhrase(value) {
   return String(value || '')
-    .replace(/\\s+/g, ' ')
-    .replace(/^[\\s,.;:()\-"']+|[\\s,.;:()\-"']+$/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,.;:()\-"'"]+|[\s,.;:()\-"'"]+$/g, '')
     .trim();
 }
 
 function splitSecSentences(text) {
   return stripSecHtml(text)
-    .split(/(?<=[.!?])\\s+|\\n+/)
+    .split(/(?<=[.!?])\s+|\n+/)
     .map(cleanSecPhrase)
     .filter(s => s.length >= 25 && s.length <= 1200);
 }
@@ -60,17 +60,17 @@ function splitSecSentences(text) {
 function extractCounterparty(text) {
   const source = stripSecHtml(text);
   const candidates = [];
-  const between = /\\bbetween\\s+(.{2,180}?)\\s+(?:and)\\s+(.{2,180}?)(?:[.;:,]|\\n|$)/gi;
+  const between = /\bbetween\s+(.{2,180}?)\s+(?:and)\s+(.{2,180}?)(?:[.;:,]|\n|$)/gi;
   for (const match of source.matchAll(between)) {
     candidates.push(cleanSecPhrase(match[1]), cleanSecPhrase(match[2]));
   }
 
-  const withPattern = /\\b(?:agreement|contract|arrangement|lease|order)\\s+(?:with|between)\\s+(.{2,180}?)(?:\\s+(?:to|for|under|pursuant|dated)|[.;:,]|\\n|$)/gi;
+  const withPattern = /\b(?:agreement|contract|arrangement|lease|order)\s+(?:with|between)\s+(.{2,180}?)(?:\s+(?:to|for|under|pursuant|dated)|[.;:,]|\n|$)/gi;
   for (const match of source.matchAll(withPattern)) {
     candidates.push(cleanSecPhrase(match[1]));
   }
 
-  const entered = /\\bentered into\\s+(?:a|an)\\s+(?:material\\s+)?(?:definitive\\s+)?(?:agreement|contract|arrangement)\\s+with\\s+(.{2,180}?)(?:\\s+(?:to|for|under|pursuant)|[.;:,]|\\n|$)/gi;
+  const entered = /\bentered into\s+(?:a|an)\s+(?:material\s+)?(?:definitive\s+)?(?:agreement|contract|arrangement)\s+with\s+(.{2,180}?)(?:\s+(?:to|for|under|pursuant)|[.;:,]|\n|$)/gi;
   for (const match of source.matchAll(entered)) {
     candidates.push(cleanSecPhrase(match[1]));
   }
@@ -80,21 +80,21 @@ function extractCounterparty(text) {
   for (const item of candidates) {
     const value = cleanSecPhrase(item);
     if (!value || value.length < 3 || value.length > 100 || noise.test(value)) continue;
-    if (value.split(/\\s+/).length > 12) continue;
+    if (value.split(/\s+/).length > 12) continue;
     if (!normalized.some(existing => existing.toLowerCase() === value.toLowerCase())) normalized.push(value);
   }
   return normalized[0] || '';
 }
 
 function parseMoney(raw) {
-  const value = Number(String(raw).replace(/[$,]/g, '').match(/\\d+(?:\\.\\d+)?/)?.[0]);
+  const value = Number(String(raw).replace(/[$,]/g, '').match(/\d+(?:\.\d+)?/)?.[0]);
   if (!Number.isFinite(value)) return 0;
   const lower = String(raw).toLowerCase();
   if (lower.includes('trillion')) return value * 1e12;
   if (lower.includes('billion') || lower.includes('bn')) return value * 1e9;
   if (lower.includes('million') || lower.includes('mm')) return value * 1e6;
-  if (/\\$?\\s*\\d+(?:\\.\\d+)?\\s*m$/i.test(lower)) return value * 1e6;
-  if (/\\$?\\s*\\d+(?:\\.\\d+)?\\s*k$/i.test(lower)) return value * 1e3;
+  if (/\$?\s*\d+(?:\.\d+)?\s*m$/i.test(lower)) return value * 1e6;
+  if (/\$?\s*\d+(?:\.\d+)?\s*k$/i.test(lower)) return value * 1e3;
   return value;
 }
 
@@ -102,13 +102,13 @@ function extractContractDetails(symbol, filing, html) {
   const text = stripSecHtml(html);
   const sentences = splitSecSentences(html);
   const relevant = sentences.filter(sentence =>
-    /\\b(agreement|contract|lease|purchase|order|commitment|obligation|colocation|capacity|services?)\\b/i.test(sentence)
+    /\b(agreement|contract|lease|purchase|order|commitment|obligation|colocation|capacity|service)\b/i.test(sentence)
   );
   const counterparty = extractCounterparty(text);
 
   const valueMatches = [];
   for (const sentence of relevant) {
-    for (const match of sentence.matchAll(/(?:US\\$|\\$)\\s?\\d+(?:,\\d{3})*(?:\\.\\d+)?\\s?(?:trillion|billion|million|bn|mm|m|k)?/gi)) {
+    for (const match of sentence.matchAll(/(?:US\$|\$)\s?\d+(?:,\d{3})*(?:\.\d+)?\s?(?:trillion|billion|million|bn|mm|m|k)?/gi)) {
       valueMatches.push(match[0]);
     }
   }
@@ -118,8 +118,8 @@ function extractContractDetails(symbol, filing, html) {
 
   let duration = 'See SEC filing';
   for (const sentence of relevant) {
-    const match = sentence.match(/\\b(?:for|over|during|term(?: of)?|period of)\\s+(?:a\\s+)?(\\d+(?:\\.\\d+)?)\\s*[- ]?(year|years|month|months)\\b/i)
-      || sentence.match(/\\b(\\d+(?:\\.\\d+)?)[ -]?(year|years|month|months)[ -](?:term|agreement|contract|lease)\\b/i);
+    const match = sentence.match(/\b(?:for|over|during|term(?: of)?|period of)\s+(?:a\s+)?(\d+(?:\.\d+)?)\s*[- ]?(year|years|month|months)\b/i)
+      || sentence.match(/\b(\d+(?:\.\d+)?)[ -]?(year|years|month|months)[ -](?:term|agreement|contract|lease)\b/i);
     if (match) {
       duration = match[1] + ' ' + match[2];
       break;
@@ -128,21 +128,26 @@ function extractContractDetails(symbol, filing, html) {
 
   let hardware = 'See SEC filing';
   const hardwareSentence = sentences.find(sentence =>
-    /\\b(?:NVIDIA|Blackwell|Rubin|GPU|GPUs|accelerator|data center|datacenter|colocation|megawatt|MW|gigawatt|GW|server|compute)\\b/i.test(sentence)
+    /\b(?:NVIDIA|Blackwell|Rubin|GPU|GPUs|accelerator|data center|datacenter|colocation|megawatt|MW|gigawatt|GW|server|compute)\b/i.test(sentence)
   );
-  if (hardwareSentence) {
-    hardware = hardwareSentence.slice(0, 500);
-  }
+  if (hardwareSentence) hardware = hardwareSentence.slice(0, 500);
 
   const evidence = [...new Set((relevant.length ? relevant : sentences)
-    .filter(sentence => counterparty ? sentence.toLowerCase().includes(counterparty.toLowerCase()) || /\\b(?:agreement|contract|lease|commitment|obligation)\\b/i.test(sentence) : /\\b(?:agreement|contract|lease|commitment|obligation)\\b/i.test(sentence))
+    .filter(sentence =>
+      counterparty
+        ? sentence.toLowerCase().includes(counterparty.toLowerCase()) || /\b(?:agreement|contract|lease|commitment|obligation)\b/i.test(sentence)
+        : /\b(?:agreement|contract|lease|commitment|obligation)\b/i.test(sentence)
+    )
     .slice(0, 3))];
 
   const detailSentences = relevant.filter(sentence =>
     (counterparty && sentence.toLowerCase().includes(counterparty.toLowerCase()))
-    || /(?:agreement|contract|lease).{0,180}(?:million|billion|\\$|MW|GW|year|month)/i.test(sentence)
+    || /(?:agreement|contract|lease).{0,180}(?:million|billion|\$|MW|GW|year|month)/i.test(sentence)
   );
-  const details = (detailSentences.length ? detailSentences : relevant).slice(0, 3).join(' ').slice(0, 1400)
+  const details = (detailSentences.length ? detailSentences : relevant)
+    .slice(0, 3)
+    .join(' ')
+    .slice(0, 1400)
     || 'SEC Form 8-K Item 1.01 — Entry into a Material Definitive Agreement. Review the primary filing for commercial terms.';
 
   return {
@@ -190,6 +195,7 @@ async function fetchSecContracts() {
         const recent = payload?.filings?.recent;
         if (!recent) return;
 
+        let countForSymbol = 0;
         for (let i = 0; i < (recent.form || []).length; i++) {
           const form = recent.form[i];
           const items = recent.items?.[i] || '';
@@ -210,7 +216,8 @@ async function fetchSecContracts() {
             url: 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + accessionPath + '/' + primaryDocument
           });
 
-          if (filings.filter(x => x.symbol === symbol).length >= 2) break;
+          countForSymbol++;
+          if (countForSymbol >= 2) break;
         }
       } catch {
         // Skip symbols with unavailable SEC submissions.
@@ -226,14 +233,16 @@ async function fetchSecContracts() {
           headers: ua,
           signal: AbortSignal.timeout(6500)
         });
-        if (!response.ok) return {
-          ...extractContractDetails(filing.symbol, filing, ''),
-          value: 'Not quantified',
-          client: 'Material definitive agreement',
-          duration: 'See SEC filing',
-          hardware: 'See SEC filing',
-          details: 'SEC Form 8-K Item 1.01 — Entry into a Material Definitive Agreement. Primary filing text could not be fetched during this refresh.'
-        };
+        if (!response.ok) {
+          return {
+            ...extractContractDetails(filing.symbol, filing, ''),
+            value: 'Not quantified',
+            client: 'Material definitive agreement',
+            duration: 'See SEC filing',
+            hardware: 'See SEC filing',
+            details: 'SEC Form 8-K Item 1.01 — Entry into a Material Definitive Agreement. Primary filing text could not be fetched during this refresh.'
+          };
+        }
         const html = await response.text();
         return extractContractDetails(filing.symbol, filing, html);
       } catch {
@@ -248,7 +257,7 @@ async function fetchSecContracts() {
       }
     }));
 
-    return parsed.filter(Boolean);
+    return parsed;
   } catch {
     return [];
   }
