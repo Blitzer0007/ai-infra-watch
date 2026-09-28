@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Search, Info, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
-import { CONGRESS_TRADES } from '../data';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
 
@@ -12,7 +11,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
   const [search, setSearch] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
 
-  const activeTrades = liveTrades && liveTrades.length > 0 ? liveTrades : CONGRESS_TRADES;
+  const activeTrades = liveTrades || [];
 
   const filtered = activeTrades.filter((t) => {
     const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
