@@ -95,7 +95,8 @@ class LLMClient:
             data = json.loads(self._cache_path(cache_key).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return None
-        return data.get("text")
+        cached_text = data.get("text")
+        return cached_text if isinstance(cached_text, str) else None
 
     def _cache_write(self, cache_key: str, text: str, usage: dict[str, int]) -> None:
         if not settings.CACHE_ENABLED:
