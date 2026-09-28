@@ -56,7 +56,9 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-        <Metric label="Invested cost" value={'
+        <Metric label="Invested cost" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
+        <Metric label="Live current" value={liveCurrentTotal != null ? '$' + liveCurrentTotal.toFixed(2) : '—'} suffix={livePositions.length + '/' + analyses.length + ' quotes'} tone="up" icon={<TrendingUp/>}/>
+        <Metric label="Live unrealized" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '') + '$' + liveUnrealized.toFixed(2) : '—'} suffix={liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : ''} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
         <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
       </div>
