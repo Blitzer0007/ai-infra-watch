@@ -175,6 +175,24 @@ export default function BuySellWatchlist() {
 
           <div className="pt-3 border-t border-white/10 space-y-3">
             <div className="flex items-center justify-between">
+              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Catalyst Alerts</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = { ...config, catalystAlerts: !config.catalystAlerts };
+                  setConfig(updated);
+                  saveConfig(updated);
+                }}
+                className={config.catalystAlerts ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}
+              >
+                {config.catalystAlerts ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <p className="text-[10px] text-white/40">New SEC material-agreement filings and congressional disclosures for watched symbols.</p>
+          </div>
+
+          <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
               <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Smart Move Alerts</span>
               <button
                 type="button"
