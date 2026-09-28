@@ -26,7 +26,7 @@ function loadConfiguredSymbols() {
 const SYMBOLS = loadConfiguredSymbols();
 
 async function fetchSecContracts() {
-  const ua = { 'User-Agent': 'AI Infra Watch research contact@example.com' };
+  const ua = { 'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)' };
   try {
     const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua });
     if (!tickerResponse.ok) return [];
