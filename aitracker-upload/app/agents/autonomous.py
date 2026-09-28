@@ -249,14 +249,15 @@ class AutonomousMCPAgent:
             steps.append(Step(node="plan", kind="node", note=f"iteration={iteration}"))
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
-                # Once a tool has produced evidence, synthesize that evidence
-                # instead of returning the deterministic router's placeholder.
-                if any(c.ok for c in calls):
-                    return self._finalize(question, calls, steps)
+                # Respect an explicit planner answer. If the deterministic
+                # fallback emits an empty final action after successful calls,
+                # synthesize the retrieved evidence instead.
                 answer = str(plan.get("answer", "")).strip()
                 if answer:
                     steps.append(Step(node="finalize", kind="node", note="planner settled"))
                     return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
+                if any(c.ok for c in calls):
+                    return self._finalize(question, calls, steps)
             if action != "tool":
                 error = "planner returned neither a valid tool action nor a final answer"
                 steps.append(tool_call("autonomous.planner", ok=False, note=error))
