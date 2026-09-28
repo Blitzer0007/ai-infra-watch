@@ -77,7 +77,11 @@ STUB_MODE: bool = _env_bool("CI_USE_STUB_LLM", False) or _env_bool("EVAL_STUB", 
 
 # Backoff / retry for transient HTTP errors from LLM providers.
 MAX_RETRIES: int = int(_env_str("EVAL_MAX_RETRIES", "1" if os.getenv("VERCEL") else "4"))
-RETRY_BASE_DELAY_SEC: float = _env_float("EVAL_RETRY_BASE_DELAY", 1.0)\n\nLLM_REQUEST_TIMEOUT_SEC: float = _env_float(\n    "LLM_REQUEST_TIMEOUT_SEC", 12.0 if os.getenv("VERCEL") else 90.0\n)
+RETRY_BASE_DELAY_SEC: float = _env_float("EVAL_RETRY_BASE_DELAY", 1.0)
+
+LLM_REQUEST_TIMEOUT_SEC: float = _env_float(
+    "LLM_REQUEST_TIMEOUT_SEC", 12.0 if os.getenv("VERCEL") else 90.0
+)
 
 # ---- production API security / browser access -----------------------
 # When set, /api/ask/autonomous requires Authorization: Bearer <token>.
