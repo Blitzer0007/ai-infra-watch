@@ -266,6 +266,12 @@ Requirements:
 - State missing or conflicting evidence.
 - Do not invent prices, events, contracts, or causal explanations.
 - Do not present model signals as guaranteed outcomes.
+- For event-study output, report the actual number of returned events and distinguish
+  an empty events list from events whose return fields are null.
+- Prefer company-specific primary SEC evidence over generic sector-level filing text
+  when explaining possible catalysts.
+- For each named ticker, identify what is directly observed and label any driver
+  not directly supported by retrieved evidence as a hypothesis.
 '''
 
 
