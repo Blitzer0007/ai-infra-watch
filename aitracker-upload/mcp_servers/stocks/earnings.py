@@ -201,18 +201,50 @@ class FinnhubEarningsProvider:
         except QuoteError:
             pass  # calendar alone is enough; actuals are best-effort
 
-        events: list[EarningsEvent] = []
+        # Normalize the calendar plus the reported-earnings endpoint.
+        # Finnhub's calendar can omit EPS actuals for recently completed
+        # quarters, while /stock/earnings contains the reported actuals.
+        # Merge both sources by report date so past events are not silently
+        # classified as upcoming or dropped from event studies.
+        merged: dict[str, dict] = {}
+
         for row in rows:
             date = row.get("date")
             if not date:
                 continue
+            merged[str(date)] = dict(row)
+
+        for date, rec in actuals.items():
+            if not date:
+                continue
+            row = merged.setdefault(str(date), {})
+            if row.get("epsActual") is None:
+                row["epsActual"] = rec.get("actual")
+            if row.get("epsEstimate") is None:
+                row["epsEstimate"] = rec.get("estimate")
+            if row.get("quarter") is None and rec.get("quarter") is not None:
+                row["quarter"] = rec.get("quarter")
+            if row.get("year") is None and rec.get("year") is not None:
+                row["year"] = rec.get("year")
+            if row.get("hour") is None:
+                row["hour"] = rec.get("hour")
+
+        events: list[EarningsEvent] = []
+        for date, row in sorted(merged.items()):
             eps_actual = row.get("epsActual")
-            back = actuals.get(date)
-            if eps_actual is None and back is not None:
-                eps_actual = back.get("actual")
             eps_estimate = row.get("epsEstimate")
-            if eps_estimate is None and back is not None:
-                eps_estimate = back.get("estimate")
+
+            # /stock/earnings uses actual/estimate; calendar uses
+            # epsActual/epsEstimate. Keep a fallback for provider variations.
+            if eps_actual is None:
+                back = actuals.get(date)
+                if back is not None:
+                    eps_actual = back.get("actual")
+            if eps_estimate is None:
+                back = actuals.get(date)
+                if back is not None:
+                    eps_estimate = back.get("estimate")
+
             when = "past" if date <= today_str and eps_actual is not None else (
                 "past" if date < today_str else "upcoming"
             )
@@ -221,7 +253,12 @@ class FinnhubEarningsProvider:
                 date=date,
                 when=when,
                 hour=row.get("hour") or None,
-                period=row.get("quarter") and f"{row.get('year')}-Q{row.get('quarter')}" or None,
+                period=(
+                    row.get("quarter") is not None
+                    and row.get("year") is not None
+                    and f"{row.get('year')}-Q{row.get('quarter')}"
+                    or row.get("period")
+                ),
                 eps_actual=eps_actual,
                 eps_estimate=eps_estimate,
                 revenue_actual=row.get("revenueActual"),
@@ -230,6 +267,7 @@ class FinnhubEarningsProvider:
             )
             event.surprise_pct = event.compute_surprise()
             events.append(event)
+
         if not events:
             raise QuoteError("NO_DATA", f"no earnings data for {symbol}")
         events.sort(key=lambda e: e.date)
