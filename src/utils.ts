@@ -7,6 +7,7 @@ export interface AppConfig {
   largeMoveEnabled: boolean;
   largeMovePct: number;
   browserNotifications: boolean;
+  catalystAlerts: boolean;
 }
 
 const CONFIG_KEY = 'aiw_config_v1';
@@ -20,7 +21,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   ],
   largeMoveEnabled: true,
   largeMovePct: 5,
-  browserNotifications: false
+  browserNotifications: false,
+  catalystAlerts: true
 };
 
 export function loadConfig(): AppConfig {
