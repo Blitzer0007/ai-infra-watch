@@ -1,0 +1,11 @@
+[
+  {
+    "id": "fixture-1",
+    "published_at": "2026-09-28T08:00:00Z",
+    "headline": "AI infrastructure demand remains a key market theme",
+    "source": "fixture",
+    "summary": "Synthetic fixture article for deterministic tests.",
+    "url": "https://example.com/fixture-ai",
+    "related": "NVDA MU SNDK"
+  }
+]
