@@ -1,4 +1,4 @@
-const DEFAULT_TIMEOUT_MS = 25000;
+const DEFAULT_TIMEOUT_MS = 55000;
 
 function backendUrl(req) {
   const configured = String(process.env.AI_INFRA_AGENT_URL || '').trim().replace(/\/+$/, '');
