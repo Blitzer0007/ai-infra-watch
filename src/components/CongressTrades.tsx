@@ -74,6 +74,10 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
         </div>
       </div>
 
+      <div className="text-[10px] text-white/40 font-mono">
+        Data source: Bargo U.S. Congress Stock Trades API, derived from official House and Senate disclosure filings.
+      </div>
+
       {/* Trades Table */}
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
