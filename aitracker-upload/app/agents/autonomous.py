@@ -290,6 +290,27 @@ class AutonomousMCPAgent:
         for iteration in range(1, self.max_steps + 1):
             plan = self._plan(question, tools, history)
             steps.append(Step(node="plan", kind="node", note=f"iteration={iteration}"))
+            # Never allow a malformed/empty planner result to crash the whole
+            # request. This also protects production when an OpenAI-compatible
+            # model returns an empty/null JSON response.
+            if not isinstance(plan, dict):
+                fallback_plans = keyword_router(question, tools, max_tools=1)
+                if fallback_plans:
+                    fallback = fallback_plans[0]
+                    plan = {
+                        "action": "tool",
+                        "tool": fallback.tool,
+                        "arguments": fallback.arguments,
+                        "reason": "planner returned no usable action; deterministic fallback",
+                    }
+                    steps.append(Step(node="plan", kind="node", note="planner fallback"))
+                else:
+                    error = "planner returned no usable action"
+                    steps.append(tool_call("autonomous.planner", ok=False, note=error))
+                    return AutonomousResult(
+                        question, "", calls, discovered, AgentTrajectory(steps=steps),
+                        error=error, resolution="error"
+                    )
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
                 # Respect an explicit planner answer. If the deterministic
