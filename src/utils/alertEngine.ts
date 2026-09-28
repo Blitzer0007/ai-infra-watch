@@ -76,7 +76,7 @@ export function evaluateQuoteAlerts(
       continue;
     }
 
-    if (!state[key] && !bootstrap) {
+    if (!state[key] && !seedOnly) {
       events.push({
         id: key + ':' + now,
         type: 'price',
@@ -98,7 +98,7 @@ export function evaluateQuoteAlerts(
       if (!Number.isFinite(quote.changePct) || Math.abs(quote.changePct) < threshold) continue;
       const direction = quote.changePct >= 0 ? 'up' : 'down';
       const key = eventId('large-move', symbol, today + ':' + direction);
-      if (!state[key] && !bootstrap) {
+      if (!state[key] && !seedOnly) {
         events.push({
           id: key + ':' + now,
           type: 'large-move',
@@ -148,12 +148,14 @@ export function evaluateFeedAlerts(
   const events: AlertEvent[] = [];
   const now = Date.now();
   const watched = new Set([...config.watchlist, ...config.alerts.map(alert => alert.symbol)]);
+  const hasFeedState = Object.keys(state).some(key => key.startsWith('catalyst:'));
+  const seedOnly = bootstrap || !hasFeedState;
 
   for (const contract of feed.contracts || []) {
     const symbol = contract.company || '';
     if (!symbol || !watched.has(symbol) || !contract.id) continue;
     const key = 'catalyst:contract:' + contract.id;
-    if (!state[key] && !bootstrap) {
+    if (!state[key] && !seedOnly) {
       events.push({
         id: key + ':' + now,
         type: 'catalyst',
@@ -172,7 +174,7 @@ export function evaluateFeedAlerts(
     const symbol = trade.stockSymbol || '';
     if (!symbol || !watched.has(symbol) || !trade.id) continue;
     const key = 'catalyst:congress:' + trade.id;
-    if (!state[key] && !bootstrap) {
+    if (!state[key] && !seedOnly) {
       events.push({
         id: key + ':' + now,
         type: 'catalyst',
