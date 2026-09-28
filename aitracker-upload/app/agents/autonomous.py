@@ -418,6 +418,17 @@ class AutonomousMCPAgent:
             if action == "final":
                 forced = _driver_research_plan(question, tools, calls)
                 if forced is not None:
+                    forced_action = str(forced.get("action", "")).strip().lower()
+                    if forced_action == "final":
+                        # Driver research is complete. The forced planner uses
+                        # an empty final action only as a bounded stop signal;
+                        # never convert it into a tool call with an empty name.
+                        steps.append(Step(
+                            node="finalize",
+                            kind="node",
+                            note="forced driver evidence complete",
+                        ))
+                        return self._finalize(question, calls, steps)
                     plan = forced
                     action = "tool"
                     steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
