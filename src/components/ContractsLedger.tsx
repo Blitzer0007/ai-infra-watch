@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Info, ShieldCheck, DollarSign, Sparkles } from 'lucide-react';
-import { CONTRACTS_LEDGER, STOCK_METADATA } from '../data';
+import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
 
 interface ContractsLedgerProps {
@@ -12,7 +12,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
   const [filterStatusLevel, setFilterStatusLevel] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  const activeContracts = liveContracts && liveContracts.length > 0 ? liveContracts : CONTRACTS_LEDGER;
+  const activeContracts = liveContracts || [];
 
   const parseValueB = (value: string): number => {
     const match = value.match(/\$([0-9]+(?:\.[0-9]+)?)\s*(B|bn)/i);
@@ -134,7 +134,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
       <div className="space-y-4">
         {filteredContracts.length === 0 ? (
           <div className="text-center py-12 border border-white/10 rounded text-white/40 text-xs font-mono">
-            No contracts matching current filter query found.
+            No live SEC-linked contracts are available for the current data refresh.
           </div>
         ) : (
           filteredContracts.map((c) => {
