@@ -4,6 +4,9 @@ export interface AppConfig {
   finnhubKey: string;
   watchlist: string[];
   alerts: { symbol: string; targetPrice: number; type: 'above' | 'below'; active: boolean }[];
+  largeMoveEnabled: boolean;
+  largeMovePct: number;
+  browserNotifications: boolean;
 }
 
 const CONFIG_KEY = 'aiw_config_v1';
@@ -14,7 +17,10 @@ export const DEFAULT_CONFIG: AppConfig = {
   alerts: [
     { symbol: 'DGXX', targetPrice: 5.0, type: 'above', active: true },
     { symbol: 'NBIS', targetPrice: 20.0, type: 'below', active: false }
-  ]
+  ],
+  largeMoveEnabled: true,
+  largeMovePct: 5,
+  browserNotifications: false
 };
 
 export function loadConfig(): AppConfig {
