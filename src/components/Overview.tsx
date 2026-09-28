@@ -351,7 +351,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
         <div className="flex items-start space-x-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 md:p-4 text-amber-300">
           <BadgeInfo className="w-5 h-5 mt-0.5 flex-shrink-0" />
           <div className="text-xs leading-relaxed">
-            <span className="font-bold text-amber-200">NO FINNHUB API KEY CONFIGURED.</span> Quotes below are fluctuating mock values. Set up a free API key inside the <button onClick={() => onNavigate('settings')} className="text-amber-200 underline hover:text-white font-bold cursor-pointer">Settings panel</button> to stream active production market rates.
+            <span className="font-bold text-amber-200">SERVER MARKET FEED ACTIVE.</span> Quotes use the server-side market feed when no optional Finnhub key is configured. <button onClick={() => onNavigate('settings')} className="text-amber-200 underline hover:text-white font-bold cursor-pointer">Settings panel</button>
           </div>
         </div>
       )}
@@ -398,7 +398,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
                 <div className="min-w-0">
                   <div className="flex items-center space-x-2">
                     <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest px-2 py-0.5 bg-white/5 border border-white/10 rounded">{sym}</span>
-                    <span className="text-[9px] font-mono text-white/40">{source === 'live' ? 'LIVE FEED' : 'SIMULATED'}</span>
+                    <span className="text-[9px] font-mono text-white/40">{source === 'live' ? 'LIVE FEED' : 'UNAVAILABLE'}</span>
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-tight text-white/80 truncate mt-2">{name}</h3>
                 </div>
