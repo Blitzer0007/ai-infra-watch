@@ -6,6 +6,7 @@ import {
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
+import { evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 
 // Component Views
 import Overview from './components/Overview';
@@ -38,6 +39,49 @@ export default function App() {
   const [liveError, setLiveError] = useState<string | null>(null);
 
   const watchlistSymbols = Object.keys(STOCK_METADATA);
+
+  // Alert engine: keep price thresholds and large-move alerts active across the dashboard.
+  useEffect(() => {
+    if (!config) return;
+    let cancelled = false;
+    let initialized = false;
+
+    const checkAlerts = async () => {
+      const symbols = [...new Set([
+        ...config.watchlist,
+        ...config.alerts.map(alert => alert.symbol),
+        ...STOCK_UNIVERSE_SYMBOLS
+      ])];
+
+      const quotes: Record<string, { price: number; changePct: number }> = {};
+      for (const symbol of symbols) {
+        try {
+          const quote = await fetchLiveQuote(symbol, config.finnhubKey || '');
+          if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
+            quotes[symbol] = { price: quote.price, changePct: quote.changePct };
+          }
+        } catch {
+          // A single quote failure should not stop alert evaluation for other symbols.
+        }
+      }
+
+      if (cancelled) return;
+
+      const events = evaluateQuoteAlerts(config, quotes, !initialized);
+      initialized = true;
+
+      if (config.browserNotifications) {
+        events.forEach(notifyBrowser);
+      }
+    };
+
+    checkAlerts();
+    const interval = setInterval(checkAlerts, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [config]);
 
   useEffect(() => {
     if (activeView !== 'portfolio') return;
