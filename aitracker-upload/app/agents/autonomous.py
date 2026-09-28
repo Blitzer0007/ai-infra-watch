@@ -158,54 +158,94 @@ Rules:
 
 
 def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[ToolCallRecord]) -> dict[str, Any] | None:
-    """Require non-quote evidence for questions asking about recent drivers."""
+    """Build a bounded evidence sequence for 'what changed / why / drivers' questions.
+
+    Prefer one batched quote call, then historical earnings-event reaction, then
+    a filing search. This avoids spending the six-step budget on repeated
+    per-symbol quote calls and gives the synthesizer evidence about both price
+    reaction and material disclosures.
+    """
     lower = question.lower()
     terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed")
     if not any(term in lower for term in terms):
         return None
-    symbols = extract_symbols(question)
+    symbols = [s.upper() for s in extract_symbols(question)]
     if not symbols:
         return None
 
-    completed: set[str] = set()
-    evidence_markers = ("get_earnings", "get_event_study", "get_milestones", "get_contracts")
-    for call in calls:
-        if not call.ok or not any(marker in call.tool.lower() for marker in evidence_markers):
-            continue
-        args = call.arguments or {}
-        symbol = args.get("symbol")
-        if isinstance(symbol, str):
-            completed.add(symbol.upper())
-        values = args.get("symbols")
-        if isinstance(values, list):
-            completed.update(str(value).upper() for value in values)
+    def successful_tool(predicate):
+        return any(c.ok and predicate(c) for c in calls)
 
-    missing = [symbol.upper() for symbol in symbols if symbol.upper() not in completed]
-    if not missing:
-        return None
+    # Step 1: one quote batch for all explicitly named symbols.
+    batch = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower().endswith(".get_quotes")
+            and "symbols" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if batch is not None and not successful_tool(
+        lambda c: c.tool.lower().endswith(".get_quotes")
+        or c.tool.lower().endswith(".get_quote")
+    ):
+        return {
+            "action": "tool",
+            "tool": batch.qualified_name,
+            "arguments": {"symbols": symbols},
+            "reason": "driver question: batch current quotes before causal research",
+        }
 
-    target = missing[0]
-    candidates = []
-    for tool in tools:
-        props = (tool.input_schema or {}).get("properties") or {}
-        name = tool.qualified_name.lower()
-        if "symbol" in props and any(marker in name for marker in evidence_markers):
-            candidates.append(tool)
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda tool: (
-        0 if tool.qualified_name.lower().endswith(".get_earnings") else 1,
-        tool.qualified_name,
-    ))
-    tool = candidates[0]
-    return {
-        "action": "tool",
-        "tool": tool.qualified_name,
-        "arguments": {"symbol": target},
-        "reason": f"driver question requires evidence for {target}",
+    # Step 2: historical earnings-event reaction for every named ticker.
+    event_tools = [
+        t for t in tools
+        if t.qualified_name.lower().endswith(".get_event_study")
+        and "symbol" in ((t.input_schema or {}).get("properties") or {})
+    ]
+    completed_events = {
+        str((c.arguments or {}).get("symbol", "")).upper()
+        for c in calls
+        if c.ok and c.tool.lower().endswith(".get_event_study")
     }
+    for symbol in symbols:
+        if symbol not in completed_events and event_tools:
+            return {
+                "action": "tool",
+                "tool": event_tools[0].qualified_name,
+                "arguments": {"symbol": symbol},
+                "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
+            }
 
+    # Step 3: search the filings corpus for recent material disclosures across
+    # all named symbols. This is the evidence source that can actually contain
+    # contracts, milestones, counterparties, and other potential catalysts.
+    filing_search = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower().endswith(".search_filings")
+            and "query" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if filing_search is not None and not successful_tool(
+        lambda c: c.tool.lower().endswith(".search_filings")
+    ):
+        query = (
+            f"recent material events catalysts contracts earnings developments "
+            f"for {' '.join(symbols)}"
+        )
+        props = (filing_search.input_schema or {}).get("properties") or {}
+        args = {"query": query}
+        if "top_k" in props:
+            args["top_k"] = 8
+        return {
+            "action": "tool",
+            "tool": filing_search.qualified_name,
+            "arguments": args,
+            "reason": "driver question: retrieve recent filing disclosures",
+        }
+
+    return None
 
 def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
     evidence = [{
