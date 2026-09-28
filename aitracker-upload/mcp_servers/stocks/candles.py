@@ -316,6 +316,95 @@ class FinnhubCandleProvider:
 
 
 # ----------------------------------------------------------------------
+# Yahoo Finance provider (live, no API key)
+# ----------------------------------------------------------------------
+class YahooCandleProvider:
+    """Live daily candles from Yahoo Finance's chart endpoint.
+
+    This endpoint does not require a separate API key and is used for
+    historical event-study data. Quote/earnings data can continue to come
+    from Finnhub.
+    """
+
+    source = "yahoo"
+
+    def __init__(self, max_retries: int = 3, base_delay: float = 1.0, timeout: float = 15.0) -> None:
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.timeout = timeout
+
+    def get_series(self, symbol: str, lookback: int = 60) -> CandleSeries:
+        symbol = symbol.strip().upper()
+        now = int(time.time())
+        days = max(180, lookback + 60)
+        params = {
+            "period1": now - days * 86400,
+            "period2": now,
+            "interval": "1d",
+            "events": "history",
+            "includeAdjustedClose": "true",
+        }
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with httpx.Client(timeout=self.timeout, headers={"User-Agent": "Mozilla/5.0"}) as client:
+                    resp = client.get(url, params=params)
+                if resp.status_code == 429:
+                    if attempt < self.max_retries:
+                        time.sleep(self.base_delay * (2 ** attempt))
+                        continue
+                    raise QuoteError("RATE_LIMIT", "Yahoo Finance rate limit")
+                if resp.status_code >= 400:
+                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
+                        time.sleep(self.base_delay * (2 ** attempt))
+                        continue
+                    raise QuoteError("HTTP_ERROR", f"Yahoo Finance returned {resp.status_code}")
+                payload = resp.json()
+                result = ((payload.get("chart") or {}).get("result") or [None])[0]
+                if not result:
+                    raise QuoteError("NO_DATA", f"no candle data for {symbol}")
+                timestamps = result.get("timestamp") or []
+                quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+                opens = quote.get("open") or []
+                highs = quote.get("high") or []
+                lows = quote.get("low") or []
+                closes = quote.get("close") or []
+                volumes = quote.get("volume") or []
+                candles: list[Candle] = []
+                for i, ts in enumerate(timestamps):
+                    try:
+                        if closes[i] is None:
+                            continue
+                        candles.append(
+                            Candle(
+                                symbol=symbol,
+                                date=time.strftime("%Y-%m-%d", time.gmtime(ts)),
+                                open=float(opens[i]),
+                                high=float(highs[i]),
+                                low=float(lows[i]),
+                                close=float(closes[i]),
+                                volume=float(volumes[i]) if i < len(volumes) and volumes[i] is not None else None,
+                                source=self.source,
+                            )
+                        )
+                    except (IndexError, TypeError, ValueError):
+                        continue
+                if not candles:
+                    raise QuoteError("NO_DATA", f"no parseable candle data for {symbol}")
+                candles.sort(key=lambda c: c.date)
+                if lookback > 0:
+                    candles = candles[-(lookback + 1):]
+                return CandleSeries(symbol=symbol, candles=candles, source=self.source)
+            except httpx.HTTPError as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    time.sleep(self.base_delay * (2 ** attempt))
+                    continue
+        raise QuoteError("HTTP_ERROR", f"Yahoo Finance candle request failed: {last_exc}")
+
+
+# ----------------------------------------------------------------------
 # Service (best-effort batch, mirrors StockService)
 # ----------------------------------------------------------------------
 class CandleService:
@@ -334,7 +423,7 @@ class CandleService:
     @classmethod
     def from_env(cls, mode: str = "fixture", lookback: int = 60) -> "CandleService":
         if mode == "live":
-            return cls(provider=FinnhubCandleProvider(), lookback=lookback)
+            return cls(provider=YahooCandleProvider(), lookback=lookback)
         return cls(provider=FixtureCandleProvider(fixture_path=CANDLES_FIXTURE_PATH), lookback=lookback)
 
     def get_series(self, symbol: str, lookback: int | None = None) -> CandleSeries:
