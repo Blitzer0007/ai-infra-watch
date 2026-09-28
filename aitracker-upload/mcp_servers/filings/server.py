@@ -66,7 +66,7 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
         # Use FILINGS_MODE directly. FilingsService may fall back to the local
         # RAG fixture when data/filings is absent, but milestone research must
         # still be able to use live EDGAR in that situation.
-        mode = os.getenv("FILINGS_MODE", "fixture") or "fixture"
+        mode = os.getenv("FILINGS_MODE", "live") or "live"
         timeline = MilestoneService.from_env(mode=mode).get_timeline(symbol)
         return timeline.model_dump()
 
