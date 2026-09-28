@@ -147,8 +147,26 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Other', desc: '', logoColor: '#fff' };
 
   const getAccuratePrice = (m: Milestone) => {
-    const matchedPt = chartHistory.find((pt) => matchesDate(m.date, pt.date));
-    return matchedPt?.price;
+    // Prefer an exact trading-day match. For month-only milestones, use the
+    // nearest available trading day to the middle of that month so the UI
+    // still shows a real market price instead of a missing/static value.
+    const exact = chartHistory.find((pt) => matchesDate(m.date, pt.date));
+    if (exact) return exact.price;
+
+    const monthYear = m.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+(\\d{4})$/i);
+    if (monthYear) {
+      const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+      const year = Number(monthYear[2]);
+      const candidates = chartHistory
+        .filter((pt) => {
+          const d = new Date(pt.date + 'T00:00:00Z');
+          return d.getUTCFullYear() === year && d.getUTCMonth() === month;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (candidates.length) return candidates[Math.floor((candidates.length - 1) / 2)].price;
+    }
+
+    return undefined;
   };
 
   // Prepare chart data by merging stock history with milestone flags
