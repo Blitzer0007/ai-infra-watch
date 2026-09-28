@@ -306,7 +306,7 @@ class AutonomousMCPAgent:
     def __init__(self, toolbox: MCPToolbox, client: LLMClient | None = None, max_steps: int | None = None, planner: Any | None = None) -> None:
         self.toolbox = toolbox
         self.client = client or LLMClient()
-        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "6"))
+        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))
         self.planner = planner
 
     def _plan(self, question: str, tools: list[ToolInfo], history: list[dict[str, Any]]) -> dict[str, Any]:
