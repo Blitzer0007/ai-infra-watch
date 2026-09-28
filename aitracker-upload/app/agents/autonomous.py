@@ -370,22 +370,17 @@ class AutonomousMCPAgent:
                     steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
                 else:
                     # Respect an explicit planner answer. If the deterministic
-                # fallback emits an empty final action after successful calls,
-                # synthesize the retrieved evidence instead.
-                answer = str(plan.get("answer", "")).strip()
-                placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
-                if any(c.ok for c in calls) and answer == placeholder:
-                    return self._finalize(question, calls, steps)
-                if answer:
-                    steps.append(Step(node="finalize", kind="node", note="planner settled"))
-                    return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
-                if any(c.ok for c in calls):
-                    return self._finalize(question, calls, steps)
-            if action != "tool":
-                error = "planner returned neither a valid tool action nor a final answer"
-                steps.append(tool_call("autonomous.planner", ok=False, note=error))
-                return AutonomousResult(question, "", calls, discovered, AgentTrajectory(steps=steps), error=error, resolution="error")
-
+                    # fallback emits an empty final action after successful calls,
+                    # synthesize the retrieved evidence instead.
+                    answer = str(plan.get("answer", "")).strip()
+                    placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
+                    if any(c.ok for c in calls) and answer == placeholder:
+                        return self._finalize(question, calls, steps)
+                    if answer:
+                        steps.append(Step(node="finalize", kind="node", note="planner settled"))
+                        return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
+                    if any(c.ok for c in calls):
+                        return self._finalize(question, calls, steps)
             tool_name = str(plan.get("tool", "")).strip()
             tool = by_name.get(tool_name)
             if tool is None:
