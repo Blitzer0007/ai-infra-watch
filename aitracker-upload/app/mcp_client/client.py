@@ -89,14 +89,27 @@ async def _stdio_session_factory(cfg: ServerConfig, stack: AsyncExitStack) -> Se
     Imported lazily so the hermetic test path never imports transport code.
     """
     import os
+    import sys
 
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
+    # Vercel can install function dependencies into a per-function virtual
+    # environment while sys.executable still points at the runtime interpreter.
+    # A stdio child does not inherit the parent's Python sys.path, so packages
+    # such as httpx can be missing inside an MCP server even though the API
+    # function imported them successfully. Propagate the active search path.
+    child_env = {**os.environ, **cfg.env}
+    inherited_pythonpath = os.pathsep.join(path for path in sys.path if path)
+    existing_pythonpath = child_env.get("PYTHONPATH", "")
+    child_env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (inherited_pythonpath, existing_pythonpath) if part
+    )
+
     params = StdioServerParameters(
         command=cfg.command,
         args=cfg.args,
-        env={**os.environ, **cfg.env},
+        env=child_env,
         cwd=cfg.cwd,
     )
     read, write = await stack.enter_async_context(stdio_client(params))
