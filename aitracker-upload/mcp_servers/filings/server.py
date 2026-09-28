@@ -80,7 +80,7 @@ def build_server(service: FilingsService | None = None) -> MCPServer:
         from .milestones import MilestoneService
         from .contracts import ContractService
 
-        mode = os.getenv("FILINGS_MODE", "live") or "live"
+        mode = "live"
         milestone_service = MilestoneService.from_env(mode=mode)
         contract_service = ContractService.from_env(mode=mode)
 
