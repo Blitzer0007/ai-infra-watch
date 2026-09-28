@@ -157,6 +157,56 @@ Rules:
 '''
 
 
+def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[ToolCallRecord]) -> dict[str, Any] | None:
+    """Require non-quote evidence for questions asking about recent drivers."""
+    lower = question.lower()
+    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed")
+    if not any(term in lower for term in terms):
+        return None
+    symbols = extract_symbols(question)
+    if not symbols:
+        return None
+
+    completed: set[str] = set()
+    evidence_markers = ("get_earnings", "get_event_study", "get_milestones", "get_contracts")
+    for call in calls:
+        if not call.ok or not any(marker in call.tool.lower() for marker in evidence_markers):
+            continue
+        args = call.arguments or {}
+        symbol = args.get("symbol")
+        if isinstance(symbol, str):
+            completed.add(symbol.upper())
+        values = args.get("symbols")
+        if isinstance(values, list):
+            completed.update(str(value).upper() for value in values)
+
+    missing = [symbol.upper() for symbol in symbols if symbol.upper() not in completed]
+    if not missing:
+        return None
+
+    target = missing[0]
+    candidates = []
+    for tool in tools:
+        props = (tool.input_schema or {}).get("properties") or {}
+        name = tool.qualified_name.lower()
+        if "symbol" in props and any(marker in name for marker in evidence_markers):
+            candidates.append(tool)
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda tool: (
+        0 if tool.qualified_name.lower().endswith(".get_earnings") else 1,
+        tool.qualified_name,
+    ))
+    tool = candidates[0]
+    return {
+        "action": "tool",
+        "tool": tool.qualified_name,
+        "arguments": {"symbol": target},
+        "reason": f"driver question requires evidence for {target}",
+    }
+
+
 def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
     evidence = [{
         "tool": c.tool,
@@ -313,7 +363,13 @@ class AutonomousMCPAgent:
                     )
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
-                # Respect an explicit planner answer. If the deterministic
+                forced = _driver_research_plan(question, tools, calls)
+                if forced is not None:
+                    plan = forced
+                    action = "tool"
+                    steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
+                else:
+                    # Respect an explicit planner answer. If the deterministic
                 # fallback emits an empty final action after successful calls,
                 # synthesize the retrieved evidence instead.
                 answer = str(plan.get("answer", "")).strip()
