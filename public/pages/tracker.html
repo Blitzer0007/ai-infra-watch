@@ -149,133 +149,19 @@
         AMPG: { name: 'AmpliTech Group', sector: 'Telecom RF Hardware', desc: 'Designs low-noise radio amplifiers; showcased in NVIDIA AI-RAN cellular networking demonstrations.', logoColor: '#D97706' }
       };
 
-      const STOCK_HISTORY = {
-        NVDA: [
-          { date: 'Jan 2025', price: 115.0 },
-          { date: 'Mar 2025', price: 122.0 },
-          { date: 'May 2025', price: 130.0 },
-          { date: 'Jul 2025', price: 135.0 },
-          { date: 'Aug 2025', price: 142.0 },
-          { date: 'Oct 2025', price: 150.0 },
-          { date: 'Nov 2025', price: 158.0 },
-          { date: 'Jan 2026', price: 168.0 },
-          { date: 'Mar 2026', price: 175.0 },
-          { date: 'May 2026', price: 184.0 },
-          { date: 'Jun 2026', price: 192.53 }
-        ],
-        NBIS: [
-          { date: 'Jan 2025', price: 15.2 },
-          { date: 'Mar 2025', price: 18.5 },
-          { date: 'May 2025', price: 24.0 },
-          { date: 'Jul 2025', price: 32.0 },
-          { date: 'Sep 2025', price: 48.0 },
-          { date: 'Nov 2025', price: 72.0 },
-          { date: 'Dec 2025', price: 105.0 },
-          { date: 'Jan 2026', price: 140.0 },
-          { date: 'Mar 2026', price: 178.0 },
-          { date: 'May 2026', price: 212.0 },
-          { date: 'Jun 2026', price: 240.30 }
-        ],
-        DGXX: [
-          { date: 'Jan 2025', price: 0.95 },
-          { date: 'Mar 2025', price: 1.20 },
-          { date: 'May 2025', price: 1.15 },
-          { date: 'Jul 2025', price: 1.45 },
-          { date: 'Sep 2025', price: 1.30 },
-          { date: 'Nov 2025', price: 1.65 },
-          { date: 'Jan 2026', price: 1.80 },
-          { date: 'Mar 2026', price: 1.95 },
-          { date: 'Apr 2026', price: 2.10 },
-          { date: 'May 2026', price: 3.80 },
-          { date: 'Jun 2026', price: 4.50 }
-        ],
-        MU: [
-          { date: 'Jan 2025', price: 75.61 },
-          { date: 'Mar 2025', price: 92.50 },
-          { date: 'Jun 2025', price: 110.0 },
-          { date: 'Sep 2025', price: 118.0 },
-          { date: 'Dec 2025', price: 122.5 },
-          { date: 'Mar 2026', price: 125.0 },
-          { date: 'May 2026', price: 129.5 },
-          { date: 'Jun 2026', price: 132.0 }
-        ],
-        AMD: [
-          { date: 'Jan 2025', price: 114.74 },
-          { date: 'Mar 2025', price: 130.00 },
-          { date: 'Jul 2025', price: 145.0 },
-          { date: 'Oct 2025', price: 155.0 },
-          { date: 'Jan 2026', price: 168.0 },
-          { date: 'Mar 2026', price: 171.2 },
-          { date: 'May 2026', price: 175.0 },
-          { date: 'Jun 2026', price: 178.50 }
-        ],
-        META: [
-          { date: 'Jan 2025', price: 450.0 },
-          { date: 'Jul 2025', price: 480.0 },
-          { date: 'Sep 2025', price: 502.0 },
-          { date: 'Dec 2025', price: 515.0 },
-          { date: 'Mar 2026', price: 535.0 },
-          { date: 'May 2026', price: 542.5 },
-          { date: 'Jun 2026', price: 550.00 }
-        ],
-        MSFT: [
-          { date: 'Jan 2025', price: 320.0 },
-          { date: 'May 2025', price: 335.0 },
-          { date: 'Sep 2025', price: 350.0 },
-          { date: 'Nov 2025', price: 362.0 },
-          { date: 'Jan 2026', price: 368.0 },
-          { date: 'Mar 2026', price: 370.0 },
-          { date: 'May 2026', price: 371.5 },
-          { date: 'Jun 2026', price: 372.97 }
-        ],
-        GOOG: [
-          { date: 'Jan 2025', price: 155.0 },
-          { date: 'Mar 2025', price: 180.0 },
-          { date: 'Aug 2025', price: 210.0 },
-          { date: 'Dec 2025', price: 245.0 },
-          { date: 'Mar 2026', price: 285.0 },
-          { date: 'May 2026', price: 315.0 },
-          { date: 'Jun 2026', price: 334.69 }
-        ],
-        CERE: [
-          { date: 'Jan 2025', price: 12.5 },
-          { date: 'May 2025', price: 15.0 },
-          { date: 'Oct 2025', price: 18.0 },
-          { date: 'Mar 2026', price: 21.5 },
-          { date: 'May 2026', price: 24.0 },
-          { date: 'Jun 2026', price: 28.50 }
-        ],
-        NOW: [
-          { date: 'Jan 2025', price: 65.0 },
-          { date: 'Jul 2025', price: 72.0 },
-          { date: 'Oct 2025', price: 80.0 },
-          { date: 'Jan 2026', price: 88.0 },
-          { date: 'Apr 2026', price: 94.0 },
-          { date: 'Jun 2026', price: 98.34 }
-        ],
-        SUBQ: [
-          { date: 'Jan 2025', price: 1.10 },
-          { date: 'Aug 2025', price: 1.50 },
-          { date: 'Jan 2026', price: 1.85 },
-          { date: 'Apr 2026', price: 2.20 },
-          { date: 'May 2026', price: 2.80 },
-          { date: 'Jun 2026', price: 3.10 }
-        ],
-        SNDK: [
-          { date: 'Jan 2025', price: 1250.0 },
-          { date: 'Sep 2025', price: 1480.0 },
-          { date: 'Dec 2025', price: 1650.0 },
-          { date: 'Mar 2026', price: 1850.0 },
-          { date: 'Jun 2026', price: 2090.71 }
-        ],
-        AMPG: [
-          { date: 'Jan 2025', price: 1.55 },
-          { date: 'Jul 2025', price: 2.40 },
-          { date: 'Nov 2025', price: 3.80 },
-          { date: 'Mar 2026', price: 5.10 },
-          { date: 'Jun 2026', price: 6.55 }
-        ]
-      };
+      const STOCK_HISTORY = {};
+
+      async function loadHistory(symbol) {
+        try {
+          const res = await fetch('/api/stock-history?symbol=' + encodeURIComponent(symbol) + '&range=2y');
+          if (!res.ok) throw new Error('No public market history');
+          const data = await res.json();
+          STOCK_HISTORY[symbol] = Array.isArray(data.points) ? data.points : [];
+        } catch {
+          STOCK_HISTORY[symbol] = [];
+        }
+      }
+
 
       const INITIAL_MILESTONES = [
         { id: 'm1_nvda', stockSymbol: 'NVDA', date: 'Mar 2025', title: 'Blackwell production ramp begins', description: 'Production ramp-up for the Blackwell GPU architecture starts at TSMC, laying the groundwork for severe demand supply queues.', priceAtTime: 122.0, status: 'done' },
@@ -355,7 +241,7 @@
         Object.keys(STOCK_METADATA).forEach(symbol => {
           const meta = STOCK_METADATA[symbol];
           const history = STOCK_HISTORY[symbol] || [];
-          const currentPrice = history.length > 0 ? history[history.length - 1].price : 0;
+          const currentPrice = history.length > 0 ? history[history.length - 1].price : null;
           
           const isActive = symbol === activeSymbol;
           const button = document.createElement('button');
@@ -371,7 +257,523 @@
               <div class="text-[10px] uppercase font-mono tracking-wider ${isActive ? 'text-black/60' : 'text-white/40'}">${meta.name}</div>
             </div>
             <div class="font-mono text-xs font-bold ${isActive ? 'text-black' : 'text-[#10B981]'}">
-              $${currentPrice.toFixed(2)}
+              ${currentPrice == null ? '—' : '
+            </div>
+          `;
+
+          button.onclick = () => {
+            activeSymbol = symbol;
+            renderAll();
+          };
+
+          container.appendChild(button);
+        });
+      }
+
+      // Render details metadata box
+      function renderDetails() {
+        const meta = STOCK_METADATA[activeSymbol];
+        if (!meta) return;
+
+        document.getElementById('descSector').innerText = meta.sector;
+        document.getElementById('descName').innerText = `${activeSymbol} / ${meta.name}`;
+        document.getElementById('descContent').innerText = meta.desc;
+        document.getElementById('chartHeaderSymbol').innerText = `${activeSymbol} PROGRESSION VALUATION LINE`;
+
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const currentPrice = history.length > 0 ? history[history.length - 1].price : null;
+        document.getElementById('currentLiveQuote').innerText = currentPrice == null ? '—' : '
+      }
+
+      // Render milestones timeline with prices at time
+      function renderMilestones() {
+        const container = document.getElementById('milestonesTimelineContainer');
+        container.innerHTML = '';
+
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        if (milestones.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-white/40 text-xs font-mono">
+              No milestones cataloged for this symbol.
+            </div>
+          `;
+          return;
+        }
+
+        milestones.forEach(m => {
+          const isDone = m.status === 'done';
+          const milestoneCard = document.createElement('div');
+          milestoneCard.className = 'bg-black/20 border border-white/5 p-4 rounded flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-white/10 transition';
+          
+          milestoneCard.innerHTML = `
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="text-[9px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded ${
+                  isDone ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }">
+                  ${m.date}
+                </span>
+                <span class="text-[9px] font-mono tracking-widest uppercase text-white/40">ID: ${m.id}</span>
+              </div>
+              <h4 class="text-sm font-black text-white uppercase mt-1">${m.title}</h4>
+              <p class="text-xs text-gray-400 leading-normal">${m.description}</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded px-4 py-2 font-mono text-right shrink-0">
+              <span class="text-[8px] uppercase tracking-widest text-white/40 block">Price At Event</span>
+              <span class="text-sm font-bold text-white">$${m.priceAtTime.toFixed(2)}</span>
+            </div>
+          `;
+          container.appendChild(milestoneCard);
+        });
+      }
+
+      // Render or Update the Chart.js
+      function renderChart() {
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const labels = history.map(h => h.date);
+        const prices = history.map(h => h.price);
+
+        // Filter milestones to overlay as dots
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        const ctx = document.getElementById('progressionChart').getContext('2d');
+
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        // Generate datasets
+        myChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${activeSymbol} Share Price ($)`,
+                data: prices,
+                borderColor: '#FFFFFF',
+                borderWidth: 3,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                fill: true,
+                tension: 0.1,
+                pointBackgroundColor: '#10B981',
+                pointBorderColor: '#FFFFFF',
+                pointHoverRadius: 8,
+                pointRadius: 6,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: '#0F1115',
+                titleColor: '#FFFFFF',
+                titleFont: { family: 'JetBrains Mono', size: 10 },
+                bodyColor: '#10B981',
+                bodyFont: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    const price = context.parsed.y;
+                    const date = context.label;
+                    // Check if there is a milestone on this date
+                    const m = milestones.find(ms => ms.date === date);
+                    if (m) {
+                      return [`Price: $${price.toFixed(2)}`, `Event: ${m.title}`];
+                    }
+                    return `Price: $${price.toFixed(2)}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      async function renderAll() {
+        await loadHistory(activeSymbol);
+        renderStockList();
+        renderDetails();
+        renderMilestones();
+        renderChart();
+      }
+
+      // Initial Fire
+      window.addEventListener('load', () => {
+        renderAll();
+      });
+    </script>
+  </body>
+</html>
+ + currentPrice.toFixed(2)}
+            </div>
+          `;
+
+          button.onclick = () => {
+            activeSymbol = symbol;
+            renderAll();
+          };
+
+          container.appendChild(button);
+        });
+      }
+
+      // Render details metadata box
+      function renderDetails() {
+        const meta = STOCK_METADATA[activeSymbol];
+        if (!meta) return;
+
+        document.getElementById('descSector').innerText = meta.sector;
+        document.getElementById('descName').innerText = `${activeSymbol} / ${meta.name}`;
+        document.getElementById('descContent').innerText = meta.desc;
+        document.getElementById('chartHeaderSymbol').innerText = `${activeSymbol} PROGRESSION VALUATION LINE`;
+
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const currentPrice = history.length > 0 ? history[history.length - 1].price : 0;
+        document.getElementById('currentLiveQuote').innerText = `$${currentPrice.toFixed(2)}`;
+      }
+
+      // Render milestones timeline with prices at time
+      function renderMilestones() {
+        const container = document.getElementById('milestonesTimelineContainer');
+        container.innerHTML = '';
+
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        if (milestones.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-white/40 text-xs font-mono">
+              No milestones cataloged for this symbol.
+            </div>
+          `;
+          return;
+        }
+
+        milestones.forEach(m => {
+          const isDone = m.status === 'done';
+          const milestoneCard = document.createElement('div');
+          milestoneCard.className = 'bg-black/20 border border-white/5 p-4 rounded flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-white/10 transition';
+          
+          milestoneCard.innerHTML = `
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="text-[9px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded ${
+                  isDone ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }">
+                  ${m.date}
+                </span>
+                <span class="text-[9px] font-mono tracking-widest uppercase text-white/40">ID: ${m.id}</span>
+              </div>
+              <h4 class="text-sm font-black text-white uppercase mt-1">${m.title}</h4>
+              <p class="text-xs text-gray-400 leading-normal">${m.description}</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded px-4 py-2 font-mono text-right shrink-0">
+              <span class="text-[8px] uppercase tracking-widest text-white/40 block">Price At Event</span>
+              <span class="text-sm font-bold text-white">$${m.priceAtTime.toFixed(2)}</span>
+            </div>
+          `;
+          container.appendChild(milestoneCard);
+        });
+      }
+
+      // Render or Update the Chart.js
+      function renderChart() {
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const labels = history.map(h => h.date);
+        const prices = history.map(h => h.price);
+
+        // Filter milestones to overlay as dots
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        const ctx = document.getElementById('progressionChart').getContext('2d');
+
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        // Generate datasets
+        myChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${activeSymbol} Share Price ($)`,
+                data: prices,
+                borderColor: '#FFFFFF',
+                borderWidth: 3,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                fill: true,
+                tension: 0.1,
+                pointBackgroundColor: '#10B981',
+                pointBorderColor: '#FFFFFF',
+                pointHoverRadius: 8,
+                pointRadius: 6,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: '#0F1115',
+                titleColor: '#FFFFFF',
+                titleFont: { family: 'JetBrains Mono', size: 10 },
+                bodyColor: '#10B981',
+                bodyFont: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    const price = context.parsed.y;
+                    const date = context.label;
+                    // Check if there is a milestone on this date
+                    const m = milestones.find(ms => ms.date === date);
+                    if (m) {
+                      return [`Price: $${price.toFixed(2)}`, `Event: ${m.title}`];
+                    }
+                    return `Price: $${price.toFixed(2)}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function renderAll() {
+        renderStockList();
+        renderDetails();
+        renderMilestones();
+        renderChart();
+      }
+
+      // Initial Fire
+      window.addEventListener('load', () => {
+        renderAll();
+      });
+    </script>
+  </body>
+</html>
+ + currentPrice.toFixed(2);
+      }
+
+      // Render milestones timeline with prices at time
+      function renderMilestones() {
+        const container = document.getElementById('milestonesTimelineContainer');
+        container.innerHTML = '';
+
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        if (milestones.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-white/40 text-xs font-mono">
+              No milestones cataloged for this symbol.
+            </div>
+          `;
+          return;
+        }
+
+        milestones.forEach(m => {
+          const isDone = m.status === 'done';
+          const milestoneCard = document.createElement('div');
+          milestoneCard.className = 'bg-black/20 border border-white/5 p-4 rounded flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-white/10 transition';
+          
+          milestoneCard.innerHTML = `
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="text-[9px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded ${
+                  isDone ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }">
+                  ${m.date}
+                </span>
+                <span class="text-[9px] font-mono tracking-widest uppercase text-white/40">ID: ${m.id}</span>
+              </div>
+              <h4 class="text-sm font-black text-white uppercase mt-1">${m.title}</h4>
+              <p class="text-xs text-gray-400 leading-normal">${m.description}</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded px-4 py-2 font-mono text-right shrink-0">
+              <span class="text-[8px] uppercase tracking-widest text-white/40 block">Price At Event</span>
+              <span class="text-sm font-bold text-white">$${m.priceAtTime.toFixed(2)}</span>
+            </div>
+          `;
+          container.appendChild(milestoneCard);
+        });
+      }
+
+      // Render or Update the Chart.js
+      function renderChart() {
+        const history = STOCK_HISTORY[activeSymbol] || [];
+        const labels = history.map(h => h.date);
+        const prices = history.map(h => h.price);
+
+        // Filter milestones to overlay as dots
+        const milestones = INITIAL_MILESTONES.filter(m => m.stockSymbol === activeSymbol);
+
+        const ctx = document.getElementById('progressionChart').getContext('2d');
+
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        // Generate datasets
+        myChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${activeSymbol} Share Price ($)`,
+                data: prices,
+                borderColor: '#FFFFFF',
+                borderWidth: 3,
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                fill: true,
+                tension: 0.1,
+                pointBackgroundColor: '#10B981',
+                pointBorderColor: '#FFFFFF',
+                pointHoverRadius: 8,
+                pointRadius: 6,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: '#0F1115',
+                titleColor: '#FFFFFF',
+                titleFont: { family: 'JetBrains Mono', size: 10 },
+                bodyColor: '#10B981',
+                bodyFont: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    const price = context.parsed.y;
+                    const date = context.label;
+                    // Check if there is a milestone on this date
+                    const m = milestones.find(ms => ms.date === date);
+                    if (m) {
+                      return [`Price: $${price.toFixed(2)}`, `Event: ${m.title}`];
+                    }
+                    return `Price: $${price.toFixed(2)}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  font: {
+                    family: 'JetBrains Mono',
+                    size: 9
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function renderAll() {
+        renderStockList();
+        renderDetails();
+        renderMilestones();
+        renderChart();
+      }
+
+      // Initial Fire
+      window.addEventListener('load', () => {
+        renderAll();
+      });
+    </script>
+  </body>
+</html>
+ + currentPrice.toFixed(2)}
             </div>
           `;
 
