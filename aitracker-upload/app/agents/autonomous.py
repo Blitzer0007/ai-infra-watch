@@ -338,8 +338,16 @@ class AutonomousMCPAgent:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
         for iteration in range(1, self.max_steps + 1):
-            plan = self._plan(question, tools, history)
-            steps.append(Step(node="plan", kind="node", note=f"iteration={iteration}"))
+            # For "what changed / why / drivers" questions, require evidence
+            # retrieval before allowing the LLM planner to settle on quote-only
+            # data. This prevents repeated quote calls from consuming all steps.
+            forced_driver = _driver_research_plan(question, tools, calls)
+            plan = forced_driver if forced_driver is not None else self._plan(question, tools, history)
+            steps.append(Step(
+                node="plan",
+                kind="node",
+                note=f"iteration={iteration}" + ("; forced driver evidence" if forced_driver else ""),
+            ))
             # Never allow a malformed/empty planner result to crash the whole
             # request. This also protects production when an OpenAI-compatible
             # model returns an empty/null JSON response.
