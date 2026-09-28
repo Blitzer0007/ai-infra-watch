@@ -216,34 +216,33 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
                 "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
             }
 
-    # Step 3: search the filings corpus for recent material disclosures across
-    # all named symbols. This is the evidence source that can actually contain
-    # contracts, milestones, counterparties, and other potential catalysts.
-    filing_search = next(
+    # Step 3: retrieve company-specific SEC evidence in one batched call.
+    # The generic RAG corpus may contain sector-level documents that do not
+    # mention the requested tickers. get_catalysts uses primary EDGAR 8-K data
+    # and preserves accession URLs, material-event items, and contract evidence.
+    catalyst_tool = next(
         (
             t for t in tools
-            if t.qualified_name.lower().endswith(".search_filings")
-            and "query" in ((t.input_schema or {}).get("properties") or {})
+            if t.qualified_name.lower().endswith(".get_catalysts")
+            and "symbols" in ((t.input_schema or {}).get("properties") or {})
         ),
         None,
     )
-    if filing_search is not None and not successful_tool(
-        lambda c: c.tool.lower().endswith(".search_filings")
+    if catalyst_tool is not None and not successful_tool(
+        lambda c: c.tool.lower().endswith(".get_catalysts")
     ):
-        query = (
-            f"recent material events catalysts contracts earnings developments "
-            f"for {' '.join(symbols)}"
-        )
-        props = (filing_search.input_schema or {}).get("properties") or {}
-        args = {"query": query}
-        if "top_k" in props:
-            args["top_k"] = 8
         return {
             "action": "tool",
-            "tool": filing_search.qualified_name,
-            "arguments": args,
-            "reason": "driver question: retrieve recent filing disclosures",
+            "tool": catalyst_tool.qualified_name,
+            "arguments": {"symbols": symbols},
+            "reason": "driver question: retrieve company-specific SEC catalyst evidence",
         }
+
+    # Once quotes, historical event studies, and SEC catalyst evidence have
+    # all been collected, stop the bounded investigation. Do not let the LLM
+    # spend the final step repeating quote retrieval.
+    if successful_tool(lambda c: c.tool.lower().endswith(".get_catalysts")):
+        return {"action": "final", "answer": ""}
 
     return None
 
