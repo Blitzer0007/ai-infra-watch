@@ -10,7 +10,7 @@
     "api/agent-ask.js": {
       "maxDuration": 60
     },
-    "api/agent-python.py": {
+    "api/*.py": {
       "maxDuration": 60,
       "excludeFiles": "{aitracker-upload/data/filings/**,aitracker-upload/tests/**,aitracker-upload/.cache/**,aitracker-upload/data/traces/**,.github/**,*.zip,node_modules/**,dist/**}"
     }
