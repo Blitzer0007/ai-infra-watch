@@ -153,7 +153,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     const exact = chartHistory.find((pt) => matchesDate(m.date, pt.date));
     if (exact) return exact.price;
 
-    const monthYear = m.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+(\\d{4})$/i);
+    const monthYear = m.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
     if (monthYear) {
       const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
       const year = Number(monthYear[2]);
