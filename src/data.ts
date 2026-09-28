@@ -1,4 +1,4 @@
-import { Milestone, Contract, CongressTrade, MacroRisk } from './types';
+import { Milestone } from './types';
 
 export const STOCK_METADATA: Record<string, { name: string; sector: string; desc: string; logoColor: string }> = {
   NVDA: { name: 'NVIDIA Corporation', sector: 'Semiconductors', desc: 'Designs high-performance GPUs and AI compute clusters powering modern AI workloads.', logoColor: '#76B900' },
