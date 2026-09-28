@@ -505,9 +505,6 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
     <div className="text-[10px] text-white/35 mt-2">{body}</div>
   </div>;
 }
- + liveUnrealized.toFixed(2) : '—'} suffix={liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : ''} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
-        <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
-        <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
       </div>
 
       <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
