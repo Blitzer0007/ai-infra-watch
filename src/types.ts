@@ -4,7 +4,7 @@ export interface Milestone {
   date: string;
   title: string;
   description: string;
-  priceAtTime: number;
+  priceAtTime?: number;
   status: 'done' | 'active' | 'planned';
 }
 
