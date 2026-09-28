@@ -25,6 +25,7 @@ EXPECTED_TOOLS = {
     "search_filings",
     "answer_question",
     "get_milestones",
+    "get_catalysts",
     "get_contracts",
     "list_documents",
     "get_document",
@@ -139,6 +140,14 @@ def test_get_milestones_schema_advertises_symbol(server):
     tool = next(t for t in tools if t.name == "get_milestones")
     props = (tool.input_schema or {}).get("properties", {})
     assert "symbol" in props
+
+
+def test_get_catalysts_schema_advertises_symbols(server):
+    tools = _run(server.list_tools())
+    tool = next(t for t in tools if t.name == "get_catalysts")
+    props = (tool.input_schema or {}).get("properties", {})
+    assert "symbols" in props
+    assert (tool.input_schema or {}).get("required") == ["symbols"]
 
 
 def test_get_contracts_schema_advertises_symbol(server):
