@@ -95,31 +95,30 @@ async function fetchSecContracts() {
 }
 
 async function fetchCongressTrades() {
-  const symbols = ['NVDA','MSFT','NBIS','META','NOW','SNDK','MU','AMD','AMPG','DGXX'];
+  const symbols = new Set(['NVDA','MSFT','NBIS','META','NOW','SNDK','MU','AMD','AMPG','DGXX']);
   try {
-    const results = await Promise.all(symbols.map(async symbol => {
-      try {
-        const response = await fetch(
-          'https://www.bargo.ai/free-apis/congress/v1/trades/' + encodeURIComponent(symbol) + '?limit=10',
-          { headers: { 'User-Agent': 'AI Infra Watch/1.0' } }
-        );
-        if (!response.ok) return [];
-        const payload = await response.json();
-        return (payload?.trades || []).map((t, index) => ({
-          id: 'congress-' + symbol + '-' + String(t.disclosure_date || t.transaction_date || '') + '-' + index,
-          politician: t.member || 'Unknown filer',
-          chamber: String(t.chamber || '').toLowerCase() === 'senate' ? 'Senate' : 'House',
-          stockSymbol: t.ticker || symbol,
-          transactionType: String(t.type || '').toLowerCase().includes('sale') ? 'sell' : 'buy',
-          amountRange: t.amount_range || 'Not disclosed',
-          date: t.disclosure_date || t.transaction_date || '',
-          stockPrice: typeof t.est_price === 'number' ? t.est_price : 0
-        }));
-      } catch {
-        return [];
-      }
-    }));
-    return results.flat().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 100);
+    // Use one global request instead of one request per ticker. This stays within
+    // Bargo's keyless rate limit and avoids partial/empty results on Vercel.
+    const response = await fetch(
+      'https://www.bargo.ai/free-apis/congress/v1/trades?limit=100',
+      { headers: { 'User-Agent': 'AI Infra Watch/1.0' } }
+    );
+    if (!response.ok) return [];
+    const payload = await response.json();
+    return (payload?.trades || [])
+      .filter((t) => symbols.has(String(t.ticker || '').toUpperCase()))
+      .map((t, index) => ({
+        id: 'congress-' + String(t.ticker || '') + '-' + String(t.disclosure_date || t.transaction_date || '') + '-' + index,
+        politician: t.member || 'Unknown filer',
+        chamber: String(t.chamber || '').toLowerCase() === 'senate' ? 'Senate' : 'House',
+        stockSymbol: String(t.ticker || '').toUpperCase(),
+        transactionType: String(t.type || '').toLowerCase().includes('sale') ? 'sell' : 'buy',
+        amountRange: t.amount_range || 'Not disclosed',
+        date: t.disclosure_date || t.transaction_date || '',
+        stockPrice: typeof t.est_price === 'number' ? t.est_price : 0
+      }))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 100);
   } catch {
     return [];
   }
