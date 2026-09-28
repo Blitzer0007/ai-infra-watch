@@ -70,14 +70,61 @@ def _result_preview(value: Any, limit: int = 5000) -> str:
 
 
 def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """Extract the first valid JSON object from model output.
+
+    OpenAI-compatible reasoning models may wrap the requested JSON in
+    markdown or explanatory text. Tolerate those wrappers while still
+    requiring the extracted value to be a JSON object.
+    """
     raw = text.strip()
-    match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw, flags=re.DOTALL)
-    candidate = match.group(1) if match else raw
-    try:
-        value = json.loads(candidate)
-    except json.JSONDecodeError:
+    if not raw:
         return None
-    return value if isinstance(value, dict) else None
+
+    candidates: list[str] = []
+    fenced = re.search(
+        r"```(?:json)?\s*(\{.*?\})\s*```",
+        raw,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if fenced:
+        candidates.append(fenced.group(1))
+
+    # Scan for balanced JSON objects embedded in prose/reasoning.
+    for start_match in re.finditer(r"\{", raw):
+        start = start_match.start()
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(raw)):
+            char = raw[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == chr(92):
+                    escaped = True
+                elif char == chr(34):
+                    in_string = False
+                continue
+            if char == chr(34):
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidates.append(raw[start:index + 1])
+                    break
+
+    candidates.append(raw)
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate.strip())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
 
 
 def _planner_prompt(question: str, tools: list[ToolInfo], history: list[dict[str, Any]]) -> str:
