@@ -96,7 +96,7 @@ Choose exactly one next action.
 Return JSON only:
 {{"action":"tool","tool":"server.tool","arguments":{{}},"reason":"..."}}
 or:
-{"action":"final","answer":"..."}
+{{"action":"final","answer":"..."}}
 
 Rules:
 - Use only a discovered tool.
