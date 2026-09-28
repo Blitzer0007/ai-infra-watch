@@ -225,6 +225,97 @@ class StooqCandleProvider:
 
 
 # ----------------------------------------------------------------------
+# Finnhub provider (live, uses the same API key as quotes/earnings)
+# ----------------------------------------------------------------------
+class FinnhubCandleProvider:
+    """Live daily candles from Finnhub's /stock/candle endpoint."""
+
+    source = "finnhub"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        max_retries: int = 4,
+        base_delay: float = 1.0,
+        timeout: float = 15.0,
+    ) -> None:
+        import os
+        self.api_key = api_key if api_key is not None else os.getenv("FINNHUB_API_KEY", "")
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.timeout = timeout
+
+    def get_series(self, symbol: str, lookback: int = 60) -> CandleSeries:
+        if not self.api_key:
+            raise QuoteError("NO_KEY", "FINNHUB_API_KEY is not set")
+        symbol = symbol.strip().upper()
+        # Request a generous daily window so recent earnings have enough
+        # pre/post-event sessions for T+1/T+5/T+20.
+        now = int(time.time())
+        days = max(120, lookback + 30)
+        params = {
+            "symbol": symbol,
+            "resolution": "D",
+            "from": now - days * 86400,
+            "to": now,
+            "token": self.api_key,
+        }
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.get("https://finnhub.io/api/v1/stock/candle", params=params)
+                if resp.status_code == 429:
+                    if attempt < self.max_retries:
+                        time.sleep(self.base_delay * (2 ** attempt))
+                        continue
+                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit (60/min free tier)")
+                if resp.status_code >= 400:
+                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
+                        time.sleep(self.base_delay * (2 ** attempt))
+                        continue
+                    raise QuoteError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
+                data = resp.json()
+                if data.get("s") != "ok":
+                    raise QuoteError("NO_DATA", f"no candle data for {symbol}")
+                closes = data.get("c") or []
+                timestamps = data.get("t") or []
+                opens = data.get("o") or []
+                highs = data.get("h") or []
+                lows = data.get("l") or []
+                volumes = data.get("v") or []
+                candles: list[Candle] = []
+                for i, ts in enumerate(timestamps):
+                    try:
+                        candles.append(
+                            Candle(
+                                symbol=symbol,
+                                date=time.strftime("%Y-%m-%d", time.gmtime(ts)),
+                                open=float(opens[i]),
+                                high=float(highs[i]),
+                                low=float(lows[i]),
+                                close=float(closes[i]),
+                                volume=float(volumes[i]) if i < len(volumes) else None,
+                                source=self.source,
+                            )
+                        )
+                    except (IndexError, TypeError, ValueError):
+                        continue
+                if not candles:
+                    raise QuoteError("NO_DATA", f"no parseable candle data for {symbol}")
+                candles.sort(key=lambda c: c.date)
+                if lookback > 0:
+                    candles = candles[-(lookback + 1):]
+                return CandleSeries(symbol=symbol, candles=candles, source=self.source)
+            except httpx.HTTPError as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    time.sleep(self.base_delay * (2 ** attempt))
+                    continue
+        raise QuoteError("HTTP_ERROR", f"Finnhub candle request failed: {last_exc}")
+
+
+# ----------------------------------------------------------------------
 # Service (best-effort batch, mirrors StockService)
 # ----------------------------------------------------------------------
 class CandleService:
@@ -243,7 +334,7 @@ class CandleService:
     @classmethod
     def from_env(cls, mode: str = "fixture", lookback: int = 60) -> "CandleService":
         if mode == "live":
-            return cls(provider=StooqCandleProvider(), lookback=lookback)
+            return cls(provider=FinnhubCandleProvider(), lookback=lookback)
         return cls(provider=FixtureCandleProvider(fixture_path=CANDLES_FIXTURE_PATH), lookback=lookback)
 
     def get_series(self, symbol: str, lookback: int | None = None) -> CandleSeries:
