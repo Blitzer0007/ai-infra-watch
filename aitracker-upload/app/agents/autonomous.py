@@ -253,6 +253,9 @@ class AutonomousMCPAgent:
                 # fallback emits an empty final action after successful calls,
                 # synthesize the retrieved evidence instead.
                 answer = str(plan.get("answer", "")).strip()
+                placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
+                if any(c.ok for c in calls) and answer == placeholder:
+                    return self._finalize(question, calls, steps)
                 if answer:
                     steps.append(Step(node="finalize", kind="node", note="planner settled"))
                     return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
