@@ -1,4 +1,4 @@
-import { AppConfig } from './utils';
+import { AppConfig } from '../utils';
 
 export type AlertSeverity = 'info' | 'medium' | 'high' | 'critical';
 export type AlertEventType = 'price' | 'large-move' | 'catalyst';
