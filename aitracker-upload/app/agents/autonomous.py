@@ -188,6 +188,22 @@ class AutonomousMCPAgent:
                 error="no successful tool calls",
                 resolution="error",
             )
+        # Stub mode is intentionally offline and may not have a matching
+        # final-answer fixture for every possible question. The MCP result is
+        # still valid evidence, so fall back to a deterministic JSON rendering
+        # instead of marking a successful investigation as degraded.
+        if self.client.stub:
+            final_text = _result_preview(successful[-1].output, 4000)
+            steps.append(Step(node="finalize", kind="node", note="deterministic evidence synthesis"))
+            return AutonomousResult(
+                question,
+                final_text,
+                calls,
+                [tool.qualified_name for tool in self.toolbox.tools()],
+                AgentTrajectory(steps=steps),
+                resolution="completed",
+            )
+
         try:
             final_text = self.client.generate(
                 _final_prompt(question, successful),
