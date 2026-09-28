@@ -123,12 +123,13 @@ export default function App() {
         timestamp: data.timestamp || Date.now()
       });
 
-      if (config) {
-        const catalystEvents = evaluateFeedAlerts(config, {
+      const activeConfig = config || loadConfig();
+      if (activeConfig) {
+        const catalystEvents = evaluateFeedAlerts(activeConfig, {
           contracts: data.contracts,
           congressTrades: data.congressTrades
         });
-        if (config.browserNotifications) {
+        if (activeConfig.browserNotifications) {
           catalystEvents.forEach(notifyBrowser);
         }
       }
