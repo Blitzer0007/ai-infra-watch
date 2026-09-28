@@ -25,35 +25,104 @@ function loadConfiguredSymbols() {
 
 const SYMBOLS = loadConfiguredSymbols();
 
-function loadSecContracts() {
+async function fetchSecContracts() {
+  const ua = { 'User-Agent': 'AI Infra Watch research contact@example.com' };
   try {
-    const payload = JSON.parse(
-      readFileSync(join(process.cwd(), 'data', 'contracts_sec.json'), 'utf8')
-    );
-    return Array.isArray(payload.contracts) ? payload.contracts : [];
+    const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua });
+    if (!tickerResponse.ok) return [];
+    const tickerMap = await tickerResponse.json();
+    const cikByTicker = {};
+    for (const entry of Object.values(tickerMap)) {
+      if (entry && entry.ticker && entry.cik_str) cikByTicker[String(entry.ticker).toUpperCase()] = String(entry.cik_str).padStart(10, '0');
+    }
+
+    const candidates = SYMBOLS
+      .map(symbol => ({ symbol, cik: cikByTicker[String(symbol).toUpperCase()] }))
+      .filter(x => x.cik);
+
+    const results = await Promise.all(candidates.map(async ({ symbol, cik }) => {
+      try {
+        const response = await fetch('https://data.sec.gov/submissions/CIK' + cik + '.json', { headers: ua });
+        if (!response.ok) return [];
+        const payload = await response.json();
+        const recent = payload?.filings?.recent;
+        if (!recent) return [];
+
+        const rows = [];
+        for (let i = 0; i < recent.form.length; i++) {
+          const form = recent.form[i];
+          const items = recent.items?.[i] || '';
+          const filingDate = recent.filingDate?.[i];
+          if (form !== '8-K' || !String(items).includes('1.01') || !filingDate) continue;
+          if (Date.now() - new Date(filingDate).getTime() > 120 * 24 * 60 * 60 * 1000) continue;
+
+          const accession = recent.accessionNumber[i];
+          const accessionPath = accession.replaceAll('-', '');
+          const primaryDocument = recent.primaryDocument?.[i];
+          const url = primaryDocument
+            ? 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + accessionPath + '/' + primaryDocument
+            : 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + accessionPath + '/' + accession + '-index.html';
+
+          rows.push({
+            id: 'sec-' + accession,
+            company: symbol,
+            client: 'Material definitive agreement',
+            value: 'Not quantified',
+            duration: 'See SEC filing',
+            hardware: 'See SEC filing',
+            details: 'SEC Form 8-K Item 1.01 — Entry into a Material Definitive Agreement. Review the primary filing for counterparties and commercial terms.',
+            status: 'SEC filed',
+            statusLevel: 'high-verified',
+            dateSigned: filingDate,
+            source: 'sec-edgar-primary',
+            accession,
+            url,
+            items: String(items).split(',').map(x => x.trim()).filter(Boolean),
+            evidence: [form + ' Item 1.01']
+          });
+          if (rows.length >= 5) break;
+        }
+        return rows;
+      } catch {
+        return [];
+      }
+    }));
+
+    return results.flat().sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned))).slice(0, 40);
   } catch {
     return [];
   }
 }
 
-function secContractsForDashboard() {
-  return loadSecContracts().map((c) => ({
-    id: c.id,
-    company: c.company,
-    client: c.client,
-    value: c.value,
-    duration: c.duration,
-    hardware: c.hardware,
-    details: c.details,
-    status: c.status,
-    statusLevel: c.statusLevel || 'high-verified',
-    dateSigned: c.dateSigned,
-    source: c.source,
-    accession: c.accession,
-    url: c.url,
-    items: c.items || [],
-    evidence: c.evidence || []
-  }));
+async function fetchCongressTrades() {
+  const symbols = ['NVDA','MSFT','NBIS','META','NOW','SNDK','MU','AMD','AMPG','DGXX'];
+  try {
+    const results = await Promise.all(symbols.map(async symbol => {
+      try {
+        const response = await fetch(
+          'https://www.bargo.ai/free-apis/congress/v1/trades?ticker=' + encodeURIComponent(symbol) + '&limit=10',
+          { headers: { 'User-Agent': 'AI Infra Watch/1.0' } }
+        );
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return (payload?.trades || []).map((t, index) => ({
+          id: 'congress-' + symbol + '-' + String(t.disclosure_date || t.transaction_date || '') + '-' + index,
+          politician: t.member || 'Unknown filer',
+          chamber: String(t.chamber || '').toLowerCase() === 'senate' ? 'Senate' : 'House',
+          stockSymbol: t.ticker || symbol,
+          transactionType: String(t.type || '').toLowerCase().includes('sale') ? 'sell' : 'buy',
+          amountRange: t.amount_range || 'Not disclosed',
+          date: t.disclosure_date || t.transaction_date || '',
+          stockPrice: typeof t.est_price === 'number' ? t.est_price : 0
+        }));
+      } catch {
+        return [];
+      }
+    }));
+    return results.flat().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 100);
+  } catch {
+    return [];
+  }
 }
 
 
@@ -129,10 +198,11 @@ export default async function handler(req, res) {
     },
     stockPrices,
     news: currentNews,
-    contracts: secContractsForDashboard(),
+    contracts: await fetchSecContracts(),
+    congressTrades: await fetchCongressTrades(),
     macroRisks,
     marketSentiment:'Live quotes + AI-infrastructure news feed active.',
-    sources:['Yahoo Finance chart data','GDELT news']
+    sources:['Yahoo Finance chart data','GDELT news','SEC EDGAR','Bargo Congress Trades API']
   };
   cached = data;
   cachedAt = Date.now();
