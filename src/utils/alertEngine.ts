@@ -76,7 +76,7 @@ export function evaluateQuoteAlerts(
       continue;
     }
 
-    if (!state[key] && !seedOnly) {
+    if (!state[key] && !bootstrap) {
       events.push({
         id: key + ':' + now,
         type: 'price',
@@ -98,7 +98,7 @@ export function evaluateQuoteAlerts(
       if (!Number.isFinite(quote.changePct) || Math.abs(quote.changePct) < threshold) continue;
       const direction = quote.changePct >= 0 ? 'up' : 'down';
       const key = eventId('large-move', symbol, today + ':' + direction);
-      if (!state[key] && !seedOnly) {
+      if (!state[key] && !bootstrap) {
         events.push({
           id: key + ':' + now,
           type: 'large-move',
