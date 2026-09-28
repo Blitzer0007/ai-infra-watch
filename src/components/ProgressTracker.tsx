@@ -1,21 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
 import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Plus, Trash2, Award } from 'lucide-react';
-import { STOCK_METADATA, STOCK_HISTORY, INITIAL_MILESTONES } from '../data';
+import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
 
 const LOCAL_STORAGE_CUSTOM_MILESTONES = 'aiw_custom_milestones_v1';
 
 function matchesDate(milestoneDate: string, historyDate: string): boolean {
-  const mLower = milestoneDate.toLowerCase();
-  const hLower = historyDate.toLowerCase();
-  if (mLower === hLower) return true;
-  const parts = hLower.split(' ');
-  if (parts.length === 2) {
-    const [month, year] = parts;
-    return mLower.includes(month) && mLower.includes(year);
+  const m = milestoneDate.trim().toLowerCase();
+  const h = historyDate.trim().toLowerCase();
+  if (m === h) return true;
+
+  const parsed = Date.parse(milestoneDate);
+  if (!Number.isNaN(parsed) && /^\d{4}-\d{2}-\d{2}$/.test(historyDate)) {
+    return new Date(parsed).toISOString().slice(0, 10) === historyDate;
   }
+
+  const monthYear = m.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4})$/);
+  if (monthYear && /^\d{4}-\d{2}-\d{2}$/.test(historyDate)) {
+    const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+    const date = new Date(historyDate + 'T00:00:00Z');
+    return date.getUTCMonth() === month && date.getUTCFullYear() === Number(monthYear[2]);
+  }
+
   return false;
 }
 
@@ -27,6 +35,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [selectedStock, setSelectedStock] = useState<string>('NBIS');
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<{ date: string; price: number }[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Custom milestone state
   const [customTitle, setCustomTitle] = useState('');
@@ -49,19 +60,36 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const stockMilestones = milestones.filter((m) => m.stockSymbol === selectedStock);
   const activeMilestone = stockMilestones.find((m) => m.id === activeMilestoneId) || stockMilestones[0];
 
-  // Retrieve stock history for chart
-  const baseHistory = STOCK_HISTORY[selectedStock] || [];
-  const historyData = [...baseHistory];
-  if (livePrices && livePrices[selectedStock]) {
-    const liveObj = livePrices[selectedStock];
-    const todayLabel = 'LIVE PRICE';
-    const lastItem = historyData[historyData.length - 1];
-    if (!lastItem || lastItem.date !== todayLabel) {
-      historyData.push({
-        date: todayLabel,
-        price: liveObj.price
-      });
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHistory() {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const res = await fetch('/api/stock-history?symbol=' + encodeURIComponent(selectedStock) + '&range=2y');
+        if (!res.ok) throw new Error('History request failed: HTTP ' + res.status);
+        const data = await res.json();
+        if (!cancelled) setHistoryData(Array.isArray(data.points) ? data.points : []);
+      } catch (err: any) {
+        if (!cancelled) {
+          setHistoryData([]);
+          setHistoryError(err?.message || 'Historical market data unavailable');
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
     }
+    loadHistory();
+    return () => { cancelled = true; };
+  }, [selectedStock]);
+
+  const chartHistory = [...historyData];
+  if (livePrices?.[selectedStock]) {
+    const liveObj = livePrices[selectedStock];
+    const today = new Date().toISOString().slice(0, 10);
+    const lastItem = chartHistory[chartHistory.length - 1];
+    if (lastItem?.date === today) lastItem.price = liveObj.price;
+    else chartHistory.push({ date: today, price: liveObj.price });
   }
 
   // Add custom milestone
@@ -75,7 +103,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       date: customDate || 'No date set',
       title: customTitle.trim(),
       description: 'Manually logged event.',
-      priceAtTime: parseFloat(customPrice) || (historyData[historyData.length - 1]?.price || 0),
+      priceAtTime: parseFloat(customPrice) || (chartHistory[chartHistory.length - 1]?.price || 0),
       status: customStatus
     };
 
@@ -119,12 +147,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Other', desc: '', logoColor: '#fff' };
 
   const getAccuratePrice = (m: Milestone) => {
-    const matchedPt = historyData.find((pt) => matchesDate(m.date, pt.date));
-    return matchedPt ? matchedPt.price : m.priceAtTime;
+    const matchedPt = chartHistory.find((pt) => matchesDate(m.date, pt.date));
+    return matchedPt?.price;
   };
 
   // Prepare chart data by merging stock history with milestone flags
-  const chartData = historyData.map((pt) => {
+  const chartData = chartHistory.map((pt) => {
     // Find milestone at matching month/date
     const m = stockMilestones.find((mil) => matchesDate(mil.date, pt.date));
     return {
@@ -208,6 +236,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
           {/* Recharts Wrapper */}
           <div className="h-64 md:h-80 w-full bg-[#0F1115] rounded-xl p-2 border border-white/5">
+            {historyLoading && <div className="text-[10px] font-mono text-white/40 p-2">Loading verified daily market history…</div>}
+            {!historyLoading && historyError && <div className="text-[10px] font-mono text-amber-300 p-2">{historyError}</div>}
+            {!historyLoading && !historyError && chartHistory.length === 0 && <div className="text-[10px] font-mono text-white/40 p-2">No public market history is available for this symbol.</div>}
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
                 <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
