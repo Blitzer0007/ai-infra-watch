@@ -56,10 +56,22 @@ def notifications_config(command: str | None = None, mode: str | None = None) ->
     )
 
 
+def news_config(command: str | None = None, mode: str | None = None) -> ServerConfig:
+    """ServerConfig for mcp-server-news (Finnhub company + market news)."""
+    return ServerConfig(
+        name="news",
+        command=command or sys.executable,
+        args=["-m", "mcp_servers.news.server"],
+        env=_mode_env("news", mode or "live"),
+        cwd=str(REPO_ROOT),
+    )
+
+
 def default_configs(
     stocks_mode: str | None = None,
     filings_mode: str | None = None,
     notify_mode: str | None = None,
+    news_mode: str | None = None,
 ) -> list[ServerConfig]:
     """The standard 3-server pool: stocks + filings + notifications.
 
@@ -71,12 +83,13 @@ def default_configs(
         stocks_config(mode=stocks_mode),
         filings_config(mode=filings_mode),
         notifications_config(mode=notify_mode),
+        news_config(mode=news_mode),
     ]
 
 
 def live_configs() -> list[ServerConfig]:
-    """Convenience: live data everywhere (Finnhub + EDGAR + webhooks)."""
-    return default_configs(stocks_mode="live", filings_mode="live", notify_mode="live")
+    """Convenience: live data everywhere (Finnhub + EDGAR + webhooks + news)."""
+    return default_configs(stocks_mode="live", filings_mode="live", notify_mode="live", news_mode="live")
 
 
 __all__ = [
@@ -84,6 +97,7 @@ __all__ = [
     "stocks_config",
     "filings_config",
     "notifications_config",
+    "news_config",
     "default_configs",
     "live_configs",
 ]
