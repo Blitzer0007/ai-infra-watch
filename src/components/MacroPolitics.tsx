@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
-import { MACRO_RISKS } from '../data';
 import { MacroRisk } from '../types';
 
 interface MacroPoliticsProps {
@@ -12,7 +11,7 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
 
-  const activeRisks = liveRisks && liveRisks.length > 0 ? liveRisks : MACRO_RISKS;
+  const activeRisks = liveRisks || [];
 
   // Sync sliders dynamically if live risks are updated
   useEffect(() => {
@@ -68,7 +67,7 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Current Risk Indicators</h3>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white">Current Risk Indicators (Live Feed)</h3>
           
           <div className="space-y-4">
             {activeRisks.map((r) => (
