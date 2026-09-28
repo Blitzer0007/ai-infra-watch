@@ -55,7 +55,7 @@ export default function AutonomousResearch() {
     try {
       const res = await fetch('/api/agent-ask', { method: 'GET' });
       const body = await res.json().catch(() => ({}));
-      const online = res.ok && body?.ok === true;
+      const online = res.ok && (body?.ok === true || body?.status === 'ok');
       setBackendOnline(online);
       setBackendMessage(
         online
