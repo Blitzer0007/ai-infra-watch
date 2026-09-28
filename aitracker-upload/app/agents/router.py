@@ -185,7 +185,39 @@ def keyword_router(
         scored.append((score, tool.qualified_name, plan))
     # Highest score first; qualified name ascending as the deterministic tiebreak.
     scored.sort(key=lambda t: (-t[0], t[1]))
-    return [plan for _, _, plan in scored[:max_tools]]
+    if scored:
+        return [plan for _, _, plan in scored[:max_tools]]
+
+    # Generic ticker questions such as "Tell me about IONQ" contain the
+    # symbol but no vocabulary that overlaps a tool description. In that
+    # case the deterministic fallback must still use the discovered market
+    # catalog rather than incorrectly concluding that no tool applies.
+    # Prefer the generic quote tool for an otherwise unqualified symbol;
+    # more specific questions (earnings, contracts, filings, etc.) already
+    # match their corresponding tool vocabulary above.
+    symbols = extract_symbols(question)
+    if symbols:
+        quote_candidates: list[ToolPlan] = []
+        for tool in tools:
+            props = (tool.input_schema or {}).get("properties") or {}
+            if "symbol" not in props and "symbols" not in props:
+                continue
+            arguments = _build_arguments(tool, question)
+            if arguments is None:
+                continue
+            if tool.qualified_name.endswith(".get_quote"):
+                quote_candidates.append(
+                    ToolPlan(
+                        tool=tool.qualified_name,
+                        arguments=arguments,
+                        score=0.5,
+                        reason="explicit ticker with generic market question",
+                    )
+                )
+        if quote_candidates:
+            return quote_candidates[:max_tools]
+
+    return []
 
 
 class RouterState(TypedDict, total=False):
