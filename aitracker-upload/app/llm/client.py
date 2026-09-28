@@ -190,7 +190,7 @@ class LLMClient:
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
-                with httpx.Client(timeout=90.0) as client:
+                with httpx.Client(timeout=settings.LLM_REQUEST_TIMEOUT_SEC) as client:
                     resp = client.post(url, json=body, headers=headers)
                 if resp.status_code >= 400:
                     if _http_retryable(resp.status_code) and attempt < self.max_retries:
