@@ -205,7 +205,16 @@ def keyword_router(
             arguments = _build_arguments(tool, question)
             if arguments is None:
                 continue
-            if tool.qualified_name.endswith(".get_quote"):
+            if len(symbols) > 1 and tool.qualified_name.endswith(".get_quotes"):
+                quote_candidates.append(
+                    ToolPlan(
+                        tool=tool.qualified_name,
+                        arguments=arguments,
+                        score=0.6,
+                        reason="multiple explicit tickers with generic market question",
+                    )
+                )
+            elif len(symbols) == 1 and tool.qualified_name.endswith(".get_quote"):
                 quote_candidates.append(
                     ToolPlan(
                         tool=tool.qualified_name,
