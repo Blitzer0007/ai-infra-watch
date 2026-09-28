@@ -136,3 +136,58 @@ export function notifyBrowser(event: AlertEvent): void {
     tag: event.id
   });
 }
+
+export function evaluateFeedAlerts(
+  config: AppConfig,
+  feed: { contracts?: Array<{ id?: string; company?: string; client?: string; value?: string; dateSigned?: string }>; congressTrades?: Array<{ id?: string; stockSymbol?: string; politician?: string; transactionType?: string; amountRange?: string; date?: string }> },
+  bootstrap = false,
+): AlertEvent[] {
+  if (!config.catalystAlerts) return [];
+
+  const state = loadAlertState();
+  const events: AlertEvent[] = [];
+  const now = Date.now();
+  const watched = new Set([...config.watchlist, ...config.alerts.map(alert => alert.symbol)]);
+
+  for (const contract of feed.contracts || []) {
+    const symbol = contract.company || '';
+    if (!symbol || !watched.has(symbol) || !contract.id) continue;
+    const key = 'catalyst:contract:' + contract.id;
+    if (!state[key] && !bootstrap) {
+      events.push({
+        id: key + ':' + now,
+        type: 'catalyst',
+        severity: 'high',
+        symbol,
+        title: symbol + ' SEC agreement detected',
+        message: (contract.client || 'Material definitive agreement') + ' · ' + (contract.value || 'Value not quantified') + (contract.dateSigned ? ' · ' + contract.dateSigned : ''),
+        timestamp: now,
+        source: 'SEC EDGAR'
+      });
+    }
+    state[key] = true;
+  }
+
+  for (const trade of feed.congressTrades || []) {
+    const symbol = trade.stockSymbol || '';
+    if (!symbol || !watched.has(symbol) || !trade.id) continue;
+    const key = 'catalyst:congress:' + trade.id;
+    if (!state[key] && !bootstrap) {
+      events.push({
+        id: key + ':' + now,
+        type: 'catalyst',
+        severity: 'medium',
+        symbol,
+        title: symbol + ' congressional trade disclosed',
+        message: (trade.politician || 'Unknown filer') + ' reported a ' + (trade.transactionType || 'transaction') + ' in the range ' + (trade.amountRange || 'not disclosed') + (trade.date ? ' · ' + trade.date : ''),
+        timestamp: now,
+        source: 'Congressional disclosure feed'
+      });
+    }
+    state[key] = true;
+  }
+
+  saveAlertState(state);
+  if (events.length) saveAlertEvents([...events, ...loadAlertEvents()]);
+  return events;
+}
