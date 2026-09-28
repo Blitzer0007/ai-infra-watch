@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +109,7 @@ def autonomous(
     try:
         result = AutonomousMCPAgent(get_toolbox()).run(question)
     except Exception as exc:  # noqa: BLE001 — return structured agent failures
+        print(traceback.format_exc(), flush=True)
         raise HTTPException(
             status_code=422,
             detail=f"autonomous ask failed: {type(exc).__name__}: {exc}",
