@@ -238,10 +238,33 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
             "reason": "driver question: retrieve company-specific SEC catalyst evidence",
         }
 
-    # Once quotes, historical event studies, and SEC catalyst evidence have
-    # all been collected, stop the bounded investigation. Do not let the LLM
-    # spend the final step repeating quote retrieval.
-    if successful_tool(lambda c: c.tool.lower().endswith(".get_catalysts")):
+    # Step 4: retrieve recent market/company news for the explicitly named
+    # symbols. One keyword search keeps the bounded six-tool budget while
+    # adding the missing news/macroeconomic evidence layer.
+    news_search = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower().endswith(".search")
+            and t.qualified_name.lower().startswith("news.")
+            and "query" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if news_search is not None and not successful_tool(
+        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
+    ):
+        return {
+            "action": "tool",
+            "tool": news_search.qualified_name,
+            "arguments": {"query": " ".join(symbols), "days": 7},
+            "reason": "driver question: retrieve recent news for named symbols",
+        }
+
+    # Once quotes, historical event studies, SEC catalysts, and news have all
+    # been collected, stop the bounded investigation.
+    if successful_tool(lambda c: c.tool.lower().endswith(".get_catalysts")) and successful_tool(
+        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
+    ):
         return {"action": "final", "answer": ""}
 
     return None
