@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Info, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
@@ -11,7 +11,37 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
   const [search, setSearch] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
 
-  const activeTrades = liveTrades || [];
+  const [fallbackTrades, setFallbackTrades] = useState<CongressTrade[]>([]);
+
+  useEffect(() => {
+    if (liveTrades && liveTrades.length > 0) return;
+    const controller = new AbortController();
+    fetch('https://www.bargo.ai/free-apis/congress/v1/trades?limit=100', {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' }
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((payload) => {
+        const symbols = new Set(['NVDA','MSFT','NBIS','META','NOW','SNDK','MU','AMD','AMPG','DGXX']);
+        const rows = (payload?.trades || [])
+          .filter((t: any) => symbols.has(String(t.ticker || '').toUpperCase()))
+          .map((t: any, index: number) => ({
+            id: 'bargo-congress-' + String(t.ticker || '') + '-' + String(t.disclosure_date || t.transaction_date || '') + '-' + index,
+            politician: t.member || 'Unknown filer',
+            chamber: String(t.chamber || '').toLowerCase() === 'senate' ? 'Senate' : 'House',
+            stockSymbol: String(t.ticker || '').toUpperCase(),
+            transactionType: /sale|sell/i.test(String(t.type || '')) ? 'sell' : 'buy',
+            amountRange: t.amount_range || 'Not disclosed',
+            date: t.disclosure_date || t.transaction_date || '',
+            stockPrice: typeof t.est_price === 'number' ? t.est_price : 0
+          }));
+        setFallbackTrades(rows);
+      })
+      .catch(() => setFallbackTrades([]));
+    return () => controller.abort();
+  }, [liveTrades]);
+
+  const activeTrades = liveTrades && liveTrades.length > 0 ? liveTrades : fallbackTrades;
 
   const filtered = activeTrades.filter((t) => {
     const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
