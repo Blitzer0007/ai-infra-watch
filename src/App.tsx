@@ -474,11 +474,11 @@ export default function App() {
           </div>
 
           {(() => {
+            const prices = { ...tickerPrices, ...(liveData?.stockPrices || {}) };
             const stress = calculatePortfolioStress(
-              liveData?.stockPrices || tickerPrices,
+              prices,
               liveData?.macroRisks || []
             );
-            const prices = liveData?.stockPrices || tickerPrices;
             const coverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null).length;
             return (
               <div className="max-w-7xl mx-auto mb-6 rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
