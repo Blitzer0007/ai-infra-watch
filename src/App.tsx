@@ -30,6 +30,7 @@ export default function App() {
     stockPrices?: Record<string, { price: number; changePct: number }>;
     contracts?: any[];
     congressTrades?: any[];
+    news?: any[];
     macroRisks?: any[];
     marketSentiment?: string;
     build?: { commit?: string | null; environment?: string };
