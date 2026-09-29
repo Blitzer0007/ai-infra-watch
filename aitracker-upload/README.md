@@ -76,3 +76,19 @@ This project does not provide investment advice. Markets involve risk of loss. V
 ### Autonomous research on Vercel
 
 The Vercel frontend and the autonomous Python MCP function now run in the same project. The frontend proxy uses the native `/api/agent-python` route by default, so `AI_INFRA_AGENT_URL` is optional. Set `AI_INFRA_AGENT_TOKEN` on Vercel when bearer authentication is desired. The Python function uses the root `requirements.txt` and imports the production agent stack from `aitracker-upload/app`.
+
+## Jev decision routing
+
+Autonomous Research can optionally use TypeSafe Jev as a fast typed decision layer before the existing LLM planner. Jev is used for route selection only; the existing LLM remains responsible for the final natural-language synthesis.
+
+Production environment:
+
+```text
+JEV_ENABLED=true
+TYPESAFE_API_KEY=...
+JEV_MODEL=jev-latest
+JEV_TIMEOUT_SEC=3
+JEV_ROUTE_THRESHOLD=0.75
+```
+
+The key stays server-side. When Jev is unavailable or below the confidence threshold, the existing planner/fallback path continues automatically.
