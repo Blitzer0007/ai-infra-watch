@@ -50,7 +50,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="aiw-page-header flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>
           <div className="text-2xl font-black mt-2">Portfolio + Watchlist Decision Lab</div>
