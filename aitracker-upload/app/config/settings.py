@@ -92,7 +92,7 @@ LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
 # Keep the key server-side only; never expose it to the React bundle.
 JEV_ENABLED: bool = _env_bool("JEV_ENABLED", True)
 JEV_API_KEY: str = _env_str("TYPESAFE_API_KEY", "")
-JEV_MODEL: str = _env_str("JEV_MODEL", "jev-latest")
+JEV_MODEL: str = _env_str("JEV_MODEL", "jev-1.13.0")
 JEV_BASE_URL: str = _env_str("JEV_BASE_URL", "https://api.typesafe.ai")
 JEV_TIMEOUT_SEC: float = _env_float(
     "JEV_TIMEOUT_SEC", 3.0 if os.getenv("VERCEL") else 8.0
