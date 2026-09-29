@@ -368,7 +368,7 @@ class AutonomousMCPAgent:
             return {"action": "tool", "tool": plan.tool, "arguments": plan.arguments, "reason": "deterministic fallback router"}
         # Keep ticker-focused investigations inside the explicitly named\n        # symbols. Broad relationship/rotation tools can otherwise query a\n        # default universe of many tickers and hit the Vercel timeout.\n        planning_tools = tools\n        symbols = extract_symbols(question)\n        if symbols:\n            lower_question = question.lower()\n            filing_terms = (\n                "sec", "filing", "filings", "10-k", "10-q", "8-k",\n                "contract", "contracts", "disclosure", "disclosures", "cik",\n            )\n            is_filing_question = any(term in lower_question for term in filing_terms)\n            ticker_tools = []\n            for tool in tools:\n                props = (tool.input_schema or {}).get("properties") or {}\n                if "symbol" not in props and "symbols" not in props:\n                    continue\n                if not is_filing_question and "milestone" in tool.qualified_name.lower():\n                    continue\n                ticker_tools.append(tool)\n            if ticker_tools:\n                planning_tools = ticker_tools\n\n        raw = self.client.generate(\n            _planner_prompt(question, planning_tools, history),\n            max_tokens=800,\n            temperature=0.0,\n        )\n        parsed = _extract_json_object(raw)\n        if not parsed:\n            raise ValueError("planner did not return a valid JSON object")\n        return parsed
 
-    def _finalize(self, question: str, calls: list[ToolCallRecord], steps: list[Step]) -> AutonomousResult:
+    def _finalize(self, question: str, calls: list[ToolCallRecord], steps: list[Step], resolution: str = "completed") -> AutonomousResult:
         successful = [c for c in calls if c.ok]
         if not successful:
             steps.append(Step(node="finalize", kind="node", note="no successful calls"))
@@ -396,7 +396,7 @@ class AutonomousMCPAgent:
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
                 answer_source="deterministic-evidence",
-                resolution="completed",
+                resolution=resolution,
             )
 
         try:
@@ -419,7 +419,7 @@ class AutonomousMCPAgent:
                 AgentTrajectory(steps=steps),
                 answer_source="deterministic-fallback",
                 error=error,
-                resolution="completed",
+                resolution=resolution,
             )
         steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
         steps.append(Step(node="finalize", kind="node", note="evidence sufficient"))
@@ -429,7 +429,7 @@ class AutonomousMCPAgent:
             calls,
             [tool.qualified_name for tool in self.toolbox.tools()],
             AgentTrajectory(steps=steps),
-            resolution="completed",
+            resolution=resolution,
         )
 
     def run(self, question: str) -> AutonomousResult:
