@@ -362,7 +362,8 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert gate.calls == 1
     assert result.jev["evidence_gate"]["action"] == "gather_more"
     assert len(result.calls) == 3
-    assert session.calls[-1] == ("search", {"query": "Analyze AMD today"})
+    assert result.calls[-1].tool == "news.search"
+    assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
 
 
 def test_jev_strong_evidence_can_stop_before_step_bound():
