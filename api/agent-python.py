@@ -52,6 +52,7 @@ def _shape(result: Any) -> dict[str, Any]:
         "degraded": result.degraded(),
         "summary": result.summary,
         "answer_source": result.answer_source,
+        "jev": result.jev,
         "error": result.error,
         "resolution": result.resolution,
         "discovered": result.discovered,
@@ -92,6 +93,8 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "api_key_configured": bool(
             settings.ANTHROPIC_API_KEY or settings.OPENAI_API_KEY
         ),
+        "jev_enabled": settings.JEV_ENABLED,
+        "jev_api_key_configured": bool(settings.JEV_API_KEY),
         "mcp": toolbox_status(),
     }
 
