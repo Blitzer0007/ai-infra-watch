@@ -4,6 +4,7 @@ import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
 import ContractEventStudy from './ContractEventStudy';
 import ContractTerms from './ContractTerms';
+import ContractPortfolioImpact from './ContractPortfolioImpact';
 
 interface ContractsLedgerProps {
   liveContracts?: Contract[];
@@ -187,6 +188,8 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                 <ContractEventStudy symbol={c.company} eventDate={c.dateSigned} />
 
                 <ContractTerms symbol={c.company} accession={c.accession} url={c.url} />
+
+                <ContractPortfolioImpact contract={c} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0F1115]/30 border border-white/5 rounded p-4 text-xs font-mono">
                   <div>
