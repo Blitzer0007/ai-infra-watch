@@ -31,3 +31,23 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Keep the active page title/header visible while the page body scrolls.
+   The offset accounts for the global ticker and the mobile navigation bar. */
+.aiw-page-header {
+  position: sticky;
+  top: 2rem;
+  z-index: 30;
+  margin-top: -0.25rem;
+  padding-top: 0.25rem;
+  padding-bottom: 1rem;
+  background: rgba(15, 17, 21, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (max-width: 1023px) {
+  .aiw-page-header {
+    top: 4rem;
+  }
+}
