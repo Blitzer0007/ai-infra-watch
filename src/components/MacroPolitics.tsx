@@ -171,9 +171,9 @@ function PortfolioScenarioSensitivity({
       : position?.investedValue ?? 0;
     const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
     const sensitivity = Math.round(
-      taiwanProb * 0.5 * exposureFactor(exposure.taiwan) +
-      gridSeverity * 0.25 * exposureFactor(exposure.power) +
-      embargoBreadth * 0.25 * exposureFactor(exposure.export)
+      taiwanProb * 0.5 * exposureFactor(exposure.taiwanEvidence.level) +
+      gridSeverity * 0.25 * exposureFactor(exposure.powerEvidence.level) +
+      embargoBreadth * 0.25 * exposureFactor(exposure.exportEvidence.level)
     );
     return {
       ...exposure,
