@@ -394,6 +394,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                answer_source="deterministic-evidence",
                 resolution="completed",
             )
 
