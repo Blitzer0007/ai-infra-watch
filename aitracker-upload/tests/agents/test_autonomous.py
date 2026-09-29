@@ -398,6 +398,15 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
 
 
+def test_historical_market_data_prioritizes_event_study_channel():
+    from app.agents.autonomous import _question_evidence_priorities
+
+    priorities = _question_evidence_priorities(
+        "What recent developments could affect NVIDIA's stock price? Check historical market data."
+    )
+    assert priorities.index("event_study") < priorities.index("earnings")
+
+
 def test_recent_developments_affect_question_uses_evidence_gate():
     from app.agents.autonomous import _needs_evidence_gate
 
