@@ -243,7 +243,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
 
   return (
     <div className="space-y-6" id="congress-view">
-      <div className="flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 04 / Signals</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
           Congressional Trading Signals
