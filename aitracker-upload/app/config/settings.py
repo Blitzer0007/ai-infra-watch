@@ -86,10 +86,18 @@ LLM_FINAL_TIMEOUT_SEC: float = _env_float(
     "LLM_FINAL_TIMEOUT_SEC", 20.0 if os.getenv("VERCEL") else 60.0
 )
 LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
-LLM_FINAL_TIMEOUT_SEC: float = _env_float(
-    "LLM_FINAL_TIMEOUT_SEC", 20.0 if os.getenv("VERCEL") else 60.0
+
+# ---- Jev decision layer ----------------------------------------------
+# Optional typed decision model used to route research before prose synthesis.
+# Keep the key server-side only; never expose it to the React bundle.
+JEV_ENABLED: bool = _env_bool("JEV_ENABLED", True)
+JEV_API_KEY: str = _env_str("TYPESAFE_API_KEY", "")
+JEV_MODEL: str = _env_str("JEV_MODEL", "jev-latest")
+JEV_BASE_URL: str = _env_str("JEV_BASE_URL", "https://api.typesafe.ai")
+JEV_TIMEOUT_SEC: float = _env_float(
+    "JEV_TIMEOUT_SEC", 3.0 if os.getenv("VERCEL") else 8.0
 )
-LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
+JEV_ROUTE_THRESHOLD: float = _env_float("JEV_ROUTE_THRESHOLD", 0.75)
 
 # ---- production API security / browser access -----------------------
 # When set, /api/ask/autonomous requires Authorization: Bearer <token>.
