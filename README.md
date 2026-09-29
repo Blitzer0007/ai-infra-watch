@@ -52,7 +52,7 @@ CRON_SECRET=...
 EARNINGS_ALERT_LEAD_DAYS=1
 ```
 
-The project cron calls `/api/earnings-alerts` daily at 03:00 UTC (~08:30 IST; Vercel cron execution timing depends on plan/runtime). The route only sends the due T-1 events and is idempotent by earnings date. The browser panel also supports optional local browser notifications while the dashboard is open.
+GitHub Actions calls `/api/earnings-alerts` daily at 08:30 IST. The workflow is independent of Vercel Cron and only sends due T-1 events. The browser panel also supports optional local browser notifications while the dashboard is open. Store `AIW_CRON_SECRET` in GitHub Actions secrets and the matching `CRON_SECRET` in Vercel.
 
 The Finnhub key saved in the browser Settings page is separate from the Vercel server-side key used by the scheduled alert.
 
