@@ -19,6 +19,16 @@ type ResearchResponse = {
   degraded?: boolean;
   summary?: string;
   answer_source?: 'agent-llm' | 'deterministic-evidence' | 'deterministic-fallback' | 'none' | string;
+  jev?: {
+    enabled?: boolean;
+    action?: string;
+    choice?: string;
+    confidence?: number;
+    model?: string;
+    latency_ms?: number;
+    tool?: string;
+    error?: string;
+  };
   error?: string | null;
   resolution?: string | null;
   discovered?: string[];
@@ -239,9 +249,14 @@ export default function AutonomousResearch() {
               {result.resolution && (
                 <p className="mt-3 text-[10px] font-mono text-white/35">Resolution: {result.resolution}</p>
               )}
-              <p className="mt-2 text-[9px] font-mono text-white/25">
-                Tool outputs below are the evidence sources used by the answer.
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono text-white/25">
+                <span>Tool outputs below are the evidence sources used by the answer.</span>
+                {result.jev?.enabled && result.jev.choice && (
+                  <span className="rounded border border-fuchsia-400/20 bg-fuchsia-400/5 px-1.5 py-0.5 text-fuchsia-300/80">
+                    Jev: {result.jev.choice} · {typeof result.jev.confidence === 'number' ? Math.round(result.jev.confidence * 100) + '%' : 'confidence n/a'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
