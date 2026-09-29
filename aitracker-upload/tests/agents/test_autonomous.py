@@ -262,4 +262,132 @@ def test_autonomous_jev_is_recorded_for_forced_driver_research():
     assert result.jev["choice"] == "earnings"
     assert result.jev["action"] == "forced_driver_plan"
 
+
+class _GateJev:
+    enabled = True
+
+    def __init__(self, choice: str, score: float, confidence: float = 0.9):
+        self.choice = choice
+        self.score = score
+        self.confidence = confidence
+        self.calls = 0
+
+    def choose(self, **kwargs):
+        from app.jev.client import JevDecision
+        return JevDecision(
+            choice="multi_source",
+            confidence=0.96,
+            model="jev-test",
+            latency_ms=2.0,
+        )
+
+    def evaluate(self, **kwargs):
+        from app.jev.client import JevAnswer, JevEvaluation
+        self.calls += 1
+        return JevEvaluation(
+            answers={
+                "sufficiency": JevAnswer(
+                    type="choice",
+                    choice=self.choice,
+                    confidence=self.confidence,
+                ),
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=self.score,
+                    confidence=0.9,
+                ),
+            },
+            model="jev-test",
+            latency_ms=3.0,
+            input_tokens=100,
+        )
+
+
+def _gate_toolbox():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_quote",
+                description="Get a current quote.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_snapshot",
+                description="Get a market snapshot.",
+                input_schema={"properties": {}, "required": []},
+            ),
+            dict(
+                name="search",
+                description="Search recent company news.",
+                input_schema={
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+        ],
+        call_returns={
+            "get_quote": {"symbol": "AMD", "price": 180.0},
+            "get_snapshot": {"symbol": "AMD", "volume": 1000},
+            "search": {"query": "Analyze AMD today", "hits": [{"title": "AMD update"}]},
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks"), _cfg("news")], _factory({"stocks": session, "news": session}))
+    tb.connect()
+    return tb, session
+
+
+def test_jev_low_evidence_quality_forces_another_source():
+    tb, session = _gate_toolbox()
+    gate = _GateJev("gather_more", 0.5)
+    plans = [
+        {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
+        {"action": "tool", "tool": "stocks.get_snapshot", "arguments": {}, "reason": "snapshot"},
+        {"action": "final", "answer": ""},
+    ]
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            planner=lambda q, tools, history: plans.pop(0),
+            jev=gate,
+            client=LLMClient(provider="stub", model="stub"),
+            max_steps=3,
+        )
+        result = agent.run("Analyze AMD today")
+    finally:
+        tb.close()
+
+    assert gate.calls == 1
+    assert result.jev["evidence_gate"]["action"] == "gather_more"
+    assert len(result.calls) == 3
+    assert session.calls[-1] == ("search", {"query": "Analyze AMD today"})
+
+
+def test_jev_strong_evidence_can_stop_before_step_bound():
+    tb, session = _gate_toolbox()
+    gate = _GateJev("stop", 3.0)
+    plans = [
+        {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
+        {"action": "tool", "tool": "stocks.get_snapshot", "arguments": {}, "reason": "snapshot"},
+        {"action": "tool", "tool": "news.search", "arguments": {"query": "should not run"}, "reason": "extra"},
+    ]
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            planner=lambda q, tools, history: plans.pop(0),
+            jev=gate,
+            client=LLMClient(provider="stub", model="stub"),
+            max_steps=3,
+        )
+        result = agent.run("Analyze AMD today")
+    finally:
+        tb.close()
+
+    assert gate.calls == 1
+    assert result.jev["evidence_gate"]["action"] == "stop"
+    assert result.resolution == "jev_evidence_sufficient"
+    assert len(result.calls) == 2
+
 # Finalizer model routing regression coverage.
