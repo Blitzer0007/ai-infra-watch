@@ -1,13 +1,13 @@
-"""Small TypeSafe Jev client for bounded typed decisions.
+"""Server-side TypeSafe Jev client for fast, typed platform decisions.
 
-Jev is used only for structured decisions (Choice / Noul), never for prose.
-The official TypeSafe route is documented at:
-https://api.typesafe.ai/v1/systemone
+Jev is used only for structured decisions (Choice / Score / Noul), never for
+prose generation. Multiple questions can be evaluated in one System One call.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import time
+from typing import Any
 
 import httpx
 
@@ -28,6 +28,30 @@ class JevDecision:
         return bool(self.choice) and not self.error
 
 
+@dataclass
+class JevAnswer:
+    type: str = ""
+    choice: str = ""
+    confidence: float | None = None
+    probabilities: dict[str, float] = field(default_factory=dict)
+    score: float | None = None
+    legend: dict[str, str] = field(default_factory=dict)
+    noul: float | None = None
+
+
+@dataclass
+class JevEvaluation:
+    answers: dict[str, JevAnswer] = field(default_factory=dict)
+    model: str = ""
+    latency_ms: float = 0.0
+    input_tokens: int | None = None
+    error: str = ""
+
+    @property
+    def usable(self) -> bool:
+        return bool(self.answers) and not self.error
+
+
 class JevClient:
     """Minimal, server-side-only client for TypeSafe System One."""
 
@@ -39,32 +63,41 @@ class JevClient:
     ) -> None:
         self.api_key = api_key or settings.JEV_API_KEY
         self.model = model or settings.JEV_MODEL
-        self.timeout_sec = timeout_sec or settings.JEV_TIMEOUT_SEC
+        self.timeout_sec = timeout_sec if timeout_sec is not None else settings.JEV_TIMEOUT_SEC
 
     @property
     def enabled(self) -> bool:
         return settings.JEV_ENABLED and bool(self.api_key)
 
-    def choose(
+    @staticmethod
+    def _normalise_probabilities(value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        output: dict[str, float] = {}
+        for key, number in value.items():
+            if isinstance(number, (int, float)):
+                output[str(key)] = float(number)
+        return output
+
+    def evaluate(
         self,
         *,
         state: str,
-        instructions: str,
-        criteria: dict[str, str],
-    ) -> JevDecision:
+        questions: dict[str, dict[str, Any]],
+    ) -> JevEvaluation:
         if not self.enabled:
-            return JevDecision(error="Jev is disabled or TYPESAFE_API_KEY is not configured.")
+            return JevEvaluation(
+                error="Jev is disabled or TYPESAFE_API_KEY is not configured."
+            )
+        if not questions:
+            return JevEvaluation(error="No Jev questions supplied.")
+        if not isinstance(state, str) or not state.strip():
+            return JevEvaluation(error="Jev state must be a non-empty string.")
 
         body = {
             "state": state,
             "model": self.model,
-            "questions": {
-                "route": {
-                    "type": "choice",
-                    "instructions": instructions,
-                    "criteria": criteria,
-                }
-            },
+            "questions": questions,
         }
 
         try:
@@ -80,26 +113,79 @@ class JevClient:
                 )
             response.raise_for_status()
             payload = response.json()
-            answer = (payload.get("answers") or {}).get("route") or {}
-            probabilities = answer.get("probabilities")
-            if isinstance(probabilities, dict):
-                normalized = {
-                    str(key): float(value)
-                    for key, value in probabilities.items()
-                    if isinstance(value, (int, float))
-                }
-            else:
-                normalized = None
+            raw_answers = payload.get("answers") or {}
+            answers: dict[str, JevAnswer] = {}
+            for key, raw in raw_answers.items():
+                if not isinstance(raw, dict):
+                    continue
+                answers[str(key)] = JevAnswer(
+                    type=str(raw.get("type") or ""),
+                    choice=str(raw.get("choice") or ""),
+                    confidence=(
+                        float(raw["confidence"])
+                        if isinstance(raw.get("confidence"), (int, float))
+                        else None
+                    ),
+                    probabilities=self._normalise_probabilities(raw.get("probabilities")),
+                    score=(
+                        float(raw["score"])
+                        if isinstance(raw.get("score"), (int, float))
+                        else None
+                    ),
+                    legend={
+                        str(k): str(v)
+                        for k, v in (raw.get("legend") or {}).items()
+                    } if isinstance(raw.get("legend"), dict) else {},
+                    noul=(
+                        float(raw["noul"])
+                        if isinstance(raw.get("noul"), (int, float))
+                        else None
+                    ),
+                )
 
-            return JevDecision(
-                choice=str(answer.get("choice") or ""),
-                confidence=float(answer.get("confidence") or 0.0),
-                probabilities=normalized,
+            usage = payload.get("usage") or {}
+            input_tokens = usage.get("input_tokens")
+            return JevEvaluation(
+                answers=answers,
                 model=str(payload.get("model") or self.model),
                 latency_ms=(time.perf_counter() - started_at) * 1000.0,
+                input_tokens=int(input_tokens) if isinstance(input_tokens, (int, float)) else None,
             )
         except (httpx.HTTPError, ValueError, TypeError) as exc:
-            return JevDecision(error=f"{type(exc).__name__}: {exc}")
+            return JevEvaluation(error=f"{type(exc).__name__}: {exc}")
+
+    def choose(
+        self,
+        *,
+        state: str,
+        instructions: str,
+        criteria: dict[str, str],
+    ) -> JevDecision:
+        evaluation = self.evaluate(
+            state=state,
+            questions={
+                "route": {
+                    "type": "choice",
+                    "instructions": instructions,
+                    "criteria": criteria,
+                }
+            },
+        )
+        if not evaluation.usable:
+            return JevDecision(
+                model=evaluation.model or self.model,
+                latency_ms=evaluation.latency_ms,
+                error=evaluation.error,
+            )
+
+        answer = evaluation.answers.get("route") or JevAnswer()
+        return JevDecision(
+            choice=answer.choice,
+            confidence=answer.confidence or 0.0,
+            probabilities=answer.probabilities or None,
+            model=evaluation.model or self.model,
+            latency_ms=evaluation.latency_ms,
+        )
 
 
-__all__ = ["JevClient", "JevDecision"]
+__all__ = ["JevClient", "JevDecision", "JevAnswer", "JevEvaluation"]
