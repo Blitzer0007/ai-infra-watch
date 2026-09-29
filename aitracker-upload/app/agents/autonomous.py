@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.agents.router import extract_symbols, keyword_router
@@ -21,6 +21,7 @@ from app.llm.client import LLMClient
 from app.mcp_client import MCPToolbox, ToolInfo
 from app.mcp_client.client import MCPClientError
 from app.config import settings
+from app.jev.client import JevClient, JevDecision
 
 
 @dataclass
@@ -30,6 +31,7 @@ class AutonomousResult:
     calls: list[ToolCallRecord]
     discovered: list[str]
     trajectory: AgentTrajectory
+    jev: dict[str, Any] = field(default_factory=dict)
     answer_source: str = "agent-llm"
     error: str = ""
     resolution: str = "completed"
@@ -128,6 +130,48 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
+
+JEV_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
+    "market": (".get_quotes", ".get_quote", ".get_snapshot"),
+    "earnings": (".get_earnings",),
+    "event_study": (".get_event_study",),
+    "filings": (".get_catalysts", ".search_filings", ".get_filings"),
+    "macro": (".get_macro", ".macro", ".get_risks"),
+    "congress": ("congress.", ".get_congress", ".get_trades"),
+    "news": ("news.search",),
+    "rotation": (".get_rotation",),
+}
+
+JEV_ROUTE_CRITERIA = {
+    "market": "Current price, daily move, quote or snapshot request",
+    "earnings": "Earnings date, EPS, revenue, earnings report or earnings surprise",
+    "event_study": "Historical event study or post-event price reaction",
+    "filings": "SEC filing, contract, material agreement, disclosure or filing catalyst",
+    "macro": "Macro, geopolitics, Taiwan, power/grid or export-control exposure",
+    "congress": "Congressional/public official stock transaction disclosure",
+    "news": "Recent news or media reporting about a company or ticker",
+    "rotation": "Relative rotation, peer basket, hardware/application or sector rotation",
+    "multi_source": "Question requires combining several evidence sources before answering",
+}
+
+def _jev_route(question: str, tools: list[ToolInfo], client: JevClient) -> JevDecision:
+    tool_names = ", ".join(t.qualified_name for t in tools[:80])
+    state = f"AI Infra Watch research question: {question}\nAvailable tool names: {tool_names}"
+    return client.choose(
+        state=state,
+        instructions="Which research route should run first? Choose multi_source when the question asks why/what changed or clearly needs multiple evidence sources.",
+        criteria={**JEV_ROUTE_CRITERIA},
+    )
+
+def _tool_for_jev_route(route: str, tools: list[ToolInfo]) -> ToolInfo | None:
+    patterns = JEV_ROUTE_PATTERNS.get(route, ())
+    if not patterns:
+        return None
+    for tool in tools:
+        name = tool.qualified_name.lower()
+        if any(pattern.lower() in name for pattern in patterns):
+            return tool
+    return None
 
 def _planner_prompt(question: str, tools: list[ToolInfo], history: list[dict[str, Any]]) -> str:
     return f'''You are the autonomous tool planner for AI Infra Watch.
@@ -331,15 +375,53 @@ Requirements:
 
 
 class AutonomousMCPAgent:
-    def __init__(self, toolbox: MCPToolbox, client: LLMClient | None = None, max_steps: int | None = None, planner: Any | None = None) -> None:
+    def __init__(self, toolbox: MCPToolbox, client: LLMClient | None = None, max_steps: int | None = None, planner: Any | None = None, jev: JevClient | None = None) -> None:
         self.toolbox = toolbox
         self.client = client or LLMClient()
         self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))
         self.planner = planner
+        self.jev = jev or JevClient()
+        self.last_jev: dict[str, Any] = {}
 
     def _plan(self, question: str, tools: list[ToolInfo], history: list[dict[str, Any]]) -> dict[str, Any]:
         if self.planner is not None:
             return self.planner(question, tools, history)
+        if self.jev.enabled and mode != "keyword" and self.client.provider != "stub":
+            try:
+                decision = _jev_route(question, tools, self.jev)
+                self.last_jev = {
+                    "enabled": True,
+                    "choice": decision.choice,
+                    "confidence": decision.confidence,
+                    "probabilities": decision.probabilities or {},
+                    "model": decision.model,
+                    "latency_ms": round(decision.latency_ms, 1),
+                }
+                route_tool = _tool_for_jev_route(decision.choice, tools)
+                if route_tool is not None and decision.confidence >= settings.JEV_ROUTE_THRESHOLD:
+                    symbols = extract_symbols(question)
+                    arguments: dict[str, Any] = {}
+                    properties = (route_tool.input_schema or {}).get("properties") or {}
+                    if "symbols" in properties and symbols:
+                        arguments["symbols"] = symbols
+                    elif "symbol" in properties and symbols:
+                        arguments["symbol"] = symbols[0]
+                    self.last_jev["action"] = "direct_tool"
+                    self.last_jev["tool"] = route_tool.qualified_name
+                    return {
+                        "action": "tool",
+                        "tool": route_tool.qualified_name,
+                        "arguments": arguments,
+                        "reason": f"Jev route={decision.choice} confidence={decision.confidence:.2f}",
+                    }
+                self.last_jev["action"] = "llm_planner"
+            except Exception as exc:
+                self.last_jev = {
+                    "enabled": True,
+                    "action": "fallback",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+
         mode = os.getenv("AUTONOMOUS_MODE", "llm").strip().lower()
         if mode == "keyword" or self.client.provider == "stub":
             used_tools = {
@@ -395,6 +477,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                jev=self.last_jev,
                 answer_source="deterministic-evidence",
                 resolution=resolution,
             )
@@ -417,6 +500,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                jev=self.last_jev,
                 answer_source="deterministic-fallback",
                 error=error,
                 resolution=resolution,
@@ -429,6 +513,7 @@ class AutonomousMCPAgent:
             calls,
             [tool.qualified_name for tool in self.toolbox.tools()],
             AgentTrajectory(steps=steps),
+            jev=self.last_jev,
             resolution=resolution,
         )
 
@@ -439,6 +524,7 @@ class AutonomousMCPAgent:
         history: list[dict[str, Any]] = []
         calls: list[ToolCallRecord] = []
         steps: list[Step] = [Step(node="discover", kind="node", note=f"{len(tools)} tools")]
+        self.last_jev = {}
         if not tools:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
