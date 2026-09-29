@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from 'react';
-import { ArrowRight, BriefcaseBusiness, Cpu, Gauge, Link2, Waves } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ArrowRight, BriefcaseBusiness, Gauge, Link2, Waves } from 'lucide-react';
 import { Contract } from '../types';
 
 type Props = {
@@ -174,6 +174,63 @@ export default function ContractPortfolioImpact({ contract }: Props) {
           label="Capacity signal"
           value={analysis.capacityMw == null ? '—' : formatMw(analysis.capacityMw)}
         />
+      </div>
+
+      <div className="rounded-lg border border-cyan-400/10 bg-cyan-400/[0.03] p-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300/70">
+              Economic scale context
+            </div>
+            <div className="text-[9px] text-white/30 mt-1">
+              Uses the issuer's latest annual revenue reported to SEC XBRL. This is scale context, not recognized contract revenue or a return forecast.
+            </div>
+          </div>
+          {!scale && (
+            <button
+              type="button"
+              onClick={loadScale}
+              disabled={scaleLoading}
+              className="rounded border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-1.5 text-[8px] font-mono uppercase text-cyan-300 hover:bg-cyan-400/10 disabled:opacity-50"
+            >
+              {scaleLoading ? 'Reading SEC…' : 'Load SEC scale'}
+            </button>
+          )}
+        </div>
+
+        {scaleError && (
+          <div className="mt-2 text-[9px] font-mono text-rose-300/80">{scaleError}</div>
+        )}
+
+        {scale?.error && (
+          <div className="mt-2 text-[9px] font-mono text-amber-300/70">{scale.error}</div>
+        )}
+
+        {scale && !scale.error && (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Metric
+              icon={<Gauge className="w-3.5 h-3.5" />}
+              label="Latest annual revenue"
+              value={latestRevenue == null ? '—' : formatMoney(latestRevenue)}
+            />
+            <Metric
+              icon={<BriefcaseBusiness className="w-3.5 h-3.5" />}
+              label="Annualized / annual revenue"
+              value={annualizedToRevenue == null ? '—' : annualizedToRevenue.toFixed(1) + '%'}
+            />
+            <Metric
+              icon={<ArrowRight className="w-3.5 h-3.5" />}
+              label="Disclosed value / annual revenue"
+              value={contractValueToRevenue == null ? '—' : contractValueToRevenue.toFixed(1) + '%'}
+            />
+          </div>
+        )}
+
+        {scale?.revenue && (
+          <div className="mt-2 text-[8px] font-mono text-white/20">
+            SEC revenue fact: {scale.revenue.tag} · FY ending {scale.revenue.end} · filed {scale.revenue.filed || 'date unavailable'} · source {scale.source}.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
