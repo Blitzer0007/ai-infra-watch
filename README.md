@@ -56,3 +56,4 @@ GitHub Actions calls `/api/earnings-alerts` daily at 08:30 IST. The workflow is 
 
 The Finnhub key saved in the browser Settings page is separate from the Vercel server-side key used by the scheduled alert.
 
+<!-- deployment-trigger: frontend-ci-clean -->
