@@ -81,8 +81,19 @@ class LLMClient:
         return {"provider": self.provider, "model": self.model}
 
     # ---- cache -----------------------------------------------------
-    def _cache_key(self, prompt: str, max_tokens: int, temperature: float) -> str:
-        raw = f"{self.provider}::{self.model}::{max_tokens}::{temperature}::{prompt}"
+    def _cache_key(
+        self,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
+    ) -> str:
+        effective_model = model or self.model
+        raw = (
+            f"{self.provider}::{effective_model}::{max_tokens}::{temperature}::"
+            f"{reasoning_effort or ''}::{prompt}"
+        )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def _cache_path(self, cache_key: str) -> Path:
@@ -118,10 +129,12 @@ class LLMClient:
         temperature: float | None = None,
         timeout_sec: float | None = None,
         max_retries: int | None = None,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> str:
         max_tokens = settings.DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
         temperature = settings.DEFAULT_TEMPERATURE if temperature is None else temperature
-        key = self._cache_key(prompt, max_tokens, temperature)
+        key = self._cache_key(prompt, max_tokens, temperature, model, reasoning_effort)
         cached = self._cache_read(key)
         if cached is not None:
             return cached
@@ -134,6 +147,8 @@ class LLMClient:
                 temperature,
                 timeout_sec=timeout_sec,
                 max_retries=max_retries,
+                model=model,
+                reasoning_effort=reasoning_effort,
             )
         self._cache_write(key, text, usage)
         return text
@@ -174,14 +189,17 @@ class LLMClient:
         temperature: float,
         timeout_sec: float | None = None,
         max_retries: int | None = None,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> tuple[str, dict[str, int]]:
         headers = {"content-type": "application/json"}
+        effective_model = model or self.model
         if self.provider == "anthropic":
             url = f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages"
             headers["x-api-key"] = self.api_key
             headers["anthropic-version"] = "2023-06-01"
             body: dict[str, Any] = {
-                "model": self.model,
+                "model": effective_model,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
                 "messages": [{"role": "user", "content": prompt}],
