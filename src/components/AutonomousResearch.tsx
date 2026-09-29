@@ -278,7 +278,9 @@ export default function AutonomousResearch() {
                         ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300/80'
                         : result.jev.evidence_gate.action === 'gather_more'
                           ? 'border-amber-400/20 bg-amber-400/5 text-amber-300/80'
-                          : 'border-fuchsia-400/20 bg-fuchsia-400/5 text-fuchsia-300/80'
+                          : result.jev.evidence_gate.action === 'insufficient'
+                            ? 'border-rose-400/20 bg-rose-400/5 text-rose-300/80'
+                            : 'border-fuchsia-400/20 bg-fuchsia-400/5 text-fuchsia-300/80'
                     )
                   }>
                     Evidence gate: {result.jev.evidence_gate.action || 'continue'}
