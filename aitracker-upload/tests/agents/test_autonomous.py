@@ -398,6 +398,35 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
 
 
+def test_duplicate_planner_call_redirects_to_complementary_evidence():
+    tb, _ = _gate_toolbox()
+    gate = _GateJev([("stop", 3.0)])
+    plans = [
+        {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
+        # Simulate the production planner repeating the same successful call.
+        {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "repeated quote"},
+    ]
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            planner=lambda q, tools, history: plans.pop(0),
+            jev=gate,
+            client=LLMClient(provider="stub", model="stub"),
+            max_steps=3,
+        )
+        result = agent.run("Analyze AMD today and explain the drivers")
+    finally:
+        tb.close()
+
+    assert [call.tool for call in result.calls] == ["stocks.get_quote", "news.search"]
+    assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
+    assert result.resolution == "jev_evidence_sufficient"
+    assert any(
+        step.node == "plan" and "complementary evidence source" in step.note
+        for step in result.trajectory.steps
+    )
+
+
 def test_jev_strong_evidence_can_stop_before_step_bound():
     tb, session = _gate_toolbox()
     gate = _GateJev([("stop", 3.0)])
