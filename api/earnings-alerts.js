@@ -425,7 +425,8 @@ export default async function handler(req, res) {
     .filter(event => event.days_until >= 0 && event.days_until <= lookaheadDays)
     .sort((a, b) => a.date.localeCompare(b.date) || a.symbol.localeCompare(b.symbol));
 
-  const notify = String(req.query?.notify || '') === '1';
+  const isVercelCron = String(req.headers['user-agent'] || '').includes('vercel-cron/1.0');
+  const notify = String(req.query?.notify || '') === '1' || isVercelCron;
   let delivered = {
     configured: Boolean(String(process.env.NOTIFY_WEBHOOK_URL || '').trim()),
     attempted: false,
