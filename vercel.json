@@ -17,11 +17,5 @@
     "api/earnings-alerts.js": {
       "maxDuration": 30
     }
-  },
-  "crons": [
-    {
-      "path": "/api/earnings-alerts",
-      "schedule": "0 3 * * *"
-    }
-  ]
+  }
 }
