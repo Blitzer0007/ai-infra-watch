@@ -154,7 +154,7 @@ export default function EarningsAlerts() {
         </div>
 
         <div className="rounded-xl border border-white/5 bg-black/15 px-3 py-2 text-[9px] font-mono text-white/30">
-          <span className="text-white/50">Server schedule:</span> daily pre-earnings check at 03:00 UTC ·
+          <span className="text-white/50">GitHub Actions schedule:</span> daily pre-earnings check at 08:30 IST ·
           <span className="text-white/50"> Source:</span> Finnhub earnings calendar ·
           <span className="text-white/50"> Browser alert:</span> only while this dashboard is open
         </div>
@@ -259,8 +259,8 @@ export default function EarningsAlerts() {
             <CheckCircle2 className="mt-0.5 w-3.5 h-3.5 text-amber-300/70 flex-shrink-0" />
             <p>
               To make the alert independent of the open browser, set <span className="text-white/65">FINNHUB_API_KEY</span> and
-              <span className="text-white/65"> NOTIFY_WEBHOOK_URL</span> in Vercel. Set <span className="text-white/65"> CRON_SECRET</span> as well
-              to secure manual cron triggering.
+              <span className="text-white/65"> NOTIFY_WEBHOOK_URL</span> in Vercel, then set matching <span className="text-white/65">CRON_SECRET</span> in Vercel
+              and <span className="text-white/65">AIW_CRON_SECRET</span> in GitHub Actions secrets.
             </p>
           </div>
         )}
