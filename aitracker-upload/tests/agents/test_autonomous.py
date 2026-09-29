@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.agents.autonomous import AutonomousMCPAgent
+from app.agents.autonomous import AutonomousMCPAgent, _final_prompt, _deterministic_summary
 from app.agents.schemas import ToolCallRecord
 from app.llm.client import LLMClient
 from app.mcp_client import MCPToolbox
@@ -337,6 +337,36 @@ def _gate_toolbox():
     tb = MCPToolbox([_cfg("stocks"), _cfg("news")], _factory({"stocks": session, "news": session}))
     tb.connect()
     return tb, session
+
+
+
+
+def test_jev_insufficient_finalization_is_explicitly_provisional():
+    calls = [
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=True,
+            output={"hits": []},
+        )
+    ]
+    prompt = _final_prompt("Analyze AMD drivers", calls, evidence_status="insufficient")
+    assert "did not meet the research sufficiency gate" in prompt
+    assert "keep conclusions provisional" in prompt
+
+
+def test_deterministic_insufficient_summary_is_explicit():
+    calls = [
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=True,
+            output={"hits": []},
+        )
+    ]
+    summary = _deterministic_summary("Analyze AMD drivers", calls, evidence_status="insufficient")
+    assert "Evidence status: INSUFFICIENT" in summary
+    assert "Conclusions are provisional" in summary
 
 
 def test_jev_low_evidence_quality_forces_another_source():
