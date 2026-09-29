@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ShieldAlert, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
+import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-react';
 import { MacroRisk } from '../types';
+import { PORTFOLIO_POSITIONS } from '../utils/portfolioPositions';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
+  livePrices?: Record<string, { price: number; changePct: number }>;
 }
+
+type ExposureLevel = 'Direct' | 'Secondary' | 'Limited';
 
 
 
@@ -25,6 +29,111 @@ function exposureClass(level: 'Direct' | 'Secondary' | 'Limited') {
   if (level === 'Direct') return 'bg-rose-500/10 text-rose-300 border-rose-500/20';
   if (level === 'Secondary') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
   return 'bg-white/5 text-white/40 border-white/10';
+}
+
+
+function exposureFactor(level: ExposureLevel) {
+  if (level === 'Direct') return 1;
+  if (level === 'Secondary') return 0.55;
+  return 0.2;
+}
+
+function PortfolioScenarioSensitivity({
+  taiwanProb,
+  gridSeverity,
+  embargoBreadth,
+  livePrices = {},
+}: {
+  taiwanProb: number;
+  gridSeverity: number;
+  embargoBreadth: number;
+  livePrices?: Record<string, { price: number; changePct: number }>;
+}) {
+  const totalInvested = PORTFOLIO_POSITIONS.reduce((sum, position) => sum + position.investedValue, 0);
+  const portfolioRows = PORTFOLIO_EXPOSURE.map((exposure) => {
+    const position = PORTFOLIO_POSITIONS.find((item) => item.symbol === exposure.symbol);
+    const live = livePrices[exposure.symbol];
+    const currentValue = live?.price != null && position
+      ? live.price * position.quantity
+      : position?.investedValue ?? 0;
+    const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
+    const sensitivity = Math.round(
+      taiwanProb * 0.5 * exposureFactor(exposure.taiwan) +
+      gridSeverity * 0.25 * exposureFactor(exposure.power) +
+      embargoBreadth * 0.25 * exposureFactor(exposure.export)
+    );
+    return {
+      ...exposure,
+      position,
+      currentValue,
+      portfolioWeight,
+      sensitivity,
+      weightedContribution: sensitivity * (portfolioWeight / 100),
+    };
+  });
+
+  const portfolioSensitivity = portfolioRows.reduce((sum, row) => sum + row.weightedContribution, 0);
+
+  return (
+    <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-cyan-300" />
+            <h3 className="text-xs font-black uppercase tracking-widest text-white">Stock-Specific Scenario Sensitivity</h3>
+          </div>
+          <p className="text-[10px] text-white/35 mt-1 font-mono max-w-3xl">
+            Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
+          </p>
+        </div>
+        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3">
+          <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300/60">Portfolio scenario sensitivity</div>
+          <div className="text-2xl font-black font-mono text-cyan-300 mt-1">{Math.round(portfolioSensitivity)} / 100</div>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-[10px] font-mono">
+          <thead className="text-white/30 uppercase tracking-wider">
+            <tr>
+              <th className="text-left p-2">Holding</th>
+              <th className="text-right p-2">Portfolio wt.</th>
+              <th className="text-center p-2">TSMC</th>
+              <th className="text-center p-2">Power</th>
+              <th className="text-center p-2">Export</th>
+              <th className="text-right p-2">Sensitivity</th>
+              <th className="text-right p-2">Weighted contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {portfolioRows.map((row) => (
+              <tr key={row.symbol} className="border-t border-white/5">
+                <td className="p-2 font-black text-white">{row.symbol}</td>
+                <td className="p-2 text-right text-white/60">{row.portfolioWeight.toFixed(1)}%</td>
+                <td className="p-2 text-center"><ExposurePill level={row.taiwan} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.power} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.export} /></td>
+                <td className="p-2 text-right font-black text-white">{row.sensitivity}/100</td>
+                <td className="p-2 text-right text-cyan-300 font-bold">{row.weightedContribution.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="text-[9px] text-white/25 font-mono mt-3">
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Portfolio weighting uses invested capital.
+      </div>
+    </div>
+  );
+}
+
+function ExposurePill({ level }: { level: ExposureLevel }) {
+  return (
+    <span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(level)}>
+      {level}
+    </span>
+  );
 }
 
 function PortfolioExposureMatrix() {
@@ -70,7 +179,7 @@ function PortfolioExposureMatrix() {
   );
 }
 
-export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
+export default function MacroPolitics({ liveRisks, livePrices = {} }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
@@ -144,6 +253,13 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
       </div>
 
       <PortfolioExposureMatrix />
+
+      <PortfolioScenarioSensitivity
+        taiwanProb={taiwanProb}
+        gridSeverity={gridSeverity}
+        embargoBreadth={embargoBreadth}
+        livePrices={livePrices}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
