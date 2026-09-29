@@ -387,7 +387,10 @@ class AutonomousMCPAgent:
         if self.planner is not None:
             return self.planner(question, tools, history)
         mode = os.getenv("AUTONOMOUS_MODE", "llm").strip().lower()
-        if self.jev.enabled and mode != "keyword":
+        # Jev is a per-question routing decision, not a loop-level
+        # planner. Cache its decision for the lifetime of this investigation
+        # so repeated iterations do not call the same route/tool again.
+        if self.jev.enabled and mode != "keyword" and not self.last_jev:
             try:
                 decision = _jev_route(question, tools, self.jev)
                 self.last_jev = {
@@ -598,6 +601,25 @@ class AutonomousMCPAgent:
                 error = f"unknown discovered tool: {tool_name}"
                 steps.append(tool_call(tool_name or "unknown", ok=False, note=error))
                 return AutonomousResult(question, "", calls, discovered, AgentTrajectory(steps=steps), error=error, resolution="error")
+
+            # Do not burn the bounded step budget repeating an already
+            # successful identical call. Jev is cached above, and this guard
+            # protects the fallback/LLM planner when it proposes the same call.
+            candidate_arguments = plan.get("arguments") or {}
+            if not isinstance(candidate_arguments, dict):
+                candidate_arguments = {}
+            if any(
+                c.ok and c.tool == tool_name and c.arguments == candidate_arguments
+                for c in calls
+            ):
+                steps.append(
+                    Step(
+                        node="plan",
+                        kind="node",
+                        note="duplicate successful tool call skipped",
+                    )
+                )
+                return self._finalize(question, calls, steps)
 
             arguments = plan.get("arguments") or {}
             if not isinstance(arguments, dict):
