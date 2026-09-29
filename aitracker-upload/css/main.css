@@ -399,6 +399,8 @@ tr:hover td{ background: var(--panel-2); }
 .badge-sell{ background: var(--rose-dim); color: var(--rose); }
 .badge-hold{ background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--line); }
 .badge-amber{ background: var(--amber-dim); color: var(--accent-text); }
+.badge-green{ background: var(--cyan-dim); color: var(--cyan); }
+.badge-red{ background: var(--rose-dim); color: var(--rose); }
 
 /* ============================================================
    PROGRESS / TIMELINE (contract tracker)
