@@ -7,7 +7,7 @@ interface CongressTradesProps {
   liveTrades?: CongressTrade[];
 }
 
-const TRACKED_SYMBOLS = ['NVDA', 'MSFT', 'NBIS', 'META', 'NOW', 'MU', 'AMD', 'DGXX'];
+const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 
 export default function CongressTrades({ liveTrades }: CongressTradesProps) {
   const [search, setSearch] = useState('');
