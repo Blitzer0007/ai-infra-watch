@@ -143,7 +143,32 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
         </div>
       )}
 
-      {tab === 'events' && selectedAnalysis && <EventImpactExplorer symbol={selectedAnalysis.symbol} />}
+      {tab === 'events' && selectedAnalysis && (
+        <div className="space-y-3">
+          <Panel title="Event study universe" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
+            <div className="flex flex-wrap gap-2">
+              {analyses.map((position) => (
+                <button
+                  key={position.symbol}
+                  onClick={() => setSelected(position.symbol)}
+                  className={
+                    'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
+                    (selected === position.symbol
+                      ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
+                      : 'bg-white/[.02] border-white/10 text-white/45 hover:text-white hover:bg-white/[.04]')
+                  }
+                >
+                  {position.symbol}
+                </button>
+              ))}
+            </div>
+            <div className="text-[10px] text-white/30 mt-3">
+              {analyses.length} portfolio holdings supported · select a ticker to load its recent SEC events and historical price reactions.
+            </div>
+          </Panel>
+          <EventImpactExplorer symbol={selectedAnalysis.symbol} />
+        </div>
+      )}
 
       {tab === 'network' && <Panel title="Relationship graph" subtitle="Competition and second-order exposure — click a node">
         <svg viewBox="0 0 920 420" className="w-full rounded-xl bg-[#0D1015] border border-white/5">
