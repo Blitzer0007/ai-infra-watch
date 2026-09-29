@@ -130,7 +130,7 @@ export default function AutonomousResearch() {
 
   return (
     <div className="space-y-6" id="autonomous-research-view">
-      <div className="flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-xs font-mono uppercase tracking-widest text-white/40">Agentic Research</span>
         <div className="flex items-center gap-3">
           <Bot className="w-7 h-7 text-emerald-400" />
