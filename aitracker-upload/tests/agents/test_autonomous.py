@@ -398,6 +398,14 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
 
 
+def test_recent_developments_affect_question_uses_evidence_gate():
+    from app.agents.autonomous import _needs_evidence_gate
+
+    assert _needs_evidence_gate(
+        "What recent developments could affect NVIDIA's stock price? Check news, SEC/filings, and historical market data."
+    )
+
+
 def test_duplicate_planner_call_redirects_to_complementary_evidence():
     tb, _ = _gate_toolbox()
     gate = _GateJev([("stop", 3.0)])
