@@ -194,7 +194,7 @@ export default function UnifiedEventTimeline({
     const contractEvents: TimelineEvent[] = (contracts || [])
       .filter(item => String(item?.company || '').toUpperCase() === ticker)
       .map(item => ({
-        id: 'contract-' + String(item?.id || item?.dateSigned || Math.random()),
+        id: 'contract-' + String(item?.id || item?.dateSigned || item?.client || item?.details),
         kind: 'Contract',
         date: String(item?.dateSigned || item?.date || ''),
         title: String(item?.client || 'Contract disclosure'),
