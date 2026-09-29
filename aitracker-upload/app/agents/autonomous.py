@@ -812,39 +812,53 @@ class AutonomousMCPAgent:
                     if additional is not None:
                         plan = additional
                         action = "tool"
-                        steps.append(Step(node="plan", kind="node", note="Jev evidence gate forced additional source"))
+                        steps.append(
+                            Step(
+                                node="plan",
+                                kind="node",
+                                note="Jev evidence gate forced additional source",
+                            )
+                        )
                     else:
-                        return self._finalize(question, calls, steps, resolution="jev_evidence_gate_unsatisfied")
-                else:
+                        return self._finalize(
+                            question,
+                            calls,
+                            steps,
+                            resolution="jev_evidence_gate_unsatisfied",
+                        )
+
+                if action == "final":
                     forced = _driver_research_plan(question, tools, calls)
-                if forced is not None:
-                    forced_action = str(forced.get("action", "")).strip().lower()
-                    if forced_action == "final":
-                        # Driver research is complete. The forced planner uses
-                        # an empty final action only as a bounded stop signal;
-                        # never convert it into a tool call with an empty name.
-                        steps.append(Step(
-                            node="finalize",
-                            kind="node",
-                            note="forced driver evidence complete",
-                        ))
-                        return self._finalize(question, calls, steps)
-                    plan = forced
-                    action = "tool"
-                    steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
-                else:
-                    # Respect an explicit planner answer. If the deterministic
-                    # fallback emits an empty final action after successful calls,
-                    # synthesize the retrieved evidence instead.
-                    answer = str(plan.get("answer", "")).strip()
-                    placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
-                    if any(c.ok for c in calls) and answer == placeholder:
-                        return self._finalize(question, calls, steps)
-                    if answer:
-                        steps.append(Step(node="finalize", kind="node", note="planner settled"))
-                        return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
-                    if any(c.ok for c in calls):
-                        return self._finalize(question, calls, steps)
+                    if forced is not None:
+                        forced_action = str(forced.get("action", "")).strip().lower()
+                        if forced_action == "final":
+                            # Driver research is complete. The forced planner uses
+                            # an empty final action only as a bounded stop signal;
+                            # never convert it into a tool call with an empty name.
+                            steps.append(
+                                Step(
+                                    node="finalize",
+                                    kind="node",
+                                    note="forced driver evidence complete",
+                                )
+                            )
+                            return self._finalize(question, calls, steps)
+                        plan = forced
+                        action = "tool"
+                        steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
+                    else:
+                        # Respect an explicit planner answer. If the deterministic
+                        # fallback emits an empty final action after successful calls,
+                        # synthesize the retrieved evidence instead.
+                        answer = str(plan.get("answer", "")).strip()
+                        placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
+                        if any(c.ok for c in calls) and answer == placeholder:
+                            return self._finalize(question, calls, steps)
+                        if answer:
+                            steps.append(Step(node="finalize", kind="node", note="planner settled"))
+                            return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
+                        if any(c.ok for c in calls):
+                            return self._finalize(question, calls, steps)
             tool_name = str(plan.get("tool", "")).strip()
             tool = by_name.get(tool_name)
             if tool is None:
