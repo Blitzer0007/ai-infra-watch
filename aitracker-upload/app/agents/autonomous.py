@@ -990,14 +990,51 @@ class AutonomousMCPAgent:
                 c.ok and c.tool == tool_name and c.arguments == arguments
                 for c in calls
             ):
-                steps.append(
-                    Step(
-                        node="plan",
-                        kind="node",
-                        note="duplicate successful tool call skipped",
+                # A planner may repeat a successful call after the evidence
+                # gate has not been satisfied. For evidence-enabled research,
+                # do not finalize just because the planner repeated itself;
+                # first try an unused complementary evidence family.
+                if evidence_enabled:
+                    additional = _next_evidence_plan(question, tools, calls)
+                    if additional is not None:
+                        plan = additional
+                        tool_name = str(plan.get("tool", "")).strip()
+                        tool = by_name.get(tool_name)
+                        arguments = plan.get("arguments") or {}
+                        if not isinstance(arguments, dict):
+                            arguments = {}
+                        symbols = extract_symbols(question)
+                        props = (tool.input_schema or {}).get("properties") or {} if tool else {}
+                        if tool is not None:
+                            if "symbol" in props and "symbol" not in arguments and symbols:
+                                arguments["symbol"] = symbols[0]
+                            if "symbols" in props and "symbols" not in arguments and symbols:
+                                arguments["symbols"] = symbols
+                        steps.append(
+                            Step(
+                                node="plan",
+                                kind="node",
+                                note="duplicate successful tool redirected to complementary evidence source",
+                            )
+                        )
+                    else:
+                        steps.append(
+                            Step(
+                                node="plan",
+                                kind="node",
+                                note="duplicate successful tool skipped; no complementary evidence source available",
+                            )
+                        )
+                        return self._finalize(question, calls, steps)
+                else:
+                    steps.append(
+                        Step(
+                            node="plan",
+                            kind="node",
+                            note="duplicate successful tool skipped",
+                        )
                     )
-                )
-                return self._finalize(question, calls, steps)
+                    return self._finalize(question, calls, steps)
 
             validation_error = _validate_arguments(tool, arguments)
             if validation_error:
