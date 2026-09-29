@@ -1,103 +1,67 @@
-"""Agent layer — LangGraph specialists over the existing synthesis/RAG infra.
+"""Agent layer public exports.
 
-Each agent is a hand-built `StateGraph` (not a ReAct loop) so that every LLM
-call maps to a committed stub fixture by exact prompt hash — the suite stays
-hermetic and deterministic. Every graph carries a trajectory (`steps`) that
-records the path it took, so tests assert *how* the agent reached its answer,
-not just the answer. Both agents return pydantic result models ready for MCP
-exposure and a later supervisor.
+Keep package import lightweight so the Vercel autonomous MCP entrypoint does not
+eagerly import the optional LangGraph specialist stack. Public names remain
+available through lazy module loading.
 """
 from __future__ import annotations
 
-from app.agents.filings import FilingsAgent, build_filings_graph
-from app.agents.handoff import (
-    AgentNode,
-    HandoffRequest,
-    SwarmCoordinator,
-    build_research_data_swarm,
-)
-from app.agents.ingest import IngestAgent, build_ingest_graph
-from app.agents.market import MarketAgent, build_market_graph
-from app.agents.qa import (
-    BrowserDriver,
-    QAAgent,
-    build_qa_graph,
-    explore_policy,
-)
-from app.agents.rotation import RotationAgent, build_rotation_graph, default_narrator
-from app.agents.router import (
-    ToolRouterAgent,
-    build_router_graph,
-    keyword_router,
-)
-from app.agents.schemas import (
-    BugReport,
-    FilingsAgentResult,
-    HandoffHop,
-    HandoffResult,
-    IngestAgentResult,
-    MarketAgentResult,
-    QAAction,
-    QAAgentResult,
-    QAObservation,
-    RotationAgentResult,
-    RotationSignal,
-    RouterAgentResult,
-    SupervisorResult,
-    ToolCallRecord,
-    ToolPlan,
-)
-from app.agents.supervisor import (
-    SupervisorAgent,
-    build_supervisor_graph,
-    classify_question,
-    default_combine,
-)
-from app.agents.trajectory import AgentTrajectory, Step, llm_call, tool_call, traced_node
+from importlib import import_module
+from typing import Any
 
-__all__ = [
-    "MarketAgent",
-    "FilingsAgent",
-    "SupervisorAgent",
-    "IngestAgent",
-    "RotationAgent",
-    "ToolRouterAgent",
-    "SwarmCoordinator",
-    "QAAgent",
-    "BrowserDriver",
-    "explore_policy",
-    "AgentNode",
-    "HandoffRequest",
-    "build_research_data_swarm",
-    "build_market_graph",
-    "build_filings_graph",
-    "build_supervisor_graph",
-    "build_ingest_graph",
-    "build_rotation_graph",
-    "build_router_graph",
-    "build_qa_graph",
-    "keyword_router",
-    "classify_question",
-    "default_combine",
-    "default_narrator",
-    "MarketAgentResult",
-    "FilingsAgentResult",
-    "SupervisorResult",
-    "IngestAgentResult",
-    "RotationAgentResult",
-    "RotationSignal",
-    "RouterAgentResult",
-    "QAAgentResult",
-    "QAObservation",
-    "QAAction",
-    "BugReport",
-    "HandoffHop",
-    "HandoffResult",
-    "ToolPlan",
-    "ToolCallRecord",
-    "AgentTrajectory",
-    "Step",
-    "tool_call",
-    "llm_call",
-    "traced_node",
-]
+_EXPORTS = {
+    "MarketAgent": ("app.agents.market", "MarketAgent"),
+    "build_market_graph": ("app.agents.market", "build_market_graph"),
+    "FilingsAgent": ("app.agents.filings", "FilingsAgent"),
+    "build_filings_graph": ("app.agents.filings", "build_filings_graph"),
+    "SupervisorAgent": ("app.agents.supervisor", "SupervisorAgent"),
+    "build_supervisor_graph": ("app.agents.supervisor", "build_supervisor_graph"),
+    "IngestAgent": ("app.agents.ingest", "IngestAgent"),
+    "build_ingest_graph": ("app.agents.ingest", "build_ingest_graph"),
+    "RotationAgent": ("app.agents.rotation", "RotationAgent"),
+    "build_rotation_graph": ("app.agents.rotation", "build_rotation_graph"),
+    "default_narrator": ("app.agents.rotation", "default_narrator"),
+    "ToolRouterAgent": ("app.agents.router", "ToolRouterAgent"),
+    "build_router_graph": ("app.agents.router", "build_router_graph"),
+    "keyword_router": ("app.agents.router", "keyword_router"),
+    "QAAgent": ("app.agents.qa", "QAAgent"),
+    "BrowserDriver": ("app.agents.qa", "BrowserDriver"),
+    "explore_policy": ("app.agents.qa", "explore_policy"),
+    "AgentNode": ("app.agents.handoff", "AgentNode"),
+    "HandoffRequest": ("app.agents.handoff", "HandoffRequest"),
+    "SwarmCoordinator": ("app.agents.handoff", "SwarmCoordinator"),
+    "build_research_data_swarm": ("app.agents.handoff", "build_research_data_swarm"),
+    "classify_question": ("app.agents.supervisor", "classify_question"),
+    "default_combine": ("app.agents.supervisor", "default_combine"),
+    "BugReport": ("app.agents.schemas", "BugReport"),
+    "FilingsAgentResult": ("app.agents.schemas", "FilingsAgentResult"),
+    "HandoffHop": ("app.agents.schemas", "HandoffHop"),
+    "HandoffResult": ("app.agents.schemas", "HandoffResult"),
+    "IngestAgentResult": ("app.agents.schemas", "IngestAgentResult"),
+    "MarketAgentResult": ("app.agents.schemas", "MarketAgentResult"),
+    "QAAction": ("app.agents.schemas", "QAAction"),
+    "QAAgentResult": ("app.agents.schemas", "QAAgentResult"),
+    "QAObservation": ("app.agents.schemas", "QAObservation"),
+    "RotationAgentResult": ("app.agents.schemas", "RotationAgentResult"),
+    "RotationSignal": ("app.agents.schemas", "RotationSignal"),
+    "RouterAgentResult": ("app.agents.schemas", "RouterAgentResult"),
+    "SupervisorResult": ("app.agents.schemas", "SupervisorResult"),
+    "ToolCallRecord": ("app.agents.schemas", "ToolCallRecord"),
+    "ToolPlan": ("app.agents.schemas", "ToolPlan"),
+    "AgentTrajectory": ("app.agents.trajectory", "AgentTrajectory"),
+    "Step": ("app.agents.trajectory", "Step"),
+    "tool_call": ("app.agents.trajectory", "tool_call"),
+    "llm_call": ("app.agents.trajectory", "llm_call"),
+    "traced_node": ("app.agents.trajectory", "traced_node"),
+}
+
+__all__ = list(_EXPORTS)
+
+def __getattr__(name: str) -> Any:
+    target = _EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute = target
+    value = getattr(import_module(module_name), attribute)
+    globals()[name] = value
+    return value
