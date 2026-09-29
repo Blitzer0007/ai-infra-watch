@@ -194,7 +194,6 @@ class LLMClient:
     ) -> tuple[str, dict[str, int]]:
         headers = {"content-type": "application/json"}
         effective_model = model or self.model
-        effective_model = model or self.model
         if self.provider == "anthropic":
             url = f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages"
             headers["x-api-key"] = self.api_key
