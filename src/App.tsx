@@ -74,6 +74,7 @@ export default function App() {
     congressTrades?: any[];
     news?: any[];
     macroRisks?: any[];
+    politicalSignals?: any[];
     marketSentiment?: string;
     build?: { commit?: string | null; environment?: string };
     timestamp?: number;
@@ -546,7 +547,7 @@ export default function App() {
               {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} />}
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
-              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} />}
+              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
               {activeView === 'research' && <AutonomousResearch />}
