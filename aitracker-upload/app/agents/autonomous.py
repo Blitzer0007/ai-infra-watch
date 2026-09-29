@@ -345,7 +345,7 @@ def _needs_evidence_gate(question: str) -> bool:
     return any(term in lower for term in terms)
 
 
-def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: JevClient) -> str:
+def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: JevClient) -> tuple[str, dict[str, Any]]:
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
     state = {
