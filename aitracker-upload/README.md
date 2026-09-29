@@ -92,3 +92,13 @@ JEV_ROUTE_THRESHOLD=0.75
 ```
 
 The key stays server-side. When Jev is unavailable or below the confidence threshold, the existing planner/fallback path continues automatically.
+
+
+### Jev platform decision layer
+
+The platform uses the server-side Jev client for typed decisions across
+autonomous research plus on-demand reviews for contracts, event studies, macro
+risk, Congress disclosures, earnings, and portfolio signals. Each module sends
+a compact evidence state and receives structured Choice/Score answers; Jev never
+generates user-facing prose. Reviews are on demand so one page visit does not
+consume credits automatically.
