@@ -602,14 +602,21 @@ class AutonomousMCPAgent:
                 steps.append(tool_call(tool_name or "unknown", ok=False, note=error))
                 return AutonomousResult(question, "", calls, discovered, AgentTrajectory(steps=steps), error=error, resolution="error")
 
+            arguments = plan.get("arguments") or {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            symbols = extract_symbols(question)
+            props = (tool.input_schema or {}).get("properties") or {}
+            if "symbol" in props and "symbol" not in arguments and symbols:
+                arguments["symbol"] = symbols[0]
+            if "symbols" in props and "symbols" not in arguments and symbols:
+                arguments["symbols"] = symbols
+
             # Do not burn the bounded step budget repeating an already
             # successful identical call. Jev is cached above, and this guard
             # protects the fallback/LLM planner when it proposes the same call.
-            candidate_arguments = plan.get("arguments") or {}
-            if not isinstance(candidate_arguments, dict):
-                candidate_arguments = {}
             if any(
-                c.ok and c.tool == tool_name and c.arguments == candidate_arguments
+                c.ok and c.tool == tool_name and c.arguments == arguments
                 for c in calls
             ):
                 steps.append(
@@ -620,16 +627,6 @@ class AutonomousMCPAgent:
                     )
                 )
                 return self._finalize(question, calls, steps)
-
-            arguments = plan.get("arguments") or {}
-            if not isinstance(arguments, dict):
-                arguments = {}
-            symbols = extract_symbols(question)
-            props = (tool.input_schema or {}).get("properties") or {}
-            if "symbol" in props and "symbol" not in arguments and symbols:
-                arguments["symbol"] = symbols[0]
-            if "symbols" in props and "symbols" not in arguments and symbols:
-                arguments["symbols"] = symbols
 
             validation_error = _validate_arguments(tool, arguments)
             if validation_error:
