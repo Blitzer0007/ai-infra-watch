@@ -64,6 +64,21 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
         </p>
       </div>
 
+      <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl border ${verdict.color}`}>
+        <div>
+          <span className="text-[9px] uppercase tracking-[0.2em] opacity-60 font-mono font-black block">Calculated System Stress Score</span>
+          <div className="flex items-baseline gap-3 mt-1">
+            <span className="text-5xl font-black font-mono">{threatScore} / 100</span>
+            <span className="text-[11px] font-black tracking-widest uppercase">{verdict.label}</span>
+          </div>
+          <p className="text-[9px] text-white/40 font-mono mt-2">50% TSMC disruption + 25% power grid + 25% export controls. Values are scenario inputs, not forecasts.</p>
+        </div>
+        <div className="flex items-start gap-2 max-w-md text-[10px] text-white/40 leading-normal">
+          <AlertCircle className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
+          <span>Adjust the scenario sliders below to recalculate the score.</span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
         <div className="lg:col-span-2 space-y-4">
@@ -176,18 +191,7 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
             </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-white/10">
-            <div className={`p-4 rounded border text-center font-mono space-y-1 ${verdict.color}`}>
-              <span className="text-[9px] uppercase tracking-widest opacity-60 font-black block">Calculated Stress Score</span>
-              <div className="text-4xl font-black">{threatScore} / 100</div>
-              <span className="text-[10px] font-black tracking-widest block mt-1">{verdict.label}</span>
-            </div>
 
-            <div className="flex items-start space-x-2 text-[10px] text-white/40 leading-normal">
-              <AlertCircle className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
-              <span>Stress formulas weigh component constraints at 50% and regional utilities/export controls at 25% each.</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
