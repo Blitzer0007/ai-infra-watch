@@ -152,7 +152,9 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         <div className="rounded-xl border border-white/5 bg-white/[.02] p-4 text-xs text-white/35">No combined signals are available from the current refresh.</div>
       ) : (
         <div className="space-y-2">
-          {signals.map((signal, index) => (
+          {signals.map((signal, index) => {
+            const evidence = evidenceProfile(signal.kind, signal.source);
+            return (
             <div key={signal.kind + signal.title + index} className="rounded-xl border border-white/5 bg-white/[.02] p-3">
               <div className="flex flex-col lg:flex-row gap-3">
                 <div className={'inline-flex shrink-0 w-fit h-fit items-center gap-1 rounded border px-2 py-1 text-[8px] font-mono font-black uppercase ' + badge(signal.kind)}>
@@ -183,7 +185,8 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
