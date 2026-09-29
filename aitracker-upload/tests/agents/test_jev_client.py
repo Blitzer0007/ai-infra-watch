@@ -79,7 +79,8 @@ def test_jev_client_evaluate_parses_choice_and_score(tmp_path, monkeypatch):
 
 
 def test_assess_returns_disabled_error_without_key(monkeypatch):
-    monkeypatch.setattr("app.jev.assess.settings.JEV_ENABLED", True)
+    import app.jev.assess as assess_module
+    monkeypatch.setattr(assess_module.settings, "JEV_ENABLED", True)
     evaluation = assess("platform", {"x": 1}, JevClient(api_key=""))
     assert not evaluation.usable
     assert "not configured" in evaluation.error
