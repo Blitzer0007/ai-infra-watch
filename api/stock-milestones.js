@@ -19,6 +19,18 @@ const ITEM_TITLES = {
   '8.01': 'Other Events'
 };
 
+function categoryFor(items, title = '') {
+  const set = new Set(items);
+  const text = title.toLowerCase();
+
+  if (set.has('2.02') || set.has('4.02') || text.includes('financial')) return 'Earnings / Financial';
+  if (set.has('1.01') || set.has('1.02') || set.has('2.03')) return 'Contracts / Commercial';
+  if (set.has('5.01') || set.has('5.02') || set.has('5.03')) return 'Management / Corporate';
+  if (set.has('3.01') || set.has('3.02') || set.has('3.03') || set.has('7.01')) return 'Regulatory / Disclosure';
+  if (set.has('2.01') || set.has('2.05')) return 'Strategic / Asset';
+  return 'Other';
+}
+
 function cleanSymbol(value) {
   return String(value || '').trim().toUpperCase();
 }
@@ -101,11 +113,14 @@ export default async function handler(req, res) {
       const url = 'https://www.sec.gov/Archives/edgar/data/' +
         Number(cik) + '/' + accessionPath + '/' + primaryDocument;
 
+      const eventTitle = titleFor(selectedItems);
       events.push({
         id: 'sec-milestone-' + accession,
         stockSymbol: symbol,
         date: filedDate,
-        title: titleFor(selectedItems),
+        title: eventTitle,
+        category: categoryFor(selectedItems, eventTitle),
+        items: selectedItems,
         description: selectedItems.length
           ? 'SEC 8-K disclosure · Items ' + selectedItems.join(', ') + ' · Accession ' + accession
           : 'SEC 8-K filing · Accession ' + accession,
