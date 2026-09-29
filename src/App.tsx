@@ -249,7 +249,7 @@ export default function App() {
       {/* 2. BODY LAYOUT */}
       <div className="flex flex-1 relative">
         {/* DESKTOP SIDEBAR */}
-        <aside className="hidden lg:flex flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 flex-shrink-0 min-h-[calc(100vh-2rem)] sticky top-8">
+        <aside className="hidden lg:flex fixed top-8 bottom-0 left-0 z-40 flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 overflow-y-auto">
           {/* Brand header */}
           <div className="space-y-1 border-b border-white/10 pb-4">
             <div className="flex items-center space-x-2 text-white">
@@ -386,7 +386,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* 3. MAIN DASHBOARD MAINSPACE CONTAINER */}
-        <main className="flex-1 bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)]">
+        <main className="flex-1 bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)] lg:ml-64">
           {/* Universal Live AI Sync Controller Panel */}
           <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#15181E]/40 border border-white/10 rounded-2xl p-4 gap-4">
             <div className="flex items-center space-x-3">
