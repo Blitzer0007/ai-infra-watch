@@ -187,3 +187,56 @@ def test_autonomous_cross_source_research_uses_contract_earnings_rotation():
     }
     assert stocks.calls
     assert filings.calls
+
+class _FakeJev:
+    enabled = True
+
+    def choose(self, **kwargs):
+        from app.jev.client import JevDecision
+        return JevDecision(
+            choice="earnings",
+            confidence=0.96,
+            probabilities={"earnings": 0.96, "market": 0.02, "news": 0.02},
+            model="jev-test",
+            latency_ms=4.2,
+        )
+
+
+def test_autonomous_jev_high_confidence_routes_to_earnings_tool():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_earnings",
+                description="Get past and upcoming earnings for one symbol.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_quote",
+                description="Get a real-time stock quote.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+        ],
+        call_returns={
+            "get_earnings": {"symbol": "NVDA", "events": [{"date": "2026-09-30"}]},
+            "get_quote": {"symbol": "NVDA", "price": 200.0},
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks")], _factory({"stocks": session}))
+    tb.connect()
+    try:
+        agent = AutonomousMCPAgent(tb, client=LLMClient(provider="stub", model="stub"), jev=_FakeJev(), max_steps=1)
+        result = agent.run("What is the next NVDA earnings report?")
+    finally:
+        tb.close()
+
+    assert result.calls[0].tool == "stocks.get_earnings"
+    assert result.calls[0].arguments == {"symbol": "NVDA"}
+    assert result.jev["choice"] == "earnings"
+    assert result.jev["confidence"] == 0.96
+
