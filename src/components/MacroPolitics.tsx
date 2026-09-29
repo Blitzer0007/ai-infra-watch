@@ -187,6 +187,7 @@ function PortfolioScenarioSensitivity({
 
   const portfolioSensitivity = portfolioRows.reduce((sum, row) => sum + row.weightedContribution, 0);
 
+  return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
         <div>
@@ -258,8 +259,6 @@ function EvidenceExposurePill({ level, basis }: { level: ExposureLevel; basis: s
 
 function PortfolioExposureMatrix({ evidence = {} }: { evidence?: EvidenceInput }) {
   const derivedExposure = derivePortfolioExposure(evidence);
-  return (
-
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
