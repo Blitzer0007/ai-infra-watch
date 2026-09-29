@@ -393,4 +393,60 @@ def test_jev_strong_evidence_can_stop_before_step_bound():
     assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 2
 
+
+def test_jev_repeated_gather_more_ends_as_insufficient():
+    tb, _ = _gate_toolbox()
+    gate = _GateJev([("gather_more", 0.5), ("gather_more", 1.0), ("gather_more", 1.0)])
+    plans = [
+        {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
+        {"action": "tool", "tool": "stocks.get_snapshot", "arguments": {}, "reason": "snapshot"},
+        {"action": "final", "answer": ""},
+    ]
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            planner=lambda q, tools, history: plans.pop(0),
+            jev=gate,
+            client=LLMClient(provider="stub", model="stub"),
+            max_steps=4,
+        )
+        result = agent.run("Analyze AMD today")
+    finally:
+        tb.close()
+
+    assert gate.calls == 1
+    assert result.jev["evidence_gate"]["action"] == "insufficient"
+    assert result.jev["evidence_gate"]["reason"].startswith("No unused complementary")
+    assert result.resolution == "jev_evidence_insufficient"
+
+
+def test_jev_gate_prefers_new_evidence_family():
+    tb, _ = _gate_toolbox()
+    gate = _GateJev([("gather_more", 0.5)])
+    try:
+        # Two successful market-family calls already exist. The next-source
+        # selector should choose news.search, not another market snapshot.
+        from app.agents.autonomous import _next_evidence_plan
+        from app.agents.schemas import ToolCallRecord
+        calls = [
+            ToolCallRecord(
+                tool="stocks.get_quote",
+                arguments={"symbol": "AMD"},
+                ok=True,
+                output={"symbol": "AMD", "price": 180.0},
+            ),
+            ToolCallRecord(
+                tool="stocks.get_snapshot",
+                arguments={},
+                ok=True,
+                output={"symbol": "AMD", "volume": 1000},
+            ),
+        ]
+        plan = _next_evidence_plan("Analyze AMD today and explain the drivers", tb.tools(), calls)
+    finally:
+        tb.close()
+
+    assert plan is not None
+    assert plan["tool"] == "news.search"
+
 # Finalizer model routing regression coverage.
