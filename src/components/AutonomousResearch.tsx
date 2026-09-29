@@ -28,6 +28,20 @@ type ResearchResponse = {
     latency_ms?: number;
     tool?: string;
     error?: string;
+    evidence_gate?: {
+      enabled?: boolean;
+      action?: string;
+      choice?: string;
+      choice_confidence?: number;
+      raw_score?: number | null;
+      evidence_quality?: number | null;
+      model?: string;
+      latency_ms?: number;
+      input_tokens?: number | null;
+      checked_after_successful_calls?: number;
+      fallback?: boolean;
+      error?: string;
+    };
   };
   error?: string | null;
   resolution?: string | null;
@@ -253,7 +267,24 @@ export default function AutonomousResearch() {
                 <span>Tool outputs below are the evidence sources used by the answer.</span>
                 {result.jev?.enabled && result.jev.choice && (
                   <span className="rounded border border-fuchsia-400/20 bg-fuchsia-400/5 px-1.5 py-0.5 text-fuchsia-300/80">
-                    Jev: {result.jev.choice} · {typeof result.jev.confidence === 'number' ? Math.round(result.jev.confidence * 100) + '%' : 'confidence n/a'}
+                    Jev route: {result.jev.choice} · {typeof result.jev.confidence === 'number' ? Math.round(result.jev.confidence * 100) + '%' : 'confidence n/a'}
+                  </span>
+                )}
+                {result.jev?.evidence_gate && (
+                  <span className={
+                    'rounded border px-1.5 py-0.5 ' +
+                    (
+                      result.jev.evidence_gate.action === 'stop'
+                        ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300/80'
+                        : result.jev.evidence_gate.action === 'gather_more'
+                          ? 'border-amber-400/20 bg-amber-400/5 text-amber-300/80'
+                          : 'border-fuchsia-400/20 bg-fuchsia-400/5 text-fuchsia-300/80'
+                    )
+                  }>
+                    Evidence gate: {result.jev.evidence_gate.action || 'continue'}
+                    {typeof result.jev.evidence_gate.evidence_quality === 'number'
+                      ? ' · ' + Math.round(result.jev.evidence_gate.evidence_quality) + '/100'
+                      : ''}
                   </span>
                 )}
               </div>
