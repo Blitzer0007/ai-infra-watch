@@ -1,0 +1,36 @@
+name: Earnings Alert Scheduler
+
+on:
+  schedule:
+    # 08:30 Asia/Kolkata every day.
+    - cron: '30 8 * * *'
+      timezone: "Asia/Kolkata"
+  workflow_dispatch:
+
+concurrency:
+  group: earnings-alert-scheduler
+  cancel-in-progress: false
+
+jobs:
+  check-earnings:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Run T-1 earnings alert check
+        env:
+          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AIW_CRON_SECRET" ]; then
+            echo "::error::Missing AIW_CRON_SECRET repository secret."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $AIW_CRON_SECRET" \
+            --header "User-Agent: ai-infra-watch-github-actions/1.0" \
+            "https://ai-infra-watch.vercel.app/api/earnings-alerts?days=14&notify=1"
+
+      - name: Record completion
+        run: echo "Earnings alert check completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
