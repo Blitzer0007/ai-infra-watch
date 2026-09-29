@@ -140,7 +140,7 @@ AI_INFRA_AGENT_TOKEN=...
 
 ## 8. Scheduled earnings alerts
 
-The Vercel cron route `/api/earnings-alerts` needs the server-side Finnhub key and a delivery webhook:
+The GitHub Actions scheduler calls `/api/earnings-alerts` daily at 08:30 IST. The Vercel route needs the server-side Finnhub key and a delivery webhook:
 
 ```text
 FINNHUB_API_KEY=...
@@ -149,5 +149,5 @@ CRON_SECRET=...
 EARNINGS_ALERT_LEAD_DAYS=1
 ```
 
-`EARNINGS_ALERT_LEAD_DAYS=1` sends the alert one day before the scheduled report. Increase it up to 7 for an earlier warning. The browser-stored Finnhub token in React Settings is not used by the server cron.
+`EARNINGS_ALERT_LEAD_DAYS=1` sends the alert one day before the scheduled report. Increase it up to 7 for an earlier warning. Also store matching `CRON_SECRET` in Vercel and `AIW_CRON_SECRET` in GitHub Actions secrets. The browser-stored Finnhub token in React Settings is not used by the scheduled job.
 
