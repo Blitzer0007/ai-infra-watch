@@ -18,6 +18,7 @@ import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
 import AutonomousResearch from './components/AutonomousResearch';
+import EarningsAlerts from './components/EarningsAlerts';
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
@@ -430,6 +431,8 @@ export default function App() {
             </div>
           </div>
 
+          <EarningsAlerts />
+
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView}
@@ -455,8 +458,7 @@ export default function App() {
           {/* App Footer */}
           <footer className="max-w-7xl mx-auto border-t border-white/10 mt-12 pt-6 pb-4 text-[10px] font-mono text-white/40 leading-normal space-y-1">
             <p>
-              Data, where live, originates from Finnhub's free tier services using customer authorization tokens. 
-              All parameters are loaded locally within the browser; no customer details are transferred.
+              Browser-side quote customization uses locally stored Finnhub authorization tokens. Server-side earnings alerts use Vercel environment credentials when configured; no customer details are transferred.
             </p>
             <p>
               This app tracks execution and deployment targets; it does not provide active capital strategy advice.
