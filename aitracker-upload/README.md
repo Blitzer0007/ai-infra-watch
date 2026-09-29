@@ -86,7 +86,7 @@ Production environment:
 ```text
 JEV_ENABLED=true
 TYPESAFE_API_KEY=...
-JEV_MODEL=jev-latest
+JEV_MODEL=jev-1.13.0
 JEV_TIMEOUT_SEC=3
 JEV_ROUTE_THRESHOLD=0.75
 ```
