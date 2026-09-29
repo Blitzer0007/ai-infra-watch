@@ -213,7 +213,7 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
     reaction and material disclosures.
     """
     lower = question.lower()
-    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed")
+    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed", "recent developments", "could affect", "affect", "stock price")
     if not any(term in lower for term in terms):
         return None
     symbols = [s.upper() for s in extract_symbols(question)]
@@ -247,7 +247,7 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
     # about earnings/reactions. On serverless deployments, running one event
     # study per ticker can consume the whole step budget before filings/news
     # are retrieved, which was a major source of slow or incomplete answers.
-    event_terms = ("earnings", "earning", "event study", "price reaction", "reaction", "reacted")
+    event_terms = ("earnings", "earning", "event study", "price reaction", "reaction", "reacted", "historical market data", "historical price data", "price history", "historical stock price")
     needs_event_study = any(term in lower for term in event_terms)
     if needs_event_study:
         event_tools = [
@@ -451,7 +451,7 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
     priorities: list[str] = []
     if any(term in lower for term in ("earnings", "earning", "eps", "revenue surprise")):
         priorities.extend(["earnings", "event_study"])
-    if any(term in lower for term in ("reaction", "event study", "reacted", "price moved", "price movement")):
+    if any(term in lower for term in ("reaction", "event study", "reacted", "price moved", "price movement", "historical market data", "historical price data", "price history", "historical stock price")):
         priorities.append("event_study")
     if any(term in lower for term in ("sec", "filing", "contract", "disclosure", "material agreement")):
         priorities.append("sec")
