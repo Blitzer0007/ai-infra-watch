@@ -261,3 +261,5 @@ def test_autonomous_jev_is_recorded_for_forced_driver_research():
 
     assert result.jev["choice"] == "earnings"
     assert result.jev["action"] == "forced_driver_plan"
+
+# Finalizer model routing regression coverage.
