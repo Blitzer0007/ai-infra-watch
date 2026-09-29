@@ -124,6 +124,39 @@ export default function ContractPortfolioImpact({ contract }: Props) {
     };
   }, [contract]);
 
+  const [scale, setScale] = useState<CompanyScale | null>(null);
+  const [scaleLoading, setScaleLoading] = useState(false);
+  const [scaleError, setScaleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setScale(null);
+    setScaleError(null);
+  }, [contract.company]);
+
+  async function loadScale() {
+    if (scaleLoading || scale) return;
+    setScaleLoading(true);
+    setScaleError(null);
+    try {
+      const response = await fetch('/api/company-scale?symbol=' + encodeURIComponent(contract.company), { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || 'SEC company scale lookup failed.');
+      setScale(payload);
+    } catch (error) {
+      setScaleError(error instanceof Error ? error.message : 'SEC company scale lookup failed.');
+    } finally {
+      setScaleLoading(false);
+    }
+  }
+
+  const latestRevenue = scale?.revenue?.value ?? null;
+  const annualizedToRevenue = analysis.annualized != null && latestRevenue
+    ? (analysis.annualized / latestRevenue) * 100
+    : null;
+  const contractValueToRevenue = analysis.amount != null && latestRevenue
+    ? (analysis.amount / latestRevenue) * 100
+    : null;
+
   return (
     <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[0.03] p-4 space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
