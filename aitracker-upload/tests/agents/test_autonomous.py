@@ -414,7 +414,7 @@ def test_jev_repeated_gather_more_ends_as_insufficient():
     finally:
         tb.close()
 
-    assert gate.calls == 1
+    assert gate.calls == 3
     assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert result.jev["evidence_gate"]["reason"].startswith("No unused complementary")
     assert result.resolution == "jev_evidence_insufficient"
