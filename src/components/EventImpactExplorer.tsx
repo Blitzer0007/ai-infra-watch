@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, ShieldAlert } from 'lucide-react';
+import JevDecisionPanel from './JevDecisionPanel';
 
 type HistoryPoint = { date: string; price: number };
 
@@ -237,6 +238,26 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       title={'Historical event impact · ' + symbol}
       subtitle="SEC filing chronology linked to verified price history; SPY is used as market context, not causal proof."
     >
+      <JevDecisionPanel
+        kind="events"
+        title={'Event-study evidence review · ' + symbol}
+        state={{
+          symbol,
+          events_returned: events.length,
+          reactions_matched: summary.events,
+          average_next_day_reaction_pct: summary.avgT1,
+          average_next_day_vs_spy_pct_points: summary.avgRelativeT1,
+          categories: categories.slice(0, 8),
+          recent_events: events.slice(0, 8).map((event) => ({
+            date: event.date,
+            title: event.title,
+            category: event.category,
+            source: event.source,
+            accession: event.accession,
+          })),
+        }}
+      />
+
       <div className="mb-4 rounded-xl border border-white/5 bg-white/[.02] p-3">
         <div className="text-[9px] uppercase tracking-widest font-mono text-white/30 mb-2">Historical reaction by event type</div>
         <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-5 gap-2">
