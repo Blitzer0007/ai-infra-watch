@@ -198,7 +198,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
             {analysis.issuerDirect && analysis.counterpartyHeld
               ? contract.company + ' and ' + analysis.counterparty + ' are both portfolio holdings, so the agreement is relevant to both sides of the tracked relationship.'
               : analysis.issuerDirect
-                ? contract.company + ' is a direct holding; the contract is mapped first to the issuer's business exposure.'
+                ? contract.company + ' is a direct holding; the contract is mapped first to the issuer\'s business exposure.'
                 : analysis.counterpartyHeld
                   ? analysis.counterparty + ' is a tracked counterparty; the issuer itself is outside the held portfolio.'
                   : 'No direct holding or mapped portfolio counterparty was identified from the contract record.'}
