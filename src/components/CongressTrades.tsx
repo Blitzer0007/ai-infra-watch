@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
+import { Search, AlertTriangle, Loader2, ExternalLink, Activity } from 'lucide-react';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
 
@@ -7,14 +7,91 @@ interface CongressTradesProps {
   liveTrades?: CongressTrade[];
 }
 
+type HistoryPoint = {
+  date: string;
+  price: number;
+};
+
+type TradeReaction = {
+  eventDate: string;
+  eventPrice: number;
+  nextDate: string | null;
+  nextPrice: number | null;
+  day5: number | null;
+  day20: number | null;
+  nextPct: number | null;
+  day5Pct: number | null;
+  day20Pct: number | null;
+};
+
 const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
+const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
+
+function loadHistory(symbol: string): Promise<HistoryPoint[]> {
+  const key = symbol.trim().toUpperCase();
+  if (!historyCache[key]) {
+    historyCache[key] = fetch('/api/stock-history?symbol=' + encodeURIComponent(key) + '&range=5y')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('History HTTP ' + res.status);
+        const data = await res.json();
+        return Array.isArray(data?.points) ? data.points : [];
+      })
+      .catch(() => []);
+  }
+  return historyCache[key];
+}
+
+function pct(from: number | null, to: number | null): number | null {
+  if (from == null || to == null || !Number.isFinite(from) || !Number.isFinite(to) || from === 0) {
+    return null;
+  }
+  return ((to - from) / from) * 100;
+}
+
+function reactionFor(history: HistoryPoint[], tradeDate: string): TradeReaction | null {
+  if (!history.length || !tradeDate) return null;
+  const eventIndex = history.findIndex((point) => point.date >= tradeDate);
+  if (eventIndex < 0) return null;
+
+  const event = history[eventIndex];
+  const next = history[eventIndex + 1] || null;
+  const day5 = history[eventIndex + 5] || null;
+  const day20 = history[eventIndex + 20] || null;
+
+  return {
+    eventDate: event.date,
+    eventPrice: event.price,
+    nextDate: next?.date || null,
+    nextPrice: next?.price || null,
+    day5: day5?.price || null,
+    day20: day20?.price || null,
+    nextPct: pct(event.price, next?.price ?? null),
+    day5Pct: pct(event.price, day5?.price ?? null),
+    day20Pct: pct(event.price, day20?.price ?? null),
+  };
+}
+
+function formatPct(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+}
+
+function reactionTone(value: number | null) {
+  return value == null
+    ? 'text-white/30'
+    : value >= 0
+      ? 'text-emerald-400'
+      : 'text-rose-400';
+}
 
 export default function CongressTrades({ liveTrades }: CongressTradesProps) {
   const [search, setSearch] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
   const [symbolFilter, setSymbolFilter] = useState('NVDA');
   const [trades, setTrades] = useState<CongressTrade[]>([]);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,6 +128,26 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
     };
   }, [symbolFilter]);
 
+  useEffect(() => {
+    if (symbolFilter === 'ALL') {
+      setHistory([]);
+      return;
+    }
+
+    let cancelled = false;
+    setHistoryLoading(true);
+
+    loadHistory(symbolFilter).then((points) => {
+      if (!cancelled) setHistory(points);
+    }).finally(() => {
+      if (!cancelled) setHistoryLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [symbolFilter]);
+
   const sourceTrades = symbolFilter === 'ALL' && liveTrades?.length
     ? liveTrades
     : trades;
@@ -64,6 +161,37 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
       t.stockSymbol.toLowerCase().includes(needle);
     return matchesChamber && matchesSearch;
   }), [sourceTrades, chamberFilter, search]);
+
+  const reactions = useMemo(() => {
+    if (symbolFilter === 'ALL') return [];
+    return filtered
+      .map((trade) => ({
+        trade,
+        reaction: reactionFor(history, trade.transactionDate || trade.date),
+      }))
+      .filter((row) => row.reaction);
+  }, [filtered, history, symbolFilter]);
+
+  const reactionSummary = useMemo(() => {
+    const next = reactions.map((row) => row.reaction?.nextPct).filter((v): v is number => v != null);
+    const day5 = reactions.map((row) => row.reaction?.day5Pct).filter((v): v is number => v != null);
+    const day20 = reactions.map((row) => row.reaction?.day20Pct).filter((v): v is number => v != null);
+
+    return {
+      matched: reactions.length,
+      next: next.length ? next.reduce((a, b) => a + b, 0) / next.length : null,
+      day5: day5.length ? day5.reduce((a, b) => a + b, 0) / day5.length : null,
+      day20: day20.length ? day20.reduce((a, b) => a + b, 0) / day20.length : null,
+    };
+  }, [reactions]);
+
+  const reactionById = useMemo(() => {
+    const map = new Map<string, TradeReaction>();
+    reactions.forEach(({ trade, reaction }) => {
+      if (reaction) map.set(trade.id, reaction);
+    });
+    return map;
+  }, [reactions]);
 
   return (
     <div className="space-y-6" id="congress-view">
@@ -80,7 +208,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
       <div className="flex items-start space-x-3 bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 text-white/80">
         <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
         <div className="text-xs leading-relaxed">
-          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Treat the table as a disclosure record, not a real-time transaction feed.
+          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the transaction date, while the filing date remains the disclosure timestamp.
         </div>
       </div>
 
@@ -138,6 +266,31 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
         </div>
       </div>
 
+      {symbolFilter !== 'ALL' && (
+        <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-cyan-300" />
+            <div>
+              <div className="text-xs font-black text-white uppercase tracking-wider">Historical price context · {symbolFilter}</div>
+              <div className="text-[9px] text-white/30 font-mono mt-1">
+                Anchored to the transaction date; this shows what the market did afterward and does not establish that the trade caused the move.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <SummaryMetric label="Trades matched to history" value={String(reactionSummary.matched)} tone="text-white" />
+            <SummaryMetric label="Average next-day move" value={formatPct(reactionSummary.next)} tone={reactionTone(reactionSummary.next)} />
+            <SummaryMetric label="Average 5-day move" value={formatPct(reactionSummary.day5)} tone={reactionTone(reactionSummary.day5)} />
+            <SummaryMetric label="Average 20-day move" value={formatPct(reactionSummary.day20)} tone={reactionTone(reactionSummary.day20)} />
+          </div>
+
+          {historyLoading && (
+            <div className="text-[9px] font-mono text-white/30 mt-3">Loading 5-year market history…</div>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/40 font-mono">
         <span>Data source: Bargo U.S. Congress Stock Trades API.</span>
         <span>•</span>
@@ -157,61 +310,83 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
                 <th className="p-4">Amount Range</th>
                 <th className="p-4">Trade Date</th>
                 <th className="p-4">Filed</th>
-                <th className="p-4 text-right">Est. Price</th>
+                <th className="p-4">Trade-Day Close</th>
+                <th className="p-4 text-right">Afterward</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-white/40">
+                  <td colSpan={8} className="text-center py-12 text-white/40">
                     {loading ? 'Loading disclosure records…' : 'No transactions found for the selected filters.'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((t) => (
-                  <tr key={t.id} className="hover:bg-white/5 transition">
-                    <td className="p-4 font-sans font-bold text-white">
-                      <div>{t.politician}</div>
-                      <div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{t.chamber}</div>
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">
-                        {t.stockSymbol}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' +
-                        (t.transactionType === 'buy'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}
-                      >
-                        {t.transactionType}
-                      </span>
-                    </td>
-                    <td className="p-4 text-white/80 font-bold">{t.amountRange}</td>
-                    <td className="p-4 text-white/60 font-bold">{t.transactionDate || t.date || '—'}</td>
-                    <td className="p-4 text-white/40 font-bold">{t.filingDate || t.date || '—'}</td>
-                    <td className="p-4 text-right text-emerald-400 font-bold">
-                      {t.stockPrice > 0 ? '$' + formatPrice(t.stockPrice) : '—'}
-                      {t.filingPortal && (
-                        <a
-                          href={t.filingPortal}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-2 inline-flex text-cyan-300 hover:text-cyan-200"
-                          title="Open filing portal"
+                filtered.map((t) => {
+                  const reaction = reactionById.get(t.id);
+
+                  return (
+                    <tr key={t.id} className="hover:bg-white/5 transition">
+                      <td className="p-4 font-sans font-bold text-white">
+                        <div>{t.politician}</div>
+                        <div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{t.chamber}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">
+                          {t.stockSymbol}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' +
+                          (t.transactionType === 'buy'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}
                         >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                          {t.transactionType}
+                        </span>
+                      </td>
+                      <td className="p-4 text-white/80 font-bold">{t.amountRange}</td>
+                      <td className="p-4 text-white/60 font-bold">{t.transactionDate || t.date || '—'}</td>
+                      <td className="p-4 text-white/40 font-bold">{t.filingDate || t.date || '—'}</td>
+                      <td className="p-4 text-white font-bold">
+                        {reaction ? '$' + formatPrice(reaction.eventPrice) : '—'}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>
+                          Next day {formatPct(reaction?.nextPct ?? null)}
+                        </div>
+                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>
+                          5 days {formatPct(reaction?.day5Pct ?? null)}
+                        </div>
+                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>
+                          20 days {formatPct(reaction?.day20Pct ?? null)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-black/10 p-3">
+      <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div>
+      <div className={'text-base font-black mt-1 ' + tone}>{value}</div>
     </div>
   );
 }
