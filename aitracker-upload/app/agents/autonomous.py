@@ -22,6 +22,7 @@ from app.mcp_client import MCPToolbox, ToolInfo
 from app.mcp_client.client import MCPClientError
 from app.config import settings
 from app.jev.client import JevClient, JevDecision
+from app.jev.assess import assess
 
 
 @dataclass
@@ -321,6 +322,162 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
 
     return None
 
+
+def _needs_evidence_gate(question: str) -> bool:
+    """Return whether a question benefits from an explicit evidence sufficiency check."""
+    lower = question.lower()
+    terms = (
+        "why",
+        "what changed",
+        "drivers",
+        "driver",
+        "catalyst",
+        "catalysts",
+        "impact",
+        "affected",
+        "risk",
+        "analyze",
+        "analysis",
+        "compare",
+        "comparison",
+        "outlook",
+    )
+    return any(term in lower for term in terms)
+
+
+def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: JevClient) -> str:
+    """Run one batched Jev assessment and record the typed gate decision."""
+    successful = [call for call in calls if call.ok]
+    state = {
+        "question": question,
+        "successful_calls": [
+            {
+                "tool": call.tool,
+                "arguments": call.arguments,
+                "output": _result_preview(call.output, 1800),
+            }
+            for call in successful
+        ],
+        "failed_calls": [
+            {
+                "tool": call.tool,
+                "arguments": call.arguments,
+                "error": call.error,
+            }
+            for call in calls
+            if not call.ok
+        ],
+    }
+    evaluation = assess("research", state, client)
+    gate: dict[str, Any] = {
+        "enabled": client.enabled,
+        "checked_after_successful_calls": len(successful),
+        "action": "continue",
+        "fallback": not evaluation.usable,
+    }
+    if not evaluation.usable:
+        gate["error"] = evaluation.error or "Jev evidence gate unavailable"
+        decision = "continue"
+    else:
+        sufficiency = evaluation.answers.get("sufficiency")
+        quality = evaluation.answers.get("evidence_quality")
+        choice = (sufficiency.choice or "").strip().lower() if sufficiency else ""
+        score = quality.score if quality else None
+        confidence = sufficiency.confidence if sufficiency else None
+
+        # Only allow an early stop when Jev explicitly selects stop and the
+        # evidence-quality score reaches the Usable/Strong boundary.
+        if (
+            choice == "stop"
+            and isinstance(score, (int, float))
+            and score >= 2.25
+            and (confidence is None or confidence >= 0.50)
+        ):
+            decision = "stop"
+        elif choice in {"gather_more", "resolve_conflict"}:
+            decision = "gather_more"
+        elif isinstance(score, (int, float)) and score < 1.50:
+            decision = "gather_more"
+        else:
+            decision = "continue"
+
+        gate.update(
+            {
+                "action": decision,
+                "choice": choice,
+                "choice_confidence": confidence,
+                "raw_score": score,
+                "evidence_quality": (
+                    round(max(0.0, min(3.0, float(score))) / 3.0 * 100.0)
+                    if isinstance(score, (int, float))
+                    else None
+                ),
+                "model": evaluation.model,
+                "latency_ms": round(evaluation.latency_ms, 1),
+                "input_tokens": evaluation.input_tokens,
+            }
+        )
+    return decision, gate
+
+
+def _next_evidence_plan(
+    question: str,
+    tools: list[ToolInfo],
+    calls: list[ToolCallRecord],
+) -> dict[str, Any] | None:
+    """Pick a simple unused evidence tool when the gate requires another source."""
+    symbols = extract_symbols(question)
+    used = {call.tool for call in calls if call.ok}
+    lower = question.lower()
+
+    def candidate_score(tool: ToolInfo) -> int:
+        name = tool.qualified_name.lower()
+        score = 0
+        if "news." in name and any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact")):
+            score += 8
+        if "filings." in name and any(term in lower for term in ("why", "driver", "changed", "catalyst", "contract", "impact")):
+            score += 8
+        if "earnings" in name and "earnings" in lower:
+            score += 8
+        if "event_study" in name and any(term in lower for term in ("reaction", "event study", "earnings")):
+            score += 8
+        if "congress" in name and "congress" in lower:
+            score += 8
+        if "macro" in name and any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
+            score += 8
+        if "symbol" in ((tool.input_schema or {}).get("properties") or {}) and symbols:
+            score += 2
+        if "symbols" in ((tool.input_schema or {}).get("properties") or {}) and symbols:
+            score += 2
+        return score
+
+    ranked = sorted(
+        (tool for tool in tools if tool.qualified_name not in used),
+        key=lambda tool: (-candidate_score(tool), tool.qualified_name),
+    )
+    for tool in ranked:
+        props = (tool.input_schema or {}).get("properties") or {}
+        required = _required_params(tool)
+        args: dict[str, Any] = {}
+        if "symbols" in props and symbols:
+            args["symbols"] = symbols
+        elif "symbol" in props and symbols:
+            args["symbol"] = symbols[0]
+        if "query" in props:
+            args["query"] = question
+        if "days" in props:
+            args["days"] = 7
+        if "limit" in props and "limit" in required:
+            args["limit"] = 20
+        if all(name in args for name in required):
+            return {
+                "action": "tool",
+                "tool": tool.qualified_name,
+                "arguments": args,
+                "reason": "Jev evidence gate requested an additional independent source",
+            }
+    return None
+
 def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
     """Readable fallback when the final LLM synthesis is unavailable."""
     successful = [call for call in calls if call.ok]
@@ -547,6 +704,31 @@ class AutonomousMCPAgent:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
         for iteration in range(1, self.max_steps + 1):
+            # For compound research questions, evaluate evidence sufficiency once
+            # after two successful sources. Low/sparse evidence forces another
+            # source; strong evidence can stop the loop before the hard step bound.
+            if (
+                _needs_evidence_gate(question)
+                and self.jev.enabled
+                and "evidence_gate" not in self.last_jev
+                and sum(1 for call in calls if call.ok) >= 2
+            ):
+                gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
+                self.last_jev["evidence_gate"] = gate
+                steps.append(
+                    Step(
+                        node="evidence_gate",
+                        kind="node",
+                        note=f"action={gate_decision}; successful_calls={gate['checked_after_successful_calls']}",
+                    )
+                )
+                if gate_decision == "stop":
+                    return self._finalize(
+                        question,
+                        calls,
+                        steps,
+                        resolution="jev_evidence_sufficient",
+                    )
             # Driver investigations use a bounded evidence sequence instead of
             # the generic planner. Still run Jev once so the research trace
             # records the routing decision even when the forced plan controls
@@ -621,7 +803,20 @@ class AutonomousMCPAgent:
                     )
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
-                forced = _driver_research_plan(question, tools, calls)
+                gate = self.last_jev.get("evidence_gate") or {}
+                if (
+                    gate.get("action") == "gather_more"
+                    and len([call for call in calls if call.ok]) <= int(gate.get("checked_after_successful_calls", 0))
+                ):
+                    additional = _next_evidence_plan(question, tools, calls)
+                    if additional is not None:
+                        plan = additional
+                        action = "tool"
+                        steps.append(Step(node="plan", kind="node", note="Jev evidence gate forced additional source"))
+                    else:
+                        return self._finalize(question, calls, steps, resolution="jev_evidence_gate_unsatisfied")
+                else:
+                    forced = _driver_research_plan(question, tools, calls)
                 if forced is not None:
                     forced_action = str(forced.get("action", "")).strip().lower()
                     if forced_action == "final":
@@ -712,7 +907,10 @@ class AutonomousMCPAgent:
                 # A high-confidence Jev direct route needs only the selected
                 # evidence call. Finalize immediately instead of spending an
                 # extra planner iteration and another LLM request.
-                if self.last_jev.get("action") == "direct_tool":
+                if (
+                    self.last_jev.get("action") == "direct_tool"
+                    and not _needs_evidence_gate(question)
+                ):
                     return self._finalize(question, calls, steps)
 
         successful = [c for c in calls if c.ok]
