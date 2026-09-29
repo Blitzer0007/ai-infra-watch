@@ -35,7 +35,10 @@ export interface CongressTrade {
   transactionType: 'buy' | 'sell';
   amountRange: string;
   date: string;
+  transactionDate?: string;
+  filingDate?: string;
   stockPrice: number;
+  filingPortal?: string | null;
   geminiImpactSummary?: string;
 }
 
