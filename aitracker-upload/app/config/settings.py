@@ -85,7 +85,18 @@ LLM_REQUEST_TIMEOUT_SEC: float = _env_float(
 LLM_FINAL_TIMEOUT_SEC: float = _env_float(
     "LLM_FINAL_TIMEOUT_SEC", 20.0 if os.getenv("VERCEL") else 60.0
 )
-LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
+LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "700"))
+# Final synthesis may use a smaller/faster model than the planner. When the
+# OpenAI-compatible endpoint is NVIDIA NIM, default to GPT-OSS 20B for the
+# final response while leaving the planner model unchanged.
+LLM_FINAL_PROVIDER: str = _env_str("LLM_FINAL_PROVIDER", "")
+LLM_FINAL_MODEL: str = _env_str(
+    "LLM_FINAL_MODEL",
+    "openai/gpt-oss-20b"
+    if "integrate.api.nvidia.com" in OPENAI_BASE_URL
+    else "",
+)
+LLM_FINAL_REASONING_EFFORT: str = _env_str("LLM_FINAL_REASONING_EFFORT", "low")
 
 # ---- Jev decision layer ----------------------------------------------
 # Optional typed decision model used to route research before prose synthesis.
