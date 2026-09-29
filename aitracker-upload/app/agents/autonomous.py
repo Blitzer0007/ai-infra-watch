@@ -573,7 +573,7 @@ Question:
 {question}
 
 Evidence status:
-{evidence_status or "sufficientity not independently reported"}
+{evidence_status or "sufficiency not independently reported"}
 
 Retrieved evidence:
 {json.dumps(evidence, ensure_ascii=False, indent=2, default=str)}
@@ -865,11 +865,24 @@ class AutonomousMCPAgent:
                             )
                         )
                     else:
+                        gate = dict(gate)
+                        gate["action"] = "insufficient"
+                        gate["budget_exhausted"] = False
+                        gate["checked_sources"] = len([call for call in calls if call.ok])
+                        gate["reason"] = "No unused complementary evidence channel was available."
+                        self.last_jev["evidence_gate"] = gate
+                        steps.append(
+                            Step(
+                                node="evidence_gate",
+                                kind="node",
+                                note="action=insufficient; no complementary evidence channel available",
+                            )
+                        )
                         return self._finalize(
                             question,
                             calls,
                             steps,
-                            resolution="jev_evidence_gate_unsatisfied",
+                            resolution="jev_evidence_insufficient",
                         )
 
                 if action == "final":
