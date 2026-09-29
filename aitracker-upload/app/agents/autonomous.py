@@ -561,7 +561,7 @@ def _next_evidence_plan(
     return None
 
 
-def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
+def _deterministic_summary(question: str, calls: list[ToolCallRecord], evidence_status: str = "") -> str:
     """Readable fallback when the final LLM synthesis is unavailable."""
     successful = [call for call in calls if call.ok]
     if not successful:
@@ -577,7 +577,10 @@ def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
         lines.append(f"- {call.tool}: {preview}")
 
     lines.append("")
-    lines.append("Interpretation note: this is a deterministic evidence summary because the final synthesis model was unavailable. No causal conclusion is inferred.")
+    if evidence_status == "insufficient":
+        lines.append("Evidence status: INSUFFICIENT — the evidence did not meet the research sufficiency gate. Conclusions are provisional and no unsupported causal conclusion is inferred.")
+    else:
+        lines.append("Interpretation note: this is a deterministic evidence summary because the final synthesis model was unavailable. No causal conclusion is inferred.")
     return "\n".join(lines)
 
 
@@ -753,7 +756,7 @@ class AutonomousMCPAgent:
                 ),
             )
         except Exception as exc:
-            final_text = _deterministic_summary(question, calls)
+            final_text = _deterministic_summary(question, calls, evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else ""))
             error = f"finalization_failed: {type(exc).__name__}: {exc}"
             steps.append(Step(node="finalize", kind="node", note=error))
             return AutonomousResult(
@@ -768,7 +771,12 @@ class AutonomousMCPAgent:
                 resolution=resolution,
             )
         steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
-        steps.append(Step(node="finalize", kind="node", note="evidence sufficient"))
+        final_note = {
+            "jev_evidence_sufficient": "evidence sufficient",
+            "jev_evidence_insufficient": "evidence insufficient; conclusions are provisional",
+            "max_steps": "research budget exhausted; finalizing available evidence",
+        }.get(resolution, resolution.replace("_", " "))
+        steps.append(Step(node="finalize", kind="node", note=final_note))
         return AutonomousResult(
             question,
             final_text,
