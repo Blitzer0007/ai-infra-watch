@@ -4,6 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import { buildIntelligence } from '../utils/intelligence';
 import { buildPositionAnalyses, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
+import EventImpactExplorer from './EventImpactExplorer';
 
 type Price = { price: number; changePct: number };
 type Props = { livePrices?: Record<string, Price> };
@@ -142,13 +143,7 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
         </div>
       )}
 
-      {tab === 'events' && <Panel title="Event study" subtitle="Historical event windows are separate until verified price history is available">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Insight title="Data status" body="Live prices are available. Verified event-date price history is the remaining input for T-5 / T0 / T+1 / T+5 / T+20 calculations." icon={<CalendarDays/>}/>
-          <Insight title="Method" body="Measure raw return and benchmark-relative return at each window, then compare persistence across repeated event types." icon={<BarChart3/>}/>
-          <Insight title="Guardrail" body="A catalyst reaction is not causal proof; separate company news from sector and macro moves." icon={<ShieldAlert/>}/>
-        </div>
-      </Panel>}
+      {tab === 'events' && selectedAnalysis && <EventImpactExplorer symbol={selectedAnalysis.symbol} />}
 
       {tab === 'network' && <Panel title="Relationship graph" subtitle="Competition and second-order exposure — click a node">
         <svg viewBox="0 0 920 420" className="w-full rounded-xl bg-[#0D1015] border border-white/5">
