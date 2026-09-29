@@ -90,10 +90,15 @@ class LLMClient:
         reasoning_effort: str | None = None,
     ) -> str:
         effective_model = model or self.model
-        raw = (
-            f"{self.provider}::{effective_model}::{max_tokens}::{temperature}::"
-            f"{reasoning_effort or ''}::{prompt}"
-        )
+        if model is None and not reasoning_effort:
+            # Preserve the historical cache key format so committed stub
+            # fixtures remain valid after adding per-call model overrides.
+            raw = f"{self.provider}::{effective_model}::{max_tokens}::{temperature}::{prompt}"
+        else:
+            raw = (
+                f"{self.provider}::{effective_model}::{max_tokens}::{temperature}::"
+                f"{reasoning_effort or ''}::{prompt}"
+            )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def _cache_path(self, cache_key: str) -> Path:
