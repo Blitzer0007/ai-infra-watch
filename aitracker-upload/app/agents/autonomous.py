@@ -20,6 +20,7 @@ from app.agents.trajectory import AgentTrajectory, Step, llm_call, tool_call
 from app.llm.client import LLMClient
 from app.mcp_client import MCPToolbox, ToolInfo
 from app.mcp_client.client import MCPClientError
+from app.config import settings
 
 
 @dataclass
@@ -301,7 +302,7 @@ def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
         "tool": c.tool,
         "ok": c.ok,
         "arguments": c.arguments,
-        "output": c.output if c.ok else c.error,
+        "output": _result_preview(c.output, 1800) if c.ok else str(c.error or "")[:600],
     } for c in calls]
     return f'''Answer this AI Infra Watch question using only the retrieved evidence.
 
@@ -401,8 +402,10 @@ class AutonomousMCPAgent:
         try:
             final_text = self.client.generate(
                 _final_prompt(question, successful),
-                max_tokens=2400,
+                max_tokens=settings.LLM_FINAL_MAX_TOKENS,
                 temperature=0.0,
+                timeout_sec=settings.LLM_FINAL_TIMEOUT_SEC,
+                max_retries=0,
             )
         except Exception as exc:
             final_text = _deterministic_summary(question, calls)
@@ -548,7 +551,7 @@ class AutonomousMCPAgent:
         successful = [c for c in calls if c.ok]
         if successful:
             try:
-                final_text = self.client.generate(_final_prompt(question, successful), max_tokens=1200, temperature=0.0)
+                return self._finalize(question, calls, steps)
             except Exception as exc:
                 final_text = _result_preview(successful[-1].output, 2000)
                 error = f"finalization_failed: {type(exc).__name__}: {exc}"
