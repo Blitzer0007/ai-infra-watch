@@ -18,6 +18,7 @@ type ResearchResponse = {
   ok?: boolean;
   degraded?: boolean;
   summary?: string;
+  answer_source?: 'agent-llm' | 'deterministic-evidence' | 'deterministic-fallback' | 'none' | string;
   error?: string | null;
   resolution?: string | null;
   discovered?: string[];
@@ -37,6 +38,23 @@ type ResearchResponse = {
     duration_ms?: number | null;
   }>;
 };
+
+function answerSourceLabel(source?: string) {
+  switch (source) {
+    case 'agent-llm': return 'Agent LLM synthesis';
+    case 'deterministic-evidence': return 'Deterministic evidence output';
+    case 'deterministic-fallback': return 'Deterministic fallback';
+    case 'none': return 'No answer source';
+    default: return source || 'Source not reported';
+  }
+}
+
+function answerSourceClass(source?: string) {
+  if (source === 'agent-llm') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+  if (source === 'deterministic-evidence') return 'border-cyan-400/20 bg-cyan-400/10 text-cyan-300';
+  if (source === 'deterministic-fallback') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+  return 'border-white/10 bg-white/5 text-white/40';
+}
 
 const EXAMPLES = [
   'What changed recently across MU, NVDA and SNDK?',
@@ -206,9 +224,14 @@ export default function AutonomousResearch() {
             </div>
 
             <div className="rounded-xl border border-white/5 bg-black/20 p-4">
-              <div className="mb-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-white/35">
-                <MessageSquareText className="w-3.5 h-3.5" />
-                Synthesis
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-white/35">
+                  <MessageSquareText className="w-3.5 h-3.5" />
+                  Synthesis
+                </div>
+                <span className={'rounded border px-2 py-1 text-[9px] font-mono font-black uppercase tracking-wider ' + answerSourceClass(result.answer_source)}>
+                  Answer source: {answerSourceLabel(result.answer_source)}
+                </span>
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-white/80">
                 {result.summary || result.error || 'No synthesis was returned.'}
@@ -216,6 +239,9 @@ export default function AutonomousResearch() {
               {result.resolution && (
                 <p className="mt-3 text-[10px] font-mono text-white/35">Resolution: {result.resolution}</p>
               )}
+              <p className="mt-2 text-[9px] font-mono text-white/25">
+                Tool outputs below are the evidence sources used by the answer.
+              </p>
             </div>
           </div>
 
