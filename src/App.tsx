@@ -18,7 +18,6 @@ import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
 import AutonomousResearch from './components/AutonomousResearch';
-import EarningsAlerts from './components/EarningsAlerts';
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
@@ -431,8 +430,6 @@ export default function App() {
             </div>
           </div>
 
-          <EarningsAlerts />
-
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView}
@@ -447,7 +444,7 @@ export default function App() {
               {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} />}
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
-              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} />}
+              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} congressTrades={liveData?.congressTrades} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
               {activeView === 'research' && <AutonomousResearch />}
