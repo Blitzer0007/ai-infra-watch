@@ -49,7 +49,7 @@ export default function Settings() {
   return (
     <div className="space-y-6" id="settings-view">
       {/* Page Header */}
-      <div className="flex flex-col space-y-1 md:space-y-2 border-b border-slate-800 pb-4">
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-slate-800 pb-4">
         <span className="text-xs font-mono uppercase tracking-widest text-slate-500">System Configuration</span>
         <h1 className="text-2xl md:text-3xl font-sans font-semibold tracking-tight text-white">
           System Settings
