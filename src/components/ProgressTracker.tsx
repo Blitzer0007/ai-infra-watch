@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
-import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Plus, Trash2, Award } from 'lucide-react';
+import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Plus, Trash2, Award, Search, Loader2 } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
@@ -38,6 +38,10 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [historyData, setHistoryData] = useState<{ date: string; price: number }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [secMilestones, setSecMilestones] = useState<Milestone[]>([]);
+  const [secMilestoneLoading, setSecMilestoneLoading] = useState(false);
+  const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
+  const [tickerInput, setTickerInput] = useState('');
 
   // Custom milestone state
   const [customTitle, setCustomTitle] = useState('');
@@ -56,8 +60,15 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     }
   }, []);
 
-  // Filter milestones for selected stock
-  const stockMilestones = milestones.filter((m) => m.stockSymbol === selectedStock);
+  // Combine the curated timeline with live SEC milestones for the selected symbol.
+  const stockMilestones = [
+    ...milestones.filter((m) => m.stockSymbol === selectedStock),
+    ...secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+  ].sort((a, b) => {
+    const da = Date.parse(a.date) || 0;
+    const db = Date.parse(b.date) || 0;
+    return db - da;
+  });
   const activeMilestone = stockMilestones.find((m) => m.id === activeMilestoneId) || stockMilestones[0];
 
   useEffect(() => {
@@ -80,6 +91,34 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       }
     }
     loadHistory();
+    return () => { cancelled = true; };
+  }, [selectedStock]);
+
+  // Live SEC milestone discovery makes the tracker work for any public ticker,
+  // not only symbols present in the curated dashboard metadata.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSecMilestones() {
+      setSecMilestoneLoading(true);
+      setSecMilestoneError(null);
+      try {
+        const res = await fetch('/api/stock-milestones?symbol=' + encodeURIComponent(selectedStock) + '&limit=12');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'SEC milestone lookup failed');
+        if (!cancelled) {
+          const events = Array.isArray(data.events) ? data.events : [];
+          setSecMilestones(events);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setSecMilestones([]);
+          setSecMilestoneError(err?.message || 'Live SEC milestones unavailable');
+        }
+      } finally {
+        if (!cancelled) setSecMilestoneLoading(false);
+      }
+    }
+    loadSecMilestones();
     return () => { cancelled = true; };
   }, [selectedStock]);
 
@@ -144,7 +183,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     }
   };
 
-  const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Other', desc: '', logoColor: '#fff' };
+  const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
 
   const getAccuratePrice = (m: Milestone) => {
     // Prefer an exact trading-day match. For month-only milestones, use the
@@ -213,29 +252,77 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         </p>
       </div>
 
-      {/* Stock Selection Grid */}
-      <div className="flex flex-wrap gap-2 border-b border-white/10 pb-4">
-        {Object.keys(STOCK_METADATA).map((symbol) => {
-          const isSelected = selectedStock === symbol;
-          const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
-          return (
-            <button
-              key={symbol}
-              onClick={() => {
-                setSelectedStock(symbol);
-                setActiveMilestoneId(null);
-              }}
-              className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded border transition cursor-pointer flex items-center space-x-2 ${
-                isSelected
-                  ? 'bg-white text-black border-white'
-                  : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-              <span>{symbol}</span>
-            </button>
-          );
-        })}
+      {/* Stock Selection + Arbitrary Ticker Search */}
+      <div className="space-y-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+              Track any public ticker
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
+                <input
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tickerInput.trim()) {
+                      setSelectedStock(tickerInput.trim().toUpperCase());
+                      setActiveMilestoneId(null);
+                    }
+                  }}
+                  placeholder="e.g. AAPL, AVGO, TSM, PLTR"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!tickerInput.trim()) return;
+                  setSelectedStock(tickerInput.trim().toUpperCase());
+                  setActiveMilestoneId(null);
+                }}
+                className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
+              >
+                Track
+              </button>
+            </div>
+            <p className="text-[9px] text-white/30 font-mono mt-1.5">
+              Public tickers use live market history plus recent SEC 8-K milestones. Private/non-SEC issuers may have price history without SEC events.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {Object.keys(STOCK_METADATA).map((symbol) => {
+            const isSelected = selectedStock === symbol;
+            const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+            return (
+              <button
+                key={symbol}
+                onClick={() => {
+                  setSelectedStock(symbol);
+                  setTickerInput('');
+                  setActiveMilestoneId(null);
+                }}
+                className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded border transition cursor-pointer flex items-center space-x-2 ${
+                  isSelected
+                    ? 'bg-white text-black border-white'
+                    : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                <span>{symbol}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-cyan-300">
+          {secMilestoneLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+          <span>{secMilestoneLoading ? 'Discovering SEC milestones' : `${secMilestones.length} live SEC milestones found`}</span>
+          {secMilestoneError && <span className="text-amber-300 normal-case tracking-normal">· {secMilestoneError}</span>}
+        </div>
       </div>
 
       {/* Interactive Chart Section */}
@@ -359,7 +446,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
             <span className="text-[10px] font-mono text-white/60 flex items-center space-x-1.5">
               <Award className="w-4 h-4 text-emerald-400" />
-              <span>Current Evaluation: ${formatPrice(historyData[historyData.length - 1]?.price)}</span>
+              <span>Current Evaluation: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
             </span>
           </div>
         </div>
