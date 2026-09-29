@@ -116,6 +116,8 @@ class LLMClient:
         prompt: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        timeout_sec: float | None = None,
+        max_retries: int | None = None,
     ) -> str:
         max_tokens = settings.DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
         temperature = settings.DEFAULT_TEMPERATURE if temperature is None else temperature
@@ -126,7 +128,13 @@ class LLMClient:
         if self.stub:
             text, usage = self._generate_stub(prompt, max_tokens, temperature)
         else:
-            text, usage = self._generate_remote(prompt, max_tokens, temperature)
+            text, usage = self._generate_remote(
+                prompt,
+                max_tokens,
+                temperature,
+                timeout_sec=timeout_sec,
+                max_retries=max_retries,
+            )
         self._cache_write(key, text, usage)
         return text
 
@@ -159,7 +167,14 @@ class LLMClient:
         return data["text"], data.get("usage", {"prompt_tokens": 0, "completion_tokens": 0})
 
     # ---- real providers ---------------------------------------------
-    def _generate_remote(self, prompt: str, max_tokens: int, temperature: float) -> tuple[str, dict[str, int]]:
+    def _generate_remote(
+        self,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        timeout_sec: float | None = None,
+        max_retries: int | None = None,
+    ) -> tuple[str, dict[str, int]]:
         headers = {"content-type": "application/json"}
         if self.provider == "anthropic":
             url = f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages"
@@ -187,13 +202,15 @@ class LLMClient:
         else:
             raise LLMConfigError(f"Unknown LLM_PROVIDER={self.provider!r}")
 
+        request_timeout = timeout_sec if timeout_sec is not None else settings.LLM_REQUEST_TIMEOUT_SEC
+        retries = self.max_retries if max_retries is None else max(0, int(max_retries))
         last_exc: Exception | None = None
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(retries + 1):
             try:
-                with httpx.Client(timeout=settings.LLM_REQUEST_TIMEOUT_SEC) as client:
+                with httpx.Client(timeout=request_timeout) as client:
                     resp = client.post(url, json=body, headers=headers)
                 if resp.status_code >= 400:
-                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
+                    if _http_retryable(resp.status_code) and attempt < retries:
                         delay = self.base_delay * (2 ** attempt)
                         time.sleep(delay)
                         last_exc = RuntimeError(f"HTTP {resp.status_code} (retryable): {resp.text[:200]}")
@@ -207,11 +224,11 @@ class LLMClient:
                 return text, dict(usage)
             except httpx.HTTPError as exc:
                 last_exc = exc
-                if attempt < self.max_retries:
+                if attempt < retries:
                     delay = self.base_delay * (2 ** attempt)
                     time.sleep(delay)
                     continue
-        raise RuntimeError(f"LLM request failed after {self.max_retries + 1} attempts: {last_exc}")
+        raise RuntimeError(f"LLM request failed after {retries + 1} attempts: {last_exc}")
 
 
 def _dig(mapping: dict, *path: Any) -> Any:
