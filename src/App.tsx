@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
+import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 
@@ -18,6 +19,47 @@ import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
 import AutonomousResearch from './components/AutonomousResearch';
+
+type StressSnapshot = {
+  score: number;
+  label: string;
+  breadth: number | null;
+  avgMove: number | null;
+  macroLoad: number;
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function calculatePortfolioStress(
+  prices: Record<string, { price: number; changePct: number }>,
+  macroRisks: any[] = [],
+): StressSnapshot {
+  const portfolioSymbols = PORTFOLIO_POSITIONS.map(position => position.symbol);
+  const moves = portfolioSymbols
+    .map(symbol => prices[symbol]?.changePct)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+  const breadth = moves.length
+    ? moves.filter(value => value >= 0).length / moves.length
+    : null;
+  const avgMove = moves.length
+    ? moves.reduce((sum, value) => sum + value, 0) / moves.length
+    : null;
+
+  // Transparent 0-100 model: 40 pts breadth stress, 30 pts move stress,
+  // and 30 pts live macro-risk load. Higher = more observed stress.
+  const breadthStress = breadth == null ? 0 : (1 - breadth) * 40;
+  const moveStress = avgMove == null ? 0 : clamp((-avgMove / 5) * 30, 0, 30);
+  const high = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
+  const medium = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
+  const macroLoad = clamp(high * 12 + medium * 6, 0, 30);
+  const score = Math.round(clamp(breadthStress + moveStress + macroLoad, 0, 100));
+
+  const label = score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained';
+  return { score, label, breadth, avgMove, macroLoad };
+}
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
@@ -430,6 +472,62 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {(() => {
+            const stress = calculatePortfolioStress(
+              liveData?.stockPrices || tickerPrices,
+              liveData?.macroRisks || []
+            );
+            const prices = liveData?.stockPrices || tickerPrices;
+            const coverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null).length;
+            return (
+              <div className="max-w-7xl mx-auto mb-6 rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/5 p-2">
+                      <ShieldAlert className="w-4 h-4 text-amber-300" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-white/65">Portfolio Stress Score</span>
+                        <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
+                      </div>
+                      <div className="text-[10px] text-white/35 mt-0.5">
+                        Breadth + average daily move + macro risk load · {coverage}/{PORTFOLIO_POSITIONS.length} holdings with live quotes
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-28 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-full rounded-full bg-amber-300/80 transition-all" style={{ width: stress.score + '%' }} />
+                    </div>
+                    <div className="text-right min-w-24">
+                      <div className="text-xl font-black font-mono text-white">{stress.score}/100</div>
+                      <div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">{stress.label}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Breadth</div>
+                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.breadth == null ? '—' : Math.round(stress.breadth * 100) + '% positive'}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Avg daily move</div>
+                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.avgMove == null ? '—' : (stress.avgMove >= 0 ? '+' : '') + stress.avgMove.toFixed(2) + '%'}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
+                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
+                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{coverage}/{PORTFOLIO_POSITIONS.length} live</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <AnimatePresence mode="wait">
             <motion.div
