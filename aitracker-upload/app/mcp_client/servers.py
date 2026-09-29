@@ -87,6 +87,20 @@ def default_configs(
     ]
 
 
+def research_configs() -> list[ServerConfig]:
+    """Lean MCP pool for autonomous research requests.
+
+    Notifications are intentionally excluded from the research path because
+    the agent never needs a notification tool to answer a research question.
+    Fewer stdio subprocesses reduces cold-start time and failure surface on
+    serverless runtimes such as Vercel.
+    """
+    return [
+        stocks_config(),
+        filings_config(),
+        news_config(),
+    ]
+
 def live_configs() -> list[ServerConfig]:
     """Convenience: live data everywhere (Finnhub + EDGAR + webhooks + news)."""
     return default_configs(stocks_mode="live", filings_mode="live", notify_mode="live", news_mode="live")
@@ -99,5 +113,6 @@ __all__ = [
     "notifications_config",
     "news_config",
     "default_configs",
+    "research_configs",
     "live_configs",
 ]
