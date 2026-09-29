@@ -395,7 +395,7 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
-    assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
+    assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
 
 
 def test_recent_developments_affect_question_uses_evidence_gate():
@@ -427,7 +427,7 @@ def test_duplicate_planner_call_redirects_to_complementary_evidence():
         tb.close()
 
     assert [call.tool for call in result.calls] == ["stocks.get_quote", "news.search"]
-    assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
+    assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
     assert result.resolution == "jev_evidence_sufficient"
     assert any(
         step.node == "plan" and "complementary evidence source" in step.note
