@@ -29,6 +29,7 @@ class AutonomousResult:
     calls: list[ToolCallRecord]
     discovered: list[str]
     trajectory: AgentTrajectory
+    answer_source: str = "agent-llm"
     error: str = ""
     resolution: str = "completed"
 
@@ -376,6 +377,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                answer_source="none",
                 error="no successful tool calls",
                 resolution="error",
             )
@@ -411,6 +413,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                answer_source="deterministic-fallback",
                 error=error,
                 resolution="completed",
             )
@@ -549,10 +552,10 @@ class AutonomousMCPAgent:
                 final_text = _result_preview(successful[-1].output, 2000)
                 error = f"finalization_failed: {type(exc).__name__}: {exc}"
                 steps.append(Step(node="finalize", kind="node", note=error))
-                return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), error=error, resolution="max_steps")
+                return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), answer_source="deterministic-fallback", error=error, resolution="max_steps")
             steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
             steps.append(Step(node="finalize", kind="node", note="max steps reached"))
-            return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), resolution="max_steps")
+            return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), answer_source="agent-llm", resolution="max_steps")
 
         steps.append(Step(node="finalize", kind="node", note="no successful calls"))
         return AutonomousResult(question, "No MCP tool produced usable evidence.", calls, discovered, AgentTrajectory(steps=steps), error="no successful tool calls", resolution="error")
