@@ -346,7 +346,7 @@ def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
         "tool": c.tool,
         "ok": c.ok,
         "arguments": c.arguments,
-        "output": _result_preview(c.output, 1800) if c.ok else str(c.error or "")[:600],
+        "output": _result_preview(c.output, 1200) if c.ok else str(c.error or "")[:500],
     } for c in calls]
     return f'''Answer this AI Infra Watch question using only the retrieved evidence.
 
@@ -487,12 +487,26 @@ class AutonomousMCPAgent:
             )
 
         try:
-            final_text = self.client.generate(
+            final_provider = settings.LLM_FINAL_PROVIDER or self.client.provider
+            final_model = settings.LLM_FINAL_MODEL or self.client.model
+            final_client = self.client
+            if (
+                final_provider != self.client.provider
+                or final_model != self.client.model
+            ):
+                final_client = LLMClient(provider=final_provider, model=final_model)
+            final_text = final_client.generate(
                 _final_prompt(question, successful),
                 max_tokens=settings.LLM_FINAL_MAX_TOKENS,
                 temperature=0.0,
                 timeout_sec=settings.LLM_FINAL_TIMEOUT_SEC,
-                max_retries=0,
+                max_retries=1,
+                reasoning_effort=(
+                    settings.LLM_FINAL_REASONING_EFFORT
+                    if final_provider == "openai"
+                    and settings.LLM_FINAL_REASONING_EFFORT
+                    else None
+                ),
             )
         except Exception as exc:
             final_text = _deterministic_summary(question, calls)
@@ -694,6 +708,12 @@ class AutonomousMCPAgent:
                 calls.append(record)
                 steps.append(tool_call(tool_name, arguments, note="ok"))
                 history.append({"tool": tool_name, "arguments": arguments, "output": _result_preview(output)})
+
+                # A high-confidence Jev direct route needs only the selected
+                # evidence call. Finalize immediately instead of spending an
+                # extra planner iteration and another LLM request.
+                if self.last_jev.get("action") == "direct_tool":
+                    return self._finalize(question, calls, steps)
 
         successful = [c for c in calls if c.ok]
         if successful:
