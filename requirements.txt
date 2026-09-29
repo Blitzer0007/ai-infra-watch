@@ -1,9 +1,8 @@
 # Vercel Python Function dependencies for the autonomous MCP endpoint.
+# Keep this file limited to packages imported by the Vercel Python routes.
+# RAG/evaluation-only dependencies live under aitracker-upload/requirements*.txt
+# and are intentionally not installed into the production function bundle.
 fastapi>=0.141,<1
 pydantic>=2.13,<3
 httpx>=0.28,<1
 mcp>=2.2,<3
-langgraph>=1.2,<2
-langchain-core>=1.6,<2
-numpy>=2.5,<3
-rank-bm25>=0.2.2
