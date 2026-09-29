@@ -266,9 +266,8 @@ def test_autonomous_jev_is_recorded_for_forced_driver_research():
 class _GateJev:
     enabled = True
 
-    def __init__(self, choice: str, score: float, confidence: float = 0.9):
-        self.choice = choice
-        self.score = score
+    def __init__(self, decisions, confidence: float = 0.9):
+        self.decisions = list(decisions)
         self.confidence = confidence
         self.calls = 0
 
@@ -284,16 +283,17 @@ class _GateJev:
     def evaluate(self, **kwargs):
         from app.jev.client import JevAnswer, JevEvaluation
         self.calls += 1
+        choice, score = self.decisions[min(self.calls - 1, len(self.decisions) - 1)]
         return JevEvaluation(
             answers={
                 "sufficiency": JevAnswer(
                     type="choice",
-                    choice=self.choice,
+                    choice=choice,
                     confidence=self.confidence,
                 ),
                 "evidence_quality": JevAnswer(
                     type="score",
-                    score=self.score,
+                    score=score,
                     confidence=0.9,
                 ),
             },
@@ -341,7 +341,7 @@ def _gate_toolbox():
 
 def test_jev_low_evidence_quality_forces_another_source():
     tb, session = _gate_toolbox()
-    gate = _GateJev("gather_more", 0.5)
+    gate = _GateJev([("gather_more", 0.5), ("stop", 2.5)])
     plans = [
         {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
         {"action": "tool", "tool": "stocks.get_snapshot", "arguments": {}, "reason": "snapshot"},
@@ -353,14 +353,16 @@ def test_jev_low_evidence_quality_forces_another_source():
             planner=lambda q, tools, history: plans.pop(0),
             jev=gate,
             client=LLMClient(provider="stub", model="stub"),
-            max_steps=3,
+            max_steps=4,
         )
         result = agent.run("Analyze AMD today")
     finally:
         tb.close()
 
-    assert gate.calls == 1
-    assert result.jev["evidence_gate"]["action"] == "gather_more"
+    assert gate.calls == 2
+    assert result.jev["evidence_gate"]["action"] == "stop"
+    assert result.jev["evidence_gate"]["checks"] == 2
+    assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
@@ -368,7 +370,7 @@ def test_jev_low_evidence_quality_forces_another_source():
 
 def test_jev_strong_evidence_can_stop_before_step_bound():
     tb, session = _gate_toolbox()
-    gate = _GateJev("stop", 3.0)
+    gate = _GateJev([("stop", 3.0)])
     plans = [
         {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
         {"action": "tool", "tool": "stocks.get_snapshot", "arguments": {}, "reason": "snapshot"},
