@@ -57,3 +57,44 @@ jobs:
           print("news:", len(body["news"]))
           print("contracts:", len(body["contracts"]))
           PY
+
+      - name: Run authenticated autonomous research smoke
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          question='What recent developments could affect NVIDIA'"'"'s stock price? Check news, SEC/filings, and historical market data, and distinguish confirmed facts from hypotheses.'
+          curl --fail --silent --show-error --max-time 70             -H "Content-Type: application/json"             -X POST             "https://ai-infra-watch.vercel.app/api/agent-ask"             --data "$(python -c 'import json, os; print(json.dumps({"question": os.environ["QUESTION"]}))')"             -o /tmp/autonomous-smoke.json
+          python - <<'PY'
+          import json
+
+          with open("/tmp/autonomous-smoke.json", encoding="utf-8") as f:
+              body = json.load(f)
+
+          if body.get("mode") != "autonomous-mcp":
+              raise SystemExit(f"unexpected autonomous mode: {body}")
+
+          if not body.get("calls"):
+              raise SystemExit(f"autonomous smoke returned no evidence calls: {body}")
+
+          if not body.get("trajectory"):
+              raise SystemExit(f"autonomous smoke returned no trajectory: {body}")
+
+          allowed_resolutions = {
+              "completed",
+              "jev_evidence_sufficient",
+              "jev_evidence_insufficient",
+              "max_steps",
+          }
+          resolution = body.get("resolution")
+          if resolution not in allowed_resolutions:
+              raise SystemExit(f"unexpected autonomous resolution: {resolution}")
+
+          tools = [item.get("tool") for item in body["calls"] if item.get("ok")]
+          print("autonomous research smoke check passed")
+          print("resolution:", resolution)
+          print("answer source:", body.get("answer_source"))
+          print("successful tools:", tools)
+          print("trajectory nodes:", [item.get("node") for item in body["trajectory"]])
+          PY
+        env:
+          QUESTION: What recent developments could affect NVIDIA's stock price? Check news, SEC/filings, and historical market data, and distinguish confirmed facts from hypotheses.
