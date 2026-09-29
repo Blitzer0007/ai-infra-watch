@@ -445,7 +445,7 @@ export default function App() {
               {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} />}
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
-              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} />}
+              {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
               {activeView === 'research' && <AutonomousResearch />}
