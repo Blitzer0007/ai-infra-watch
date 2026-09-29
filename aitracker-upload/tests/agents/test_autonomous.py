@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.agents.autonomous import AutonomousMCPAgent
+from app.agents.schemas import ToolCallRecord
 from app.llm.client import LLMClient
 from app.mcp_client import MCPToolbox
 from tests.agents.conftest import MAX_STEPS
