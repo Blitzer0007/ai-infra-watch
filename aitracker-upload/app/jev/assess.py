@@ -1,0 +1,139 @@
+"""Reusable, auditable Jev assessments for AI Infra Watch platform modules."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from .client import JevClient, JevEvaluation
+
+
+ASSESSMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    "platform": {
+        "attention": {
+            "type": "choice",
+            "instructions": "Which aspect of this portfolio state deserves the most immediate research attention?",
+            "criteria": {
+                "earnings": "Earnings timing, estimates, results or reactions are the clearest active issue.",
+                "sec": "A primary SEC filing, contract or disclosure is the clearest active issue.",
+                "macro": "A geopolitical, power or export risk is the clearest active issue.",
+                "market": "A price, breadth or relative-strength change is the clearest active issue.",
+                "mixed": "Several evidence channels are active and should be reviewed together.",
+                "monitor": "No single issue stands out from the available evidence.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the evidence needed to support a near-term research conclusion?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
+    "contracts": {
+        "materiality": {
+            "type": "choice",
+            "instructions": "How should this contract set be triaged for research attention?",
+            "criteria": {
+                "material": "Disclosed value, counterparty, capacity or commercial terms indicate a potentially material infrastructure development.",
+                "commercial": "The disclosure contains meaningful commercial terms but materiality is not fully established.",
+                "routine": "The available evidence looks routine, repetitive or limited in economic detail.",
+                "unclear": "The evidence is insufficient to classify the contract set confidently.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the available contract evidence for understanding economic significance?",
+            "criteria": ["Minimal", "Partial", "Good", "Strong"],
+        },
+    },
+    "events": {
+        "follow_up": {
+            "type": "choice",
+            "instructions": "What historical-reaction follow-up is appropriate for this event-study state?",
+            "criteria": {
+                "deep_dive": "Multiple verified events and usable price reactions justify deeper event-pattern analysis.",
+                "standard": "There is enough evidence for standard event-study review.",
+                "insufficient": "Events exist but price history or reaction fields are too incomplete for a useful reaction conclusion.",
+                "monitor": "The current event set does not expose a clear historical pattern worth extending.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the event-study evidence for evaluating historical reactions?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
+    "macro": {
+        "attention": {
+            "type": "choice",
+            "instructions": "Which macro channel deserves the most immediate review given the current risk ledger?",
+            "criteria": {
+                "taiwan": "TSMC or Taiwan supply-chain disruption is the clearest active exposure.",
+                "power": "Power or grid constraints are the clearest active exposure.",
+                "export": "AI-chip export controls or embargo breadth are the clearest active exposure.",
+                "mixed": "Multiple macro channels are materially active and should be reviewed together.",
+                "monitor": "No single macro channel stands out from the current ledger.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the current macro evidence for portfolio transmission analysis?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
+    "congress": {
+        "relevance": {
+            "type": "choice",
+            "instructions": "How should the current congressional disclosure set be triaged?",
+            "criteria": {
+                "research": "The disclosures provide a clear reason to inspect company-specific context and timing.",
+                "context": "The disclosures are useful as context but do not independently establish a company event.",
+                "low_signal": "The current disclosure set appears low-signal for the selected research question.",
+                "unclear": "Available disclosure data is insufficient for confident triage.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the available congressional transaction evidence?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
+    "earnings": {
+        "urgency": {
+            "type": "choice",
+            "instructions": "How should this earnings state be triaged for attention?",
+            "criteria": {
+                "immediate": "An earnings event is imminent or newly reported and deserves immediate review.",
+                "near_term": "An earnings event is approaching but does not require immediate escalation.",
+                "historical": "The state is primarily historical earnings evidence for pattern analysis.",
+                "monitor": "No clear earnings issue requires additional attention now.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the earnings evidence for the current research question?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
+}
+
+
+def _compact_state(state: Any, max_chars: int = 8000) -> str:
+    if isinstance(state, str):
+        text = state
+    else:
+        text = json.dumps(state, ensure_ascii=False, separators=(",", ":"), default=str)
+    return text[:max_chars]
+
+
+def assess(kind: str, state: Any, client: JevClient | None = None) -> JevEvaluation:
+    key = kind.strip().lower()
+    questions = ASSESSMENTS.get(key)
+    if questions is None:
+        return JevEvaluation(error=f"Unknown Jev assessment kind: {key!r}")
+    return (client or JevClient()).evaluate(
+        state=_compact_state(state),
+        questions=questions,
+    )
+
+
+__all__ = ["ASSESSMENTS", "assess"]
