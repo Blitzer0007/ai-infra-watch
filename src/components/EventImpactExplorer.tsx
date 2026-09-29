@@ -212,15 +212,15 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
         <Metric label="Events matched" value={String(summary.events)} suffix="SEC events" />
         <Metric
-          label="Avg T+1 reaction"
+          label="Avg Next-Day Reaction"
           value={formatPct(summary.avgT1)}
           suffix=""
           valueClass={tone(summary.avgT1)}
         />
         <Metric
-          label="Avg T+1 vs SPY"
+          label="Avg Next-Day vs Market"
           value={formatPct(summary.avgRelativeT1)}
-          suffix="pts"
+          suffix="pts vs SPY"
           valueClass={tone(summary.avgRelativeT1)}
         />
       </div>
@@ -248,11 +248,11 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
               <tr>
                 <th className="text-left p-3">Event</th>
                 <th className="text-left p-3">Date</th>
-                <th className="text-right p-3">T0</th>
-                <th className="text-right p-3">T+1</th>
-                <th className="text-right p-3">T+5</th>
-                <th className="text-right p-3">T+20</th>
-                <th className="text-right p-3">T+1 vs SPY</th>
+                <th className="text-right p-3">Event Day (T0)</th>
+                <th className="text-right p-3">Next Trading Day (T+1)</th>
+                <th className="text-right p-3">5 Trading Days Later (T+5)</th>
+                <th className="text-right p-3">20 Trading Days Later (T+20)</th>
+                <th className="text-right p-3">Next Day vs Market</th>
               </tr>
             </thead>
             <tbody>
@@ -304,6 +304,10 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           </table>
         </div>
       )}
+
+      <div className="mt-3 text-[9px] text-white/30 font-mono">
+        Event Day = the first trading day on or after the filing date · Next Trading Day = the following market session · 5/20 Trading Days Later = forward market sessions.
+      </div>
 
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
         <Callout
