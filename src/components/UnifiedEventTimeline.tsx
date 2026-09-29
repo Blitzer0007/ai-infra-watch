@@ -195,7 +195,7 @@ export default function UnifiedEventTimeline({
       .filter(item => String(item?.company || '').toUpperCase() === ticker)
       .map(item => ({
         id: 'contract-' + String(item?.id || item?.dateSigned || item?.client || item?.details),
-        kind: 'Contract',
+        kind: 'Contract' as const,
         date: String(item?.dateSigned || item?.date || ''),
         title: String(item?.client || 'Contract disclosure'),
         detail: String(item?.geminiImpactSummary || item?.details || 'Contract disclosure linked to the portfolio issuer.'),
@@ -209,7 +209,7 @@ export default function UnifiedEventTimeline({
       .filter(item => String(item?.stockSymbol || '').toUpperCase() === ticker)
       .map(item => ({
         id: 'congress-' + String(item?.id || item?.transactionDate || item?.date),
-        kind: 'Congress',
+        kind: 'Congress' as const,
         date: String(item?.transactionDate || item?.date || ''),
         title: ticker + ' transaction disclosure',
         detail: String(item?.politician || 'Public filer') + ' · ' + String(item?.chamber || 'Chamber') + ' · ' + String(item?.transactionType || 'transaction') + ' · ' + String(item?.amountRange || 'amount not disclosed'),
@@ -223,7 +223,7 @@ export default function UnifiedEventTimeline({
       .filter(item => macroHolds(ticker, String(item?.id || item?.title || '')))
       .map(item => ({
         id: 'macro-' + String(item?.id || item?.dateUpdated || item?.title),
-        kind: 'Macro',
+        kind: 'Macro' as const,
         date: String(item?.dateUpdated || ''),
         title: String(item?.title || 'Macro risk indicator'),
         detail: String(item?.geminiImpactSummary || item?.description || 'Macro risk indicator affecting the tracked exposure group.'),
@@ -237,7 +237,7 @@ export default function UnifiedEventTimeline({
       .filter(item => item?.title && newsSymbols(String(item.title)).includes(ticker))
       .map(item => ({
         id: 'news-' + String(item?.id || item?.date || item?.title),
-        kind: 'News',
+        kind: 'News' as const,
         date: String(item?.date || ''),
         title: String(item?.title),
         detail: 'Reported by ' + String(item?.source || 'news feed') + '; review the linked report for context.',
