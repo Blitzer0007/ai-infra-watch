@@ -20,7 +20,7 @@
   },
   "crons": [
     {
-      "path": "/api/earnings-alerts?notify=1",
+      "path": "/api/earnings-alerts",
       "schedule": "0 3 * * *"
     }
   ]
