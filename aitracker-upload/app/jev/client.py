@@ -61,9 +61,9 @@ class JevClient:
         model: str | None = None,
         timeout_sec: float | None = None,
     ) -> None:
-        self.api_key = api_key or settings.JEV_API_KEY
-        self.model = model or settings.JEV_MODEL
-        self.timeout_sec = timeout_sec if timeout_sec is not None else settings.JEV_TIMEOUT_SEC
+        self.api_key = settings.JEV_API_KEY if api_key is None else api_key
+        self.model = settings.JEV_MODEL if model is None else model
+        self.timeout_sec = settings.JEV_TIMEOUT_SEC if timeout_sec is None else timeout_sec
 
     @property
     def enabled(self) -> bool:
