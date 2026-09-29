@@ -18,6 +18,10 @@ def test_jev_client_evaluate_parses_choice_and_score(tmp_path, monkeypatch):
         status_code = 200
         text = "ok"
 
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("unexpected status")
+
         @staticmethod
         def json():
             return {
@@ -78,10 +82,7 @@ def test_jev_client_evaluate_parses_choice_and_score(tmp_path, monkeypatch):
     assert set(captured["body"]["questions"]) == {"attention", "evidence_quality"}
 
 
-def test_assess_returns_disabled_error_without_key(monkeypatch):
-    import importlib
-    assess_module = importlib.import_module("app.jev.assess")
-    monkeypatch.setattr(assess_module.settings, "JEV_ENABLED", True)
+def test_assess_returns_disabled_error_without_key():
     evaluation = assess("platform", {"x": 1}, JevClient(api_key=""))
     assert not evaluation.usable
     assert "not configured" in evaluation.error
