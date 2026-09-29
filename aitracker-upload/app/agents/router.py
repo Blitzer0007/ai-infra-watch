@@ -92,39 +92,62 @@ _COMMON_UPPERCASE_WORDS = frozenset({
 })
 
 
+_SYMBOL_ALIASES = {
+    "NVIDIA": "NVDA",
+    "MICRON": "MU",
+    "AMD": "AMD",
+    "SANDISK": "SNDK",
+    "MICROSOFT": "MSFT",
+    "META": "META",
+    "METAPLATFORMS": "META",
+    "SERVICENOW": "NOW",
+    "NEBIUS": "NBIS",
+    "DIGIPOWERX": "DGXX",
+    "VIVOPOWER": "VIVO",
+    "PHARVARIS": "PHVS",
+}
+
+
+def _normalize_symbol(symbol: str) -> str:
+    normalized = re.sub(r"[^A-Z0-9.-]", "", symbol.upper())
+    return _SYMBOL_ALIASES.get(normalized, normalized)
+
+
 def extract_symbols(question: str, max_symbols: int = 10) -> list[str]:
-    """Extract explicit ticker symbols from natural-language questions.
+    """Extract ticker symbols and common company-name aliases from a question.
 
     Supports dollar-prefixed symbols, "ticker/symbol/stock NAME" phrases,
-    and conservative uppercase ticker tokens.
+    common company names such as NVIDIA -> NVDA, and conservative uppercase
+    ticker tokens. Returned values are normalized to market tickers.
     """
     symbols: list[str] = []
 
-    for match in re.finditer(r"\$([A-Z][A-Z0-9.-]{0,5})\b", question):
-        sym = match.group(1).upper()
-        if sym not in symbols:
+    def add(raw: str) -> None:
+        sym = _normalize_symbol(raw)
+        if sym and sym not in _COMMON_UPPERCASE_WORDS and sym not in symbols:
             symbols.append(sym)
 
+    # Common company-name aliases are checked before generic token extraction,
+    # so natural-language questions like "latest NVIDIA earnings" resolve to
+    # the actual market ticker NVDA instead of the literal word NVIDIA.
+    for alias in sorted(_SYMBOL_ALIASES, key=len, reverse=True):
+        if re.search(rf"\\b{re.escape(alias)}\\b", question, flags=re.IGNORECASE):
+            add(alias)
+
+    for match in re.finditer(r"\\$([A-Z][A-Z0-9.-]{0,5})\\b", question):
+        add(match.group(1))
+
     for match in re.finditer(
-        r"\b(?:ticker|symbol|stock)\s*[:#-]?\s*([A-Z][A-Z0-9.-]{0,5})\b",
+        r"\\b(?:ticker|symbol|stock)\\s*[:#-]?\\s*([A-Z][A-Z0-9.-]{0,5})\\b",
         question,
         flags=re.IGNORECASE,
     ):
-        sym = match.group(1).upper()
-        if sym not in _COMMON_UPPERCASE_WORDS and sym not in symbols:
-            symbols.append(sym)
+        add(match.group(1))
 
-    for token in re.findall(r"\b[A-Z][A-Z0-9.-]{1,5}\b", question):
-        sym = token.upper().rstrip(".")
-        if (
-            sym not in _COMMON_UPPERCASE_WORDS
-            and any(ch.isalpha() for ch in sym)
-            and sym not in symbols
-        ):
-            symbols.append(sym)
+    for token in re.findall(r"\\b[A-Z][A-Z0-9.-]{1,5}\\b", question):
+        add(token.rstrip("."))
 
     return symbols[:max_symbols]
-
 
 def _build_arguments(tool: ToolInfo, question: str) -> dict[str, Any] | None:
     """Fill a tool's args from the question, or return None if we can't.
