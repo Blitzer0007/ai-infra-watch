@@ -1,5 +1,6 @@
 import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Zap } from 'lucide-react';
 import type { Contract, CongressTrade, MacroRisk } from '../types';
+import JevDecisionPanel from './JevDecisionPanel';
 
 type Price = { price: number; changePct: number };
 type NewsItem = { title?: string; source?: string; url?: string; date?: string };
@@ -147,6 +148,23 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
           <Metric label="Holdings touched" value={String(touched.length)} />
         </div>
       </div>
+
+      <JevDecisionPanel
+        kind="platform"
+        title="Portfolio signal triage"
+        state={{
+          signal_count: signals.length,
+          holdings_touched: touched,
+          signals: signals.slice(0, 8).map((signal) => ({
+            kind: signal.kind,
+            title: signal.title,
+            detail: signal.detail,
+            date: signal.when,
+            affected: signal.affected,
+            source: signal.source,
+          })),
+        }}
+      />
 
       {signals.length === 0 ? (
         <div className="rounded-xl border border-white/5 bg-white/[.02] p-4 text-xs text-white/35">No combined signals are available from the current refresh.</div>
