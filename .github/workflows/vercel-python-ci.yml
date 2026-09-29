@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "api/agent-python.py"
+      - "api/jev-assess.py"
       - "requirements.txt"
       - "aitracker-upload/app/**"
       - "aitracker-upload/mcp_servers/**"
@@ -52,4 +53,20 @@ jobs:
 
           assert module.app.title == "AI Infra Watch Autonomous Agent"
           print("Vercel Python entrypoint import passed")
+          PY
+
+      - name: Compile and import Jev assessment entrypoint
+        run: |
+          python -m py_compile api/jev-assess.py
+          PYTHONPATH=aitracker-upload python - <<'PY'
+          import importlib.util
+
+          spec = importlib.util.spec_from_file_location(
+              "vercel_jev", "api/jev-assess.py"
+          )
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          assert module.app.title == "AI Infra Watch Jev Assessment"
+          print("Jev assessment entrypoint import passed")
           PY
