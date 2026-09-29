@@ -200,7 +200,50 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                     {event.url && <a className="text-cyan-300 hover:text-cyan-200 underline mt-1 inline-block" href={event.url} target="_blank" rel="noreferrer">SEC filing</a>}
                   </td>
                   <td className="p-3 whitespace-nowrap text-white/50">{event.date}</td>
-                  <td className="p-3 text-right text-white">{reaction ? '$' + reaction.eventPrice.toFixed(2) : '—'}</td>
+                  <td className="p-3 text-right text-white">{reaction?.eventPrice != null ? '</td>
+                  <td className={'p-3 text-right font-bold ' + tone(reaction?.t1 ?? null)}>{formatPct(reaction?.t1 ?? null)}</td>
+                  <td className={'p-3 text-right font-bold ' + tone(reaction?.t5 ?? null)}>{formatPct(reaction?.t5 ?? null)}</td>
+                  <td className={'p-3 text-right font-bold ' + tone(reaction?.t20 ?? null)}>{formatPct(reaction?.t20 ?? null)}</td>
+                  <td className={'p-3 text-right font-bold ' + tone(relative(reaction?.t1 ?? null, reaction?.spyT1 ?? null))}>{formatPct(relative(reaction?.t1 ?? null, reaction?.spyT1 ?? null))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+        <Callout icon={<Activity/>} title="How to read it" body="2.02 / results-of-operations events can be used to inspect post-report price reactions. The table measures what happened after the filing, not whether the filing caused the move." />
+        <Callout icon={<ShieldAlert/>} title="Market context" body="The SPY-relative column helps separate a stock-specific move from a broader market move. It is still descriptive, not a causal attribution." />
+      </div>
+    </Panel>
+  );
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:React.ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4">
+      <div className="text-sm font-bold">{title}</div>
+      <div className="text-[11px] text-white/40 mt-1">{subtitle}</div>
+    </div>
+    {children}
+  </section>;
+}
+
+function Metric({label,value,suffix,tone}:{label:string;value:string;suffix:string;tone?:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/30">{label}</div>
+    <div className={'text-lg font-black mt-2 ' + (tone || 'text-white')}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Callout({icon,title,body}:{icon:React.ReactNode;title:string;body:string}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2 leading-5">{body}</div>
+  </div>;
+}
+ + reaction.eventPrice.toFixed(2) : '—'}</td>
                   <td className={'p-3 text-right font-bold ' + tone(reaction?.t1 ?? null)}>{formatPct(reaction?.t1 ?? null)}</td>
                   <td className={'p-3 text-right font-bold ' + tone(reaction?.t5 ?? null)}>{formatPct(reaction?.t5 ?? null)}</td>
                   <td className={'p-3 text-right font-bold ' + tone(reaction?.t20 ?? null)}>{formatPct(reaction?.t20 ?? null)}</td>
