@@ -2,35 +2,20 @@ import { useState, useEffect } from 'react';
 import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-react';
 import { MacroRisk } from '../types';
 import { PORTFOLIO_POSITIONS } from '../utils/portfolioPositions';
+import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
   livePrices?: Record<string, { price: number; changePct: number }>;
+  contracts?: any[];
+  news?: any[];
 }
 
-type ExposureLevel = 'Direct' | 'Secondary' | 'Limited';
-
-
-
-const PORTFOLIO_EXPOSURE = [
-  { symbol: 'DGXX', taiwan: 'Limited', power: 'Direct', export: 'Limited' },
-  { symbol: 'DRAM', taiwan: 'Direct', power: 'Secondary', export: 'Secondary' },
-  { symbol: 'SOXL', taiwan: 'Direct', power: 'Secondary', export: 'Direct' },
-  { symbol: 'NVDA', taiwan: 'Direct', power: 'Secondary', export: 'Direct' },
-  { symbol: 'MSFT', taiwan: 'Secondary', power: 'Secondary', export: 'Secondary' },
-  { symbol: 'NBIS', taiwan: 'Secondary', power: 'Direct', export: 'Secondary' },
-  { symbol: 'VIVO', taiwan: 'Limited', power: 'Direct', export: 'Limited' },
-  { symbol: 'META', taiwan: 'Secondary', power: 'Secondary', export: 'Secondary' },
-  { symbol: 'NOW', taiwan: 'Limited', power: 'Secondary', export: 'Limited' },
-  { symbol: 'PHVS', taiwan: 'Limited', power: 'Limited', export: 'Limited' },
-] as const;
-
-function exposureClass(level: 'Direct' | 'Secondary' | 'Limited') {
+function exposureClass(level: ExposureLevel) {
   if (level === 'Direct') return 'bg-rose-500/10 text-rose-300 border-rose-500/20';
   if (level === 'Secondary') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
   return 'bg-white/5 text-white/40 border-white/10';
 }
-
 
 function exposureFactor(level: ExposureLevel) {
   if (level === 'Direct') return 1;
@@ -43,14 +28,19 @@ function PortfolioScenarioSensitivity({
   gridSeverity,
   embargoBreadth,
   livePrices = {},
+  contracts = [],
+  news = [],
 }: {
   taiwanProb: number;
   gridSeverity: number;
   embargoBreadth: number;
   livePrices?: Record<string, { price: number; changePct: number }>;
+  contracts?: any[];
+  news?: any[];
 }) {
+  const derivedExposure = derivePortfolioExposure(PORTFOLIO_POSITIONS.map(position => position.symbol), contracts, news);
   const totalInvested = PORTFOLIO_POSITIONS.reduce((sum, position) => sum + position.investedValue, 0);
-  const portfolioRows = PORTFOLIO_EXPOSURE.map((exposure) => {
+  const portfolioRows = derivedExposure.map((exposure) => {
     const position = PORTFOLIO_POSITIONS.find((item) => item.symbol === exposure.symbol);
     const live = livePrices[exposure.symbol];
     const currentValue = live?.price != null && position
@@ -110,9 +100,9 @@ function PortfolioScenarioSensitivity({
               <tr key={row.symbol} className="border-t border-white/5">
                 <td className="p-2 font-black text-white">{row.symbol}</td>
                 <td className="p-2 text-right text-white/60">{row.portfolioWeight.toFixed(1)}%</td>
-                <td className="p-2 text-center"><ExposurePill level={row.taiwan} /></td>
-                <td className="p-2 text-center"><ExposurePill level={row.power} /></td>
-                <td className="p-2 text-center"><ExposurePill level={row.export} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.power.level} basis={row.power.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.export.level} basis={row.export.basis} /></td>
                 <td className="p-2 text-right font-black text-white">{row.sensitivity}/100</td>
                 <td className="p-2 text-right text-cyan-300 font-bold">{row.weightedContribution.toFixed(1)}</td>
               </tr>
@@ -128,22 +118,26 @@ function PortfolioScenarioSensitivity({
   );
 }
 
-function ExposurePill({ level }: { level: ExposureLevel }) {
+function ExposurePill({ level, basis }: { level: ExposureLevel; basis?: string }) {
   return (
-    <span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(level)}>
+    <span
+      title={basis ? 'Evidence basis: ' + basis : undefined}
+      className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(level)}
+    >
       {level}
     </span>
   );
 }
 
-function PortfolioExposureMatrix() {
+function PortfolioExposureMatrix({ contracts = [], news = [] }: { contracts?: any[]; news?: any[] }) {
+  const derivedExposure = derivePortfolioExposure(PORTFOLIO_POSITIONS.map(position => position.symbol), contracts, news);
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
         <div>
           <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Exposure Matrix</h3>
           <p className="text-[10px] text-white/35 mt-1 font-mono">
-            Scenario exposure across your 10 held positions. This is an internal exposure lens, not a probability forecast.
+            Evidence-adjusted exposure from portfolio metadata plus matching contract/news evidence. Missing live evidence does not create direct exposure.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
@@ -164,12 +158,12 @@ function PortfolioExposureMatrix() {
             </tr>
           </thead>
           <tbody>
-            {PORTFOLIO_EXPOSURE.map((row) => (
+            {derivedExposure.map((row) => (
               <tr key={row.symbol} className="border-t border-white/5">
                 <td className="p-2 font-black text-white">{row.symbol}</td>
-                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.taiwan)}>{row.taiwan}</span></td>
-                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.power)}>{row.power}</span></td>
-                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.export)}>{row.export}</span></td>
+                <td className="p-2 text-center"><ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.power.level} basis={row.power.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.export.level} basis={row.export.basis} /></td>
               </tr>
             ))}
           </tbody>
@@ -179,7 +173,7 @@ function PortfolioExposureMatrix() {
   );
 }
 
-export default function MacroPolitics({ liveRisks, livePrices = {} }: MacroPoliticsProps) {
+export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [] }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
@@ -252,13 +246,15 @@ export default function MacroPolitics({ liveRisks, livePrices = {} }: MacroPolit
         </div>
       </div>
 
-      <PortfolioExposureMatrix />
+      <PortfolioExposureMatrix contracts={contracts} news={news} />
 
       <PortfolioScenarioSensitivity
         taiwanProb={taiwanProb}
         gridSeverity={gridSeverity}
         embargoBreadth={embargoBreadth}
         livePrices={livePrices}
+        contracts={contracts}
+        news={news}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
