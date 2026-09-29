@@ -12,7 +12,7 @@
     },
     "api/*.py": {
       "maxDuration": 60,
-      "excludeFiles": "{aitracker-upload/data/**,aitracker-upload/tests/**,aitracker-upload/.cache/**,aitracker-upload/app/rag/**,aitracker-upload/app/assertions/**,aitracker-upload/app/eval/**,aitracker-upload/app/harness/**,aitracker-upload/app/universe/**,aitracker-upload/app/main.py,aitracker-upload/requirements-rag.txt,.github/**,*.zip,node_modules/**,dist/**}"
+      "excludeFiles": "{aitracker-upload/app/rag/**,aitracker-upload/app/assertions/**,aitracker-upload/app/eval/**,aitracker-upload/app/harness/**,aitracker-upload/app/universe/**,aitracker-upload/tests/**}"
     },
     "api/earnings-alerts.js": {
       "maxDuration": 30
