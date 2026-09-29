@@ -533,6 +533,47 @@ class AutonomousMCPAgent:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
         for iteration in range(1, self.max_steps + 1):
+            # Driver investigations use a bounded evidence sequence instead of
+            # the generic planner. Still run Jev once so the research trace
+            # records the routing decision even when the forced plan controls
+            # the actual multi-source evidence sequence.
+            if (
+                iteration == 1
+                and self.jev.enabled
+                and not self.last_jev
+                and any(
+                    term in question.lower()
+                    for term in (
+                        "driver",
+                        "drivers",
+                        "why",
+                        "cause",
+                        "causes",
+                        "catalyst",
+                        "catalysts",
+                        "changed recently",
+                        "what changed",
+                    )
+                )
+            ):
+                try:
+                    decision = _jev_route(question, tools, self.jev)
+                    self.last_jev = {
+                        "enabled": True,
+                        "choice": decision.choice,
+                        "confidence": decision.confidence,
+                        "probabilities": decision.probabilities or {},
+                        "model": decision.model,
+                        "latency_ms": round(decision.latency_ms, 1),
+                        "action": "forced_driver_plan",
+                    }
+                except Exception as exc:
+                    self.last_jev = {
+                        "enabled": True,
+                        "action": "fallback",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+
             # For "what changed / why / drivers" questions, require evidence
             # retrieval before allowing the LLM planner to settle on quote-only
             # data. This prevents repeated quote calls from consuming all steps.
