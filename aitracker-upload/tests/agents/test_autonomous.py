@@ -241,3 +241,20 @@ def test_autonomous_jev_high_confidence_routes_to_earnings_tool():
     assert result.jev["choice"] == "earnings"
     assert result.jev["confidence"] == 0.96
 
+
+
+def test_autonomous_jev_is_recorded_for_forced_driver_research():
+    tb, _ = _toolbox()
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            client=LLMClient(provider="stub", model="stub"),
+            jev=_FakeJev(),
+            max_steps=1,
+        )
+        result = agent.run("What changed recently for AMD and what are the main drivers?")
+    finally:
+        tb.close()
+
+    assert result.jev["choice"] == "earnings"
+    assert result.jev["action"] == "forced_driver_plan"
