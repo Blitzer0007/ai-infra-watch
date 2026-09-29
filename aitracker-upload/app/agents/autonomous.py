@@ -386,7 +386,7 @@ class AutonomousMCPAgent:
     def _plan(self, question: str, tools: list[ToolInfo], history: list[dict[str, Any]]) -> dict[str, Any]:
         if self.planner is not None:
             return self.planner(question, tools, history)
-        if self.jev.enabled and mode != "keyword" and self.client.provider != "stub":
+        if self.jev.enabled and mode != "keyword":
             try:
                 decision = _jev_route(question, tools, self.jev)
                 self.last_jev = {
