@@ -713,36 +713,6 @@ class AutonomousMCPAgent:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
         for iteration in range(1, self.max_steps + 1):
-            # For compound research questions, evaluate evidence sufficiency once
-            # after two successful sources. Low/sparse evidence forces another
-            # source; strong evidence can stop the loop before the hard step bound.
-            successful_count = sum(1 for call in calls if call.ok)
-            last_gate = self.last_jev.get("evidence_gate") or {}
-            last_gate_checked = int(last_gate.get("checked_after_successful_calls", 0) or 0)
-            if (
-                _needs_evidence_gate(question)
-                and self.jev.enabled
-                and successful_count >= 2
-                and successful_count > last_gate_checked
-            ):
-                gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
-                prior_checks = int(last_gate.get("checks", 0) or 0)
-                gate["checks"] = prior_checks + 1
-                self.last_jev["evidence_gate"] = gate
-                steps.append(
-                    Step(
-                        node="evidence_gate",
-                        kind="node",
-                        note=f"action={gate_decision}; successful_calls={gate['checked_after_successful_calls']}",
-                    )
-                )
-                if gate_decision == "stop":
-                    return self._finalize(
-                        question,
-                        calls,
-                        steps,
-                        resolution="jev_evidence_sufficient",
-                    )
             # Driver investigations use a bounded evidence sequence instead of
             # the generic planner. Still run Jev once so the research trace
             # records the routing decision even when the forced plan controls
@@ -931,6 +901,33 @@ class AutonomousMCPAgent:
                 calls.append(record)
                 steps.append(tool_call(tool_name, arguments, note="ok"))
                 history.append({"tool": tool_name, "arguments": arguments, "output": _result_preview(output)})
+
+                # Recheck evidence sufficiency immediately after a new source
+                # arrives. This avoids losing the second Jev check when the
+                # additional source is collected on the final loop iteration.
+                if _needs_evidence_gate(question) and self.jev.enabled:
+                    successful_count = sum(1 for call in calls if call.ok)
+                    last_gate = self.last_jev.get("evidence_gate") or {}
+                    last_gate_checked = int(last_gate.get("checked_after_successful_calls", 0) or 0)
+                    if successful_count >= 2 and successful_count > last_gate_checked:
+                        gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
+                        prior_checks = int(last_gate.get("checks", 0) or 0)
+                        gate["checks"] = prior_checks + 1
+                        self.last_jev["evidence_gate"] = gate
+                        steps.append(
+                            Step(
+                                node="evidence_gate",
+                                kind="node",
+                                note=f"action={gate_decision}; successful_calls={gate['checked_after_successful_calls']}",
+                            )
+                        )
+                        if gate_decision == "stop":
+                            return self._finalize(
+                                question,
+                                calls,
+                                steps,
+                                resolution="jev_evidence_sufficient",
+                            )
 
                 # A high-confidence Jev direct route needs only the selected
                 # evidence call. Finalize immediately instead of spending an
