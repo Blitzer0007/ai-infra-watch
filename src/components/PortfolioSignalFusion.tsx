@@ -44,6 +44,26 @@ function newsSymbols(title: string) {
   return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => text.includes(term))).map(([key]) => key));
 }
 
+function evidenceProfile(kind: string, source: string) {
+  if (kind === 'Contract' && source === 'SEC EDGAR') {
+    return { level: 'PRIMARY', note: 'Primary SEC filing' };
+  }
+  if (kind === 'Congress') {
+    return { level: 'PUBLIC DISCLOSURE', note: 'Public transaction disclosure' };
+  }
+  if (kind === 'Macro') {
+    return { level: 'RISK LEDGER', note: 'Live macro indicator' };
+  }
+  return { level: 'NEWS', note: 'Secondary reporting source' };
+}
+
+function evidenceBadge(level: string) {
+  if (level === 'PRIMARY') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
+  if (level === 'PUBLIC DISCLOSURE') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
+  if (level === 'RISK LEDGER') return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
+  return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
+}
+
 function badge(kind: string) {
   if (kind === 'Contract') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
   if (kind === 'Congress') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
@@ -119,7 +139,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
           </div>
           <h2 className="text-lg font-black mt-1">What changed → Why it matters → Which holdings are affected</h2>
           <p className="text-[10px] text-white/35 mt-1 max-w-3xl">
-            Combines recent SEC contract disclosures, public congressional transaction records, macro indicators and matched news. Price moves are shown as context, not attributed to the signal.
+            Combines recent SEC contract disclosures, public congressional transaction records, macro indicators and matched news. Each signal is labeled by evidence source; price moves are shown as context, not attributed to the signal.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 min-w-[240px]">
@@ -143,7 +163,10 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
                     <div>
                       <div className="text-xs font-bold text-white">{signal.title}</div>
-                      <div className="text-[9px] text-white/25 font-mono mt-1">{date(signal.when)} · {signal.source}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-white/25 font-mono mt-1">
+                        <span>{date(signal.when)} · {signal.source}</span>
+                        <span title={evidence.note} className={'rounded border px-1.5 py-0.5 uppercase tracking-wider ' + evidenceBadge(evidence.level)}>{evidence.level}</span>
+                      </div>
                     </div>
                     {signal.url && <a href={signal.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[9px] font-mono text-cyan-300 hover:text-cyan-200">Source <ArrowUpRight className="w-3 h-3" /></a>}
                   </div>
