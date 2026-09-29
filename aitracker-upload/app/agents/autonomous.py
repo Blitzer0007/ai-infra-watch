@@ -420,38 +420,90 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     return decision, gate
 
 
+def _evidence_family(tool_name: str) -> str:
+    """Normalize MCP tools into broad evidence channels to avoid redundant sources."""
+    name = tool_name.lower()
+    if name.startswith("news."):
+        return "news"
+    if "get_event_study" in name:
+        return "event_study"
+    if "get_earnings" in name:
+        return "earnings"
+    if name.startswith("filings."):
+        return "sec"
+    if "congress" in name:
+        return "congress"
+    if "macro" in name or "risk" in name:
+        return "macro"
+    if "rotation" in name or "relationship" in name:
+        return "relationship"
+    if any(token in name for token in (".get_quote", ".get_quotes", ".get_snapshot")):
+        return "market"
+    return name.split(".", 1)[0] if "." in name else name
+
+
+def _question_evidence_priorities(question: str) -> tuple[str, ...]:
+    """Return evidence channels in a deterministic complementary order."""
+    lower = question.lower()
+    priorities: list[str] = []
+    if any(term in lower for term in ("earnings", "earning", "eps", "revenue surprise")):
+        priorities.extend(["earnings", "event_study"])
+    if any(term in lower for term in ("reaction", "event study", "reacted", "price moved", "price movement")):
+        priorities.append("event_study")
+    if any(term in lower for term in ("sec", "filing", "contract", "disclosure", "material agreement")):
+        priorities.append("sec")
+    if any(term in lower for term in ("congress", "senator", "representative", "official trade")):
+        priorities.append("congress")
+    if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid", "risk")):
+        priorities.append("macro")
+    if any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact", "affected")):
+        priorities.extend(["news", "sec", "event_study"])
+    # For broad analysis questions, prefer independent primary/secondary channels.
+    priorities.extend(["news", "sec", "event_study", "earnings", "macro", "congress"])
+    return tuple(dict.fromkeys(priorities))
+
+
 def _next_evidence_plan(
     question: str,
     tools: list[ToolInfo],
     calls: list[ToolCallRecord],
 ) -> dict[str, Any] | None:
-    """Pick a simple unused evidence tool when the gate requires another source."""
+    """Pick the strongest unused complementary evidence channel."""
     symbols = extract_symbols(question)
     used = {call.tool for call in calls if call.ok}
-    lower = question.lower()
-    used_quote_family = any(
-        call.ok and any(token in call.tool.lower() for token in (".get_quote", ".get_quotes", ".get_snapshot"))
+    used_families = {
+        _evidence_family(call.tool)
         for call in calls
-    )
+        if call.ok
+    }
+    lower = question.lower()
+    used_quote_family = "market" in used_families
 
     def candidate_score(tool: ToolInfo) -> int:
         name = tool.qualified_name.lower()
+        family = _evidence_family(name)
+        if family in used_families:
+            return -100
         score = 0
-        if "news." in name and any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact")):
-            score += 8
-        if "filings." in name and any(term in lower for term in ("why", "driver", "changed", "catalyst", "contract", "impact")):
-            score += 8
-        if "earnings" in name and "earnings" in lower:
-            score += 8
-        if "event_study" in name and any(term in lower for term in ("reaction", "event study", "earnings")):
-            score += 8
-        if "congress" in name and "congress" in lower:
-            score += 8
-        if "macro" in name and any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
-            score += 8
-        if "symbol" in ((tool.input_schema or {}).get("properties") or {}) and symbols:
+        priorities = _question_evidence_priorities(question)
+        if family in priorities:
+            score += max(1, 12 - priorities.index(family))
+        if family == "news" and any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact")):
+            score += 6
+        if family == "sec" and any(term in lower for term in ("why", "driver", "changed", "catalyst", "contract", "impact")):
+            score += 6
+        if family == "event_study" and any(term in lower for term in ("reaction", "event study", "earnings", "changed")):
+            score += 6
+        if family == "earnings" and "earnings" in lower:
+            score += 7
+        if family == "congress" and "congress" in lower:
+            score += 7
+        if family == "macro" and any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
+            score += 7
+        props = (tool.input_schema or {}).get("properties") or {}
+        if "symbol" in props and symbols:
             score += 2
-        if "symbols" in ((tool.input_schema or {}).get("properties") or {}) and symbols:
+        if "symbols" in props and symbols:
             score += 2
         return score
 
@@ -460,10 +512,10 @@ def _next_evidence_plan(
         key=lambda tool: (-candidate_score(tool), tool.qualified_name),
     )
     for tool in ranked:
-        if (
-            used_quote_family
-            and any(token in tool.qualified_name.lower() for token in (".get_quote", ".get_quotes", ".get_snapshot"))
-        ):
+        family = _evidence_family(tool.qualified_name)
+        if family in used_families:
+            continue
+        if used_quote_family and family == "market":
             continue
         props = (tool.input_schema or {}).get("properties") or {}
         required = _required_params(tool)
@@ -483,9 +535,10 @@ def _next_evidence_plan(
                 "action": "tool",
                 "tool": tool.qualified_name,
                 "arguments": args,
-                "reason": "Jev evidence gate requested an additional independent source",
+                "reason": f"Jev evidence gate requested another independent {family} source",
             }
     return None
+
 
 def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
     """Readable fallback when the final LLM synthesis is unavailable."""
@@ -507,7 +560,7 @@ def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
     return "\n".join(lines)
 
 
-def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
+def _final_prompt(question: str, calls: list[ToolCallRecord], evidence_status: str = "") -> str:
     evidence = [{
         "tool": c.tool,
         "ok": c.ok,
@@ -519,12 +572,16 @@ def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
 Question:
 {question}
 
+Evidence status:
+{evidence_status or "sufficientity not independently reported"}
+
 Retrieved evidence:
 {json.dumps(evidence, ensure_ascii=False, indent=2, default=str)}
 
 Requirements:
 - Separate retrieved facts from interpretation.
 - State missing or conflicting evidence.
+- If evidence status is "insufficient", explicitly say the available evidence did not meet the research sufficiency gate and keep conclusions provisional.
 - Do not invent prices, events, contracts, or causal explanations.
 - Do not present model signals as guaranteed outcomes.
 - For event-study output, report the actual number of returned events and distinguish
@@ -662,7 +719,7 @@ class AutonomousMCPAgent:
             ):
                 final_client = LLMClient(provider=final_provider, model=final_model)
             final_text = final_client.generate(
-                _final_prompt(question, successful),
+                _final_prompt(question, successful, evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else "")),
                 max_tokens=settings.LLM_FINAL_MAX_TOKENS,
                 temperature=0.0,
                 timeout_sec=settings.LLM_FINAL_TIMEOUT_SEC,
@@ -712,7 +769,11 @@ class AutonomousMCPAgent:
         if not tools:
             return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
 
-        for iteration in range(1, self.max_steps + 1):
+        step_limit = self.max_steps + (
+            2 if _needs_evidence_gate(question) and self.jev.enabled else 0
+        )
+        evidence_budget = step_limit
+        for iteration in range(1, step_limit + 1):
             # Driver investigations use a bounded evidence sequence instead of
             # the generic planner. Still run Jev once so the research trace
             # records the routing decision even when the forced plan controls
@@ -939,6 +1000,27 @@ class AutonomousMCPAgent:
                     return self._finalize(question, calls, steps)
 
         successful = [c for c in calls if c.ok]
+        gate = self.last_jev.get("evidence_gate") or {}
+        if successful and _needs_evidence_gate(question) and gate.get("action") == "gather_more":
+            gate = dict(gate)
+            gate["action"] = "insufficient"
+            gate["budget_exhausted"] = True
+            gate["evidence_budget"] = evidence_budget
+            gate["checked_sources"] = len(successful)
+            self.last_jev["evidence_gate"] = gate
+            steps.append(
+                Step(
+                    node="evidence_gate",
+                    kind="node",
+                    note=f"action=insufficient; evidence budget exhausted at {len(successful)} successful calls",
+                )
+            )
+            return self._finalize(
+                question,
+                calls,
+                steps,
+                resolution="jev_evidence_insufficient",
+            )
         if successful:
             return self._finalize(question, calls, steps, resolution="max_steps")
 
