@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { ArrowRight, BriefcaseBusiness, Cpu, Gauge, Link2, Waves } from 'lucide-react';
 import { Contract } from '../types';
 
@@ -221,7 +221,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
   );
 }
 
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-lg border border-white/5 bg-black/10 p-3">
       <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-widest text-white/25">
