@@ -1,12 +1,5 @@
-# Keep the deployment payload focused on runtime code and small configuration.
-# Live SEC filings are refreshed by the scheduled ingestion workflow and are
-# fetched directly by the live EDGAR client; they are not required in the
-# Vercel function package.
-aitracker-upload/data/filings/**
-aitracker-upload/tests/**
-aitracker-upload/.cache/**
-aitracker-upload/data/traces/**
-.github/**
-*.zip
+# Only omit build artifacts and local dependency directories.
+# Runtime/source files remain available to Vercel's Python function tracer.
 node_modules/**
 dist/**
+*.zip
