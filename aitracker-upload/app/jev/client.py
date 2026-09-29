@@ -7,7 +7,7 @@ https://api.typesafe.ai/v1/systemone
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+import time
 
 import httpx
 
@@ -68,8 +68,8 @@ class JevClient:
         }
 
         try:
-            started = httpx.Timeout(self.timeout_sec)
-            with httpx.Client(timeout=started) as client:
+            started_at = time.perf_counter()
+            with httpx.Client(timeout=httpx.Timeout(self.timeout_sec)) as client:
                 response = client.post(
                     f"{settings.JEV_BASE_URL.rstrip('/')}/v1/systemone",
                     headers={
@@ -96,6 +96,7 @@ class JevClient:
                 confidence=float(answer.get("confidence") or 0.0),
                 probabilities=normalized,
                 model=str(payload.get("model") or self.model),
+                latency_ms=(time.perf_counter() - started_at) * 1000.0,
             )
         except (httpx.HTTPError, ValueError, TypeError) as exc:
             return JevDecision(error=f"{type(exc).__name__}: {exc}")
