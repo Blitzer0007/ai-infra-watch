@@ -25,6 +25,25 @@ function confidence(value?: number | null) {
   return typeof value === 'number' ? Math.round(value * 100) + '%' : 'n/a';
 }
 
+function evidenceQuality(score?: number | null) {
+  if (typeof score !== 'number' || Number.isNaN(score)) {
+    return { percent: null, label: 'n/a' };
+  }
+
+  // TypeSafe Score uses the four-level criteria as an ordinal scale:
+  // 0 = first criterion ... 3 = fourth criterion. Normalize that scale to 0-100
+  // so every Jev panel presents the same human-readable evidence-quality metric.
+  const normalized = Math.max(0, Math.min(3, score)) / 3 * 100;
+  const percent = Math.round(normalized);
+  const label =
+    percent < 25 ? 'Minimal' :
+    percent < 50 ? 'Partial' :
+    percent < 75 ? 'Usable' :
+    'Strong';
+
+  return { percent, label };
+}
+
 export default function JevDecisionPanel({
   kind,
   state,
@@ -132,17 +151,59 @@ export default function JevDecisionPanel({
 
               {answer.type === 'score' && (
                 <>
-                  <div className="mt-2 text-sm font-black text-white">
-                    {typeof answer.score === 'number' ? answer.score.toFixed(2) : 'n/a'}
-                    {answer.legend?.[String(Math.round(answer.score ?? 0))] && (
-                      <span className="text-[9px] font-mono font-normal text-white/35 ml-2">
-                        {answer.legend[String(Math.round(answer.score ?? 0))]}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 text-[9px] font-mono text-fuchsia-200/70">
-                    confidence {confidence(answer.confidence)}
-                  </div>
+                  {key === 'evidence_quality' ? (
+                    (() => {
+                      const quality = evidenceQuality(answer.score);
+                      return (
+                        <>
+                          <div className="mt-2 flex items-end justify-between gap-3">
+                            <div className="text-sm font-black text-white">
+                              {quality.percent != null ? quality.percent + '/100' : 'n/a'}
+                              <span className="text-[9px] font-mono font-normal text-white/35 ml-2">
+                                {quality.label}
+                              </span>
+                            </div>
+                            {typeof answer.score === 'number' && (
+                              <span className="text-[9px] font-mono text-white/25">
+                                Jev {answer.score.toFixed(2)} / 3.00
+                              </span>
+                            )}
+                          </div>
+                          {quality.percent != null && (
+                            <div
+                              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5"
+                              aria-label={'Evidence quality ' + quality.percent + ' out of 100'}
+                            >
+                              <div
+                                className="h-full rounded-full bg-fuchsia-300/80 transition-all"
+                                style={{ width: quality.percent + '%' }}
+                              />
+                            </div>
+                          )}
+                          <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/25">
+                            0–24 Minimal · 25–49 Partial · 50–74 Usable · 75–100 Strong
+                          </div>
+                          <div className="mt-1 text-[9px] font-mono text-fuchsia-200/70">
+                            confidence {confidence(answer.confidence)}
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <>
+                      <div className="mt-2 text-sm font-black text-white">
+                        {typeof answer.score === 'number' ? answer.score.toFixed(2) : 'n/a'}
+                        {answer.legend?.[String(Math.round(answer.score ?? 0))] && (
+                          <span className="text-[9px] font-mono font-normal text-white/35 ml-2">
+                            {answer.legend[String(Math.round(answer.score ?? 0))]}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-[9px] font-mono text-fuchsia-200/70">
+                        confidence {confidence(answer.confidence)}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
