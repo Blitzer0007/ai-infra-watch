@@ -38,7 +38,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
   return (
     <div className="space-y-6" id="contracts-view">
       {/* Page Header */}
-      <div className="flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 02 / Markets</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
           AI Infrastructure Contracts Ledger
