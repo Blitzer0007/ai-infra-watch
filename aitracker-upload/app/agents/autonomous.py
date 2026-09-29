@@ -550,16 +550,7 @@ class AutonomousMCPAgent:
 
         successful = [c for c in calls if c.ok]
         if successful:
-            try:
-                return self._finalize(question, calls, steps)
-            except Exception as exc:
-                final_text = _result_preview(successful[-1].output, 2000)
-                error = f"finalization_failed: {type(exc).__name__}: {exc}"
-                steps.append(Step(node="finalize", kind="node", note=error))
-                return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), answer_source="deterministic-fallback", error=error, resolution="max_steps")
-            steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
-            steps.append(Step(node="finalize", kind="node", note="max steps reached"))
-            return AutonomousResult(question, final_text, calls, discovered, AgentTrajectory(steps=steps), answer_source="agent-llm", resolution="max_steps")
+            return self._finalize(question, calls, steps, resolution="max_steps")
 
         steps.append(Step(node="finalize", kind="node", note="no successful calls"))
         return AutonomousResult(question, "No MCP tool produced usable evidence.", calls, discovered, AgentTrajectory(steps=steps), error="no successful tool calls", resolution="error")
