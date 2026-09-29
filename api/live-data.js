@@ -94,31 +94,23 @@ async function fetchSecContracts() {
   }
 }
 
-async function fetchCongressTrades() {
-  const symbols = new Set(['NVDA','MSFT','NBIS','META','NOW','SNDK','MU','AMD','AMPG','DGXX']);
+async function fetchCongressTrades(req) {
   try {
-    // Use one global request instead of one request per ticker. This stays within
-    // Bargo's keyless rate limit and avoids partial/empty results on Vercel.
-    const response = await fetch(
-      'https://www.bargo.ai/free-apis/congress/v1/trades?limit=100',
-      { headers: { 'User-Agent': 'AI Infra Watch/1.0' } }
-    );
+    const host = req?.headers?.host;
+    const forwardedProto = req?.headers?.['x-forwarded-proto'];
+    const origin = host
+      ? (forwardedProto ? String(forwardedProto).split(',')[0].trim() : 'https') + '://' + host
+      : 'http://localhost';
+
+    const response = await fetch(origin + '/api/congress-trades?symbol=ALL', {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(9000),
+    });
+
     if (!response.ok) return [];
+
     const payload = await response.json();
-    return (payload?.trades || [])
-      .filter((t) => symbols.has(String(t.ticker || '').toUpperCase()))
-      .map((t, index) => ({
-        id: 'congress-' + String(t.ticker || '') + '-' + String(t.disclosure_date || t.transaction_date || '') + '-' + index,
-        politician: t.member || 'Unknown filer',
-        chamber: String(t.chamber || '').toLowerCase() === 'senate' ? 'Senate' : 'House',
-        stockSymbol: String(t.ticker || '').toUpperCase(),
-        transactionType: String(t.type || '').toLowerCase().includes('sale') ? 'sell' : 'buy',
-        amountRange: t.amount_range || 'Not disclosed',
-        date: t.disclosure_date || t.transaction_date || '',
-        stockPrice: typeof t.est_price === 'number' ? t.est_price : 0
-      }))
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-      .slice(0, 100);
+    return Array.isArray(payload?.trades) ? payload.trades : [];
   } catch {
     return [];
   }
@@ -198,7 +190,7 @@ export default async function handler(req, res) {
     stockPrices,
     news: currentNews,
     contracts: await fetchSecContracts(),
-    congressTrades: await fetchCongressTrades(),
+    congressTrades: await fetchCongressTrades(req),
     macroRisks,
     marketSentiment:'Live quotes + AI-infrastructure news feed active.',
     sources:['Yahoo Finance chart data','GDELT news','SEC EDGAR','Bargo Congress Trades API']
