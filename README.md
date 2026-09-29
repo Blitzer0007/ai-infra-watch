@@ -38,3 +38,21 @@ There are two backend paths in this repository:
 The Python backend defaults to `LLM_PROVIDER=stub`, so CI and local hermetic tests do not need an LLM key. For the autonomous agent to use a real model, set `LLM_PROVIDER=openai` or `LLM_PROVIDER=anthropic` and provide the matching key.
 
 See [`API_KEYS.md`](API_KEYS.md) for the exact environment setup.
+
+## Earnings alerting
+
+The dashboard now has a server-side earnings alert route at `/api/earnings-alerts`. It monitors the portfolio + configured stock universe, checks the next 14 days of Finnhub earnings dates, and prepares a T-1 alert with announcement timing, consensus estimates, impact channels, and direct/linked holdings.
+
+For independent delivery when the browser is closed, configure these Vercel environment variables:
+
+```text
+FINNHUB_API_KEY=...
+NOTIFY_WEBHOOK_URL=...
+CRON_SECRET=...
+EARNINGS_ALERT_LEAD_DAYS=1
+```
+
+The project cron calls `/api/earnings-alerts` daily at 03:00 UTC (~08:30 IST; Vercel cron execution timing depends on plan/runtime). The route only sends the due T-1 events and is idempotent by earnings date. The browser panel also supports optional local browser notifications while the dashboard is open.
+
+The Finnhub key saved in the browser Settings page is separate from the Vercel server-side key used by the scheduled alert.
+
