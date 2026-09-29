@@ -5,15 +5,22 @@ import { buildIntelligence } from '../utils/intelligence';
 import { buildPositionAnalyses, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
+import PortfolioSignalFusion from './PortfolioSignalFusion';
 
 type Price = { price: number; changePct: number };
-type Props = { livePrices?: Record<string, Price> };
+type Props = {
+  livePrices?: Record<string, Price>;
+  contracts?: any[];
+  congressTrades?: any[];
+  macroRisks?: any[];
+  news?: any[];
+};
 
 const WATCHLIST = STOCK_UNIVERSE;
 const NETWORK_NODES: Array<[string, number, number]> = [['NVDA',140,210],['AMD',330,100],['MU',330,320],['META',550,100],['NOW',550,320],['NBIS',790,150],['CRM',790,290]];
 
 
-export default function PortfolioIntelligence({ livePrices = {} }: Props) {
+export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [] }: Props) {
   const [tab, setTab] = useState('overview');
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('All');
@@ -55,6 +62,14 @@ export default function PortfolioIntelligence({ livePrices = {} }: Props) {
           <span className="px-2 py-1 rounded-full border border-white/10">RISK REVIEWS {riskReviews}</span>
         </div>
       </div>
+
+      <PortfolioSignalFusion
+        prices={livePrices}
+        contracts={contracts}
+        congressTrades={congressTrades}
+        macroRisks={macroRisks}
+        news={news}
+      />
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
         <Metric label="Invested cost" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
