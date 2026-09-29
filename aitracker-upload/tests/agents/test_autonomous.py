@@ -395,7 +395,7 @@ def test_jev_low_evidence_quality_forces_another_source():
     assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
-    assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
+    assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
 
 
 def test_recent_developments_affect_question_uses_evidence_gate():
