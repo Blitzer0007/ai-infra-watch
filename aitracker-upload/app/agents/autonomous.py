@@ -458,9 +458,37 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
         priorities.append("macro")
     if any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact", "affected")):
         priorities.extend(["news", "sec", "event_study"])
-    # For broad analysis questions, prefer independent primary/secondary channels.
     priorities.extend(["news", "sec", "event_study", "earnings", "macro", "congress"])
     return tuple(dict.fromkeys(priorities))
+
+
+def _channel_tool_usable(family: str, name: str) -> bool:
+    """Reject tool names that only happen to belong to a family but are not evidence queries."""
+    lower = name.lower()
+    if family == "news":
+        return any(
+            token in lower
+            for token in ("news.search", "news.company", "news.sector", "news.global", "news.geopolitical", "news.health")
+        )
+    if family == "sec":
+        return any(
+            token in lower
+            for token in (
+                "filings.get_catalysts",
+                "filings.search_filings",
+                "filings.get_filings",
+                "filings.get_contracts",
+                "filings.get_milestones",
+                "filings.get_documents",
+            )
+        )
+    if family == "event_study":
+        return "get_event_study" in lower
+    if family == "earnings":
+        return "get_earnings" in lower
+    if family == "market":
+        return any(token in lower for token in (".get_quote", ".get_quotes", ".get_snapshot"))
+    return True
 
 
 def _next_evidence_plan(
@@ -471,18 +499,13 @@ def _next_evidence_plan(
     """Pick the strongest unused complementary evidence channel."""
     symbols = extract_symbols(question)
     used = {call.tool for call in calls if call.ok}
-    used_families = {
-        _evidence_family(call.tool)
-        for call in calls
-        if call.ok
-    }
+    used_families = {_evidence_family(call.tool) for call in calls if call.ok}
     lower = question.lower()
-    used_quote_family = "market" in used_families
 
     def candidate_score(tool: ToolInfo) -> int:
         name = tool.qualified_name.lower()
         family = _evidence_family(name)
-        if family in used_families:
+        if family in used_families or not _channel_tool_usable(family, name):
             return -100
         score = 0
         priorities = _question_evidence_priorities(question)
@@ -513,9 +536,7 @@ def _next_evidence_plan(
     )
     for tool in ranked:
         family = _evidence_family(tool.qualified_name)
-        if family in used_families:
-            continue
-        if used_quote_family and family == "market":
+        if family in used_families or not _channel_tool_usable(family, tool.qualified_name):
             continue
         props = (tool.input_schema or {}).get("properties") or {}
         required = _required_params(tool)
@@ -767,22 +788,27 @@ class AutonomousMCPAgent:
         steps: list[Step] = [Step(node="discover", kind="node", note=f"{len(tools)} tools")]
         self.last_jev = {}
         if not tools:
-            return AutonomousResult(question, "No MCP tools are currently available.", [], [], AgentTrajectory(steps=steps), resolution="no_tool")
+            return AutonomousResult(
+                question,
+                "No MCP tools are currently available.",
+                [],
+                [],
+                AgentTrajectory(steps=steps),
+                resolution="no_tool",
+            )
 
-        step_limit = self.max_steps + (
-            2 if _needs_evidence_gate(question) and self.jev.enabled else 0
-        )
-        evidence_budget = step_limit
+        evidence_enabled = _needs_evidence_gate(question) and self.jev.enabled
+        step_limit = self.max_steps + (2 if evidence_enabled else 0)
+
         for iteration in range(1, step_limit + 1):
-            # When Jev explicitly requests more evidence, it controls the next
-            # source selection directly. This prevents the generic planner from
-            # consuming the remaining budget or returning an unrelated tool.
             gate = self.last_jev.get("evidence_gate") or {}
             successful_count = sum(1 for call in calls if call.ok)
             gate_checked = int(gate.get("checked_after_successful_calls", 0) or 0)
+
+            # Once Jev asks for more evidence, let the evidence selector
+            # choose the next independent channel directly.
             gate_forces_more = (
-                _needs_evidence_gate(question)
-                and self.jev.enabled
+                evidence_enabled
                 and gate.get("action") == "gather_more"
                 and successful_count >= 2
                 and successful_count == gate_checked
@@ -809,6 +835,7 @@ class AutonomousMCPAgent:
                         steps,
                         resolution="jev_evidence_insufficient",
                     )
+                plan = additional
                 steps.append(
                     Step(
                         node="plan",
@@ -816,11 +843,10 @@ class AutonomousMCPAgent:
                         note="Jev evidence gate selected additional source",
                     )
                 )
-                plan = additional
             else:
-                # the generic planner. Still run Jev once so the research trace
-                # records the routing decision even when the forced plan controls
-                # the actual multi-source evidence sequence.
+                # Driver investigations record Jev routing once, while the
+                # bounded evidence sequence controls retrieval for known driver
+                # questions.
                 if (
                     iteration == 1
                     and self.jev.enabled
@@ -858,19 +884,16 @@ class AutonomousMCPAgent:
                             "error": f"{type(exc).__name__}: {exc}",
                         }
 
-                # For "what changed / why / drivers" questions, require evidence
-                # retrieval before allowing the LLM planner to settle on quote-only
-                # data. This prevents repeated quote calls from consuming all steps.
                 forced_driver = _driver_research_plan(question, tools, calls)
                 plan = forced_driver if forced_driver is not None else self._plan(question, tools, history)
-                steps.append(Step(
-                    node="plan",
-                    kind="node",
-                    note=f"iteration={iteration}" + ("; forced driver evidence" if forced_driver else ""),
-                ))
-                # Never allow a malformed/empty planner result to crash the whole
-                # request. This also protects production when an OpenAI-compatible
-                # model returns an empty/null JSON response.
+                steps.append(
+                    Step(
+                        node="plan",
+                        kind="node",
+                        note=f"iteration={iteration}" + ("; forced driver evidence" if forced_driver else ""),
+                    )
+                )
+
                 if not isinstance(plan, dict):
                     fallback_plans = keyword_router(question, tools, max_tools=1)
                     if fallback_plans:
@@ -886,183 +909,179 @@ class AutonomousMCPAgent:
                         error = "planner returned no usable action"
                         steps.append(tool_call("autonomous.planner", ok=False, note=error))
                         return AutonomousResult(
-                            question, "", calls, discovered, AgentTrajectory(steps=steps),
-                            error=error, resolution="error"
+                            question,
+                            "",
+                            calls,
+                            discovered,
+                            AgentTrajectory(steps=steps),
+                            error=error,
+                            resolution="error",
                         )
-                action = str(plan.get("action", "")).strip().lower()
-                if action == "final":
+
+            action = str(plan.get("action", "")).strip().lower()
+            if action == "final":
+                forced = _driver_research_plan(question, tools, calls)
+                if forced is not None:
+                    forced_action = str(forced.get("action", "")).strip().lower()
+                    if forced_action == "final":
+                        steps.append(
+                            Step(
+                                node="finalize",
+                                kind="node",
+                                note="forced driver evidence complete",
+                            )
+                        )
+                        return self._finalize(question, calls, steps)
+                    plan = forced
+                    action = "tool"
+                    steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
+                else:
+                    answer = str(plan.get("answer", "")).strip()
+                    placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
+                    if any(c.ok for c in calls) and answer == placeholder:
+                        return self._finalize(question, calls, steps)
+                    if answer:
+                        steps.append(Step(node="finalize", kind="node", note="planner settled"))
+                        return AutonomousResult(
+                            question,
+                            answer,
+                            calls,
+                            discovered,
+                            AgentTrajectory(steps=steps),
+                            jev=self.last_jev,
+                        )
+                    if any(c.ok for c in calls):
+                        return self._finalize(question, calls, steps)
+
+            tool_name = str(plan.get("tool", "")).strip()
+            tool = by_name.get(tool_name)
+            if tool is None:
+                error = f"unknown discovered tool: {tool_name}"
+                steps.append(tool_call(tool_name or "unknown", ok=False, note=error))
+                return AutonomousResult(
+                    question,
+                    "",
+                    calls,
+                    discovered,
+                    AgentTrajectory(steps=steps),
+                    error=error,
+                    resolution="error",
+                )
+
+            arguments = plan.get("arguments") or {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            symbols = extract_symbols(question)
+            props = (tool.input_schema or {}).get("properties") or {}
+            if "symbol" in props and "symbol" not in arguments and symbols:
+                arguments["symbol"] = symbols[0]
+            if "symbols" in props and "symbols" not in arguments and symbols:
+                arguments["symbols"] = symbols
+
+            if any(
+                c.ok and c.tool == tool_name and c.arguments == arguments
+                for c in calls
+            ):
+                steps.append(
+                    Step(
+                        node="plan",
+                        kind="node",
+                        note="duplicate successful tool call skipped",
+                    )
+                )
+                return self._finalize(question, calls, steps)
+
+            validation_error = _validate_arguments(tool, arguments)
+            if validation_error:
+                record = ToolCallRecord(
+                    tool=tool_name,
+                    arguments=arguments,
+                    ok=False,
+                    error=validation_error,
+                )
+                calls.append(record)
+                steps.append(tool_call(tool_name, arguments, ok=False, note=validation_error))
+                history.append({"tool": tool_name, "arguments": arguments, "error": validation_error})
+                continue
+
+            try:
+                output = self.toolbox.call(tool_name, arguments)
+            except MCPClientError as exc:
+                record = ToolCallRecord(
+                    tool=tool_name,
+                    arguments=arguments,
+                    ok=False,
+                    error=f"{exc.code}: {exc.message}",
+                )
+                calls.append(record)
+                steps.append(tool_call(tool_name, arguments, ok=False, note=exc.code))
+                history.append({"tool": tool_name, "arguments": arguments, "error": record.error})
+            except Exception as exc:
+                record = ToolCallRecord(
+                    tool=tool_name,
+                    arguments=arguments,
+                    ok=False,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+                calls.append(record)
+                steps.append(tool_call(tool_name, arguments, ok=False, note=type(exc).__name__))
+                history.append({"tool": tool_name, "arguments": arguments, "error": record.error})
+            else:
+                record = ToolCallRecord(
+                    tool=tool_name,
+                    arguments=arguments,
+                    ok=True,
+                    output=output,
+                )
+                calls.append(record)
+                steps.append(tool_call(tool_name, arguments, note="ok"))
+                history.append(
+                    {
+                        "tool": tool_name,
+                        "arguments": arguments,
+                        "output": _result_preview(output),
+                    }
+                )
+
+                if evidence_enabled:
+                    successful_count = sum(1 for call in calls if call.ok)
                     gate = self.last_jev.get("evidence_gate") or {}
-                    if (
-                        gate.get("action") == "gather_more"
-                        and len([call for call in calls if call.ok]) <= int(gate.get("checked_after_successful_calls", 0))
-                    ):
-                        additional = _next_evidence_plan(question, tools, calls)
-                        if additional is not None:
-                            plan = additional
-                            action = "tool"
-                            steps.append(
-                                Step(
-                                    node="plan",
-                                    kind="node",
-                                    note="Jev evidence gate forced additional source",
-                                )
+                    gate_checked = int(gate.get("checked_after_successful_calls", 0) or 0)
+                    if successful_count >= 2 and successful_count > gate_checked:
+                        gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
+                        prior_checks = int((self.last_jev.get("evidence_gate") or {}).get("checks", 0) or 0)
+                        gate["checks"] = prior_checks + 1
+                        self.last_jev["evidence_gate"] = gate
+                        steps.append(
+                            Step(
+                                node="evidence_gate",
+                                kind="node",
+                                note=f"action={gate_decision}; successful_calls={gate['checked_after_successful_calls']}",
                             )
-                        else:
-                            gate = dict(gate)
-                            gate["action"] = "insufficient"
-                            gate["budget_exhausted"] = False
-                            gate["checked_sources"] = len([call for call in calls if call.ok])
-                            gate["reason"] = "No unused complementary evidence channel was available."
-                            self.last_jev["evidence_gate"] = gate
-                            steps.append(
-                                Step(
-                                    node="evidence_gate",
-                                    kind="node",
-                                    note="action=insufficient; no complementary evidence channel available",
-                                )
-                            )
+                        )
+                        if gate_decision == "stop":
                             return self._finalize(
                                 question,
                                 calls,
                                 steps,
-                                resolution="jev_evidence_insufficient",
+                                resolution="jev_evidence_sufficient",
                             )
 
-                    if action == "final":
-                        forced = _driver_research_plan(question, tools, calls)
-                        if forced is not None:
-                            forced_action = str(forced.get("action", "")).strip().lower()
-                            if forced_action == "final":
-                                # Driver research is complete. The forced planner uses
-                                # an empty final action only as a bounded stop signal;
-                                # never convert it into a tool call with an empty name.
-                                steps.append(
-                                    Step(
-                                        node="finalize",
-                                        kind="node",
-                                        note="forced driver evidence complete",
-                                    )
-                                )
-                                return self._finalize(question, calls, steps)
-                            plan = forced
-                            action = "tool"
-                            steps.append(Step(node="plan", kind="node", note="forced driver evidence"))
-                        else:
-                            # Respect an explicit planner answer. If the deterministic
-                            # fallback emits an empty final action after successful calls,
-                            # synthesize the retrieved evidence instead.
-                            answer = str(plan.get("answer", "")).strip()
-                            placeholder = "No unused MCP tool matches the question; the retrieved evidence can be finalized."
-                            if any(c.ok for c in calls) and answer == placeholder:
-                                return self._finalize(question, calls, steps)
-                            if answer:
-                                steps.append(Step(node="finalize", kind="node", note="planner settled"))
-                                return AutonomousResult(question, answer, calls, discovered, AgentTrajectory(steps=steps))
-                            if any(c.ok for c in calls):
-                                return self._finalize(question, calls, steps)
-                tool_name = str(plan.get("tool", "")).strip()
-                tool = by_name.get(tool_name)
-                if tool is None:
-                    error = f"unknown discovered tool: {tool_name}"
-                    steps.append(tool_call(tool_name or "unknown", ok=False, note=error))
-                    return AutonomousResult(question, "", calls, discovered, AgentTrajectory(steps=steps), error=error, resolution="error")
-
-                arguments = plan.get("arguments") or {}
-                if not isinstance(arguments, dict):
-                    arguments = {}
-                symbols = extract_symbols(question)
-                props = (tool.input_schema or {}).get("properties") or {}
-                if "symbol" in props and "symbol" not in arguments and symbols:
-                    arguments["symbol"] = symbols[0]
-                if "symbols" in props and "symbols" not in arguments and symbols:
-                    arguments["symbols"] = symbols
-
-                # Do not burn the bounded step budget repeating an already
-                # successful identical call. Jev is cached above, and this guard
-                # protects the fallback/LLM planner when it proposes the same call.
-                if any(
-                    c.ok and c.tool == tool_name and c.arguments == arguments
-                    for c in calls
+                if (
+                    self.last_jev.get("action") == "direct_tool"
+                    and not evidence_enabled
                 ):
-                    steps.append(
-                        Step(
-                            node="plan",
-                            kind="node",
-                            note="duplicate successful tool call skipped",
-                        )
-                    )
                     return self._finalize(question, calls, steps)
-
-                validation_error = _validate_arguments(tool, arguments)
-                if validation_error:
-                    record = ToolCallRecord(tool=tool_name, arguments=arguments, ok=False, error=validation_error)
-                    calls.append(record)
-                    steps.append(tool_call(tool_name, arguments, ok=False, note=validation_error))
-                    history.append({"tool": tool_name, "arguments": arguments, "error": validation_error})
-                    continue
-
-                try:
-                    output = self.toolbox.call(tool_name, arguments)
-                except MCPClientError as exc:
-                    record = ToolCallRecord(tool=tool_name, arguments=arguments, ok=False, error=f"{exc.code}: {exc.message}")
-                    calls.append(record)
-                    steps.append(tool_call(tool_name, arguments, ok=False, note=exc.code))
-                    history.append({"tool": tool_name, "arguments": arguments, "error": record.error})
-                except Exception as exc:
-                    record = ToolCallRecord(tool=tool_name, arguments=arguments, ok=False, error=f"{type(exc).__name__}: {exc}")
-                    calls.append(record)
-                    steps.append(tool_call(tool_name, arguments, ok=False, note=type(exc).__name__))
-                    history.append({"tool": tool_name, "arguments": arguments, "error": record.error})
-                else:
-                    record = ToolCallRecord(tool=tool_name, arguments=arguments, ok=True, output=output)
-                    calls.append(record)
-                    steps.append(tool_call(tool_name, arguments, note="ok"))
-                    history.append({"tool": tool_name, "arguments": arguments, "output": _result_preview(output)})
-
-                    # Recheck evidence sufficiency immediately after a new source
-                    # arrives. This avoids losing the second Jev check when the
-                    # additional source is collected on the final loop iteration.
-                    if _needs_evidence_gate(question) and self.jev.enabled:
-                        successful_count = sum(1 for call in calls if call.ok)
-                        last_gate = self.last_jev.get("evidence_gate") or {}
-                        last_gate_checked = int(last_gate.get("checked_after_successful_calls", 0) or 0)
-                        if successful_count >= 2 and successful_count > last_gate_checked:
-                            gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
-                            prior_checks = int(last_gate.get("checks", 0) or 0)
-                            gate["checks"] = prior_checks + 1
-                            self.last_jev["evidence_gate"] = gate
-                            steps.append(
-                                Step(
-                                    node="evidence_gate",
-                                    kind="node",
-                                    note=f"action={gate_decision}; successful_calls={gate['checked_after_successful_calls']}",
-                                )
-                            )
-                            if gate_decision == "stop":
-                                return self._finalize(
-                                    question,
-                                    calls,
-                                    steps,
-                                    resolution="jev_evidence_sufficient",
-                                )
-
-                    # A high-confidence Jev direct route needs only the selected
-                    # evidence call. Finalize immediately instead of spending an
-                    # extra planner iteration and another LLM request.
-                    if (
-                        self.last_jev.get("action") == "direct_tool"
-                        and not _needs_evidence_gate(question)
-                    ):
-                        return self._finalize(question, calls, steps)
 
         successful = [c for c in calls if c.ok]
         gate = self.last_jev.get("evidence_gate") or {}
-        if successful and _needs_evidence_gate(question) and gate.get("action") == "gather_more":
+        if successful and evidence_enabled and gate.get("action") == "gather_more":
             gate = dict(gate)
             gate["action"] = "insufficient"
             gate["budget_exhausted"] = True
-            gate["evidence_budget"] = evidence_budget
+            gate["evidence_budget"] = step_limit
             gate["checked_sources"] = len(successful)
+            gate["reason"] = "Evidence remained below the sufficiency threshold within the bounded research budget."
             self.last_jev["evidence_gate"] = gate
             steps.append(
                 Step(
@@ -1077,10 +1096,20 @@ class AutonomousMCPAgent:
                 steps,
                 resolution="jev_evidence_insufficient",
             )
+
         if successful:
             return self._finalize(question, calls, steps, resolution="max_steps")
 
         steps.append(Step(node="finalize", kind="node", note="no successful calls"))
-        return AutonomousResult(question, "No MCP tool produced usable evidence.", calls, discovered, AgentTrajectory(steps=steps), error="no successful tool calls", resolution="error")
+        return AutonomousResult(
+            question,
+            "No MCP tool produced usable evidence.",
+            calls,
+            discovered,
+            AgentTrajectory(steps=steps),
+            error="no successful tool calls",
+            resolution="error",
+        )
+
 
 __all__ = ["AutonomousMCPAgent", "AutonomousResult"]
