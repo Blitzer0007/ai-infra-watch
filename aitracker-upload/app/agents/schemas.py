@@ -12,7 +12,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.agents.trajectory import AgentTrajectory
-from app.rag.schemas import GroundednessReport
 from app.synthesis.pipeline import MarketSynthesis
 from mcp_servers.filings.schemas import AnswerResult, FilingRef
 
@@ -32,7 +31,7 @@ class MarketAgentResult(BaseModel):
     error: str = ""
     # Post-generation grounding of `synthesis.summary` against the data facts
     # it was built from. None when synthesis didn't run (degraded / no data).
-    groundedness: GroundednessReport | None = None
+    groundedness: Any | None = None
     trajectory: AgentTrajectory = Field(default_factory=AgentTrajectory)
 
     def ok(self) -> bool:
