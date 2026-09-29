@@ -12,6 +12,8 @@ type SecEvent = {
   accession?: string;
   url?: string;
   source?: string;
+  category?: string;
+  items?: string[];
 };
 
 type Reaction = {
@@ -180,6 +182,32 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
     [events, stockHistory, spyHistory]
   );
 
+  const categories = useMemo(() => {
+    const grouped = new Map<string, { count: number; t1: number[]; relativeT1: number[] }>();
+
+    for (const row of rows) {
+      if (!row.reaction) continue;
+      const category = row.event.category || 'Other';
+      const bucket = grouped.get(category) || { count: 0, t1: [], relativeT1: [] };
+      bucket.count += 1;
+      if (row.reaction.t1 != null) bucket.t1.push(row.reaction.t1);
+      const rel = relative(row.reaction.t1, row.reaction.spyT1);
+      if (rel != null) bucket.relativeT1.push(rel);
+      grouped.set(category, bucket);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([category, bucket]) => ({
+        category,
+        count: bucket.count,
+        avgT1: bucket.t1.length ? bucket.t1.reduce((a, b) => a + b, 0) / bucket.t1.length : null,
+        avgRelativeT1: bucket.relativeT1.length
+          ? bucket.relativeT1.reduce((a, b) => a + b, 0) / bucket.relativeT1.length
+          : null,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [rows]);
+
   const summary = useMemo(() => {
     const valid = rows
       .map((row) => row.reaction)
@@ -209,6 +237,23 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       title={'Historical event impact · ' + symbol}
       subtitle="SEC filing chronology linked to verified price history; SPY is used as market context, not causal proof."
     >
+      <div className="mb-4 rounded-xl border border-white/5 bg-white/[.02] p-3">
+        <div className="text-[9px] uppercase tracking-widest font-mono text-white/30 mb-2">Historical reaction by event type</div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+          {categories.map((item) => (
+            <div key={item.category} className="rounded-lg border border-white/5 bg-black/10 p-3">
+              <div className="text-[9px] uppercase font-mono font-bold text-white/55 leading-4">{item.category}</div>
+              <div className={'text-base font-black mt-2 ' + tone(item.avgT1)}>{formatPct(item.avgT1)}</div>
+              <div className="text-[9px] text-white/25 font-mono mt-1">avg next-day · {item.count} event{item.count === 1 ? '' : 's'}</div>
+              <div className={'text-[9px] font-mono mt-2 ' + tone(item.avgRelativeT1)}>vs market {formatPct(item.avgRelativeT1)}</div>
+            </div>
+          ))}
+          {!categories.length && (
+            <div className="text-[10px] text-white/30 font-mono">No classified event reactions yet.</div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
         <Metric label="Events matched" value={String(summary.events)} suffix="SEC events" />
         <Metric
@@ -264,7 +309,12 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 return (
                   <tr key={event.id} className="border-t border-white/5 align-top">
                     <td className="p-3 min-w-[240px]">
-                      <div className="text-white font-bold">{event.title}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-white font-bold">{event.title}</div>
+                        <span className="px-2 py-0.5 rounded border border-white/10 bg-white/[.03] text-[8px] uppercase tracking-wider text-white/45">
+                          {event.category || 'Other'}
+                        </span>
+                      </div>
                       <div className="text-white/25 mt-1">
                         {event.description || event.source || 'SEC EDGAR'}
                       </div>
