@@ -429,6 +429,10 @@ def _next_evidence_plan(
     symbols = extract_symbols(question)
     used = {call.tool for call in calls if call.ok}
     lower = question.lower()
+    used_quote_family = any(
+        call.ok and any(token in call.tool.lower() for token in (".get_quote", ".get_quotes", ".get_snapshot"))
+        for call in calls
+    )
 
     def candidate_score(tool: ToolInfo) -> int:
         name = tool.qualified_name.lower()
@@ -456,6 +460,11 @@ def _next_evidence_plan(
         key=lambda tool: (-candidate_score(tool), tool.qualified_name),
     )
     for tool in ranked:
+        if (
+            used_quote_family
+            and any(token in tool.qualified_name.lower() for token in (".get_quote", ".get_quotes", ".get_snapshot"))
+        ):
+            continue
         props = (tool.input_schema or {}).get("properties") or {}
         required = _required_params(tool)
         args: dict[str, Any] = {}
