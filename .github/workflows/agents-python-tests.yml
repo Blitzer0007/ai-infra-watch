@@ -13,6 +13,7 @@ on:
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
       - "aitracker-upload/app/llm/**"
+      - "aitracker-upload/app/jev/**"
       - "aitracker-upload/requirements-ingest.txt"
       - "aitracker-upload/scripts/**"
       - "aitracker-upload/tests/agents/**"
@@ -30,6 +31,7 @@ on:
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
       - "aitracker-upload/app/llm/**"
+      - "aitracker-upload/app/jev/**"
       - "aitracker-upload/scripts/**"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
@@ -69,7 +71,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_jev_client.py
 
       - name: Run MCP contract tests
         env:
