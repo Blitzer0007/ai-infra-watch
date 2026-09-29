@@ -57,7 +57,7 @@ def use_mcp() -> bool:
 
 def _build_default_configs() -> list[ServerConfig]:
     """Build the lean research server config list. Exposed as a seam so tests inject fakes."""
-    return default_configs()
+    return research_configs()
 
 
 def get_toolbox(
