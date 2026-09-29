@@ -13,6 +13,15 @@
     "api/*.py": {
       "maxDuration": 60,
       "excludeFiles": "{aitracker-upload/data/filings/**,aitracker-upload/tests/**,aitracker-upload/.cache/**,aitracker-upload/data/traces/**,.github/**,*.zip,node_modules/**,dist/**}"
+    },
+    "api/earnings-alerts.js": {
+      "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/earnings-alerts?notify=1",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }
