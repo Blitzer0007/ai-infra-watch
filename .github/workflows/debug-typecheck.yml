@@ -1,0 +1,31 @@
+name: Debug Typecheck
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture TypeScript errors
+        run: |
+          set +e
+          npm run lint > /tmp/typecheck.log 2>&1
+          code=$?
+          cat /tmp/typecheck.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b ci-debug-current
+          cp /tmp/typecheck.log ci-typecheck-error.txt
+          git add ci-typecheck-error.txt
+          git commit -m "ci: publish typecheck diagnostics" || true
+          git push -f origin ci-debug-current
+          exit 0
