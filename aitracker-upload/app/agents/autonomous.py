@@ -196,25 +196,31 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
             "reason": "driver question: batch current quotes before causal research",
         }
 
-    # Step 2: historical earnings-event reaction for every named ticker.
-    event_tools = [
-        t for t in tools
-        if t.qualified_name.lower().endswith(".get_event_study")
-        and "symbol" in ((t.input_schema or {}).get("properties") or {})
-    ]
-    completed_events = {
-        str((c.arguments or {}).get("symbol", "")).upper()
-        for c in calls
-        if c.ok and c.tool.lower().endswith(".get_event_study")
-    }
-    for symbol in symbols:
-        if symbol not in completed_events and event_tools:
-            return {
-                "action": "tool",
-                "tool": event_tools[0].qualified_name,
-                "arguments": {"symbol": symbol},
-                "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
-            }
+    # Step 2: use event-study evidence only when the user explicitly asks
+    # about earnings/reactions. On serverless deployments, running one event
+    # study per ticker can consume the whole step budget before filings/news
+    # are retrieved, which was a major source of slow or incomplete answers.
+    event_terms = ("earnings", "earning", "event study", "price reaction", "reaction", "reacted")
+    needs_event_study = any(term in lower for term in event_terms)
+    if needs_event_study:
+        event_tools = [
+            t for t in tools
+            if t.qualified_name.lower().endswith(".get_event_study")
+            and "symbol" in ((t.input_schema or {}).get("properties") or {})
+        ]
+        completed_events = {
+            str((c.arguments or {}).get("symbol", "")).upper()
+            for c in calls
+            if c.ok and c.tool.lower().endswith(".get_event_study")
+        }
+        for symbol in symbols[:1]:
+            if symbol not in completed_events and event_tools:
+                return {
+                    "action": "tool",
+                    "tool": event_tools[0].qualified_name,
+                    "arguments": {"symbol": symbol},
+                    "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
+                }
 
     # Step 3: retrieve company-specific SEC evidence in one batched call.
     # The generic RAG corpus may contain sector-level documents that do not
@@ -268,6 +274,26 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
         return {"action": "final", "answer": ""}
 
     return None
+
+def _deterministic_summary(question: str, calls: list[ToolCallRecord]) -> str:
+    """Readable fallback when the final LLM synthesis is unavailable."""
+    successful = [call for call in calls if call.ok]
+    if not successful:
+        return "No MCP tool produced usable evidence."
+
+    lines = [
+        "Facts retrieved:",
+        f"- Research question: {question}",
+        f"- Successful evidence calls: {len(successful)}",
+    ]
+    for call in successful:
+        preview = _result_preview(call.output, 700)
+        lines.append(f"- {call.tool}: {preview}")
+
+    lines.append("")
+    lines.append("Interpretation note: this is a deterministic evidence summary because the final synthesis model was unavailable. No causal conclusion is inferred.")
+    return "\n".join(lines)
+
 
 def _final_prompt(question: str, calls: list[ToolCallRecord]) -> str:
     evidence = [{
@@ -376,7 +402,7 @@ class AutonomousMCPAgent:
                 temperature=0.0,
             )
         except Exception as exc:
-            final_text = _result_preview(successful[-1].output, 2000)
+            final_text = _deterministic_summary(question, calls)
             error = f"finalization_failed: {type(exc).__name__}: {exc}"
             steps.append(Step(node="finalize", kind="node", note=error))
             return AutonomousResult(
