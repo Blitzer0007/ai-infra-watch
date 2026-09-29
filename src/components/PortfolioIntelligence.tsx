@@ -120,15 +120,25 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'watchlist' && (
-        <Panel title="Watchlist intelligence universe" subtitle={`${WATCHLIST.length} configured names analyzed using the same market/peer/rotation framework`}>
+        <Panel title="Watchlist intelligence universe" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {WATCHLIST.map(w => {
               const quote = livePrices[w.symbol];
+              const isSelected = selected === w.symbol;
               return (
-                <button key={w.symbol} onClick={() => setSelected(w.symbol)} className={'text-left border rounded-xl p-3 ' + (selected === w.symbol ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
+                <div key={w.symbol} className={'text-left border rounded-xl p-3 transition ' + (isSelected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
                   <div className="flex justify-between items-start gap-2">
-                    <div><span className="font-black text-xs">{w.symbol}</span><div className="text-xs mt-1">{w.name}</div></div>
-                    <span className="text-[10px] text-white/25">analyze</span>
+                    <button type="button" onClick={() => setSelected(w.symbol)} className="text-left min-w-0">
+                      <span className="font-black text-xs">{w.symbol}</span>
+                      <div className="text-xs mt-1">{w.name}</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(w.symbol)}
+                      className="text-[9px] font-mono uppercase tracking-wider text-cyan-300/80 hover:text-cyan-200"
+                    >
+                      Analyze →
+                    </button>
                   </div>
                   <div className="mt-3 flex items-baseline justify-between gap-2">
                     <span className="font-mono font-black text-base">{quote?.price != null ? '$' + quote.price.toFixed(2) : '—'}</span>
@@ -138,10 +148,69 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   </div>
                   <div className="text-[10px] text-white/35 mt-2">{w.group} · {w.theme}</div>
                   <div className="text-[9px] text-white/25 mt-2">Peers: {w.peers.join(' · ')}</div>
-                </button>
+                </div>
               );
             })}
           </div>
+
+          {(() => {
+            const watch = WATCHLIST.find(item => item.symbol === selected);
+            if (!watch) return null;
+            const quote = livePrices[watch.symbol];
+            const groupInfo = intelligence.groups.find(item => item.name === watch.group);
+            const peerReturns = watch.peers
+              .map(peer => livePrices[peer]?.changePct)
+              .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+            const peerAverage = peerReturns.length ? peerReturns.reduce((a, b) => a + b, 0) / peerReturns.length : null;
+            const vsPeers = quote?.changePct != null && peerAverage != null ? quote.changePct - peerAverage : null;
+            const universeVs = groupInfo?.relativeToUniverse ?? null;
+
+            return (
+              <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Watchlist analysis</div>
+                    <div className="text-lg font-black mt-1">{watch.symbol} · {watch.name}</div>
+                    <div className="text-[10px] text-white/35 mt-1">{watch.group} · {watch.theme}</div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 min-w-[420px] max-w-full">
+                    <Info label="Live price" value={quote?.price == null ? '—' : '$' + quote.price.toFixed(2)} />
+                    <Info label="Daily move" value={quote?.changePct == null ? '—' : (quote.changePct >= 0 ? '+' : '') + quote.changePct.toFixed(2) + '%'} />
+                    <Info label="Vs peers" value={vsPeers == null ? '—' : (vsPeers >= 0 ? '+' : '') + vsPeers.toFixed(2) + ' pts'} />
+                    <Info label="Group signal" value={groupInfo ? Math.round(groupInfo.score) + '/100' : '—'} />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Info label="Group breadth" value={groupInfo ? Math.round(groupInfo.breadth * 100) + '%' : '—'} />
+                  <Info label="Group vs universe" value={universeVs == null ? '—' : (universeVs >= 0 ? '+' : '') + universeVs.toFixed(2) + ' pts'} />
+                  <Info label="Peers" value={watch.peers.join(' · ') || 'No peers configured'} />
+                </div>
+
+                <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Analysis basis</div>
+                  <div className="text-[10px] text-white/50 mt-2 leading-5">
+                    {quote?.changePct == null
+                      ? 'Waiting for a live quote before calculating peer-relative performance.'
+                      : peerAverage == null
+                        ? 'Live price is available, but no peer quotes are currently available for a peer-relative comparison.'
+                        : 'Current daily move is compared with the configured peer basket; group signal combines daily return, breadth, and performance versus the tracked universe.'}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTab('events')}
+                    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-white/55 hover:text-white"
+                  >
+                    Open Event Study
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
             <Insight title="Memory cluster" body="SK Hynix · Micron · SanDisk · DRAM" icon={<BarChart3/>}/>
             <Insight title="Compute cluster" body="NVDA · AMD · TSM · QCOM · INTC · CBRS" icon={<Network/>}/>
