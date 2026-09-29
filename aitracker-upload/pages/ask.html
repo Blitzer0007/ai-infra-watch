@@ -151,6 +151,23 @@ function fmtInsight(i){
   return `<li>${tkr}${pct}${reason}</li>`;
 }
 
+function autonomousEvidenceBadge(r){
+  const gate = r && r.jev && r.jev.evidence_gate ? r.jev.evidence_gate : null;
+  const action = gate && gate.action ? String(gate.action) : '';
+  const resolution = r && r.resolution ? String(r.resolution) : '';
+  let state = action || (resolution === 'jev_evidence_insufficient' ? 'insufficient' : '');
+  if(!state) return '';
+  const map = {
+    sufficient: {label:'Evidence sufficient', cls:'badge-green'},
+    stop: {label:'Evidence sufficient', cls:'badge-green'},
+    gather_more: {label:'Gathering more evidence', cls:'badge-amber'},
+    insufficient: {label:'Evidence insufficient', cls:'badge-red'}
+  };
+  const item = map[state] || {label:esc(state.replaceAll('_',' ')), cls:'badge-amber'};
+  const reason = gate && gate.reason ? `<div class="faint" style="font-size:11px;margin-top:5px">${esc(gate.reason)}</div>` : '';
+  return `<div class="card mt-16" style="background:var(--panel-2, transparent)"><div class="card-head"><div class="card-title">Jev evidence gate</div><span class="badge ${item.cls}">${item.label}</span></div>${reason}</div>`;
+}
+
 function trajectoryLine(nodes){
   if(!nodes || !nodes.length) return '';
   return `<div class="mono faint" style="font-size:12px; margin-top:8px">trajectory: ${nodes.map(esc).join(' → ')}</div>`;
@@ -213,6 +230,7 @@ async function ask(){
         <div class="card-head" style="border:none;padding:0">
           <div><span class="badge badge-amber">autonomous-mcp</span> ${okBadge(r.ok)}${r.degraded ? ' ' + degradedBadge() : ''}</div>
         </div>
+        ${autonomousEvidenceBadge(r)}
         <div class="section-title mt-16">Summary</div>
         <div>${esc(r.summary) || '<span class="faint">No summary returned.</span>'}</div>
         ${r.discovered && r.discovered.length ? `<div class="faint mt-16" style="font-size:12px">tools discovered: ${r.discovered.map(esc).join(', ')}</div>` : ''}
