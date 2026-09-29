@@ -86,6 +86,10 @@ LLM_FINAL_TIMEOUT_SEC: float = _env_float(
     "LLM_FINAL_TIMEOUT_SEC", 20.0 if os.getenv("VERCEL") else 60.0
 )
 LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
+LLM_FINAL_TIMEOUT_SEC: float = _env_float(
+    "LLM_FINAL_TIMEOUT_SEC", 20.0 if os.getenv("VERCEL") else 60.0
+)
+LLM_FINAL_MAX_TOKENS: int = int(_env_str("LLM_FINAL_MAX_TOKENS", "1000"))
 
 # ---- production API security / browser access -----------------------
 # When set, /api/ask/autonomous requires Authorization: Bearer <token>.
