@@ -3,6 +3,7 @@ import { AppConfig, loadConfig, saveConfig, formatPrice } from '../utils';
 import { STOCK_METADATA } from '../data';
 import { Bell, BellOff, Trash2, Plus, Star, Zap, ShieldCheck } from 'lucide-react';
 import { loadAlertEvents, requestBrowserNotifications } from '../utils/alertEngine';
+import EarningsAlerts from './EarningsAlerts';
 
 export default function BuySellWatchlist() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -107,6 +108,8 @@ export default function BuySellWatchlist() {
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Alert Targets &amp; Watchlist</h1>
         <p className="text-xs text-white/60 max-w-3xl leading-relaxed">Monitor configured price thresholds using the live server market feed.</p>
       </div>
+
+      <EarningsAlerts />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
