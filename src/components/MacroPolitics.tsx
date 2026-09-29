@@ -122,7 +122,7 @@ function PortfolioScenarioSensitivity({
       </div>
 
       <div className="text-[9px] text-white/25 font-mono mt-3">
-        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Portfolio weighting uses invested capital.
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Portfolio weighting uses invested capital; the live market feed is used for the dashboard quote context.
       </div>
     </div>
   );
