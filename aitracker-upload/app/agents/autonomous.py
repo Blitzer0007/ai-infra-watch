@@ -381,7 +381,7 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     else:
         sufficiency = evaluation.answers.get("sufficiency")
         quality = evaluation.answers.get("evidence_quality")
-        choice = (sufficiency.choice or "").strip().lower() if sufficiency else ""
+        choice = (sufficiency.choice or "").strip().lower().replace(" ", "_") if sufficiency else ""
         score = quality.score if quality else None
         confidence = sufficiency.confidence if sufficiency else None
 
