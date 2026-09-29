@@ -895,7 +895,14 @@ class AutonomousMCPAgent:
                             "error": f"{type(exc).__name__}: {exc}",
                         }
 
-                forced_driver = _driver_research_plan(question, tools, calls)
+                # Custom planners are used by tests and integrations to control
+                # the exact next action; keep the production-only forced driver
+                # sequence out of that injected planner path.
+                forced_driver = (
+                    _driver_research_plan(question, tools, calls)
+                    if self.planner is None
+                    else None
+                )
                 plan = forced_driver if forced_driver is not None else self._plan(question, tools, history)
                 steps.append(
                     Step(
