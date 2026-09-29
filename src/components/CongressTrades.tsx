@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, AlertTriangle, Loader2, ExternalLink, Activity } from 'lucide-react';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
+import JevDecisionPanel from './JevDecisionPanel';
 
 interface CongressTradesProps {
   liveTrades?: CongressTrade[];
@@ -243,6 +244,26 @@ export default function CongressTrades(_props: CongressTradesProps) {
 
   return (
     <div className="space-y-6" id="congress-view">
+      <JevDecisionPanel
+        kind="congress"
+        title="Congress disclosure review"
+        state={{
+          selected_symbol: symbolFilter,
+          source: sourceStatus.label,
+          chamber_filter: chamberFilter,
+          matched_trades: filtered.length,
+          trades: filtered.slice(0, 8).map((trade) => ({
+            symbol: trade.stockSymbol,
+            chamber: trade.chamber,
+            transaction_type: trade.transactionType,
+            amount_range: trade.amountRange,
+            transaction_date: trade.transactionDate || trade.date,
+            filing_date: trade.filingDate,
+          })),
+          historical_reaction_matches: reactionSummary.matched,
+        }}
+      />
+
       <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 04 / Signals</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
