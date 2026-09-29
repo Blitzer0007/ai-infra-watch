@@ -9,6 +9,22 @@ from .client import JevClient, JevEvaluation
 
 
 ASSESSMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    "research": {
+        "sufficiency": {
+            "type": "choice",
+            "instructions": "Is the retrieved evidence sufficient to support a near-term research answer, or is another independent evidence source needed?",
+            "criteria": {
+                "stop": "At least two useful evidence signals are consistent, specific to the question and sufficient for a bounded answer.",
+                "gather_more": "Evidence is sparse, mostly single-source, stale, generic or missing an important channel; retrieve another independent source.",
+                "resolve_conflict": "Retrieved sources materially conflict or leave an important discrepancy that needs verification before finalization.",
+            },
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the retrieved evidence for answering the research question now?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"],
+        },
+    },
     "platform": {
         "attention": {
             "type": "choice",
