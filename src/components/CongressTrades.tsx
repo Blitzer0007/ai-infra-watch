@@ -24,6 +24,14 @@ type TradeReaction = {
   day20Pct: number | null;
 };
 
+type SourceStatus = {
+  label: string;
+  kind: 'bargo' | 'fallback' | 'cache' | 'unavailable' | 'loading';
+  stale: boolean;
+  sourceUrl: string | null;
+  upstreamError: string | null;
+};
+
 const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 
@@ -84,7 +92,30 @@ function reactionTone(value: number | null) {
       : 'text-rose-400';
 }
 
-export default function CongressTrades({ liveTrades }: CongressTradesProps) {
+function sourceTone(status: SourceStatus) {
+  switch (status.kind) {
+    case 'bargo':
+      return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+    case 'fallback':
+      return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+    case 'cache':
+      return 'border-cyan-400/20 bg-cyan-400/10 text-cyan-300';
+    case 'unavailable':
+      return 'border-rose-400/20 bg-rose-400/10 text-rose-300';
+    default:
+      return 'border-white/10 bg-white/5 text-white/50';
+  }
+}
+
+const INITIAL_SOURCE: SourceStatus = {
+  label: 'Loading source…',
+  kind: 'loading',
+  stale: false,
+  sourceUrl: null,
+  upstreamError: null,
+};
+
+export default function CongressTrades(_props: CongressTradesProps) {
   const [search, setSearch] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
   const [symbolFilter, setSymbolFilter] = useState('NVDA');
@@ -93,6 +124,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<SourceStatus>(INITIAL_SOURCE);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,21 +132,41 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
     async function loadTrades() {
       setLoading(true);
       setError(null);
+      setSourceStatus(INITIAL_SOURCE);
 
       try {
         const res = await fetch('/api/congress-trades?symbol=' + encodeURIComponent(symbolFilter));
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(data?.error || 'Congress trades request failed');
+          throw new Error(data?.upstreamError || data?.error || 'Congress trades request failed');
         }
 
         if (!cancelled) {
           setTrades(Array.isArray(data?.trades) ? data.trades : []);
+          setSourceStatus({
+            label: data?.sourceLabel || 'Congress trade source',
+            kind:
+              data?.source === 'datadawn'
+                ? 'fallback'
+                : data?.source === 'cache'
+                  ? 'cache'
+                  : 'bargo',
+            stale: Boolean(data?.stale),
+            sourceUrl: data?.sourceUrl || null,
+            upstreamError: data?.upstreamError || null,
+          });
         }
       } catch (err) {
         if (!cancelled) {
           setTrades([]);
+          setSourceStatus({
+            label: 'All Congress trade sources unavailable',
+            kind: 'unavailable',
+            stale: false,
+            sourceUrl: null,
+            upstreamError: err instanceof Error ? err.message : 'Congress trades unavailable',
+          });
           setError(err instanceof Error ? err.message : 'Congress trades unavailable');
         }
       } finally {
@@ -148,11 +200,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
     };
   }, [symbolFilter]);
 
-  const sourceTrades = symbolFilter === 'ALL' && liveTrades?.length
-    ? liveTrades
-    : trades;
-
-  const filtered = useMemo(() => sourceTrades.filter((t) => {
+  const filtered = useMemo(() => trades.filter((t) => {
     const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
     const needle = search.trim().toLowerCase();
     const matchesSearch =
@@ -160,7 +208,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
       t.politician.toLowerCase().includes(needle) ||
       t.stockSymbol.toLowerCase().includes(needle);
     return matchesChamber && matchesSearch;
-  }), [sourceTrades, chamberFilter, search]);
+  }), [trades, chamberFilter, search]);
 
   const reactions = useMemo(() => {
     if (symbolFilter === 'ALL') return [];
@@ -291,13 +339,57 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/40 font-mono">
-        <span>Data source: Bargo U.S. Congress Stock Trades API.</span>
-        <span>•</span>
-        <span>{symbolFilter === 'ALL' ? 'Global recent feed' : symbolFilter + ' ticker feed'}</span>
-        {loading && <span className="inline-flex items-center gap-1 text-cyan-300"><Loader2 className="w-3 h-3 animate-spin" /> Loading</span>}
-        {error && <span className="text-amber-300">• {error}</span>}
+      <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/40 font-mono">
+        <span>Congress data source:</span>
+        {sourceStatus.sourceUrl ? (
+          <a
+            href={sourceStatus.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={'inline-flex items-center gap-1 rounded border px-2 py-1 ' + sourceTone(sourceStatus)}
+          >
+            {sourceStatus.label}
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : (
+          <span className={'rounded border px-2 py-1 ' + sourceTone(sourceStatus)}>
+            {sourceStatus.label}
+          </span>
+        )}
+        {sourceStatus.stale && (
+          <span className="text-cyan-300">• showing last-known-good records</span>
+        )}
+        {loading && (
+          <span className="inline-flex items-center gap-1 text-cyan-300">
+            <Loader2 className="w-3 h-3 animate-spin" /> Loading
+          </span>
+        )}
+        {sourceStatus.upstreamError && sourceStatus.kind !== 'unavailable' && (
+          <span className="text-amber-300">• Primary issue: {sourceStatus.upstreamError}</span>
+        )}
+        {error && <span className="text-rose-300">• {error}</span>}
       </div>
+
+      {sourceStatus.kind === 'fallback' && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-400/15 bg-amber-400/5 p-3 text-[10px] text-amber-100/80">
+          <AlertTriangle className="w-4 h-4 text-amber-300 mt-0.5 flex-shrink-0" />
+          <div>
+            <span className="font-black uppercase tracking-wider text-amber-200">Fallback active:</span>{' '}
+            the primary Bargo feed was unavailable, so the API is serving normalized public congressional disclosure records from OpenRegs by DataDawn.
+            The fallback may not include a separate filing/disclosure timestamp or estimated trade price.
+          </div>
+        </div>
+      )}
+
+      {sourceStatus.kind === 'cache' && (
+        <div className="flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-[10px] text-cyan-100/80">
+          <Activity className="w-4 h-4 text-cyan-300 mt-0.5 flex-shrink-0" />
+          <div>
+            <span className="font-black uppercase tracking-wider text-cyan-200">Cache fallback active:</span>{' '}
+            both live sources were unavailable, so the page is showing the last successful dataset available to the server.
+          </div>
+        </div>
+      )}
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -318,7 +410,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-white/40">
-                    {loading ? 'Loading disclosure records…' : 'No transactions found for the selected filters.'}
+                    {loading ? 'Loading disclosure records…' : sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : 'No transactions found for the selected filters.'}
                   </td>
                 </tr>
               ) : (
@@ -347,7 +439,7 @@ export default function CongressTrades({ liveTrades }: CongressTradesProps) {
                       </td>
                       <td className="p-4 text-white/80 font-bold">{t.amountRange}</td>
                       <td className="p-4 text-white/60 font-bold">{t.transactionDate || t.date || '—'}</td>
-                      <td className="p-4 text-white/40 font-bold">{t.filingDate || t.date || '—'}</td>
+                      <td className="p-4 text-white/40 font-bold">{t.filingDate || '—'}</td>
                       <td className="p-4 text-white font-bold">
                         {reaction ? '$' + formatPrice(reaction.eventPrice) : '—'}
                       </td>
