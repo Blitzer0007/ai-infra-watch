@@ -152,6 +152,122 @@ async function quote(symbol) {
   return { price, changePct };
 }
 
+function classifyPoliticalTopic(text) {
+  const value = text.toLowerCase();
+  if (value.includes('export') || value.includes('chip') || value.includes('semiconductor') || value.includes('gpu')) {
+    return 'Semiconductors / Export Controls';
+  }
+  if (value.includes('data center') || value.includes('data-centre') || value.includes('power') || value.includes('electricity') || value.includes('grid') || value.includes('energy')) {
+    return 'Data Centers / Power';
+  }
+  if (value.includes('regulat') || value.includes('law') || value.includes('order') || value.includes('policy') || value.includes('framework')) {
+    return 'AI Policy / Regulation';
+  }
+  if (value.includes('investment') || value.includes('growth') || value.includes('innovation') || value.includes('infrastructure')) {
+    return 'AI Growth / Infrastructure';
+  }
+  if (value.includes('security') || value.includes('defense') || value.includes('national security')) {
+    return 'AI National Security';
+  }
+  return 'AI / Technology';
+}
+
+function detectPoliticalActor(text) {
+  const value = text.toLowerCase();
+  if (value.includes('donald trump') || value.includes('trump')) return 'Donald Trump';
+  if (value.includes('jd vance') || value.includes('j.d. vance') || value.includes('vice president vance')) return 'JD Vance';
+  if (value.includes('white house') || value.includes('trump administration')) return 'White House / U.S. Administration';
+  return 'U.S. political leadership';
+}
+
+function relatedSymbols(text) {
+  const value = text.toLowerCase();
+  const symbols = new Set();
+
+  if (/(nvidia|nvda|gpu|chip|semiconductor|blackwell|hbm|export)/.test(value)) {
+    ['NVDA', 'AMD', 'DRAM', 'SOXL', 'TSM', 'SNDK', 'INTC'].forEach(symbol => symbols.add(symbol));
+  }
+  if (/(data center|data-centre|power|electricity|grid|energy|neocloud|cloud)/.test(value)) {
+    ['DGXX', 'NBIS', 'IREN', 'VIVO', 'MSFT', 'META', 'NOW'].forEach(symbol => symbols.add(symbol));
+  }
+  if (/(artificial intelligence|\bai\b|ai model|ai models|ai infrastructure|innovation|investment|growth)/.test(value)) {
+    ['NVDA', 'MSFT', 'META', 'NBIS', 'NOW'].forEach(symbol => symbols.add(symbol));
+  }
+
+  return Array.from(symbols);
+}
+
+async function politicalSignals() {
+  const queries = [
+    {
+      label: 'GDELT political coverage',
+      query: '(Donald Trump OR "JD Vance" OR "White House" OR "Trump administration") (AI OR "artificial intelligence" OR "AI infrastructure" OR "data center" OR power OR electricity OR semiconductor OR GPU OR chip OR export OR regulation OR innovation OR investment)',
+      evidence: 'secondary-coverage'
+    },
+    {
+      label: 'White House primary coverage',
+      query: 'domain:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)',
+      evidence: 'primary'
+    }
+  ];
+
+  const batches = await Promise.all(queries.map(async item => {
+    try {
+      const url =
+        'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
+        encodeURIComponent(item.query) +
+        '&mode=ArtList&format=json&maxrecords=20&timespan=24h&sort=datedesc';
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'ai-infra-watch/1.0' },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!response.ok) return [];
+      const payload = await response.json();
+      return (payload?.articles || []).map(article => {
+        const title = String(article?.title || '').trim();
+        const urlValue = String(article?.url || '').trim();
+        const source = String(article?.domain || article?.source || 'GDELT');
+        const date = article?.seendate || null;
+        const text = title + ' ' + source;
+        const primary = source.toLowerCase().includes('whitehouse.gov') || item.evidence === 'primary';
+
+        return {
+          id: 'political-' + Buffer.from((urlValue || title).slice(0, 160)).toString('base64url').slice(0, 32),
+          actor: detectPoliticalActor(text),
+          title,
+          source,
+          sourceType: primary ? 'primary' : 'secondary',
+          topic: classifyPoliticalTopic(text),
+          eventType: /(executive order|presidential memorandum|fact sheet|signed into law|executive action|announces|announced|directive)/i.test(title)
+            ? 'Policy / official action'
+            : 'Political statement / coverage',
+          date,
+          url: urlValue || null,
+          relatedSymbols: relatedSymbols(text),
+          note: primary
+            ? 'Primary White House source signal.'
+            : 'Media coverage signal; verify the underlying statement or official action before treating the headline as a quote.'
+        };
+      }).filter(item => item.title);
+    } catch {
+      return [];
+    }
+  }));
+
+  const unique = new Map();
+  batches.flat().forEach(item => {
+    const key = item.url || item.title.toLowerCase();
+    const existing = unique.get(key);
+    if (!existing || (item.sourceType === 'primary' && existing.sourceType !== 'primary')) {
+      unique.set(key, item);
+    }
+  });
+
+  return Array.from(unique.values())
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 20);
+}
+
 async function news() {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
   const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&format=json&maxrecords=20&timespan=24h';
@@ -192,8 +308,9 @@ export default async function handler(req, res) {
     contracts: await fetchSecContracts(),
     congressTrades: await fetchCongressTrades(req),
     macroRisks,
-    marketSentiment:'Live quotes + AI-infrastructure news feed active.',
-    sources:['Yahoo Finance chart data','GDELT news','SEC EDGAR','Bargo Congress Trades API']
+    politicalSignals: await politicalSignals().catch(() => []),
+    marketSentiment:'Live quotes + AI-infrastructure, political and policy news feeds active.',
+    sources:['Yahoo Finance chart data','GDELT AI-infrastructure news','GDELT political/policy coverage','SEC EDGAR','Bargo Congress Trades API']
   };
   cached = data;
   cachedAt = Date.now();
