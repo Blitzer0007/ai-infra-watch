@@ -10,6 +10,7 @@ interface MacroPoliticsProps {
   livePrices?: Record<string, { price: number; changePct: number }>;
   contracts?: any[];
   news?: any[];
+  politicalSignals?: any[];
 }
 
 function exposureClass(level: ExposureLevel) {
@@ -174,7 +175,112 @@ function PortfolioExposureMatrix({ contracts = [], news = [] }: { contracts?: an
   );
 }
 
-export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [] }: MacroPoliticsProps) {
+
+
+function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
+  const actorTone = (actor: string) => {
+    if (actor === 'Donald Trump') return 'text-amber-300';
+    if (actor === 'JD Vance') return 'text-cyan-300';
+    return 'text-white/70';
+  };
+
+  return (
+    <section className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-cyan-300">Live political / policy feed</div>
+          <h3 className="text-lg font-black uppercase tracking-tight text-white mt-1">Political &amp; AI Policy Signals</h3>
+          <p className="text-[10px] text-white/35 mt-1 font-mono max-w-4xl">
+            Tracks recent political statements, official actions and related reporting that mention AI, chips, data centers, power or regulation. Headlines are evidence signals, not verified quotations; open the source before relying on wording.
+          </p>
+        </div>
+        <div className="text-[9px] font-mono uppercase tracking-wider text-white/30">
+          {signals.length} signal{signals.length === 1 ? '' : 's'} · last 24h
+        </div>
+      </div>
+
+      {signals.length === 0 ? (
+        <div className="rounded-xl border border-white/5 bg-white/[.02] p-5 text-[10px] font-mono text-white/35">
+          No recent political / AI policy signals were returned by the configured live feeds.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {signals.map((signal, index) => (
+            <article
+              key={signal.id || signal.url || signal.title || index}
+              className="rounded-xl border border-white/5 bg-white/[.02] p-4"
+            >
+              <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={'text-[9px] font-mono font-black uppercase tracking-wider ' + actorTone(signal.actor || '')}>
+                      {signal.actor || 'U.S. political leadership'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded border border-cyan-400/15 bg-cyan-400/5 text-cyan-300 text-[8px] font-mono uppercase tracking-wider">
+                      {signal.topic || 'AI / Technology'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded border border-white/10 bg-white/5 text-white/40 text-[8px] font-mono uppercase tracking-wider">
+                      {signal.eventType || 'Political statement / coverage'}
+                    </span>
+                    <span className={'px-2 py-0.5 rounded border text-[8px] font-mono uppercase tracking-wider ' +
+                      (signal.sourceType === 'primary'
+                        ? 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300'
+                        : 'border-amber-400/15 bg-amber-400/5 text-amber-300')}>
+                      {signal.sourceType === 'primary' ? 'PRIMARY' : 'SECONDARY'}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-black text-white leading-relaxed">
+                    {signal.title}
+                  </h4>
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[9px] font-mono text-white/30">
+                    <span>{signal.source || 'GDELT'}</span>
+                    {signal.date && <span>{new Date(signal.date).toLocaleString()}</span>}
+                  </div>
+
+                  {Array.isArray(signal.relatedSymbols) && signal.relatedSymbols.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {signal.relatedSymbols.map((symbol: string) => (
+                        <span
+                          key={symbol}
+                          className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[8px] font-mono font-bold text-white/55"
+                        >
+                          {symbol}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {signal.note && (
+                    <p className="text-[9px] text-white/30 font-mono mt-3 leading-relaxed">{signal.note}</p>
+                  )}
+                </div>
+
+                {signal.url && (
+                  <a
+                    href={signal.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase tracking-wider text-cyan-300 hover:text-cyan-200 hover:bg-white/10"
+                  >
+                    Open source
+                  </a>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 pt-3 border-t border-white/5 text-[9px] text-white/25 font-mono">
+        Data source: GDELT document search, including a White House-focused query. Primary-source badges are limited to results whose returned domain is whitehouse.gov; secondary items require source verification.
+      </div>
+    </section>
+  );
+}
+
+export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [] }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
@@ -276,6 +382,8 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
           })),
         }}
       />
+
+      <PoliticalSignalsFeed signals={politicalSignals} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
