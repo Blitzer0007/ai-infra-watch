@@ -261,16 +261,73 @@ class RouterState(TypedDict, total=False):
 
 
 def build_router_graph(toolbox: MCPToolbox, strategy: RoutingStrategy):
-    """Compile the router state graph over a connected toolbox + strategy."""
-    from langgraph.graph import END, START, StateGraph
-Question -> best-matching MCP tool call(s), discovered at runtime.
+    """Compile the router's state graph over a connected toolbox + strategy.
 
-    The `toolbox` is a SHARED resource whose lifecycle the caller owns: it must
-    already be connected when `run()` is called, and the agent never closes it.
-    That mirrors how a supervisor would hand one connected toolbox to several
-    agents. The routing `strategy` is injectable; the default is deterministic
-    keyword matching so the agent runs offline with no LLM and no fixtures.
+    LangGraph is imported lazily because the autonomous Vercel entrypoint only
+    needs lightweight routing helpers during module import.
     """
+    from langgraph.graph import END, START, StateGraph
+
+    @traced_node("discover")
+    def discover(state: RouterState) -> dict:
+        try:
+            tools = toolbox.tools()
+        except MCPClientError as exc:
+            step = tool_call("mcp.discover", ok=False, note=exc.code)
+            return {"discovered": [], "error": f"{exc.code}: {exc.message}", "steps": [step]}
+        step = tool_call("mcp.discover", note=f"{len(tools)} tools")
+        return {"discovered": tools, "steps": [step]}
+
+    @traced_node("route")
+    def route(state: RouterState) -> dict:
+        question = (state.get("question") or "").strip()
+        tools = state.get("discovered") or []
+        if not question or not tools:
+            return {"plan": [], "_note": "nothing to route"}
+        plan = strategy(question, tools)
+        return {"plan": plan, "_note": f"{len(plan)} tool(s) planned"}
+
+    def route_after_plan(state: RouterState) -> str:
+        return "execute" if state.get("plan") else "finalize"
+
+    @traced_node("execute")
+    def execute(state: RouterState) -> dict:
+        plan = state.get("plan") or []
+        calls: list[ToolCallRecord] = []
+        steps: list[Step] = []
+        for tp in plan:
+            try:
+                output = toolbox.call(tp.tool, tp.arguments)
+            except Exception as exc:
+                code = getattr(exc, "code", type(exc).__name__)
+                calls.append(ToolCallRecord(tool=tp.tool, arguments=tp.arguments, ok=False, error=str(exc)))
+                steps.append(tool_call(tp.tool, tp.arguments, ok=False, note=str(code)))
+            else:
+                calls.append(ToolCallRecord(tool=tp.tool, arguments=tp.arguments, ok=True, output=output))
+                steps.append(tool_call(tp.tool, tp.arguments, note="ok"))
+        return {"calls": calls, "routed": "execute", "steps": steps}
+
+    @traced_node("finalize")
+    def finalize(state: RouterState) -> dict:
+        if not state.get("plan"):
+            return {"routed": state.get("routed") or "no_route", "_note": "no tool matched"}
+        return {"_note": "done"}
+
+    graph = StateGraph(RouterState)
+    graph.add_node("discover", discover)
+    graph.add_node("route", route)
+    graph.add_node("execute", execute)
+    graph.add_node("finalize", finalize)
+    graph.add_edge(START, "discover")
+    graph.add_edge("discover", "route")
+    graph.add_conditional_edges("route", route_after_plan, {"execute": "execute", "finalize": "finalize"})
+    graph.add_edge("execute", "finalize")
+    graph.add_edge("finalize", END)
+    return graph.compile()
+
+
+class ToolRouterAgent:
+    """Question -> best-matching MCP tool call(s), discovered at runtime."""
 
     def __init__(
         self,
