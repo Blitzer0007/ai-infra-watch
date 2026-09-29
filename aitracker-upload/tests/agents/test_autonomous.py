@@ -480,3 +480,15 @@ def test_jev_gate_prefers_new_evidence_family():
     assert plan["tool"] == "news.search"
 
 # Finalizer model routing regression coverage.
+
+
+
+def test_autonomous_ui_exposes_all_jev_evidence_states():
+    from pathlib import Path
+    page = Path(__file__).resolve().parents[2] / "pages" / "ask.html"
+    content = page.read_text(encoding="utf-8")
+    assert "Jev evidence gate" in content
+    assert "Evidence sufficient" in content
+    assert "Gathering more evidence" in content
+    assert "Evidence insufficient" in content
+    assert "r.jev.evidence_gate" in content
