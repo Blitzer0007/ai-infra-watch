@@ -5,6 +5,7 @@ import { Contract } from '../types';
 import ContractEventStudy from './ContractEventStudy';
 import ContractTerms from './ContractTerms';
 import ContractPortfolioImpact from './ContractPortfolioImpact';
+import JevDecisionPanel from './JevDecisionPanel';
 
 interface ContractsLedgerProps {
   liveContracts?: Contract[];
@@ -81,6 +82,25 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
           </div>
         </div>
       </div>
+
+      <JevDecisionPanel
+        kind="contracts"
+        title="Contract triage"
+        state={{
+          active_contracts: activeContracts.length,
+          sec_primary_records: activeContracts.filter((c) => c.source === 'sec-edgar-primary').length,
+          disclosed_value_b: totalDisclosedB,
+          recent: activeContracts.slice(0, 8).map((c) => ({
+            company: c.company,
+            client: c.client,
+            value: c.value,
+            status: c.status,
+            status_level: c.statusLevel,
+            source: c.source,
+            details: c.details,
+          })),
+        }}
+      />
 
       {/* Filters Toolbar */}
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between bg-[#15181E]/30 border border-white/10 p-4 rounded-xl">
