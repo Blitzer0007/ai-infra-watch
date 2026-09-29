@@ -121,6 +121,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
   const [symbolFilter, setSymbolFilter] = useState('NVDA');
   const [trades, setTrades] = useState<CongressTrade[]>([]);
+  const [globalTrades, setGlobalTrades] = useState<CongressTrade[]>([]);
+  const [globalLoading, setGlobalLoading] = useState(false);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -181,6 +183,33 @@ export default function CongressTrades(_props: CongressTradesProps) {
     };
   }, [symbolFilter]);
 
+  // Keep a global dataset available so the search box can find a politician
+  // or ticker even when the selected symbol feed does not contain that record.
+  // The server already caches the ALL request for five minutes.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadGlobalTrades() {
+      setGlobalLoading(true);
+      try {
+        const res = await fetch('/api/congress-trades?symbol=ALL');
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) {
+          setGlobalTrades(Array.isArray(data?.trades) ? data.trades : []);
+        }
+      } catch {
+        // Keep the symbol-scoped dataset usable when the global search feed fails.
+      } finally {
+        if (!cancelled) setGlobalLoading(false);
+      }
+    }
+
+    loadGlobalTrades();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (symbolFilter === 'ALL') {
       setHistory([]);
@@ -201,15 +230,32 @@ export default function CongressTrades(_props: CongressTradesProps) {
     };
   }, [symbolFilter]);
 
-  const filtered = useMemo(() => trades.filter((t) => {
-    const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
+  const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const matchesSearch =
-      !needle ||
-      t.politician.toLowerCase().includes(needle) ||
-      t.stockSymbol.toLowerCase().includes(needle);
-    return matchesChamber && matchesSearch;
-  }), [trades, chamberFilter, search]);
+    // An active search intentionally expands to the global disclosure feed.
+    // This prevents "Search politician or symbol" from appearing broken just
+    // because the currently selected ticker has no matching record.
+    const sourceTrades = needle ? globalTrades : trades;
+
+    return sourceTrades.filter((t) => {
+      const matchesSymbol = symbolFilter === 'ALL' || needle ? true : t.stockSymbol === symbolFilter;
+      const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
+      const haystack = [
+        t.politician,
+        t.stockSymbol,
+        t.transactionType,
+        t.amountRange,
+        t.chamber,
+        t.transactionDate,
+        t.filingDate,
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      const matchesSearch = !needle || haystack.includes(needle);
+      return matchesSymbol && matchesChamber && matchesSearch;
+    });
+  }, [trades, globalTrades, chamberFilter, search, symbolFilter]);
 
   const reactions = useMemo(() => {
     if (symbolFilter === 'ALL') return [];
@@ -330,7 +376,11 @@ export default function CongressTrades(_props: CongressTradesProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-white placeholder-white/20 font-mono"
+              aria-label="Search Congress trades by politician, symbol, type, amount, or date"
             />
+            {search.trim() && globalLoading && (
+              <Loader2 className="w-3.5 h-3.5 text-cyan-300 absolute right-3 top-3 animate-spin" />
+            )}
           </div>
         </div>
       </div>
@@ -431,7 +481,13 @@ export default function CongressTrades(_props: CongressTradesProps) {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-white/40">
-                    {loading ? 'Loading disclosure records…' : sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : 'No transactions found for the selected filters.'}
+                    {loading
+                      ? 'Loading disclosure records…'
+                      : sourceStatus.kind === 'unavailable'
+                        ? 'No records available from the configured Congress sources.'
+                        : search.trim()
+                          ? 'No Congress records match the current search.'
+                          : 'No transactions found for the selected filters.'}
                   </td>
                 </tr>
               ) : (
