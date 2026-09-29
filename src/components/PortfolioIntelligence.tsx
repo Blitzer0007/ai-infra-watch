@@ -6,6 +6,7 @@ import { buildPositionAnalyses, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type Positi
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
+import UnifiedEventTimeline from './UnifiedEventTimeline';
 
 type Price = { price: number; changePct: number };
 type Props = {
@@ -65,6 +66,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       <PortfolioSignalFusion
         prices={livePrices}
+        contracts={contracts}
+        congressTrades={congressTrades}
+        macroRisks={macroRisks}
+        news={news}
+      />
+
+      <UnifiedEventTimeline
+        symbol={selected}
         contracts={contracts}
         congressTrades={congressTrades}
         macroRisks={macroRisks}
