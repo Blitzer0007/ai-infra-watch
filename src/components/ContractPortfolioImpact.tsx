@@ -6,6 +6,21 @@ type Props = {
   contract: Contract;
 };
 
+type CompanyScale = {
+  symbol: string;
+  company: string | null;
+  cik: string | null;
+  revenue: {
+    value: number;
+    start: string;
+    end: string;
+    filed: string | null;
+    tag: string;
+  } | null;
+  source: string;
+  error?: string;
+};
+
 const PORTFOLIO_SYMBOLS = new Set([
   'DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS'
 ]);
