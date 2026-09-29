@@ -91,7 +91,9 @@ def test_autonomous_has_a_hard_step_bound():
     finally:
         tb.close()
 
-    assert result.resolution in {"max_steps", "error"}
+    # A repeated successful tool call may now terminate early via the
+    # duplicate-call guard; that is still within the hard iteration bound.
+    assert result.resolution in {"completed", "max_steps", "error"}
     assert len(result.trajectory.steps) <= (MAX_STEPS * 4 + 4)
 
 
