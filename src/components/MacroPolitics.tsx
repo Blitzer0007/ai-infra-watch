@@ -3,6 +3,7 @@ import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-
 import { MacroRisk } from '../types';
 import { PORTFOLIO_POSITIONS } from '../utils/portfolioPositions';
 import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
+import JevDecisionPanel from './JevDecisionPanel';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
@@ -255,6 +256,25 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         livePrices={livePrices}
         contracts={contracts}
         news={news}
+      />
+
+      <JevDecisionPanel
+        kind="macro"
+        title="Macro exposure review"
+        state={{
+          system_stress_score: threatScore,
+          taiwan_disruption_probability: taiwanProb,
+          power_grid_shortfall: gridSeverity,
+          export_control_breadth: embargoBreadth,
+          live_risks: activeRisks.slice(0, 8).map((risk) => ({
+            id: risk.id,
+            category: risk.category,
+            title: risk.title,
+            impact_rating: risk.impactRating,
+            description: risk.description,
+            updated: risk.dateUpdated,
+          })),
+        }}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
