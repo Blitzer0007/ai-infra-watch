@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.agents.autonomous import AutonomousMCPAgent
+from app.llm.client import LLMClient
 from app.mcp_client import MCPToolbox
 from tests.agents.conftest import MAX_STEPS
 from tests.mcp_fakes import FakeSession, cfg as _cfg, make_factory as _factory
