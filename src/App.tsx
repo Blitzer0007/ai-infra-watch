@@ -474,7 +474,10 @@ export default function App() {
           </div>
 
           {(() => {
-            const prices = { ...tickerPrices, ...(liveData?.stockPrices || {}) };
+            // Browser-side ticker quotes refresh more frequently than the server feed.
+            // Prefer the freshest ticker value, with liveData as a fallback for symbols the
+            // browser quote provider could not refresh.
+            const prices = { ...(liveData?.stockPrices || {}), ...tickerPrices };
             const stress = calculatePortfolioStress(
               prices,
               liveData?.macroRisks || []
@@ -545,7 +548,7 @@ export default function App() {
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
               {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
-              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
             </motion.div>
