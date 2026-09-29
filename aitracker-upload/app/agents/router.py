@@ -131,20 +131,20 @@ def extract_symbols(question: str, max_symbols: int = 10) -> list[str]:
     # so natural-language questions like "latest NVIDIA earnings" resolve to
     # the actual market ticker NVDA instead of the literal word NVIDIA.
     for alias in sorted(_SYMBOL_ALIASES, key=len, reverse=True):
-        if re.search(rf"\\b{re.escape(alias)}\\b", question, flags=re.IGNORECASE):
+        if re.search(rf"\b{re.escape(alias)}\b", question, flags=re.IGNORECASE):
             add(alias)
 
-    for match in re.finditer(r"\\$([A-Z][A-Z0-9.-]{0,5})\\b", question):
+    for match in re.finditer(r"\$([A-Z][A-Z0-9.-]{0,5})\b", question):
         add(match.group(1))
 
     for match in re.finditer(
-        r"\\b(?:ticker|symbol|stock)\\s*[:#-]?\\s*([A-Z][A-Z0-9.-]{0,5})\\b",
+        r"\b(?:ticker|symbol|stock)\s*[:#-]?\s*([A-Z][A-Z0-9.-]{0,5})\b",
         question,
         flags=re.IGNORECASE,
     ):
         add(match.group(1))
 
-    for token in re.findall(r"\\b[A-Z][A-Z0-9.-]{1,5}\\b", question):
+    for token in re.findall(r"\b[A-Z][A-Z0-9.-]{1,5}\b", question):
         add(token.rstrip("."))
 
     return symbols[:max_symbols]
