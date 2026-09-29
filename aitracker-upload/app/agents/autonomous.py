@@ -716,13 +716,18 @@ class AutonomousMCPAgent:
             # For compound research questions, evaluate evidence sufficiency once
             # after two successful sources. Low/sparse evidence forces another
             # source; strong evidence can stop the loop before the hard step bound.
+            successful_count = sum(1 for call in calls if call.ok)
+            last_gate = self.last_jev.get("evidence_gate") or {}
+            last_gate_checked = int(last_gate.get("checked_after_successful_calls", 0) or 0)
             if (
                 _needs_evidence_gate(question)
                 and self.jev.enabled
-                and "evidence_gate" not in self.last_jev
-                and sum(1 for call in calls if call.ok) >= 2
+                and successful_count >= 2
+                and successful_count > last_gate_checked
             ):
                 gate_decision, gate = _store_evidence_gate(question, calls, self.jev)
+                prior_checks = int(last_gate.get("checks", 0) or 0)
+                gate["checks"] = prior_checks + 1
                 self.last_jev["evidence_gate"] = gate
                 steps.append(
                     Step(
