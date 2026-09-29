@@ -31,7 +31,7 @@ from typing import Any
 
 from app.mcp_client import MCPToolbox, ServerConfig, ToolInfo
 from app.mcp_client.client import MCPClientError
-from app.mcp_client.servers import default_configs
+from app.mcp_client.servers import research_configs
 
 _toolbox: MCPToolbox | None = None
 _lock = threading.Lock()
@@ -56,7 +56,7 @@ def use_mcp() -> bool:
 
 
 def _build_default_configs() -> list[ServerConfig]:
-    """Build the 3-server config list. Exposed as a seam so tests inject fakes."""
+    """Build the lean research server config list. Exposed as a seam so tests inject fakes."""
     return default_configs()
 
 
@@ -77,7 +77,7 @@ def get_toolbox(
     with _lock:
         if _toolbox is not None:
             return _toolbox
-        cfgs = list(configs or _build_default_configs())
+        cfgs = list(configs or research_configs())
         errors_this_call: list[str] = []
 
         for i in range(len(cfgs), 0, -1):
