@@ -3,16 +3,12 @@ run-name: Vercel Production Deploy • ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Deploy production now'
     name: Deploy latest main to Vercel
     runs-on: ubuntu-latest
     env:
