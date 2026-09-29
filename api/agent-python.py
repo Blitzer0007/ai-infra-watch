@@ -51,6 +51,7 @@ def _shape(result: Any) -> dict[str, Any]:
         "ok": result.ok(),
         "degraded": result.degraded(),
         "summary": result.summary,
+        "answer_source": result.answer_source,
         "error": result.error,
         "resolution": result.resolution,
         "discovered": result.discovered,
