@@ -6,6 +6,70 @@ interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
 }
 
+
+
+const PORTFOLIO_EXPOSURE = [
+  { symbol: 'DGXX', taiwan: 'Limited', power: 'Direct', export: 'Limited' },
+  { symbol: 'DRAM', taiwan: 'Direct', power: 'Secondary', export: 'Secondary' },
+  { symbol: 'SOXL', taiwan: 'Direct', power: 'Secondary', export: 'Direct' },
+  { symbol: 'NVDA', taiwan: 'Direct', power: 'Secondary', export: 'Direct' },
+  { symbol: 'MSFT', taiwan: 'Secondary', power: 'Secondary', export: 'Secondary' },
+  { symbol: 'NBIS', taiwan: 'Secondary', power: 'Direct', export: 'Secondary' },
+  { symbol: 'VIVO', taiwan: 'Limited', power: 'Direct', export: 'Limited' },
+  { symbol: 'META', taiwan: 'Secondary', power: 'Secondary', export: 'Secondary' },
+  { symbol: 'NOW', taiwan: 'Limited', power: 'Secondary', export: 'Limited' },
+  { symbol: 'PHVS', taiwan: 'Limited', power: 'Limited', export: 'Limited' },
+] as const;
+
+function exposureClass(level: 'Direct' | 'Secondary' | 'Limited') {
+  if (level === 'Direct') return 'bg-rose-500/10 text-rose-300 border-rose-500/20';
+  if (level === 'Secondary') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
+  return 'bg-white/5 text-white/40 border-white/10';
+}
+
+function PortfolioExposureMatrix() {
+  return (
+    <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Exposure Matrix</h3>
+          <p className="text-[10px] text-white/35 mt-1 font-mono">
+            Scenario exposure across your 10 held positions. This is an internal exposure lens, not a probability forecast.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
+          <span className="px-2 py-1 rounded border border-rose-500/20 bg-rose-500/10 text-rose-300">Direct</span>
+          <span className="px-2 py-1 rounded border border-amber-500/20 bg-amber-500/10 text-amber-300">Secondary</span>
+          <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40">Limited</span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-[10px] font-mono">
+          <thead className="text-white/30 uppercase tracking-wider">
+            <tr>
+              <th className="text-left p-2">Holding</th>
+              <th className="text-center p-2">TSMC disruption</th>
+              <th className="text-center p-2">Power shortfall</th>
+              <th className="text-center p-2">AI-chip export controls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PORTFOLIO_EXPOSURE.map((row) => (
+              <tr key={row.symbol} className="border-t border-white/5">
+                <td className="p-2 font-black text-white">{row.symbol}</td>
+                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.taiwan)}>{row.taiwan}</span></td>
+                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.power)}>{row.power}</span></td>
+                <td className="p-2 text-center"><span className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(row.export)}>{row.export}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
@@ -78,6 +142,8 @@ export default function MacroPolitics({ liveRisks }: MacroPoliticsProps) {
           <span>Adjust the scenario sliders below to recalculate the score.</span>
         </div>
       </div>
+
+      <PortfolioExposureMatrix />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
