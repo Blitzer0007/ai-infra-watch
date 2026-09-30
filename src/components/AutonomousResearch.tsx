@@ -28,6 +28,20 @@ type ResearchResponse = {
     latency_ms?: number;
     tool?: string;
     error?: string;
+    evidence_availability?: {
+      required?: string[];
+      missing?: string[];
+      complete?: boolean;
+      channels?: Record<string, {
+        status?: 'AVAILABLE' | 'EMPTY' | 'FAILED' | 'MISSING' | string;
+        observedCalls?: number;
+        successfulCalls?: number;
+        failedCalls?: number;
+        usableCalls?: number;
+        lastError?: string | null;
+      }>;
+      status_counts?: Record<string, number>;
+    };
     evidence_gate?: {
       enabled?: boolean;
       action?: string;
@@ -263,6 +277,35 @@ export default function AutonomousResearch() {
               {result.resolution && (
                 <p className="mt-3 text-[10px] font-mono text-white/35">Resolution: {result.resolution}</p>
               )}
+              {result.jev?.evidence_gate?.evidence_availability && (
+                <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
+                    Evidence coverage
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(result.jev.evidence_gate.evidence_availability.channels || {}).map(([family, channel]) => (
+                      <span
+                        key={family}
+                        className={
+                          'rounded border px-1.5 py-0.5 ' +
+                          (
+                            channel.status === 'AVAILABLE'
+                              ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
+                              : channel.status === 'EMPTY'
+                                ? 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300'
+                                : channel.status === 'FAILED'
+                                  ? 'border-rose-400/20 bg-rose-400/5 text-rose-300'
+                                  : 'border-amber-400/20 bg-amber-400/5 text-amber-300'
+                          )
+                        }
+                      >
+                        {family}: {channel.status || 'UNKNOWN'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono text-white/25">
                 <span>Tool outputs below are the evidence sources used by the answer.</span>
                 {result.jev?.enabled && result.jev.choice && (
