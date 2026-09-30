@@ -23,6 +23,7 @@ from app.mcp_client.client import MCPClientError
 from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
+from app.agents.evidence_quality import detect_conflicts, enrich_calls
 
 
 @dataclass
@@ -399,9 +400,13 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
     availability = _evidence_availability(question, calls)
+    evidence_quality = enrich_calls(successful)
+    conflict_report = detect_conflicts(successful)
     state = {
         "question": question,
         "evidence_availability": availability,
+        "evidence_freshness": evidence_quality,
+        "conflict_detection": conflict_report,
         "successful_calls": [
             {
                 "tool": call.tool,
@@ -427,6 +432,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         "action": "continue",
         "fallback": not evaluation.usable,
         "evidence_availability": availability,
+        "evidence_freshness": evidence_quality,
+        "conflict_detection": conflict_report,
     }
     if not evaluation.usable:
         gate["error"] = evaluation.error or "Jev evidence gate unavailable"
@@ -440,7 +447,10 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
 
         # Only allow an early stop when Jev explicitly selects stop and the
         # evidence-quality score reaches the Usable/Strong boundary.
-        if (
+        conflict_detected = bool(conflict_report.get("detected"))
+        if conflict_detected:
+            decision = "gather_more"
+        elif (
             choice == "stop"
             and isinstance(score, (int, float))
             and score >= 2.25
@@ -460,6 +470,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                 "action": decision,
                 "choice": choice,
                 "choice_confidence": confidence,
+                "conflict_detected": conflict_detected,
+                "conflict_count": int(conflict_report.get("count", 0) or 0),
                 "raw_score": score,
                 "evidence_quality": (
                     round(max(0.0, min(3.0, float(score))) / 3.0 * 100.0)
