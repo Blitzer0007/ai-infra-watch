@@ -19,6 +19,7 @@ import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
 import HelpGuide from './components/HelpGuide';
+import ForwardOutlook from './components/ForwardOutlook';
 import AutonomousResearch from './components/AutonomousResearch';
 
 type StressSnapshot = {
@@ -250,7 +251,8 @@ export default function App() {
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon },
-    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen }
+    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
+    { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp }
   ];
 
   return (
@@ -555,6 +557,7 @@ export default function App() {
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
+              {activeView === 'outlook' && <ForwardOutlook livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} macroRisks={liveData?.macroRisks} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
             </motion.div>
           </AnimatePresence>
 
