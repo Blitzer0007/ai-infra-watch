@@ -285,6 +285,8 @@ export default function HelpGuide({ onNavigate }: Props) {
                   <p><span className="text-white/80 font-bold">P25–P75 coverage</span> = the share of actual outcomes inside the middle historical range. Low coverage means the range is too narrow for the observed outcomes.</p>
                   <p><span className="text-white/80 font-bold">Baseline / lift</span> compares the analogue method with a simple unconditional historical baseline. Positive lift is descriptive evidence for that backtest—not proof of future performance.</p>
                   <p><span className="text-white/80 font-bold">JEV validation</span> interprets the measured backtest and identifies evidence gaps or the next experiment. JEV does not change the numerical forecast.</p>
+                  <p><span className="text-white/80 font-bold">Automatic model selection</span> periodically compares analogue-v1 with analogue-v2 using walk-forward historical validation. A model is changed only when the validation evidence clears the conservative selection rule; otherwise the current model remains active.</p>
+                  <p><span className="text-white/80 font-bold">Forecast verification</span> records the model version with each forecast so later accuracy measurements remain reproducible. Duplicate pending forecasts with the same ticker, horizon, scenario, and model are blocked.</p>
                 </div>
               </section>
             )}
