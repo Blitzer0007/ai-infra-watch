@@ -371,6 +371,43 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(families))
 
 
+
+FRESHNESS_WINDOWS_SECONDS = {"market":3600,"news":172800,"sec":1209600,"earnings":1209600,"event_study":604800,"congress":2592000,"macro":604800}
+
+def _normalize_evidence(question: str, calls: list[ToolCallRecord]) -> list[dict[str, Any]]:
+    import time
+    from datetime import datetime
+    out=[]
+    for call in calls:
+        if not call.ok: continue
+        family=_evidence_family(call.tool)
+        raw=call.output if isinstance(call.output, list) else [call.output]
+        for item in raw[:30]:
+            if not isinstance(item, dict): continue
+            stamp=next((item.get(k) for k in ("publishedAt","published_at","date","datetime","timestamp","asOf","as_of","retrievedAt","retrieved_at") if item.get(k) is not None),None)
+            try:
+                ts=float(stamp)/(1000 if float(stamp)>10000000000 else 1) if isinstance(stamp,(int,float)) else datetime.fromisoformat(str(stamp).replace("Z","+00:00")).timestamp()
+                age=max(0,time.time()-ts)
+            except Exception:
+                age=None
+            claim=str(item.get("claim") or item.get("status") or item.get("event") or item.get("title") or item.get("details") or item.get("description") or "")[:500]
+            out.append({"family":family,"tool":call.tool,"source":item.get("source") or item.get("provider") or call.tool,"provider":item.get("provider"),"publishedAt":stamp,"freshnessSeconds":round(age,1) if age is not None else None,"stale":bool(age is not None and age>FRESHNESS_WINDOWS_SECONDS.get(family,604800)),"evidenceType":item.get("evidenceType") or family,"ticker":item.get("ticker") or item.get("symbol") or item.get("company"),"claimKey":item.get("claimKey") or item.get("claim_key") or item.get("id"),"claim":claim,"url":item.get("url") or item.get("link")})
+    return out
+
+def _detect_evidence_conflicts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups={}
+    for item in items:
+        text=str(item.get("claim") or "").lower()
+        status="negative" if any(x in text for x in ("cancelled","canceled","terminated","delayed","postponed","rejected","denied")) else "positive" if any(x in text for x in ("signed","executed","entered into","announced","awarded","approved","completed","effective")) else None
+        if not status: continue
+        key=str(item.get("claimKey") or item.get("ticker") or item.get("claim") or "").lower()[:180]
+        groups.setdefault(key,[]).append((status,item))
+    conflicts=[]
+    for key, values in groups.items():
+        if any(s=="positive" for s,_ in values) and any(s=="negative" for s,_ in values) and len({x["family"] for _,x in values})>1:
+            conflicts.append({"status":"CONFLICT","claimKey":key,"severity":"material","needsVerification":True,"claims":[x for _,x in values[:4]]})
+    return conflicts[:10]
+
 def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[str, Any]:
     """Build a typed availability matrix from the actual MCP trajectory."""
     expected = _required_evidence_families(question)
