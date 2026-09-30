@@ -473,6 +473,17 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
   const trackForecast = async () => {
     if (!currentPrice || !history.length || analysis.confidence === 'Insufficient') return;
+    const duplicate = forecasts.some(f =>
+      f.status === 'pending' &&
+      f.ticker === selectedStock &&
+      f.horizon === horizon &&
+      f.scenarioId === scenarioId &&
+      f.modelVersion === modelVersion
+    );
+    if (duplicate) {
+      setVerificationMessage('This ticker, horizon, scenario, and model are already being tracked.');
+      return;
+    }
     const snapshot: ForecastSnapshot = {
       id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
       targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
