@@ -275,7 +275,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [modelVersion, setModelVersion] = useState('analogue-v1');
   const [modelConfig, setModelConfig] = useState<any>(null);
   const [jevLoading, setJevLoading] = useState(false);
-  const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number } | null>(null);
+  const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number; rawScore?: number; evidenceQuality?: number } | null>(null);
   const [jevError, setJevError] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
   const [verificationBusy, setVerificationBusy] = useState(false);
@@ -324,7 +324,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     let cancelled = false;
     async function loadModel() {
       try {
-        const response = await fetch('/api/forecast-model-evaluation?ticker=' + encodeURIComponent(selectedStock) + '&horizon=' + horizon);
+        const response = await fetch('/api/forecast-verification?ticker=' + encodeURIComponent(selectedStock) + '&horizon=' + horizon);
         if (!response.ok) throw new Error('Model configuration unavailable');
         const body = await response.json();
         if (!cancelled) {
@@ -461,7 +461,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         answer_source: body?.answer_source,
         choice: body?.jev?.choice,
         evidenceGate: body?.jev?.evidence_gate?.action,
-        confidence: body?.jev?.confidence
+        confidence: body?.jev?.confidence,
+        rawScore: body?.jev?.evidence_gate?.raw_score,
+        evidenceQuality: body?.jev?.evidence_gate?.evidence_quality
       });
     } catch (err: any) {
       setJevResult(null);
@@ -816,7 +818,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <div className="flex flex-wrap gap-2">
                     {jevResult.choice && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV route: {jevResult.choice}</span>}
                     {jevResult.evidenceGate && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence gate: {jevResult.evidenceGate}</span>}
-                    {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence}</span>}
+                    {jevResult.rawScore != null && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV evidence quality: {jevResult.rawScore.toFixed(2)} / 3</span>}
+                    {jevResult.evidenceQuality != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence quality: {jevResult.evidenceQuality.toFixed(0)} / 100</span>}
+                    {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence.toFixed(2)} / 1</span>}
                     {jevResult.answer_source && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Source: {jevResult.answer_source}</span>}
                   </div>
                 </div>
