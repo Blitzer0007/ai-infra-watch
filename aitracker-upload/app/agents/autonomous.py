@@ -24,6 +24,7 @@ from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
 from app.jev.evidence import evidence_health
+from app.jev.evidence import evidence_health
 
 
 @dataclass
@@ -455,8 +456,14 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
             and score >= 2.25
             and (confidence is None or confidence >= 0.50)
             and availability["complete"]
+            and not health["hasMaterialConflict"]
+            and health["staleCount"] == 0
         ):
             decision = "stop"
+        elif health["hasMaterialConflict"]:
+            decision = "resolve_conflict"
+        elif health["staleCount"] > 0:
+            decision = "gather_more"
         elif choice in {"gather_more", "resolve_conflict"} or not availability["complete"]:
             decision = "gather_more"
         elif isinstance(score, (int, float)) and score < 1.50:
@@ -480,6 +487,9 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                 "model": evaluation.model,
                 "latency_ms": round(evaluation.latency_ms, 1),
                 "input_tokens": evaluation.input_tokens,
+                "evidence_health": health,
+                "conflicts": health["conflicts"],
+                "freshness": health["freshness"],
             }
         )
     return decision, gate
