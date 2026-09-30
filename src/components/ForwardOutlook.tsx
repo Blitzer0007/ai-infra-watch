@@ -107,6 +107,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [error, setError] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<Horizon>(20);
   const [scenarioId, setScenarioId] = useState('base');
+  const [jevLoading, setJevLoading] = useState(false);
+  const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number } | null>(null);
+  const [jevError, setJevError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +181,64 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
   const selectedScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
   const meta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', logoColor: '#22c55e' };
+
+  const runJevEvidenceCheck = async () => {
+    if (!history.length || loading) return;
+    setJevLoading(true);
+    setJevError(null);
+    try {
+      const scenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
+      const compact = (items: any[], keys: string[]) => items.slice(0, 8).map(item => {
+        const out: Record<string, any> = {};
+        keys.forEach(key => { if (item?.[key] != null) out[key] = item[key]; });
+        return out;
+      });
+      const prompt = [
+        'Act as the JEV evidence/context layer for AI Infra Watch Forward Outlook.',
+        'Do not change, invent, or override the numerical historical forecast. Treat the statistical distribution as the source of the numbers.',
+        'Assess whether current evidence supports, conflicts with, or is insufficient to contextualize the historical analogue result.',
+        'Return a concise summary for the UI with: evidence assessment, key supporting/conflicting signals, important caveats, and what should be verified next.',
+        'Do not provide an investment recommendation, price target, or certainty claim.',
+        '',
+        'Ticker: ' + selectedStock,
+        'Horizon: ' + HORIZONS.find(h => h.days === horizon)?.label,
+        'Scenario: ' + scenario.label,
+        'Historical median: ' + formatReturn(analysis.median),
+        'Historical P10/P25/P75/P90: ' + [analysis.p10, analysis.p25, analysis.p75, analysis.p90].map(formatReturn).join(' / '),
+        'Positive historical outcomes: ' + (analysis.positive * 100).toFixed(0) + '%',
+        'Analogue matches: ' + analysis.analogueCount,
+        'Baseline observations: ' + analysis.allCount,
+        '20D momentum: ' + formatReturn(metrics.momentum),
+        'Annualized volatility: ' + metrics.volatility.toFixed(1) + '%',
+        '1Y move: ' + formatReturn(metrics.oneYear),
+        'Macro load: ' + macroLoad + '/100',
+        'Contracts evidence: ' + JSON.stringify(compact(contracts, ['title','company','date','status','summary'])),
+        'News evidence: ' + JSON.stringify(compact(news, ['title','source','publishedAt','summary'])),
+        'Political/policy evidence: ' + JSON.stringify(compact(politicalSignals, ['title','source','date','summary','impactRating'])),
+        'Macro risks: ' + JSON.stringify(compact(macroRisks, ['title','description','impactRating']))
+      ].join('\n');
+
+      const response = await fetch('/api/agent-ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: prompt })
+      });
+      if (!response.ok) throw new Error('JEV evidence check failed (HTTP ' + response.status + ')');
+      const body = await response.json();
+      setJevResult({
+        summary: body?.summary || body?.answer || 'JEV returned no summary.',
+        answer_source: body?.answer_source,
+        choice: body?.jev?.choice,
+        evidenceGate: body?.jev?.evidence_gate?.action,
+        confidence: body?.jev?.confidence
+      });
+    } catch (err: any) {
+      setJevResult(null);
+      setJevError(err?.message || 'JEV evidence check unavailable');
+    } finally {
+      setJevLoading(false);
+    }
+  };
 
   const runTicker = () => {
     const value = tickerInput.trim().toUpperCase();
@@ -308,6 +369,45 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 Under <strong className="text-white">{selectedScenario.label}</strong>, the historical analogue set produced a median {formatReturn(analysis.median)} outcome over the selected horizon, with the middle 50% between {formatReturn(analysis.p25)} and {formatReturn(analysis.p75)}. The model found {analysis.analogueCount} close historical regimes.
               </p>
               <p className="text-[9px] font-mono text-white/30 mt-2">This is a historical distribution, not a promise, target price, or investment recommendation.</p>
+            </div>
+
+            <div className="rounded-2xl border border-violet-400/20 bg-violet-400/[.04] p-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="w-4 h-4 text-violet-300" />
+                    <span className="text-[9px] font-mono uppercase tracking-widest text-violet-200/70">JEV evidence & context</span>
+                  </div>
+                  <p className="text-[10px] text-white/45 max-w-3xl">
+                    JEV does not generate the numerical forecast. It evaluates current evidence around the historical result and flags support, conflict, or insufficient evidence.
+                  </p>
+                </div>
+                <button
+                  onClick={runJevEvidenceCheck}
+                  disabled={jevLoading}
+                  className="shrink-0 px-4 py-2.5 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase tracking-wider disabled:opacity-50"
+                >
+                  {jevLoading ? 'JEV CHECKING…' : 'Run JEV Evidence Check'}
+                </button>
+              </div>
+
+              {jevError && <div className="mt-3 text-[10px] font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{jevError}</div>}
+
+              {!jevLoading && !jevError && !jevResult && (
+                <div className="mt-3 text-[10px] text-white/35">Run the check to have JEV assess the current evidence for {selectedStock} without changing the historical numbers above.</div>
+              )}
+
+              {jevResult && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-sm text-white/75 leading-relaxed">{jevResult.summary}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {jevResult.choice && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV route: {jevResult.choice}</span>}
+                    {jevResult.evidenceGate && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence gate: {jevResult.evidenceGate}</span>}
+                    {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence}</span>}
+                    {jevResult.answer_source && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Source: {jevResult.answer_source}</span>}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
