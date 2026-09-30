@@ -291,7 +291,7 @@ export default function App() {
       </div>
 
       {/* 2. BODY LAYOUT */}
-      <div className="flex flex-1 relative w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex flex-col xl:flex-row flex-1 relative w-full min-w-0 max-w-full overflow-x-hidden">
         {/* DESKTOP SIDEBAR */}
         <aside className="aiw-desktop-sidebar fixed top-8 bottom-0 left-0 z-40 flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 overflow-y-auto">
           {/* Brand header */}
