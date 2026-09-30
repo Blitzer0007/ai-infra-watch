@@ -18,6 +18,7 @@ from .earnings import (
     EarningsService,
     FinnhubEarningsProvider,
     FixtureEarningsProvider,
+    FmpEarningsProvider,
 )
 from .providers import FinnhubProvider, FixtureProvider, QuoteError
 from .schemas import (
