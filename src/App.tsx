@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot
+  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
@@ -18,6 +18,7 @@ import MacroPolitics from './components/MacroPolitics';
 import BuySellWatchlist from './components/BuySellWatchlist';
 import PortfolioIntelligence from './components/PortfolioIntelligence';
 import Settings from './components/Settings';
+import HelpGuide from './components/HelpGuide';
 import AutonomousResearch from './components/AutonomousResearch';
 
 type StressSnapshot = {
@@ -248,7 +249,8 @@ export default function App() {
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
+    { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon },
+    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen }
   ];
 
   return (
@@ -552,6 +554,7 @@ export default function App() {
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
+              {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
             </motion.div>
           </AnimatePresence>
 
