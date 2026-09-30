@@ -26,6 +26,7 @@ past events without enough surrounding history, get price_reaction_pct=None
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Protocol
