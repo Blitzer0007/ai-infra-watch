@@ -224,6 +224,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtestBusy, setBacktestBusy] = useState(false);
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
+  const [jevValidationBusy, setJevValidationBusy] = useState(false);
+  const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
+  const [jevValidationError, setJevValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -466,6 +469,64 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     }
   };
 
+  const runJevBacktestValidation = async () => {
+    if (!backtest || !backtest.rows.length || jevValidationBusy) return;
+    setJevValidationBusy(true);
+    setJevValidationError(null);
+    try {
+      const compactRows = backtest.rows.slice(-12).map(row => ({
+        asOfDate: row.asOfDate,
+        targetDate: row.targetDate,
+        median: formatReturn(row.median),
+        actual: formatReturn(row.actual),
+        p25: formatReturn(row.p25),
+        p75: formatReturn(row.p75),
+        p10: formatReturn(row.p10),
+        p90: formatReturn(row.p90)
+      }));
+      const prompt = [
+        'Act as the JEV Validation Analyst for AI Infra Watch.',
+        'You are evaluating a deterministic historical backtest. Do not change, recalculate, invent, or override any supplied metric.',
+        'Treat the supplied backtest numbers as authoritative measurements.',
+        'Do not provide an investment recommendation, price target, trading instruction, election/political recommendation, or certainty claim.',
+        'Assess evidence quality and limitations, identify possible model weaknesses, and recommend the next validation experiment.',
+        'Clearly distinguish measured facts from hypotheses. If evidence is insufficient, say so.',
+        'Return a concise UI-ready summary plus: evidence assessment, key concern, and next experiment.',
+        '',
+        'Ticker: ' + selectedStock,
+        'Horizon: ' + (HORIZONS.find(h => h.days === horizon)?.label || horizon + 'D'),
+        'Scenario: base / Current regime',
+        'Historical tests: ' + backtest.rows.length,
+        'Directional hit rate: ' + (backtest.directionalAccuracy * 100).toFixed(1) + '%',
+        'Median absolute error: ' + backtest.medianAbsoluteError.toFixed(1) + ' percentage points',
+        'P25-P75 coverage: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
+        'P10-P90 coverage: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
+        'Recent test rows: ' + JSON.stringify(compactRows),
+        'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
+      ].join('\n');
+
+      const response = await fetch('/api/agent-ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: prompt })
+      });
+      if (!response.ok) throw new Error('JEV validation failed (HTTP ' + response.status + ')');
+      const body = await response.json();
+      setJevValidation({
+        summary: body?.summary || body?.answer || 'JEV returned no validation summary.',
+        choice: body?.jev?.choice,
+        evidenceGate: body?.jev?.evidence_gate?.action,
+        confidence: body?.jev?.confidence,
+        answerSource: body?.answer_source
+      });
+    } catch (err: any) {
+      setJevValidation(null);
+      setJevValidationError(err?.message || 'JEV validation unavailable.');
+    } finally {
+      setJevValidationBusy(false);
+    }
+  };
+
   const runTicker = () => {
     const value = tickerInput.trim().toUpperCase();
     if (value) {
@@ -683,6 +744,26 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           {backtestMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{backtestMessage}</div>}
           {backtest ? (
             <div className="space-y-3">
+              <div className="rounded-xl border border-violet-300/20 bg-violet-300/5 p-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-violet-200/80">JEV validation analyst</div>
+                    <p className="text-[10px] text-white/45 mt-1">JEV interprets the measured backtest; it cannot change the numerical results. It identifies evidence gaps, caveats, and the next validation experiment.</p>
+                  </div>
+                  <button onClick={runJevBacktestValidation} disabled={jevValidationBusy} className="px-3 py-2 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{jevValidationBusy ? 'JEV ANALYZING…' : 'RUN JEV VALIDATION'}</button>
+                </div>
+                {jevValidationError && <div className="mt-2 text-[10px] font-mono text-amber-200 border border-amber-300/10 rounded-lg p-2">{jevValidationError}</div>}
+                {jevValidation && <div className="mt-3 space-y-2">
+                  <div className="text-xs text-white/70 leading-relaxed">{jevValidation.summary}</div>
+                  <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
+                    {jevValidation.choice && <span className="px-2 py-1 rounded border border-violet-300/20 text-violet-200">JEV route: {jevValidation.choice}</span>}
+                    {jevValidation.evidenceGate && <span className="px-2 py-1 rounded border border-cyan-300/20 text-cyan-200">Evidence gate: {jevValidation.evidenceGate}</span>}
+                    {jevValidation.confidence != null && <span className="px-2 py-1 rounded border border-white/10 text-white/50">Confidence: {typeof jevValidation.confidence === 'number' ? jevValidation.confidence.toFixed(2) : jevValidation.confidence}</span>}
+                    {jevValidation.answerSource && <span className="px-2 py-1 rounded border border-white/10 text-white/40">Source: {jevValidation.answerSource}</span>}
+                  </div>
+                </div>}
+              </div>
+              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
               <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Directional</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
