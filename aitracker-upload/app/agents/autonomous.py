@@ -438,7 +438,9 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
     availability = _evidence_availability(question, calls)
-    health = evidence_health(calls)
+    normalized_evidence = _normalize_evidence(question, calls)
+    conflicts = _detect_evidence_conflicts(normalized_evidence)
+    health = {"freshness": normalized_evidence, "staleCount": sum(1 for item in normalized_evidence if item.get("stale")), "conflicts": conflicts, "hasMaterialConflict": bool(conflicts)}
     state = {
         "question": question,
         "evidence_availability": availability,
