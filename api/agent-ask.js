@@ -14,7 +14,7 @@ function backendHeaders() {
   // Keep AI_INFRA_AGENT_TOKEN for separate-backend deployments, but fall back to
   // the native token so /api/agent-ask -> /api/agent-python does not self-401.
   const token = String(
-    process.env.AI_INFRA_AGENT_TOKEN || process.env.AGENT_API_TOKEN || ''
+    process.env.AGENT_API_TOKEN || process.env.AI_INFRA_AGENT_TOKEN || ''
   ).trim();
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
