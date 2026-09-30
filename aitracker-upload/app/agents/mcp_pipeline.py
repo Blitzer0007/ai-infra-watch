@@ -186,6 +186,24 @@ def _market_via_mcp(toolbox: MCPToolbox) -> tuple[MarketAgentResult | None, list
     return result, steps, ""
 
 
+def _extract_ticker_candidates(question: str) -> list[str]:
+    """Extract conservative ticker candidates for optional live SEC enrichment."""
+    import re
+
+    stop = {
+        "THE", "AND", "FOR", "FROM", "WITH", "THIS", "WHAT", "WHEN",
+        "ABOUT", "SEC", "FILING", "FILINGS", "STOCK", "PRICE",
+    }
+    pairs = re.findall(r"\$([A-Za-z]{2,5})\b|\b([A-Z]{2,5})\b", str(question or ""))
+    out: list[str] = []
+    for dollar, plain in pairs:
+        symbol = (dollar or plain).upper()
+        if symbol in stop or symbol in out:
+            continue
+        out.append(symbol)
+    return out[:4]
+
+
 def _filings_via_mcp(
     toolbox: MCPToolbox, question: str
 ) -> tuple[FilingsAgentResult | None, list[Step], str]:
@@ -209,7 +227,44 @@ def _filings_via_mcp(
     )
 
     answer_text = res.get("answer", "") or ""
-    citations_raw = res.get("citations", []) or []
+    citations_raw = res.get("citations", []) or ""
+
+    # RAG remains the primary cited answer. When the question contains an
+    # explicit ticker, also request live SEC 8-K/contract evidence so
+    # autonomous research can see current evidence even when the local corpus
+    # refresh has not run yet. Enrichment is optional and never breaks RAG.
+    live_sec_symbols = _extract_ticker_candidates(question)
+    if live_sec_symbols:
+        try:
+            live_sec = toolbox.call(
+                "filings.get_catalysts",
+                {"symbols": live_sec_symbols},
+            )
+            steps.append(
+                tool_call(
+                    "filings.get_catalysts",
+                    {"symbols": live_sec_symbols},
+                    note=f"live SEC enrichment: {len(live_sec.get('symbols', {}))} symbols",
+                )
+            )
+        except MCPClientError as exc:
+            steps.append(
+                tool_call(
+                    "filings.get_catalysts",
+                    {"symbols": live_sec_symbols},
+                    note=exc.code,
+                    ok=False,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
+            steps.append(
+                tool_call(
+                    "filings.get_catalysts",
+                    {"symbols": live_sec_symbols},
+                    note=type(exc).__name__,
+                    ok=False,
+                )
+            )
     routed = "generate" if answer_text else "no_answer"
 
     from mcp_servers.filings.schemas import AnswerResult, Citation
