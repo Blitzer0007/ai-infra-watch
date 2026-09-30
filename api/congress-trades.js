@@ -2,11 +2,6 @@ const CACHE_MS = 5 * 60 * 1000;
 const STALE_CACHE_MS = 24 * 60 * 60 * 1000;
 const cache = new Map();
 
-const TRACKED_SYMBOLS = [
-  'DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT',
-  'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'
-];
-
 const DATA_DAWN_TICKER_ALIASES = {
   VIVO: 'VVPR',
 };
@@ -89,9 +84,7 @@ async function fetchBargo(symbol) {
 function buildDataDawnUrl(symbol) {
   const where =
     symbol === 'ALL'
-      ? "ticker IN (" +
-        TRACKED_SYMBOLS.map((item) => "'" + item.replaceAll("'", "''") + "'").join(',') +
-        ")"
+      ? "ticker IS NOT NULL"
       : "UPPER(ticker) = UPPER('" +
         (DATA_DAWN_TICKER_ALIASES[symbol] || symbol).replaceAll("'", "''") +
         "')";
@@ -100,7 +93,7 @@ function buildDataDawnUrl(symbol) {
     'SELECT member_name, transaction_date, ticker, transaction_type, amount_range, owner, chamber, source_url ' +
     'FROM stock_trades WHERE ' +
     where +
-    ' ORDER BY transaction_date DESC LIMIT 100';
+    ' ORDER BY transaction_date DESC LIMIT 500';
 
   return (
     'https://regs.datadawn.org/openregs.json?sql=' +
@@ -169,10 +162,7 @@ function respond(res, {
 
 export default async function handler(req, res) {
   const requestedSymbol = String(req.query?.symbol || 'NVDA').trim().toUpperCase();
-  const symbol =
-    requestedSymbol === 'ALL' || TRACKED_SYMBOLS.includes(requestedSymbol)
-      ? requestedSymbol
-      : 'NVDA';
+  const symbol = requestedSymbol || 'ALL';
 
   res.setHeader(
     'Cache-Control',
