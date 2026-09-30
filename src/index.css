@@ -54,3 +54,16 @@ button, a { touch-action: manipulation; }
 @media (max-width: 640px) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+
+/* Prevent desktop-sized flex children from pushing the mobile viewport sideways. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
+@media (max-width: 1023px) {
+  main { width: 100%; max-width: 100%; min-width: 0 !important; margin-left: 0 !important; }
+  main > div { width: 100%; max-width: 100%; min-width: 0; }
+  main .max-w-7xl { width: 100%; max-width: 100%; min-width: 0; }
+  main .flex-1 { min-width: 0; }
+  main img, main svg, main canvas { max-width: 100%; }
+  .fixed { max-width: 100vw; }
+}
