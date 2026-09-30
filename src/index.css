@@ -80,3 +80,61 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   /* Keep the mobile chrome itself locked to the viewport. */
   .lg\\:hidden { max-width: 100vw; }
 }
+
+/* Definitive mobile viewport lock: desktop sidebar offsets and intrinsic-width
+   dashboard children must never affect the phone layout. */
+@media (max-width: 1023px) {
+  html, body, #root {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #root > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  main,
+  main.lg\:ml-64 {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: max(1rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+  }
+
+  main > div,
+  main .max-w-7xl {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  main .min-w-48,
+  main .min-w-\[420px\],
+  main .min-w-\[900px\],
+  main .min-w-\[760px\] {
+    min-width: 0 !important;
+  }
+
+  main .grid,
+  main .flex,
+  main .flex-1 {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  main .recharts-responsive-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
