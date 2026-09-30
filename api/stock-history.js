@@ -1,15 +1,4 @@
-const YAHOO_SYMBOL = { CERE: 'CBRS' };
-const ALLOWED_RANGES = new Set(['1y', '2y', '5y', 'max']);
-const cache = new Map();
-const CACHE_MS = 300000;
-
-function yahooSymbol(symbol) {
-  return YAHOO_SYMBOL[symbol] || symbol;
-}
-
-function validateSymbol(symbol) {
-  return typeof symbol === 'string' && /^[A-Za-z0-9.^=-]{1,20}$/.test(symbol);
-}
+import { history as routedHistory, providerSymbol } from './_market-data.js';
 
 export default async function handler(req, res) {
   const symbol = String(req.query?.symbol || '').trim().toUpperCase();
