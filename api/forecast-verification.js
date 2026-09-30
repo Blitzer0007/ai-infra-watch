@@ -1,3 +1,5 @@
+import { history as routedHistory } from './_market-data.js';
+
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
@@ -34,19 +36,8 @@ async function verifyDueForecasts() {
   const failures = [];
   for (const forecast of due) {
     try {
-      const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
-        encodeURIComponent(String(forecast.ticker).toUpperCase()) +
-        '?range=5y&interval=1d&events=div%2Csplits';
-      const marketResponse = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' } });
-      if (!marketResponse.ok) throw new Error('Yahoo Finance returned HTTP ' + marketResponse.status);
-      const marketJson = await marketResponse.json();
-      const result = marketJson?.chart?.result?.[0];
-      if (!result) throw new Error('No market history found.');
-      const timestamps = result.timestamp || [];
-      const closes = result.indicators?.quote?.[0]?.close || [];
-      const points = timestamps
-        .map((ts, i) => ({ date: new Date(ts * 1000).toISOString().slice(0, 10), price: closes[i] }))
-        .filter(point => Number.isFinite(point.price));
+      const marketData = await routedHistory(String(forecast.ticker).toUpperCase(), '5y');
+      const points = marketData.points || [];
       const point = points.find(item => item.date >= forecast.target_date) || points[points.length - 1];
       if (!point || !(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
         throw new Error('No usable market point yet.');
@@ -150,12 +141,8 @@ function runModelBacktest(history,horizon,model) {
   return {direction,error,tests:rows.length};
 }
 async function modelHistory(ticker) {
-  const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(ticker)+'?range=5y&interval=1d&events=div%2Csplits';
-  const r=await fetch(url,{headers:{'User-Agent':'ai-infra-watch/1.0'}});
-  if(!r.ok) throw new Error(ticker+' market history HTTP '+r.status);
-  const j=await r.json(), result=j?.chart?.result?.[0];
-  const ts=result?.timestamp||[], closes=result?.indicators?.quote?.[0]?.close||[];
-  return ts.map((t,i)=>({date:new Date(t*1000).toISOString().slice(0,10),price:closes[i]})).filter(p=>Number.isFinite(p.price));
+  const data = await routedHistory(ticker, '5y');
+  return data.points || [];
 }
 function chooseModel(v1,v2){
   if(!v1) return 'analogue-v2';
