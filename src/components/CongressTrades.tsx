@@ -123,6 +123,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [trades, setTrades] = useState<CongressTrade[]>([]);
   const [globalTrades, setGlobalTrades] = useState<CongressTrade[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
+  const [searchTrades, setSearchTrades] = useState<CongressTrade[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -183,9 +184,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
     };
   }, [symbolFilter]);
 
-  // Keep a global dataset available so the search box can find a politician
-  // or ticker even when the selected symbol feed does not contain that record.
-  // The server already caches the ALL request for five minutes.
+  // Keep a recent global dataset for the default table. Search itself is
+  // server-side so it is not limited by this initial page-sized batch.
   useEffect(() => {
     let cancelled = false;
 
@@ -198,7 +198,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
           setGlobalTrades(Array.isArray(data?.trades) ? data.trades : []);
         }
       } catch {
-        // Keep the symbol-scoped dataset usable when the global search feed fails.
+        // Keep the symbol-scoped dataset usable when the global feed fails.
       } finally {
         if (!cancelled) setGlobalLoading(false);
       }
@@ -209,6 +209,37 @@ export default function CongressTrades(_props: CongressTradesProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const needle = search.trim();
+    if (!needle) {
+      setSearchTrades([]);
+      return;
+    }
+
+    let cancelled = false;
+    setGlobalLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(
+          '/api/congress-trades?symbol=ALL&q=' + encodeURIComponent(needle)
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) {
+          setSearchTrades(res.ok && Array.isArray(data?.trades) ? data.trades : []);
+        }
+      } catch {
+        if (!cancelled) setSearchTrades([]);
+      } finally {
+        if (!cancelled) setGlobalLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search]);
 
   useEffect(() => {
     if (symbolFilter === 'ALL') {
@@ -235,27 +266,14 @@ export default function CongressTrades(_props: CongressTradesProps) {
     // An active search intentionally expands to the global disclosure feed.
     // This prevents "Search politician or symbol" from appearing broken just
     // because the currently selected ticker has no matching record.
-    const sourceTrades = needle ? globalTrades : trades;
+    const sourceTrades = needle ? searchTrades : trades;
 
     return sourceTrades.filter((t) => {
       const matchesSymbol = symbolFilter === 'ALL' || needle ? true : t.stockSymbol === symbolFilter;
       const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
-      const haystack = [
-        t.politician,
-        t.stockSymbol,
-        t.transactionType,
-        t.amountRange,
-        t.chamber,
-        t.transactionDate,
-        t.filingDate,
-      ]
-        .map((value) => String(value || '').toLowerCase())
-        .join(' ');
-
-      const matchesSearch = !needle || haystack.includes(needle);
-      return matchesSymbol && matchesChamber && matchesSearch;
+      return matchesSymbol && matchesChamber;
     });
-  }, [trades, globalTrades, chamberFilter, search, symbolFilter]);
+  }, [trades, searchTrades, chamberFilter, search, symbolFilter]);
 
   const reactions = useMemo(() => {
     if (symbolFilter === 'ALL') return [];
@@ -316,7 +334,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
           Congressional Trading Signals
         </h1>
         <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
-          Track public disclosure records for the configured AI-infrastructure symbols. Choose a ticker to query its ticker-specific trade feed.
+          Track public congressional disclosure records across searchable tickers and members. Search any supported ticker or politician; the preset buttons are only shortcuts.
         </p>
       </div>
 
