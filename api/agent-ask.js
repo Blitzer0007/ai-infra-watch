@@ -10,7 +10,12 @@ function backendUrl(req) {
 
 function backendHeaders() {
   const headers = { 'Content-Type': 'application/json' };
-  const token = String(process.env.AI_INFRA_AGENT_TOKEN || '').trim();
+  // Native Vercel deployments authenticate the Python agent with AGENT_API_TOKEN.
+  // Keep AI_INFRA_AGENT_TOKEN for separate-backend deployments, but fall back to
+  // the native token so /api/agent-ask -> /api/agent-python does not self-401.
+  const token = String(
+    process.env.AI_INFRA_AGENT_TOKEN || process.env.AGENT_API_TOKEN || ''
+  ).trim();
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
