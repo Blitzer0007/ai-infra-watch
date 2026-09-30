@@ -1,8 +1,11 @@
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-function configError() {
-  return !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY;
+function missingConfig() {
+  const missing = [];
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  return missing;
 }
 
 function headers() {
@@ -42,7 +45,11 @@ function normalize(row) {
 }
 
 export default async function handler(req, res) {
-  if (configError()) return send(res, 503, { error: 'Supabase forecast storage is not configured.' });
+  const missing = missingConfig();
+  if (missing.length) return send(res, 503, {
+    error: 'Supabase forecast storage is not configured for this deployment.',
+    missing
+  });
   try {
     if (req.method === 'GET') {
       const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=100', { headers: headers() });
