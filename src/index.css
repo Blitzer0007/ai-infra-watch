@@ -67,3 +67,16 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   main img, main svg, main canvas { max-width: 100%; }
   .fixed { max-width: 100vw; }
 }
+
+@media (max-width: 1023px) {
+  #root { overflow-x: clip; }
+  main, main > *, main .max-w-7xl { overflow-x: clip; }
+  main * { min-width: 0; }
+  main .grid > *, main .flex > * { min-width: 0; max-width: 100%; }
+  main .grid, main .flex { max-width: 100%; }
+  main svg, main canvas, main img { max-width: 100%; }
+  /* Recharts can establish an intrinsic width before its container measures on mobile. */
+  main .recharts-responsive-container { max-width: 100% !important; min-width: 0 !important; }
+  /* Keep the mobile chrome itself locked to the viewport. */
+  .lg\\:hidden { max-width: 100vw; }
+}
