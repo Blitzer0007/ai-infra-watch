@@ -3,6 +3,13 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  ,
+  "crons": [
+    {
+      "path": "/api/forecast-verification-cron",
+      "schedule": "30 22 * * 1-5"
+    }
+  ],
   "functions": {
     "api/live-data.js": {
       "maxDuration": 30
