@@ -274,7 +274,7 @@ export default async function handler(req, res) {
       stale: Object.values(stockPrices).some((item) => item?.stale === true)
     },
     contracts: {
-      status: contractsStatusPlaceholder,
+      status: 'PENDING',
       count: 0
     },
     news: {
