@@ -254,7 +254,7 @@ export default async function handler(req, res) {
 
   const stockPrices = {};
   await Promise.all(SYMBOLS.map(async symbol => {
-    try { stockPrices[symbol] = await quote(symbol); } catch {}
+    try { stockPrices[symbol] = await routedQuote(symbol); } catch {}
   }));
 
   const currentNews = await news().catch(() => []);
