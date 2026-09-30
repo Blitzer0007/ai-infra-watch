@@ -125,6 +125,9 @@ const ITEMS: GuideItem[] = [
 export default function HelpGuide({ onNavigate }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState('portfolio-intelligence');
+  const [jevBusy, setJevBusy] = useState(false);
+  const [jevAnswer, setJevAnswer] = useState<string | null>(null);
+  const [jevMeta, setJevMeta] = useState<{ route?: string; gate?: string } | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -133,6 +136,42 @@ export default function HelpGuide({ onNavigate }: Props) {
 
   const active = ITEMS.find(item => item.id === selected) ?? ITEMS[0];
   const Icon = active.icon;
+
+  const askJev = async (prompt: string) => {
+    if (jevBusy) return;
+    setJevBusy(true);
+    setJevAnswer(null);
+    setJevMeta(null);
+    try {
+      const response = await fetch('/api/agent-ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: [
+            'Act as the JEV-powered in-app guide for AI Infra Watch.',
+            'The user wants guidance, not an investment recommendation.',
+            'Explain the current UI in plain English, give the next 3 useful steps, identify what evidence the user should verify, and say when evidence is insufficient.',
+            'Current guide topic: ' + active.title,
+            'Topic meaning: ' + active.meaning,
+            'Topic example: ' + active.example,
+            'User request: ' + prompt
+          ].join(' ')
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.detail || body?.error || 'JEV guide request failed');
+      setJevAnswer(body.summary || body.error || 'No JEV guidance was returned.');
+      setJevMeta({
+        route: body?.jev?.choice,
+        gate: body?.jev?.evidence_gate?.action
+      });
+    } catch (error: any) {
+      setJevAnswer(error?.message || 'JEV guide is currently unavailable.');
+    } finally {
+      setJevBusy(false);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -226,6 +265,33 @@ export default function HelpGuide({ onNavigate }: Props) {
             <section className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
               <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300/70">Example</div>
               <p className="text-xs text-white/65 leading-relaxed mt-2">{active.example}</p>
+            </section>
+
+            <section className="rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/5 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-fuchsia-300/80">JEV-powered guide</div>
+                  <p className="text-xs text-white/60 mt-1">Ask JEV to explain this screen using the current evidence workflow.</p>
+                </div>
+                <button
+                  onClick={() => void askJev('How should I use this page right now?')}
+                  disabled={jevBusy}
+                  className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg border border-fuchsia-400/25 bg-fuchsia-400/10 px-3 py-2 text-[10px] font-mono font-black uppercase tracking-wider text-fuchsia-200 hover:bg-fuchsia-400/15 disabled:opacity-40 cursor-pointer"
+                >
+                  {jevBusy ? 'JEV THINKING…' : 'Ask JEV'}
+                </button>
+              </div>
+              {jevAnswer && (
+                <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                  <p className="whitespace-pre-wrap text-xs text-white/75 leading-relaxed">{jevAnswer}</p>
+                  {(jevMeta?.route || jevMeta?.gate) && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-[9px] font-mono text-white/30">
+                      {jevMeta.route && <span>JEV route: {jevMeta.route}</span>}
+                      {jevMeta.gate && <span>Evidence gate: {jevMeta.gate}</span>}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="rounded-xl border border-white/5 bg-black/10 p-4">
