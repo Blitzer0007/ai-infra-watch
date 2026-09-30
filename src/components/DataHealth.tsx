@@ -31,6 +31,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const available = entries.filter(([, item]) => item?.status === 'AVAILABLE' && !item?.stale).length;
   const stale = entries.filter(([, item]) => item?.stale || item?.status === 'STALE').length;
   const missing = entries.filter(([, item]) => item?.status === 'NOT_FOUND').length;
+  const conflicts = entries.reduce((sum, [, item]) => sum + Number(item?.conflictCount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -51,6 +52,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <Metric label="Available" value={available} icon={<ShieldCheck className="w-4 h-4"/>}/>
         <Metric label="Stale / fallback" value={stale} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden">
