@@ -138,3 +138,53 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
     min-width: 0 !important;
   }
 }
+
+
+/* Mobile-first dashboard shell. Desktop sidebar is enabled only for a
+   genuinely desktop pointer/hover environment, avoiding Android Desktop Site
+   and large CSS viewport misclassification. */
+.aiw-desktop-sidebar {
+  display: none !important;
+}
+
+.aiw-mobile-header {
+  display: flex !important;
+}
+
+.aiw-mobile-drawer {
+  display: flex !important;
+}
+
+.aiw-main {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+}
+
+@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+  .aiw-desktop-sidebar {
+    display: flex !important;
+  }
+
+  .aiw-mobile-header,
+  .aiw-mobile-drawer {
+    display: none !important;
+  }
+
+  .aiw-main {
+    margin-left: 16rem !important;
+    width: calc(100% - 16rem) !important;
+    max-width: calc(100% - 16rem) !important;
+  }
+}
+
+@media (max-width: 1279px) {
+  .aiw-desktop-sidebar {
+    display: none !important;
+  }
+
+  .aiw-mobile-header {
+    display: flex !important;
+  }
+}
