@@ -111,6 +111,16 @@ const ITEMS: GuideItem[] = [
     icon: TrendingUp
   },
   {
+    id: 'forward-outlook',
+    title: 'Forward Outlook & Forecast Verification',
+    question: 'How do I test whether the historical forecast actually works?',
+    meaning: 'Forward Outlook uses historical market regimes to build return distributions for 5D, 20D, 60D, 6M and 12M horizons. It is scenario analysis and historical evidence, not a guaranteed price prediction. Forecast Verification stores a forecast and later compares it with the observed market return.',
+    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. P25–P75 is the middle historical range. After the target date, actual return and median error show what happened.',
+    screenshot: 'Screenshot reference: Forward Outlook / forecast verification / validation matrix',
+    view: 'outlook',
+    icon: TrendingUp
+  },
+  {
     id: 'research',
     title: 'AI Research',
     question: 'How do I ask the system to investigate?',
@@ -266,6 +276,18 @@ export default function HelpGuide({ onNavigate }: Props) {
               <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300/70">Example</div>
               <p className="text-xs text-white/65 leading-relaxed mt-2">{active.example}</p>
             </section>
+            {active.id === 'forward-outlook' && (
+              <section className="rounded-xl border border-amber-400/15 bg-amber-400/5 p-4">
+                <div className="text-[9px] font-mono uppercase tracking-widest text-amber-300/80">How to interpret validation</div>
+                <div className="mt-2 space-y-2 text-xs text-white/60 leading-relaxed">
+                  <p><span className="text-white/80 font-bold">Directional accuracy</span> = how often the forecast median had the same sign as the observed return.</p>
+                  <p><span className="text-white/80 font-bold">Median absolute error</span> = typical distance between forecast median and actual return, measured in percentage points.</p>
+                  <p><span className="text-white/80 font-bold">P25–P75 coverage</span> = the share of actual outcomes inside the middle historical range. Low coverage means the range is too narrow for the observed outcomes.</p>
+                  <p><span className="text-white/80 font-bold">Baseline / lift</span> compares the analogue method with a simple unconditional historical baseline. Positive lift is descriptive evidence for that backtest—not proof of future performance.</p>
+                  <p><span className="text-white/80 font-bold">JEV validation</span> interprets the measured backtest and identifies evidence gaps or the next experiment. JEV does not change the numerical forecast.</p>
+                </div>
+              </section>
+            )}
 
             <section className="rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/5 p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -297,7 +319,9 @@ export default function HelpGuide({ onNavigate }: Props) {
             <section className="rounded-xl border border-white/5 bg-black/10 p-4">
               <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">How to use it</div>
               <div className="flex flex-wrap gap-2 mt-3">
-                {['Read the signal', 'Open the evidence', 'Check the source/date', 'Compare history', 'Review exposure'].map((step, index) => (
+                {(active.id === 'forward-outlook'
+                  ? ['Select ticker + horizon', 'Review historical distribution', 'Run backtest', 'Compare baseline + calibration', 'Track and verify later']
+                  : ['Read the signal', 'Open the evidence', 'Check the source/date', 'Compare history', 'Review exposure']).map((step, index) => (
                   <div key={step} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[.02] px-2.5 py-2">
                     <span className="w-5 h-5 rounded-full bg-white/5 text-white/60 text-[9px] font-mono flex items-center justify-center">{index + 1}</span>
                     <span className="text-[10px] text-white/55">{step}</span>
