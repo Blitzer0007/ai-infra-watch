@@ -59,7 +59,8 @@ async function yahooQuote(symbol) {
     source: 'Yahoo Finance',
     provider: 'yahoo',
     asOf: new Date().toISOString(),
-    stale: false
+    stale: false,
+    evidenceType: 'market_quote'
   };
 }
 
