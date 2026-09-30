@@ -242,3 +242,51 @@ def test_live_finnhub_smoke():
     assert h.symbol == "NVDA"
     assert h.events
     assert h.source == "finnhub"
+
+def test_service_uses_fallback_provider_when_primary_fails():
+    class Primary:
+        source = "finnhub"
+        def get_earnings(self, symbol):
+            raise QuoteError("NO_DATA", "primary unavailable")
+
+    class Fallback:
+        source = "fmp"
+        def get_earnings(self, symbol):
+            return EarningsHistory(
+                symbol=symbol,
+                events=[EarningsEvent(symbol=symbol, date="2026-10-20", when="upcoming")],
+                source="fmp",
+            )
+
+    svc = EarningsService(
+        provider=Primary(),
+        fallback_provider=Fallback(),
+        candle_service=None,
+    )
+    result = svc.get_earnings("NVDA")
+    assert result.source == "fmp"
+    assert result.next_event() is not None
+
+
+def test_service_does_not_call_fallback_when_primary_is_usable():
+    class Primary:
+        source = "finnhub"
+        def get_earnings(self, symbol):
+            return EarningsHistory(
+                symbol=symbol,
+                events=[EarningsEvent(symbol=symbol, date="2026-10-20", when="upcoming")],
+                source="finnhub",
+            )
+
+    class Fallback:
+        source = "fmp"
+        def get_earnings(self, symbol):
+            raise AssertionError("fallback should not be called")
+
+    svc = EarningsService(
+        provider=Primary(),
+        fallback_provider=Fallback(),
+        candle_service=None,
+    )
+    result = svc.get_earnings("NVDA")
+    assert result.source == "finnhub"
