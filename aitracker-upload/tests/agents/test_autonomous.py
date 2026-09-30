@@ -496,6 +496,35 @@ def test_jev_repeated_gather_more_ends_as_insufficient():
     assert result.resolution == "jev_evidence_insufficient"
 
 
+def test_evidence_availability_distinguishes_empty_failed_and_missing():
+    from app.agents.autonomous import _evidence_availability
+    from app.agents.schemas import ToolCallRecord
+
+    calls = [
+        ToolCallRecord(
+            tool="stocks.get_quotes",
+            arguments={"symbols": ["AMD"]},
+            ok=True,
+            output=[],
+        ),
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=False,
+            error="provider unavailable",
+        ),
+    ]
+
+    result = _evidence_availability("Analyze AMD today and explain the drivers", calls)
+    assert result["channels"]["market"]["status"] == "EMPTY"
+    assert result["channels"]["news"]["status"] == "FAILED"
+    assert result["channels"]["sec"]["status"] == "MISSING"
+    assert result["complete"] is False
+    assert result["status_counts"]["EMPTY"] == 1
+    assert result["status_counts"]["FAILED"] == 1
+    assert result["status_counts"]["MISSING"] == 1
+
+
 def test_jev_gate_prefers_new_evidence_family():
     tb, _ = _gate_toolbox()
     gate = _GateJev([("gather_more", 0.5)])
