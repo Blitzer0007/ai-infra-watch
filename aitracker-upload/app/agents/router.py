@@ -103,6 +103,15 @@ _SYMBOL_ALIASES = {
     "DIGIPOWERX": "DGXX",
     "VIVOPOWER": "VIVO",
     "PHARVARIS": "PHVS",
+    "ONDAS": "ONDS",
+    "ONDASNETWORKS": "ONDS",
+    "SALESFORCE": "CRM",
+    "CRM": "CRM",
+    "APPLE": "AAPL",
+    "AMAZON": "AMZN",
+    "ALPHABET": "GOOGL",
+    "GOOGLE": "GOOGL",
+    "PALANTIR": "PLTR",
 }
 
 
