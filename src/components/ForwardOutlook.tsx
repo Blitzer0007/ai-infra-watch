@@ -15,6 +15,14 @@ type ForwardOutlookProps = {
 
 type Horizon = 5 | 20 | 60 | 120 | 252;
 
+type ForecastSnapshot = {
+  id: string; ticker: string; createdAt: string; targetDate: string; horizon: Horizon; scenarioId: string;
+  entryPrice: number; median: number; p25: number; p75: number; p10: number; p90: number;
+  status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
+};
+
+const FORECAST_STORAGE_KEY = 'aiw-forward-outlook-forecasts-v1';
+
 type Scenario = {
   id: string;
   label: string;
@@ -35,6 +43,14 @@ const SCENARIOS: Scenario[] = [
   { id: 'bull', label: 'AI demand strengthens', description: 'Stronger AI-infrastructure demand and supportive business/policy signals.', adjustment: 0.45 },
   { id: 'bear', label: 'Macro / policy shock', description: 'Higher macro or policy stress with weaker market breadth.', adjustment: -0.45 },
 ];
+
+function addBusinessDays(start: Date, days: number): string {
+  const date = new Date(start); let remaining = days;
+  while (remaining > 0) { date.setDate(date.getDate() + 1); const day = date.getDay(); if (day !== 0 && day !== 6) remaining -= 1; }
+  return date.toISOString().slice(0, 10);
+}
+function loadForecasts(): ForecastSnapshot[] { try { const raw = localStorage.getItem(FORECAST_STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }
+function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
 
 function percentile(values: number[], p: number): number {
   if (!values.length) return 0;
@@ -110,6 +126,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevLoading, setJevLoading] = useState(false);
   const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number } | null>(null);
   const [jevError, setJevError] = useState<string | null>(null);
+  const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+
+  useEffect(() => { setForecasts(loadForecasts()); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,6 +259,42 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     } finally {
       setJevLoading(false);
     }
+  };
+
+  const trackForecast = () => {
+    if (!currentPrice || !history.length || analysis.confidence === 'Insufficient') return;
+    const snapshot: ForecastSnapshot = {
+      id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
+      targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice,
+      median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending'
+    };
+    const next = [...forecasts, snapshot]; setForecasts(next); saveForecasts(next);
+    setVerificationMessage('Forecast saved. Return after the target date and verify it against live market history.');
+  };
+
+  const verifyDueForecasts = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const due = forecasts.filter(f => f.status === 'pending' && f.targetDate <= today);
+    if (!due.length) { setVerificationMessage('No forecast has reached its target date yet.'); return; }
+    setVerificationBusy(true); setVerificationMessage(null);
+    try {
+      const updated = [...forecasts];
+      for (const forecast of due) {
+        const res = await fetch('/api/stock-history?symbol=' + encodeURIComponent(forecast.ticker) + '&range=5y');
+        if (!res.ok) throw new Error('Verification market data failed for ' + forecast.ticker + ' (HTTP ' + res.status + ')');
+        const data = await res.json();
+        const points: PricePoint[] = Array.isArray(data.points) ? data.points : [];
+        const point = points.find(p => p.date >= forecast.targetDate) || points[points.length - 1];
+        if (!point || !(forecast.entryPrice > 0) || !(point.price > 0)) continue;
+        const actualReturn = (point.price / forecast.entryPrice - 1) * 100;
+        const index = updated.findIndex(f => f.id === forecast.id);
+        if (index >= 0) updated[index] = { ...updated[index], status: 'verified', verifiedAt: new Date().toISOString(), actualDate: point.date, actualPrice: point.price, actualReturn, medianError: actualReturn - forecast.median };
+      }
+      setForecasts(updated); saveForecasts(updated);
+      setVerificationMessage('Verification complete using the latest market history.');
+    } catch (err: any) {
+      setVerificationMessage(err?.message || 'Forecast verification failed.');
+    } finally { setVerificationBusy(false); }
   };
 
   const runTicker = () => {
@@ -411,6 +468,24 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             </div>
           </>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast verification</div>
+          <p className="text-[10px] text-white/45 mt-1">Save the current forecast, then compare it with the real return after the selected trading horizon.</p></div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={trackForecast} disabled={!currentPrice || analysis.confidence === 'Insufficient'} className="px-3 py-2 rounded border border-cyan-300/30 bg-cyan-300/10 text-cyan-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">Track this forecast</button>
+            <button onClick={verifyDueForecasts} disabled={verificationBusy} className="px-3 py-2 rounded border border-white/10 bg-white/5 text-white/70 text-[9px] font-mono font-black uppercase disabled:opacity-40">{verificationBusy ? 'VERIFYING…' : 'Verify due forecasts'}</button>
+          </div>
+        </div>
+        {verificationMessage && <div className="text-[10px] font-mono text-cyan-200/80 border border-cyan-300/10 rounded-xl p-2">{verificationMessage}</div>}
+        <div className="space-y-2">{forecasts.slice().reverse().slice(0, 5).map(f => (
+          <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[9px] font-mono">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
+            <div className="mt-1 text-white/40">Forecast median ${formatReturn(f.median)} · middle 50% ${formatReturn(f.p25)} to ${formatReturn(f.p75)}${f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
+          </div>
+        ))}</div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
