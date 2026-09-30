@@ -121,7 +121,6 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
   const [symbolFilter, setSymbolFilter] = useState('NVDA');
   const [trades, setTrades] = useState<CongressTrade[]>([]);
-  const [globalTrades, setGlobalTrades] = useState<CongressTrade[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [searchTrades, setSearchTrades] = useState<CongressTrade[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -183,63 +182,6 @@ export default function CongressTrades(_props: CongressTradesProps) {
       cancelled = true;
     };
   }, [symbolFilter]);
-
-  // Keep a recent global dataset for the default table. Search itself is
-  // server-side so it is not limited by this initial page-sized batch.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadGlobalTrades() {
-      setGlobalLoading(true);
-      try {
-        const res = await fetch('/api/congress-trades?symbol=ALL');
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok) {
-          setGlobalTrades(Array.isArray(data?.trades) ? data.trades : []);
-        }
-      } catch {
-        // Keep the symbol-scoped dataset usable when the global feed fails.
-      } finally {
-        if (!cancelled) setGlobalLoading(false);
-      }
-    }
-
-    loadGlobalTrades();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const needle = search.trim();
-    if (!needle) {
-      setSearchTrades([]);
-      return;
-    }
-
-    let cancelled = false;
-    setGlobalLoading(true);
-    const timer = window.setTimeout(async () => {
-      try {
-        const res = await fetch(
-          '/api/congress-trades?symbol=ALL&q=' + encodeURIComponent(needle)
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled) {
-          setSearchTrades(res.ok && Array.isArray(data?.trades) ? data.trades : []);
-        }
-      } catch {
-        if (!cancelled) setSearchTrades([]);
-      } finally {
-        if (!cancelled) setGlobalLoading(false);
-      }
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [search]);
 
   useEffect(() => {
     if (symbolFilter === 'ALL') {
