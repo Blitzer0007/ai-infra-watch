@@ -35,6 +35,7 @@ import httpx
 from .candles import CandleService
 from .providers import QuoteError, _http_retryable
 from .schemas import CandleSeries, EarningsEvent, EarningsHistory
+from .earnings_fallback import FmpEarningsProvider
 
 EARNINGS_FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "earnings.json"
 
@@ -294,8 +295,10 @@ class EarningsService:
         self,
         provider: EarningsProvider | None = None,
         candle_service: CandleService | None = None,
+        fallback_provider: EarningsProvider | None = None,
     ) -> None:
         self.provider = provider or FixtureEarningsProvider()
+        self.fallback_provider = fallback_provider
         self.candle_service = candle_service
 
     @classmethod
@@ -303,6 +306,7 @@ class EarningsService:
         if mode == "live":
             return cls(
                 provider=FinnhubEarningsProvider(),
+                fallback_provider=FmpEarningsProvider() if os.getenv("FMP_API_KEY") else None,
                 candle_service=CandleService.from_env("live"),
             )
         return cls(
@@ -325,10 +329,30 @@ class EarningsService:
             event.price_reaction_pct = _reaction_from_series(series, event.date)
         return history
 
+    @staticmethod
+    def _usable(history: EarningsHistory) -> bool:
+        return bool(history.events) and bool(history.upcoming() or history.past())
+
     def get_earnings(self, symbol: str) -> EarningsHistory:
-        """One symbol's earnings (reaction-enriched). Raises QuoteError on failure."""
-        history = self.provider.get_earnings(symbol)
-        return self._enrich_reactions(history)
+        """Primary earnings provider with an optional secondary fallback."""
+        primary_error: QuoteError | None = None
+        try:
+            history = self.provider.get_earnings(symbol)
+            if self._usable(history):
+                return self._enrich_reactions(history)
+            primary_error = QuoteError("NO_DATA", f"primary earnings data unusable for {symbol}")
+        except QuoteError as exc:
+            primary_error = exc
+
+        if self.fallback_provider is not None:
+            try:
+                history = self.fallback_provider.get_earnings(symbol)
+                if self._usable(history):
+                    return self._enrich_reactions(history)
+            except QuoteError:
+                pass
+
+        raise primary_error or QuoteError("NO_DATA", f"no usable earnings for {symbol}")
 
     def get_many(self, symbols: list[str]) -> dict[str, EarningsHistory]:
         """Best-effort {symbol: EarningsHistory}. Omits symbols that error.
