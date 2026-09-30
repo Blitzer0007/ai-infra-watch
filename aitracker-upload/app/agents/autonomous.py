@@ -23,6 +23,7 @@ from app.mcp_client.client import MCPClientError
 from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
+from app.jev.evidence import evidence_health
 
 
 @dataclass
@@ -399,9 +400,13 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
     availability = _evidence_availability(question, calls)
+    health = evidence_health(calls)
     state = {
         "question": question,
         "evidence_availability": availability,
+        "evidence_freshness": health["freshness"][:80],
+        "stale_count": health["staleCount"],
+        "conflicts": health["conflicts"],
         "successful_calls": [
             {
                 "tool": call.tool,
@@ -427,6 +432,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         "action": "continue",
         "fallback": not evaluation.usable,
         "evidence_availability": availability,
+        "evidence_freshness": {"stale_count": health["staleCount"], "item_count": len(health["freshness"])},
+        "conflicts": health["conflicts"],
     }
     if not evaluation.usable:
         gate["error"] = evaluation.error or "Jev evidence gate unavailable"
@@ -440,7 +447,9 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
 
         # Only allow an early stop when Jev explicitly selects stop and the
         # evidence-quality score reaches the Usable/Strong boundary.
-        if (
+        if health["hasMaterialConflict"]:
+            decision = "resolve_conflict"
+        elif (
             choice == "stop"
             and isinstance(score, (int, float))
             and score >= 2.25
@@ -466,6 +475,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                     if isinstance(score, (int, float))
                     else None
                 ),
+                "stale_count": health["staleCount"],
+                "conflicts": health["conflicts"],
                 "model": evaluation.model,
                 "latency_ms": round(evaluation.latency_ms, 1),
                 "input_tokens": evaluation.input_tokens,
