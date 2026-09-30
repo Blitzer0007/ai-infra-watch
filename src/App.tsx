@@ -291,7 +291,7 @@ export default function App() {
       </div>
 
       {/* 2. BODY LAYOUT */}
-      <div className="flex flex-1 relative">
+      <div className="flex flex-1 relative w-full min-w-0 max-w-full overflow-x-hidden">
         {/* DESKTOP SIDEBAR */}
         <aside className="hidden xl:flex fixed top-8 bottom-0 left-0 z-40 flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 overflow-y-auto">
           {/* Brand header */}
@@ -356,7 +356,7 @@ export default function App() {
         </aside>
 
         {/* MOBILE TOP NAV HEADER */}
-        <div className="xl:hidden w-full bg-[#0F1115] border-b border-white/10 px-4 py-3 flex items-center justify-between sticky top-8 z-40">
+        <div className="xl:hidden w-full min-w-0 max-w-full shrink-0 bg-[#0F1115] border-b border-white/10 px-4 py-3 flex items-center justify-between sticky top-8 z-40">
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
             <span className="font-black text-sm tracking-tight text-white uppercase italic">AI INFRA WATCH</span>
@@ -430,7 +430,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* 3. MAIN DASHBOARD MAINSPACE CONTAINER */}
-        <main className="flex-1 bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)] xl:ml-64">
+        <main className="flex-1 w-full min-w-0 max-w-full bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)] xl:ml-64">
           {/* Universal Live AI Sync Controller Panel */}
           <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#15181E]/40 border border-white/10 rounded-2xl p-4 gap-4">
             <div className="flex items-center space-x-3">
