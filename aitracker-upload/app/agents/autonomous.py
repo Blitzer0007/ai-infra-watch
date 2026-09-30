@@ -371,28 +371,61 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
 
 
 def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[str, Any]:
-    """Build a typed availability matrix from the actual MCP trajectory."""
+    """Build a typed evidence coverage matrix from the actual MCP trajectory.
+
+    Distinguishes a successful source with useful data from a successful tool
+    that returned an empty dataset, and from an actual tool/provider failure.
+    This prevents "source returned nothing" from being mislabeled as "source
+    unavailable".
+    """
     expected = _required_evidence_families(question)
-    successful = { _evidence_family(call.tool) for call in calls if call.ok }
-    failed = { _evidence_family(call.tool) for call in calls if not call.ok }
     matrix: dict[str, Any] = {}
+
+    def has_payload(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, (list, tuple, set, dict, str)):
+            return len(value) > 0
+        return True
+
     for family in expected:
-        if family in successful:
+        family_calls = [call for call in calls if _evidence_family(call.tool) == family]
+        successful = [call for call in family_calls if call.ok]
+        failed = [call for call in family_calls if not call.ok]
+        usable = [call for call in successful if has_payload(call.output)]
+
+        if usable:
             status = "AVAILABLE"
-        elif family in failed:
-            status = "NOT_FOUND"
+        elif successful:
+            status = "EMPTY"
+        elif failed:
+            status = "FAILED"
         else:
-            status = "NOT_FOUND"
+            status = "MISSING"
+
+        latest = (usable or successful or failed or [None])[-1]
         matrix[family] = {
             "status": status,
-            "observedCalls": sum(1 for call in calls if _evidence_family(call.tool) == family),
+            "observedCalls": len(family_calls),
+            "successfulCalls": len(successful),
+            "failedCalls": len(failed),
+            "usableCalls": len(usable),
+            "lastError": getattr(latest, "error", None) if latest is not None and not latest.ok else None,
         }
-    missing = [family for family, item in matrix.items() if item["status"] != "AVAILABLE"]
+
+    missing = [
+        family for family, item in matrix.items()
+        if item["status"] != "AVAILABLE"
+    ]
     return {
         "required": list(expected),
         "channels": matrix,
         "missing": missing,
         "complete": not missing,
+        "status_counts": {
+            status: sum(1 for item in matrix.values() if item["status"] == status)
+            for status in ("AVAILABLE", "EMPTY", "FAILED", "MISSING")
+        },
     }
 
 
