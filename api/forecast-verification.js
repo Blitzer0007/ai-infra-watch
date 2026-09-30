@@ -149,7 +149,7 @@ function runModelBacktest(history,horizon,model) {
   const error=percentile(rows.map(r=>Math.abs(r.actual-r.median)),.5);
   return {direction,error,tests:rows.length};
 }
-async async function modelHistory(ticker) {
+async function modelHistory(ticker) {
   const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(ticker)+'?range=5y&interval=1d&events=div%2Csplits';
   const r=await fetch(url,{headers:{'User-Agent':'ai-infra-watch/1.0'}});
   if(!r.ok) throw new Error(ticker+' market history HTTP '+r.status);
@@ -193,7 +193,7 @@ async function evaluateForecastModels() {
 async function upsertModelConfig(row){
   const r=await fetch(SUPABASE_URL+'/rest/v1/forecast_model_config?on_conflict=ticker%2Chorizon',{
     method:'POST',
-    headers:{...sbHeaders(),Prefer:'resolution=merge-duplicates,return=representation'},
+    headers:{...headers(),Prefer:'resolution=merge-duplicates,return=representation'},
     body:JSON.stringify(row)
   });
   const d=await r.json();
@@ -243,6 +243,31 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      const ticker = String(req.query?.ticker || '').trim().toUpperCase();
+      const horizon = Number(req.query?.horizon);
+      if (ticker && Number.isFinite(horizon)) {
+        const configResponse = await fetch(
+          SUPABASE_URL +
+            '/rest/v1/forecast_model_config?select=*&ticker=eq.' +
+            encodeURIComponent(ticker) +
+            '&horizon=eq.' +
+            encodeURIComponent(String(horizon)) +
+            '&limit=1',
+          { headers: headers() }
+        );
+        const configData = await configResponse.json();
+        if (!configResponse.ok) {
+          return send(res, configResponse.status, {
+            error: configData?.message || 'Failed to load forecast model configuration.'
+          });
+        }
+        const config = Array.isArray(configData) ? configData[0] : null;
+        return send(res, 200, {
+          model: config?.active_model || 'analogue-v1',
+          config
+        });
+      }
+
       const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=100', { headers: headers() });
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to load forecasts.' });
