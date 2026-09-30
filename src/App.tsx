@@ -100,17 +100,16 @@ export default function App() {
       ])];
 
       const quotes: Record<string, { price: number; changePct: number }> = {};
-      const results = await Promise.allSettled(
-        symbols.map(async (symbol) => ({ symbol, quote: await fetchLiveQuote(symbol, config.finnhubKey || '') }))
-      );
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          const { symbol, quote } = result.value;
+      for (const symbol of symbols) {
+        try {
+          const quote = await fetchLiveQuote(symbol, config.finnhubKey || '');
           if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
             quotes[symbol] = { price: quote.price, changePct: quote.changePct };
           }
+        } catch {
+          // A single quote failure should not stop alert evaluation for other symbols.
         }
-      });
+      }
 
       if (cancelled) return;
 
@@ -135,18 +134,16 @@ export default function App() {
     let cancelled = false;
     async function updateWatchlistQuotes() {
       const updated: Record<string, { price: number; changePct: number }> = {};
-      const results = await Promise.allSettled(
-        watchlistSymbols.map(async (symbol) => ({ symbol, quote: await fetchLiveQuote(symbol, config?.finnhubKey || '') }))
-      );
-      if (cancelled) return;
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          const { symbol, quote } = result.value;
-          if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
-            updated[symbol] = { price: quote.price, changePct: quote.changePct };
+      for (const s of watchlistSymbols) {
+        try {
+          const res = await fetchLiveQuote(s, config?.finnhubKey || '');
+          if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
+            updated[s] = { price: res.price, changePct: res.changePct };
           }
+        } catch (e) {
+          // ignore individual quote failures
         }
-      });
+      }
       if (!cancelled) {
         setTickerPrices(prev => ({ ...prev, ...updated }));
         setLiveData(prev => ({ ...(prev || {}), stockPrices: { ...((prev && prev.stockPrices) || {}), ...updated } }));
@@ -205,17 +202,14 @@ export default function App() {
     async function updateTicker() {
       const updated: Record<string, { price: number; changePct: number }> = {};
       const allSymbols = STOCK_UNIVERSE_SYMBOLS;
-      const results = await Promise.allSettled(
-        allSymbols.map(async (symbol) => ({ symbol, quote: await fetchLiveQuote(symbol, loaded.finnhubKey) }))
-      );
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          const { symbol, quote } = result.value;
-          if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
-            updated[symbol] = { price: quote.price, changePct: quote.changePct };
-          }
+      for (const s of allSymbols) {
+        try {
+          const res = await fetchLiveQuote(s, loaded.finnhubKey);
+          updated[s] = { price: res.price, changePct: res.changePct };
+        } catch (e) {
+          // ignore
         }
-      });
+      }
       setTickerPrices((prev) => ({
         ...prev,
         ...updated
