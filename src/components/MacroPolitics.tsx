@@ -408,10 +408,9 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                     }`}>
                       {r.impactRating.toUpperCase()} IMPACT
                     </span>
-                    {r.geminiImpactSummary && (
+                    {r.impactSummary && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
-                        <Sparkles className="w-2.5 h-2.5 mr-1" />
-                        Live Analysis
+                        Impact
                       </span>
                     )}
                   </div>
@@ -421,10 +420,10 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                   {r.description}
                 </p>
 
-                {r.geminiImpactSummary && (
+                {r.impactSummary && (
                   <div className="mt-2 p-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-lg text-[10px] text-[#A7F3D0] font-mono leading-relaxed font-normal">
-                    <span className="text-[8px] uppercase tracking-wider text-emerald-400/70 font-black block mb-1">🤖 Gemini Sector Impact Summary</span>
-                    {r.geminiImpactSummary}
+                    <span className="text-[8px] uppercase tracking-wider text-emerald-400/70 font-black block mb-1">Impact Pathway</span>
+                    {r.impactSummary}
                   </div>
                 )}
 
