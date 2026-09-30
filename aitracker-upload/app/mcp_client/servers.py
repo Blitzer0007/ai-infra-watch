@@ -90,15 +90,18 @@ def default_configs(
 def research_configs() -> list[ServerConfig]:
     """Lean MCP pool for autonomous research requests.
 
-    Notifications are intentionally excluded from the research path because
-    the agent never needs a notification tool to answer a research question.
-    Fewer stdio subprocesses reduces cold-start time and failure surface on
-    serverless runtimes such as Vercel.
+    On Vercel, research must use live market/SEC providers by default so
+    arbitrary ticker questions do not silently fall back to fixtures. Local
+    development/tests remain hermetic unless live mode is explicitly enabled.
+    Set AI_INFRA_AGENT_LIVE_DATA=0 to force fixtures, or 1 to force live.
     """
+    live_default = "1" if os.getenv("VERCEL") else "0"
+    live_enabled = os.getenv("AI_INFRA_AGENT_LIVE_DATA", live_default).strip().lower() in {"1", "true", "yes", "on"}
+    mode = "live" if live_enabled else "fixture"
     return [
-        stocks_config(),
-        filings_config(),
-        news_config(),
+        stocks_config(mode=mode),
+        filings_config(mode=mode),
+        news_config(mode="live"),
     ]
 
 def live_configs() -> list[ServerConfig]:
