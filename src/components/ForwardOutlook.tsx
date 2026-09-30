@@ -527,7 +527,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast verification</div>
-          <p className="text-[10px] text-white/45 mt-1">Save the current forecast, then compare it with the real return after the selected trading horizon.</p></div>
+          <p className="text-[10px] text-white/45 mt-1">Save the current forecast, then compare it with the real market return after the selected trading horizon. Automatic verification runs on the scheduled backend job after deployment.</p></div>
           <div className="flex flex-wrap gap-2">
             <button onClick={trackForecast} disabled={!currentPrice || analysis.confidence === 'Insufficient'} className="px-3 py-2 rounded border border-cyan-300/30 bg-cyan-300/10 text-cyan-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">Track this forecast</button>
             <button onClick={verifyDueForecasts} disabled={verificationBusy} className="px-3 py-2 rounded border border-white/10 bg-white/5 text-white/70 text-[9px] font-mono font-black uppercase disabled:opacity-40">{verificationBusy ? 'VERIFYING…' : 'Verify due forecasts'}</button>
@@ -536,8 +536,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {verificationMessage && <div className="text-[10px] font-mono text-cyan-200/80 border border-cyan-300/10 rounded-xl p-2">{verificationMessage}</div>}
         <div className="space-y-2">{forecasts.slice().reverse().slice(0, 5).map(f => (
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[9px] font-mono">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
-            <div className="mt-1 text-white/40">Forecast median ${formatReturn(f.median)} · middle 50% ${formatReturn(f.p25)} to ${formatReturn(f.p75)}${f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
+            <div className="mt-1 text-white/40">Forecast median {formatReturn(f.median)} · middle 50% {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
           </div>
         ))}</div>
       </div>
