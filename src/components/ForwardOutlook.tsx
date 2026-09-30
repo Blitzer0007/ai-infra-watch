@@ -130,7 +130,35 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
-  useEffect(() => { setForecasts(loadForecasts()); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPersistentForecasts() {
+      try {
+        const response = await fetch('/api/forecast-verification');
+        if (!response.ok) throw new Error('Persistent forecast storage unavailable');
+        const body = await response.json();
+        const remote: ForecastSnapshot[] = Array.isArray(body.forecasts) ? body.forecasts : [];
+        if (!cancelled) {
+          setForecasts(remote);
+          if (!remote.length) {
+            const legacy = loadForecasts();
+            for (const item of legacy) {
+              fetch('/api/forecast-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+              }).catch(() => {});
+            }
+            if (legacy.length) setForecasts(legacy);
+          }
+        }
+      } catch {
+        if (!cancelled) setForecasts(loadForecasts());
+      }
+    }
+    loadPersistentForecasts();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,15 +289,30 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     }
   };
 
-  const trackForecast = () => {
+  const trackForecast = async () => {
     if (!currentPrice || !history.length || analysis.confidence === 'Insufficient') return;
     const snapshot: ForecastSnapshot = {
       id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
       targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice,
       median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending'
     };
-    const next = [...forecasts, snapshot]; setForecasts(next); saveForecasts(next);
-    setVerificationMessage('Forecast saved. Return after the target date and verify it against live market history.');
+    try {
+      const response = await fetch('/api/forecast-verification', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot)
+      });
+      if (!response.ok) throw new Error('Persistent forecast storage failed (HTTP ' + response.status + ')');
+      const body = await response.json();
+      const saved = body?.forecast || snapshot;
+      const next = [...forecasts.filter(f => f.id !== saved.id), saved];
+      setForecasts(next);
+      saveForecasts(next);
+      setVerificationMessage('Forecast saved to the verification database. It can be verified from another device after the target date.');
+    } catch (err: any) {
+      const next = [...forecasts, snapshot];
+      setForecasts(next);
+      saveForecasts(next);
+      setVerificationMessage((err?.message || 'Database save failed.') + ' Local browser fallback was kept.');
+    }
   };
 
   const verifyDueForecasts = async () => {
@@ -287,11 +330,22 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         const point = points.find(p => p.date >= forecast.targetDate) || points[points.length - 1];
         if (!point || !(forecast.entryPrice > 0) || !(point.price > 0)) continue;
         const actualReturn = (point.price / forecast.entryPrice - 1) * 100;
+        const patch = {
+          id: forecast.id, status: 'verified', verifiedAt: new Date().toISOString(),
+          actualDate: point.date, actualPrice: point.price, actualReturn,
+          medianError: actualReturn - forecast.median
+        };
+        const savedResponse = await fetch('/api/forecast-verification', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+        });
+        if (!savedResponse.ok) throw new Error('Database verification failed for ' + forecast.ticker + ' (HTTP ' + savedResponse.status + ')');
+        const savedBody = await savedResponse.json();
+        const verified = savedBody?.forecast || { ...forecast, ...patch };
         const index = updated.findIndex(f => f.id === forecast.id);
-        if (index >= 0) updated[index] = { ...updated[index], status: 'verified', verifiedAt: new Date().toISOString(), actualDate: point.date, actualPrice: point.price, actualReturn, medianError: actualReturn - forecast.median };
+        if (index >= 0) updated[index] = verified;
       }
       setForecasts(updated); saveForecasts(updated);
-      setVerificationMessage('Verification complete using the latest market history.');
+      setVerificationMessage('Verification complete using real market history and the persistent database.');
     } catch (err: any) {
       setVerificationMessage(err?.message || 'Forecast verification failed.');
     } finally { setVerificationBusy(false); }
