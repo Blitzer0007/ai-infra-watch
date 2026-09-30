@@ -26,6 +26,9 @@
     },
     "api/earnings-alerts.js": {
       "maxDuration": 30
+    },
+    "api/forecast-model-evaluation.js": {
+      "maxDuration": 60
     }
   }
 }
