@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { formatPrice } from '../utils';
 
@@ -89,6 +89,98 @@ function forwardReturns(history: PricePoint[], horizon: number): number[] {
   return result;
 }
 
+
+type BacktestRow = {
+  asOfDate: string;
+  targetDate: string;
+  median: number;
+  p25: number;
+  p75: number;
+  p10: number;
+  p90: number;
+  actual: number;
+};
+
+type BacktestSummary = {
+  rows: BacktestRow[];
+  directionalAccuracy: number;
+  medianAbsoluteError: number;
+  p25p75Coverage: number;
+  p10p90Coverage: number;
+};
+
+function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSummary {
+  if (history.length < 220 + horizon) {
+    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0 };
+  }
+
+  const regimes = history.map((_, i) => {
+    if (i < 20) return { momentum: 0, volatility: 0 };
+    const start = history[i - 20]?.price;
+    const end = history[i]?.price;
+    const daily: number[] = [];
+    for (let j = Math.max(1, i - 20); j <= i; j++) {
+      const a = history[j - 1]?.price;
+      const b = history[j]?.price;
+      if (a > 0 && b > 0) daily.push((b / a - 1) * 100);
+    }
+    return {
+      momentum: start > 0 && end > 0 ? (end / start - 1) * 100 : 0,
+      volatility: stdev(daily) * Math.sqrt(252)
+    };
+  });
+
+  const candidatesAt = (asOf: number): number[] => {
+    const candidates: { distance: number; ret: number }[] = [];
+    const current = regimes[asOf];
+    for (let j = 60; j + horizon < asOf; j++) {
+      const base = history[j]?.price;
+      const future = history[j + horizon]?.price;
+      if (!(base > 0 && future > 0)) continue;
+      const regime = regimes[j];
+      const distance = Math.abs(regime.momentum - current.momentum) + Math.abs(regime.volatility - current.volatility) * 0.7;
+      candidates.push({ distance, ret: (future / base - 1) * 100 });
+    }
+    candidates.sort((a, b) => a.distance - b.distance);
+    return candidates.slice(0, 25).map(item => item.ret);
+  };
+
+  const rows: BacktestRow[] = [];
+  const step = horizon >= 120 ? 15 : 20;
+  const first = 220;
+  const last = history.length - horizon - 1;
+  for (let asOf = first; asOf <= last; asOf += step) {
+    const sample = candidatesAt(asOf);
+    const base = sample.length >= 8 ? sample : [];
+    if (base.length < 8) continue;
+    const median = percentile(base, 0.5);
+    const p25 = percentile(base, 0.25);
+    const p75 = percentile(base, 0.75);
+    const p10 = percentile(base, 0.1);
+    const p90 = percentile(base, 0.9);
+    const actual = (history[asOf + horizon].price / history[asOf].price - 1) * 100;
+    rows.push({
+      asOfDate: history[asOf].date,
+      targetDate: history[asOf + horizon].date,
+      median, p25, p75, p10, p90, actual
+    });
+  }
+
+  const directional = rows.filter(row => row.median === 0 || row.actual === 0 ? false : Math.sign(row.median) === Math.sign(row.actual));
+  const directionalEligible = rows.filter(row => row.median !== 0 && row.actual !== 0);
+  const absErrors = rows.map(row => Math.abs(row.actual - row.median));
+  const middleCovered = rows.filter(row => row.actual >= row.p25 && row.actual <= row.p75);
+  const wideCovered = rows.filter(row => row.actual >= row.p10 && row.actual <= row.p90);
+
+  return {
+    rows,
+    directionalAccuracy: directionalEligible.length ? directional.length / directionalEligible.length : 0,
+    medianAbsoluteError: absErrors.length ? percentile(absErrors, 0.5) : 0,
+    p25p75Coverage: rows.length ? middleCovered.length / rows.length : 0,
+    p10p90Coverage: rows.length ? wideCovered.length / rows.length : 0
+  };
+}
+
 function conditionedReturns(history: PricePoint[], horizon: number, currentMomentum: number, currentVolatility: number): number[] {
   const candidates: { distance: number; ret: number }[] = [];
   const dailyReturns: number[] = [];
@@ -129,6 +221,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [backtestBusy, setBacktestBusy] = useState(false);
+  const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
+  const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -351,6 +446,26 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     } finally { setVerificationBusy(false); }
   };
 
+  const runBacktest = async () => {
+    if (loading || history.length < 220 + horizon) return;
+    setBacktestBusy(true);
+    setBacktestMessage(null);
+    try {
+      const result = historicalBacktest(history, horizon);
+      setBacktest(result);
+      setBacktestMessage(
+        result.rows.length
+          ? 'Backtest complete. Each test date uses only market data available before that date.'
+          : 'Not enough historical observations to produce a backtest for this horizon.'
+      );
+    } catch (err: any) {
+      setBacktest(null);
+      setBacktestMessage(err?.message || 'Backtest failed.');
+    } finally {
+      setBacktestBusy(false);
+    }
+  };
+
   const runTicker = () => {
     const value = tickerInput.trim().toUpperCase();
     if (value) {
@@ -540,6 +655,54 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="mt-1 text-white/40">Forecast median {formatReturn(f.median)} · middle 50% {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
           </div>
         ))}</div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CheckCircle2 className="w-4 h-4 text-cyan-300" />
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Live forecast accuracy</span>
+          </div>
+          <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+            <div>
+              <div className="flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Historical backtest</span></div>
+              <p className="text-[10px] text-white/40 mt-1">Replay the same analogue method on past dates without using information from the future.</p>
+            </div>
+            <button onClick={runBacktest} disabled={backtestBusy || loading || history.length < 220 + horizon} className="px-3 py-2 rounded border border-emerald-300/20 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{backtestBusy ? 'BACKTESTING…' : 'RUN BACKTEST'}</button>
+          </div>
+          {backtestMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{backtestMessage}</div>}
+          {backtest ? (
+            <div className="space-y-3">
+              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Directional</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P25–P75 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P10–P90 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {backtest.rows.slice(-8).reverse().map(row => (
+                  <div key={row.asOfDate} className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/5 px-2 py-1.5 text-[9px] font-mono text-white/45">
+                    <span>{row.asOfDate} → {row.targetDate}</span>
+                    <span>Median {formatReturn(row.median)}</span>
+                    <span>Actual {formatReturn(row.actual)}</span>
+                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'P25–P75' : 'outside P25–P75'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <div className="text-[10px] text-white/30 font-mono">Run the backtest to validate the historical analogue method for {selectedStock} at the selected horizon.</div>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
