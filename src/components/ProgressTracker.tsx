@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
-import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Plus, Trash2, Award, Search, Loader2 } from 'lucide-react';
+import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Award, Search, Loader2 } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
-
-const LOCAL_STORAGE_CUSTOM_MILESTONES = 'aiw_custom_milestones_v1';
 
 function matchesDate(milestoneDate: string, historyDate: string): boolean {
   const m = milestoneDate.trim().toLowerCase();
@@ -31,6 +29,24 @@ interface ProgressTrackerProps {
   livePrices?: Record<string, { price: number; changePct: number }>;
 }
 
+const TRACKER_SYMBOL_ALIASES: Record<string, string> = {
+  SALESFORCE: 'CRM',
+  MICROSOFT: 'MSFT',
+  NVIDIA: 'NVDA',
+  MICRON: 'MU',
+  ONDAS: 'ONDS',
+  ONDASNETWORKS: 'ONDS',
+  SERVICENOW: 'NOW',
+  NEBIUS: 'NBIS',
+  SANDISK: 'SNDK',
+  TSMC: 'TSM',
+};
+
+function resolveTrackerSymbol(value: string): string {
+  const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, '');
+  return TRACKER_SYMBOL_ALIASES[normalized] || normalized;
+}
+
 export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [selectedStock, setSelectedStock] = useState<string>('NBIS');
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -43,22 +59,8 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
   const [tickerInput, setTickerInput] = useState('');
 
-  // Custom milestone state
-  const [customTitle, setCustomTitle] = useState('');
-  const [customDate, setCustomDate] = useState('');
-  const [customPrice, setCustomPrice] = useState('');
-  const [customStatus, setCustomStatus] = useState<'planned' | 'active' | 'done'>('planned');
-
-  // Load all milestones (initial + custom from localStorage)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_MILESTONES);
-      const custom: Milestone[] = stored ? JSON.parse(stored) : [];
-      setMilestones([...INITIAL_MILESTONES, ...custom]);
-    } catch (e) {
-      setMilestones(INITIAL_MILESTONES);
-    }
-  }, []);
+  // Curated milestones only; live SEC milestones are added below.
+ []);
 
   // Combine the curated timeline with live SEC milestones for the selected symbol.
   const stockMilestones = [
@@ -130,58 +132,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     if (lastItem?.date === today) lastItem.price = liveObj.price;
     else chartHistory.push({ date: today, price: liveObj.price });
   }
-
-  // Add custom milestone
-  const handleAddMilestone = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customTitle.trim()) return;
-
-    const newMilestone: Milestone = {
-      id: `custom_${Date.now()}`,
-      stockSymbol: selectedStock,
-      date: customDate || 'No date set',
-      title: customTitle.trim(),
-      description: 'Manually logged event.',
-      priceAtTime: parseFloat(customPrice) || (chartHistory[chartHistory.length - 1]?.price || 0),
-      status: customStatus
-    };
-
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_MILESTONES);
-      const currentCustom: Milestone[] = stored ? JSON.parse(stored) : [];
-      const updated = [...currentCustom, newMilestone];
-      localStorage.setItem(LOCAL_STORAGE_CUSTOM_MILESTONES, JSON.stringify(updated));
-      
-      // Update state
-      setMilestones([...INITIAL_MILESTONES, ...updated]);
-      setActiveMilestoneId(newMilestone.id);
-
-      // Reset form
-      setCustomTitle('');
-      setCustomDate('');
-      setCustomPrice('');
-      setCustomStatus('planned');
-    } catch (err) {
-      console.error('Failed to save custom milestone', err);
-    }
-  };
-
-  // Remove custom milestone
-  const handleRemoveMilestone = (id: string) => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_MILESTONES);
-      const currentCustom: Milestone[] = stored ? JSON.parse(stored) : [];
-      const updated = currentCustom.filter((m) => m.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_CUSTOM_MILESTONES, JSON.stringify(updated));
-      
-      setMilestones([...INITIAL_MILESTONES, ...updated]);
-      if (activeMilestoneId === id) {
-        setActiveMilestoneId(null);
-      }
-    } catch (err) {
-      console.error('Failed to remove custom milestone', err);
-    }
-  };
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
 
@@ -267,11 +217,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && tickerInput.trim()) {
-                      setSelectedStock(tickerInput.trim().toUpperCase());
+                      setSelectedStock(resolveTrackerSymbol(tickerInput));
                       setActiveMilestoneId(null);
                     }
                   }}
-                  placeholder="e.g. AAPL, AVGO, TSM, PLTR"
+                  placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
                   className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
                 />
               </div>
@@ -578,74 +528,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         </div>
       </div>
 
-      {/* Log Custom Milestone Panel */}
-      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-4">
-        <div className="space-y-1">
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Log Custom Build Milestone</h3>
-          <p className="text-xs text-white/60">
-            Extend this progress tracker. Log additional events for <span className="text-emerald-400 font-bold font-mono">{selectedStock}</span>. Data is stored locally.
-          </p>
-        </div>
 
-        <form onSubmit={handleAddMilestone} className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 text-xs font-mono">
-          <div className="flex flex-col space-y-1.5 col-span-1 md:col-span-2">
-            <label className="text-white/40 uppercase text-[9px] tracking-widest">Milestone Title</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Phase 2 datacenter hookup"
-              value={customTitle}
-              onChange={(e) => setCustomTitle(e.target.value)}
-              className="px-3 py-2.5 bg-white/5 border border-white/10 rounded text-white focus:outline-none focus:border-white placeholder-white/20"
-            />
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label className="text-white/40 uppercase text-[9px] tracking-widest">Date</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Q3 2026 or YYYY-MM"
-              value={customDate}
-              onChange={(e) => setCustomDate(e.target.value)}
-              className="px-3 py-2.5 bg-white/5 border border-white/10 rounded text-white focus:outline-none focus:border-white placeholder-white/20"
-            />
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label className="text-white/40 uppercase text-[9px] tracking-widest">Stock Price ($)</label>
-            <input
-              type="number"
-              step="any"
-              placeholder="e.g. 35.50"
-              value={customPrice}
-              onChange={(e) => setCustomPrice(e.target.value)}
-              className="px-3 py-2.5 bg-white/5 border border-white/10 rounded text-white focus:outline-none focus:border-white placeholder-white/20"
-            />
-          </div>
-
-          <div className="flex flex-col space-y-1.5 col-span-1 md:col-span-2">
-            <label className="text-white/40 uppercase text-[9px] tracking-widest">Build Status</label>
-            <select
-              value={customStatus}
-              onChange={(e) => setCustomStatus(e.target.value as any)}
-              className="px-3 py-2.5 bg-[#0F1115] border border-white/10 rounded text-white focus:outline-none focus:border-white font-mono text-xs cursor-pointer"
-            >
-              <option value="planned" className="bg-[#0F1115] text-white">Planned</option>
-              <option value="active" className="bg-[#0F1115] text-white">In Progress</option>
-              <option value="done" className="bg-[#0F1115] text-white">Done</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="md:col-span-2 self-end border border-white text-xs font-black uppercase tracking-widest py-3 hover:bg-white hover:text-black transition rounded cursor-pointer flex items-center justify-center space-x-1.5 h-[42px]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Custom Milestone</span>
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
