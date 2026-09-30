@@ -107,11 +107,17 @@ type BacktestSummary = {
   medianAbsoluteError: number;
   p25p75Coverage: number;
   p10p90Coverage: number;
+  baselineDirectionalAccuracy: number;
+  baselineMedianAbsoluteError: number;
+  directionalLift: number;
+  errorLift: number;
+  p25CalibrationGap: number;
+  p90CalibrationGap: number;
 };
 
 function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSummary {
   if (history.length < 220 + horizon) {
-    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0 };
+    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0, baselineDirectionalAccuracy: 0, baselineMedianAbsoluteError: 0, directionalLift: 0, errorLift: 0, p25CalibrationGap: 0, p90CalibrationGap: 0 };
   }
 
   const regimes = history.map((_, i) => {
@@ -146,6 +152,7 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
   };
 
   const rows: BacktestRow[] = [];
+  const baselineRows: { median: number; actual: number }[] = [];
   const step = horizon >= 120 ? 15 : 20;
   const first = 220;
   const last = history.length - horizon - 1;
@@ -159,25 +166,43 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
     const p10 = percentile(base, 0.1);
     const p90 = percentile(base, 0.9);
     const actual = (history[asOf + horizon].price / history[asOf].price - 1) * 100;
-    rows.push({
-      asOfDate: history[asOf].date,
-      targetDate: history[asOf + horizon].date,
-      median, p25, p75, p10, p90, actual
-    });
+
+    const baseline: number[] = [];
+    for (let j = 60; j + horizon < asOf; j++) {
+      const a = history[j]?.price;
+      const b = history[j + horizon]?.price;
+      if (a > 0 && b > 0) baseline.push((b / a - 1) * 100);
+    }
+    if (baseline.length >= 8) baselineRows.push({ median: percentile(baseline, 0.5), actual });
+
+    rows.push({ asOfDate: history[asOf].date, targetDate: history[asOf + horizon].date, median, p25, p75, p10, p90, actual });
   }
 
-  const directional = rows.filter(row => row.median === 0 || row.actual === 0 ? false : Math.sign(row.median) === Math.sign(row.actual));
+  const directional = rows.filter(row => row.median !== 0 && row.actual !== 0 && Math.sign(row.median) === Math.sign(row.actual));
   const directionalEligible = rows.filter(row => row.median !== 0 && row.actual !== 0);
   const absErrors = rows.map(row => Math.abs(row.actual - row.median));
   const middleCovered = rows.filter(row => row.actual >= row.p25 && row.actual <= row.p75);
   const wideCovered = rows.filter(row => row.actual >= row.p10 && row.actual <= row.p90);
+  const baselineDirectional = baselineRows.filter(row => row.median !== 0 && row.actual !== 0 && Math.sign(row.median) === Math.sign(row.actual));
+  const baselineEligible = baselineRows.filter(row => row.median !== 0 && row.actual !== 0);
+  const baselineErrors = baselineRows.map(row => Math.abs(row.actual - row.median));
+  const modelDirectional = directionalEligible.length ? directional.length / directionalEligible.length : 0;
+  const baseDirectional = baselineEligible.length ? baselineDirectional.length / baselineEligible.length : 0;
+  const modelError = absErrors.length ? percentile(absErrors, 0.5) : 0;
+  const baseError = baselineErrors.length ? percentile(baselineErrors, 0.5) : 0;
 
   return {
     rows,
-    directionalAccuracy: directionalEligible.length ? directional.length / directionalEligible.length : 0,
-    medianAbsoluteError: absErrors.length ? percentile(absErrors, 0.5) : 0,
+    directionalAccuracy: modelDirectional,
+    medianAbsoluteError: modelError,
     p25p75Coverage: rows.length ? middleCovered.length / rows.length : 0,
-    p10p90Coverage: rows.length ? wideCovered.length / rows.length : 0
+    p10p90Coverage: rows.length ? wideCovered.length / rows.length : 0,
+    baselineDirectionalAccuracy: baseDirectional,
+    baselineMedianAbsoluteError: baseError,
+    directionalLift: modelDirectional - baseDirectional,
+    errorLift: baseError - modelError,
+    p25CalibrationGap: (rows.length ? middleCovered.length / rows.length : 0) - 0.5,
+    p90CalibrationGap: (rows.length ? wideCovered.length / rows.length : 0) - 0.8
   };
 }
 
@@ -224,6 +249,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtestBusy, setBacktestBusy] = useState(false);
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
+  const [matrixBusy, setMatrixBusy] = useState(false);
+  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number} | null>(null);
+  const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
   const [jevValidationError, setJevValidationError] = useState<string | null>(null);
@@ -466,6 +494,37 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       setBacktestMessage(err?.message || 'Backtest failed.');
     } finally {
       setBacktestBusy(false);
+    }
+  };
+
+  const runValidationMatrix = async () => {
+    if (matrixBusy) return;
+    setMatrixBusy(true);
+    setMatrix(null);
+    setMatrixMessage(null);
+    const tickers = ['NVDA','MSFT','MU','AVGO','AMD','TSM','META','NBIS'];
+    try {
+      const histories = await Promise.all(tickers.map(async ticker => {
+        const response = await fetch('/api/stock-history?symbol=' + encodeURIComponent(ticker) + '&range=5y');
+        if (!response.ok) throw new Error(ticker + ' history failed (HTTP ' + response.status + ')');
+        const body = await response.json();
+        return { ticker, points: Array.isArray(body.points) ? body.points : [] };
+      }));
+      const summaries = histories.flatMap(item => HORIZONS.map(h => historicalBacktest(item.points, h.days)));
+      const valid = summaries.filter(summary => summary.rows.length);
+      const rows = valid.flatMap(summary => summary.rows);
+      setMatrix({
+        tests: rows.length,
+        direction: valid.length ? mean(valid.map(summary => summary.directionalAccuracy)) : 0,
+        error: valid.length ? mean(valid.map(summary => summary.medianAbsoluteError)) : 0,
+        coverage50: valid.length ? mean(valid.map(summary => summary.p25p75Coverage)) : 0,
+        coverage80: valid.length ? mean(valid.map(summary => summary.p10p90Coverage)) : 0
+      });
+      setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
+    } catch (err: any) {
+      setMatrixMessage(err?.message || 'Validation matrix failed.');
+    } finally {
+      setMatrixBusy(false);
     }
   };
 
@@ -764,12 +823,17 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>}
               </div>
               <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
-              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Directional</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P25–P75 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P10–P90 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
                 {backtest.rows.slice(-8).reverse().map(row => (
@@ -784,6 +848,24 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             </div>
           ) : <div className="text-[10px] text-white/30 font-mono">Run the backtest to validate the historical analogue method for {selectedStock} at the selected horizon.</div>}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[.03] p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-200/80">Cross-ticker validation matrix</div>
+            <p className="text-[10px] text-white/45 mt-1">Runs the same backtest across 8 AI/technology tickers and all 5 horizons. This is a validation summary, not a ranking.</p>
+          </div>
+          <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
+        </div>
+        {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
+        {matrix && <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg median error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P50 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P80 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
+        </div>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
