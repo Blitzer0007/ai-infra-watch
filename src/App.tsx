@@ -21,6 +21,7 @@ import Settings from './components/Settings';
 import HelpGuide from './components/HelpGuide';
 import ForwardOutlook from './components/ForwardOutlook';
 import AutonomousResearch from './components/AutonomousResearch';
+import DataHealth from './components/DataHealth';
 
 type StressSnapshot = {
   score: number;
@@ -80,6 +81,7 @@ export default function App() {
     marketSentiment?: string;
     build?: { commit?: string | null; environment?: string };
     timestamp?: number;
+    evidenceAvailability?: Record<string, any>;
   } | null>(null);
   const [isLiveLoading, setIsLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
@@ -256,6 +258,7 @@ export default function App() {
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon },
     { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
+    { id: 'health', label: 'Data Health', index: '10', icon: ShieldAlert },
     { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp }
   ];
 
@@ -561,6 +564,7 @@ export default function App() {
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
+              {activeView === 'health' && <DataHealth evidenceAvailability={liveData?.evidenceAvailability || {}} timestamp={liveData?.timestamp} isLoading={isLiveLoading} onRefresh={() => handleFetchLiveData(true)} error={liveError} />}
               {activeView === 'outlook' && <ForwardOutlook livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} macroRisks={liveData?.macroRisks} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
             </motion.div>
           </AnimatePresence>
