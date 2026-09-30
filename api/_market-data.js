@@ -52,13 +52,15 @@ async function yahooQuote(symbol) {
   const valid = closes.filter(Number.isFinite);
   const price = Number.isFinite(meta?.regularMarketPrice) ? meta.regularMarketPrice : valid.at(-1);
   const previous = valid.length > 1 ? valid.at(-2) : meta?.previousClose;
+  const asOf = meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString() : new Date().toISOString();
   if (!Number.isFinite(price)) throw new Error('No price');
   return {
     price,
     changePct: Number.isFinite(previous) && previous !== 0 ? ((price / previous) - 1) * 100 : 0,
     source: 'Yahoo Finance',
     provider: 'yahoo',
-    asOf: new Date().toISOString(),
+    asOf,
+    retrievedAt: new Date().toISOString(),
     stale: false,
     evidenceType: 'market_quote'
   };
@@ -78,7 +80,9 @@ async function finnhubQuote(symbol) {
     source: 'Finnhub',
     provider: 'finnhub',
     asOf: j.t ? new Date(j.t * 1000).toISOString() : new Date().toISOString(),
-    stale: false
+    retrievedAt: new Date().toISOString(),
+    stale: false,
+    evidenceType: 'market_quote'
   };
 }
 
@@ -99,7 +103,9 @@ async function alphaQuote(symbol) {
     source: 'Alpha Vantage',
     provider: 'alpha-vantage',
     asOf: q?.['07. latest trading day'] ? q['07. latest trading day'] + 'T00:00:00.000Z' : new Date().toISOString(),
-    stale: false
+    retrievedAt: new Date().toISOString(),
+    stale: false,
+    evidenceType: 'market_quote'
   };
 }
 
