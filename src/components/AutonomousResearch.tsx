@@ -277,13 +277,13 @@ export default function AutonomousResearch() {
               {result.resolution && (
                 <p className="mt-3 text-[10px] font-mono text-white/35">Resolution: {result.resolution}</p>
               )}
-              {result.jev?.evidence_gate?.evidence_availability && (
+              {result.jev?.evidence_gate && (
                 <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
                   <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
                     Evidence coverage
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(result.jev.evidence_gate.evidence_availability.channels || {}).map(([family, channel]) => (
+                    {Object.entries(result.jev.evidence_gate.evidence_availability?.channels || {}).map(([family, channel]) => (
                       <span
                         key={family}
                         className={
