@@ -7,6 +7,10 @@
     {
       "path": "/api/forecast-verification",
       "schedule": "30 22 * * 1-5"
+    },
+    {
+      "path": "/api/forecast-model-evaluation",
+      "schedule": "0 23 * * 0"
     }
   ],
   "functions": {
