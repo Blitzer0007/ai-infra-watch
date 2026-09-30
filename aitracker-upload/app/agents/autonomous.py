@@ -348,11 +348,60 @@ def _needs_evidence_gate(question: str) -> bool:
     return any(term in lower for term in terms)
 
 
+def _required_evidence_families(question: str) -> tuple[str, ...]:
+    """Return evidence channels expected for a bounded research answer.
+
+    The list is question-sensitive: earnings/congress/macro are not mandatory
+    for every stock question, while market + recent news + primary SEC evidence
+    are the default core channels for causal/impact research.
+    """
+    lower = question.lower()
+    families = ["market", "news", "sec"]
+    if any(term in lower for term in ("earnings", "eps", "revenue", "results", "surprise")):
+        families.append("earnings")
+        families.append("event_study")
+    if any(term in lower for term in ("reaction", "reacted", "event study", "price history", "historical price")):
+        families.append("event_study")
+    if any(term in lower for term in ("congress", "senator", "representative", "official trade")):
+        families.append("congress")
+    if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
+        families.append("macro")
+    return tuple(dict.fromkeys(families))
+
+
+def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[str, Any]:
+    """Build a typed availability matrix from the actual MCP trajectory."""
+    expected = _required_evidence_families(question)
+    successful = { _evidence_family(call.tool) for call in calls if call.ok }
+    failed = { _evidence_family(call.tool) for call in calls if not call.ok }
+    matrix: dict[str, Any] = {}
+    for family in expected:
+        if family in successful:
+            status = "AVAILABLE"
+        elif family in failed:
+            status = "NOT_FOUND"
+        else:
+            status = "NOT_FOUND"
+        matrix[family] = {
+            "status": status,
+            "observedCalls": sum(1 for call in calls if _evidence_family(call.tool) == family),
+        }
+    missing = [family for family, item in matrix.items() if item["status"] != "AVAILABLE"]
+    return {
+        "required": list(expected),
+        "channels": matrix,
+        "missing": missing,
+        "complete": not missing,
+    }
+
+
 def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: JevClient) -> tuple[str, dict[str, Any]]:
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
+    availability = _evidence_availability(question, calls)
     state = {
         "question": question,
+        "evidence_availability": availability,
         "successful_calls": [
             {
                 "tool": call.tool,
@@ -377,6 +426,7 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         "checked_after_successful_calls": len(successful),
         "action": "continue",
         "fallback": not evaluation.usable,
+        "evidence_availability": availability,
     }
     if not evaluation.usable:
         gate["error"] = evaluation.error or "Jev evidence gate unavailable"
@@ -395,9 +445,10 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
             and isinstance(score, (int, float))
             and score >= 2.25
             and (confidence is None or confidence >= 0.50)
+            and availability["complete"]
         ):
             decision = "stop"
-        elif choice in {"gather_more", "resolve_conflict"}:
+        elif choice in {"gather_more", "resolve_conflict"} or not availability["complete"]:
             decision = "gather_more"
         elif isinstance(score, (int, float)) and score < 1.50:
             decision = "gather_more"
