@@ -265,6 +265,45 @@ export default async function handler(req, res) {
     { id:'power', category:'Infrastructure', title:'Data-center power availability', impactRating:'medium', description:'Track grid interconnection, power procurement and AI capacity announcements.', dateUpdated:today, geminiImpactSummary:'Power → AI capacity → GPU hosting demand → DGXX/NBIS/IREN/VIVO.' }
   ];
 
+  const evidenceAvailability = {
+    market: {
+      status: Object.keys(stockPrices).length ? 'AVAILABLE' : 'NOT_FOUND',
+      source: Object.values(stockPrices)[0]?.source || null,
+      provider: Object.values(stockPrices)[0]?.provider || null,
+      retrievedAt: new Date().toISOString(),
+      stale: Object.values(stockPrices).some((item) => item?.stale === true)
+    },
+    contracts: {
+      status: contractsStatusPlaceholder,
+      count: 0
+    },
+    news: {
+      status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND',
+      count: currentNews.length,
+      source: 'GDELT'
+    },
+    political: {
+      status: 'NOT_FOUND',
+      count: 0
+    },
+    congress: {
+      status: 'NOT_FOUND',
+      count: 0
+    },
+    macro: {
+      status: macroRisks.length ? 'AVAILABLE' : 'NOT_FOUND',
+      count: macroRisks.length,
+      source: 'AI Infra Watch deterministic risk map'
+    }
+  };
+
+  const contracts = await fetchSecContracts();
+  const congressTrades = await fetchCongressTrades(req);
+  const politicalSignalsResult = await politicalSignals().catch(() => []);
+  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR' };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage' };
+  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API' };
+
   const data = {
     build: {
       commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
@@ -272,10 +311,11 @@ export default async function handler(req, res) {
     },
     stockPrices,
     news: currentNews,
-    contracts: await fetchSecContracts(),
-    congressTrades: await fetchCongressTrades(req),
+    contracts,
+    congressTrades,
     macroRisks,
-    politicalSignals: await politicalSignals().catch(() => []),
+    politicalSignals: politicalSignalsResult,
+    evidenceAvailability,
     marketSentiment:'Live quotes + AI-infrastructure, political and policy news feeds active.',
     sources:['Yahoo Finance chart data','GDELT AI-infrastructure news','GDELT political/policy coverage','SEC EDGAR','Bargo Congress Trades API']
   };
