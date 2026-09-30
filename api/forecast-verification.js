@@ -21,6 +21,60 @@ function send(res, status, body) {
   res.status(status).json(body);
 }
 
+async function verifyDueForecasts() {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueResponse = await fetch(
+    SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&status=eq.pending&target_date=lte.' + today + '&order=target_date.asc&limit=100',
+    { headers: headers() }
+  );
+  const due = await dueResponse.json();
+  if (!dueResponse.ok) throw new Error(due?.message || 'Failed to load due forecasts.');
+
+  const results = [];
+  const failures = [];
+  for (const forecast of due) {
+    try {
+      const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+        encodeURIComponent(String(forecast.ticker).toUpperCase()) +
+        '?range=5y&interval=1d&events=div%2Csplits';
+      const marketResponse = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' } });
+      if (!marketResponse.ok) throw new Error('Yahoo Finance returned HTTP ' + marketResponse.status);
+      const marketJson = await marketResponse.json();
+      const result = marketJson?.chart?.result?.[0];
+      if (!result) throw new Error('No market history found.');
+      const timestamps = result.timestamp || [];
+      const closes = result.indicators?.quote?.[0]?.close || [];
+      const points = timestamps
+        .map((ts, i) => ({ date: new Date(ts * 1000).toISOString().slice(0, 10), price: closes[i] }))
+        .filter(point => Number.isFinite(point.price));
+      const point = points.find(item => item.date >= forecast.target_date) || points[points.length - 1];
+      if (!point || !(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
+        throw new Error('No usable market point yet.');
+      }
+
+      const actualReturn = (Number(point.price) / Number(forecast.entry_price) - 1) * 100;
+      const patch = {
+        status: 'verified',
+        verified_at: new Date().toISOString(),
+        actual_date: point.date,
+        actual_price: Number(point.price),
+        actual_return: actualReturn,
+        median_error: actualReturn - Number(forecast.median)
+      };
+      const updateResponse = await fetch(
+        SUPABASE_URL + '/rest/v1/forecast_snapshots?id=eq.' + encodeURIComponent(forecast.id),
+        { method: 'PATCH', headers: headers(), body: JSON.stringify(patch) }
+      );
+      const updateData = await updateResponse.json();
+      if (!updateResponse.ok) throw new Error(updateData?.message || 'Supabase update failed.');
+      results.push({ id: forecast.id, ticker: forecast.ticker, targetDate: forecast.target_date, actualDate: point.date, actualReturn });
+    } catch (error) {
+      failures.push({ id: forecast.id, ticker: forecast.ticker, error: error?.message || 'Verification failed.' });
+    }
+  }
+  return { checked: due.length, verified: results.length, failed: failures.length, results, failures };
+}
+
 function normalize(row) {
   return {
     id: row.id,
@@ -51,6 +105,15 @@ export default async function handler(req, res) {
     missing
   });
   try {
+    const cronSecret = String(process.env.CRON_SECRET || '').trim();
+    const authorization = String(req.headers?.authorization || '');
+    const isCronRequest = cronSecret && authorization === 'Bearer ' + cronSecret;
+    if (isCronRequest) {
+      if (req.method !== 'GET') return send(res, 405, { error: 'Cron verification requires GET.' });
+      const verification = await verifyDueForecasts();
+      return send(res, 200, { ok: true, ...verification });
+    }
+
     if (req.method === 'GET') {
       const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=100', { headers: headers() });
       const data = await response.json();
