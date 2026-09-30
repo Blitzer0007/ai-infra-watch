@@ -4,6 +4,24 @@ const cache = new Map();
 
 const DATA_DAWN_TICKER_ALIASES = {
   VIVO: 'VVPR',
+  NVIDIA: 'NVDA',
+  MICROSOFT: 'MSFT',
+  META: 'META',
+  FACEBOOK: 'META',
+  SERVICENOW: 'NOW',
+  SALESFORCE: 'CRM',
+  CRM: 'CRM',
+  NEBIUS: 'NBIS',
+  PALANTIR: 'PLTR',
+  AMAZON: 'AMZN',
+  APPLE: 'AAPL',
+  GOOGLE: 'GOOGL',
+  ALPHABET: 'GOOGL',
+  MICRON: 'MU',
+  SANDISK: 'SNDK',
+  AMD: 'AMD',
+  PHARVARIS: 'PHVS',
+  'DIGI POWER X': 'DGXX',
 };
 
 function normalizeDate(value) {
@@ -81,18 +99,29 @@ async function fetchBargo(symbol) {
   return Array.isArray(payload?.trades) ? payload.trades : [];
 }
 
-function buildDataDawnUrl(symbol) {
-  const where =
-    symbol === 'ALL'
-      ? "ticker IS NOT NULL"
-      : "UPPER(ticker) = UPPER('" +
-        (DATA_DAWN_TICKER_ALIASES[symbol] || symbol).replaceAll("'", "''") +
-        "')";
+function buildDataDawnUrl(symbol, query = '') {
+  const safeSymbol = DATA_DAWN_TICKER_ALIASES[symbol] || symbol;
+  const safeQuery = String(query || '').trim().replaceAll("'", "''");
+  const predicates = [];
 
+  if (symbol !== 'ALL') {
+    predicates.push("UPPER(ticker) = UPPER('" + safeSymbol.replaceAll("'", "''") + "')");
+  }
+
+  if (safeQuery) {
+    const q = safeQuery.toUpperCase();
+    const alias = DATA_DAWN_TICKER_ALIASES[q] || q;
+    const escapedAlias = alias.replaceAll("'", "''");
+    predicates.push(
+      "(UPPER(ticker) = UPPER('" + escapedAlias + "') OR " +
+      "UPPER(member_name) LIKE UPPER('%" + safeQuery + "%'))"
+    );
+  }
+
+  const where = predicates.length ? predicates.join(' AND ') : 'ticker IS NOT NULL';
   const sql =
     'SELECT member_name, transaction_date, ticker, transaction_type, amount_range, owner, chamber, source_url ' +
-    'FROM stock_trades WHERE ' +
-    where +
+    'FROM stock_trades WHERE ' + where +
     ' ORDER BY transaction_date DESC LIMIT 500';
 
   return (
@@ -102,8 +131,8 @@ function buildDataDawnUrl(symbol) {
   );
 }
 
-async function fetchDataDawn(symbol) {
-  const payload = await fetchJson(buildDataDawnUrl(symbol), 'OpenRegs fallback');
+async function fetchDataDawn(symbol, query = '') {
+  const payload = await fetchJson(buildDataDawnUrl(symbol, query), 'OpenRegs fallback');
   const rows = Array.isArray(payload)
     ? payload
     : Array.isArray(payload?.rows)
@@ -162,14 +191,17 @@ function respond(res, {
 
 export default async function handler(req, res) {
   const requestedSymbol = String(req.query?.symbol || 'NVDA').trim().toUpperCase();
-  const symbol = requestedSymbol || 'ALL';
+  const query = String(req.query?.q || '').trim();
+  const aliasSymbol = DATA_DAWN_TICKER_ALIASES[requestedSymbol] || requestedSymbol;
+  const symbol = aliasSymbol || 'ALL';
 
   res.setHeader(
     'Cache-Control',
     'public, s-maxage=300, stale-while-revalidate=900'
   );
 
-  const cachedEntry = cache.get(symbol);
+  const cacheKey = query ? symbol + '|q=' + query.toLowerCase() : symbol;
+  const cachedEntry = cache.get(cacheKey);
   if (
     cachedEntry &&
     Date.now() - cachedEntry.createdAt < CACHE_MS
@@ -187,7 +219,7 @@ export default async function handler(req, res) {
   let primaryError = null;
 
   try {
-    const rawTrades = await fetchBargo(symbol);
+    const rawTrades = query ? [] : await fetchBargo(symbol);
     const trades = rawTrades
       .map((trade, index) =>
         normalizeTrade(
@@ -201,7 +233,7 @@ export default async function handler(req, res) {
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
     const createdAt = Date.now();
-    cache.set(symbol, {
+    cache.set(cacheKey, {
       createdAt,
       trades,
       provider: 'bargo',
@@ -220,7 +252,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const trades = (await fetchDataDawn(symbol))
+    const trades = (await fetchDataDawn(symbol, query))
       .filter((trade) => trade.stockSymbol)
       .sort((a, b) => String(b.transactionDate).localeCompare(String(a.transactionDate)));
 
