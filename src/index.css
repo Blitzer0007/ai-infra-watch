@@ -4,7 +4,6 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  
   --color-brand-bg: #0F1115;
   --color-brand-card: #15181E;
   --color-brand-border: rgba(255, 255, 255, 0.1);
@@ -16,38 +15,42 @@
   100% { transform: translateX(-50%); }
 }
 
-/* Scrollbar customizations */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0F1115;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0F1115; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
 
-/* Keep the active page title/header visible while the page body scrolls.
-   The offset accounts for the global ticker and the mobile navigation bar. */
 .aiw-page-header {
   position: sticky;
   top: 2rem;
   z-index: 30;
-  margin-top: -0.25rem;
-  padding-top: 0.25rem;
+  margin-top: -.25rem;
+  padding-top: .25rem;
   padding-bottom: 1rem;
-  background: rgba(15, 17, 21, 0.96);
+  background: rgba(15,17,21,.96);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
+html { background: #0F1115; }
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+button, a { touch-action: manipulation; }
+
 @media (max-width: 1023px) {
-  .aiw-page-header {
-    top: 4rem;
+  .aiw-page-header { top: calc(4rem + env(safe-area-inset-top)); }
+  main {
+    padding-left: max(.75rem, env(safe-area-inset-left));
+    padding-right: max(.75rem, env(safe-area-inset-right));
   }
+  table { min-width: 620px; }
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
 }
