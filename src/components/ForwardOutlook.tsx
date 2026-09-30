@@ -18,6 +18,7 @@ type Horizon = 5 | 20 | 60 | 120 | 252;
 type ForecastSnapshot = {
   id: string; ticker: string; createdAt: string; targetDate: string; horizon: Horizon; scenarioId: string;
   entryPrice: number; median: number; p25: number; p75: number; p10: number; p90: number;
+  modelVersion?: string;
   status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
 };
 
@@ -206,7 +207,7 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
   };
 }
 
-function conditionedReturns(history: PricePoint[], horizon: number, currentMomentum: number, currentVolatility: number): number[] {
+function conditionedReturns(history: PricePoint[], horizon: number, currentMomentum: number, currentVolatility: number, modelVersion: string): number[] {
   const candidates: { distance: number; ret: number }[] = [];
   const dailyReturns: number[] = [];
   for (let i = 1; i < history.length; i++) {
@@ -214,17 +215,48 @@ function conditionedReturns(history: PricePoint[], horizon: number, currentMomen
     const cur = history[i]?.price;
     if (prev > 0 && cur > 0) dailyReturns.push((cur / prev - 1) * 100);
   }
+  const featureValues = { m20: [] as number[], m60: [] as number[], m252: [] as number[], vol: [] as number[] };
+  const featureAt = (i: number) => {
+    const base = history[i]?.price;
+    if (!(base > 0) || i < 20) return null;
+    const ret = (days: number) => {
+      if (i < days) return 0;
+      const start = history[i - days]?.price;
+      return start > 0 ? (base / start - 1) * 100 : 0;
+    };
+    const window = dailyReturns.slice(Math.max(0, i - 20), i);
+    return { m20: ret(20), m60: ret(60), m252: ret(252), vol: stdev(window) * Math.sqrt(252) };
+  };
+  const current = featureAt(history.length - 1);
+  if (!current) return [];
+  for (let i = Math.max(60, history.length - 500); i < history.length; i++) {
+    const f = featureAt(i);
+    if (f) { featureValues.m20.push(f.m20); featureValues.m60.push(f.m60); featureValues.m252.push(f.m252); featureValues.vol.push(f.vol); }
+  }
+  const scales = {
+    m20: Math.max(stdev(featureValues.m20), 0.25),
+    m60: Math.max(stdev(featureValues.m60), 0.25),
+    m252: Math.max(stdev(featureValues.m252), 0.25),
+    vol: Math.max(stdev(featureValues.vol), 0.25)
+  };
 
   for (let i = 60; i + horizon < history.length; i++) {
     const base = history[i]?.price;
     const future = history[i + horizon]?.price;
     if (!(base > 0 && future > 0)) continue;
-
-    const momentumStart = history[i - 20]?.price;
-    const momentum = momentumStart > 0 ? (base / momentumStart - 1) * 100 : 0;
-    const window = dailyReturns.slice(Math.max(0, i - 20), i);
-    const volatility = stdev(window) * Math.sqrt(252);
-    const distance = Math.abs(momentum - currentMomentum) + Math.abs(volatility - currentVolatility) * 0.7;
+    const f = featureAt(i);
+    if (!f) continue;
+    let distance: number;
+    if (modelVersion === 'analogue-v2') {
+      distance = Math.sqrt(
+        ((f.m20 - current.m20) / scales.m20) ** 2 +
+        ((f.m60 - current.m60) / scales.m60) ** 2 +
+        0.5 * ((f.m252 - current.m252) / scales.m252) ** 2 +
+        0.8 * ((f.vol - current.vol) / scales.vol) ** 2
+      );
+    } else {
+      distance = Math.abs(f.m20 - currentMomentum) + Math.abs(f.vol - currentVolatility) * 0.7;
+    }
     candidates.push({ distance, ret: (future / base - 1) * 100 });
   }
 
@@ -240,6 +272,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [error, setError] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<Horizon>(20);
   const [scenarioId, setScenarioId] = useState('base');
+  const [modelVersion, setModelVersion] = useState('analogue-v1');
+  const [modelConfig, setModelConfig] = useState<any>(null);
   const [jevLoading, setJevLoading] = useState(false);
   const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number } | null>(null);
   const [jevError, setJevError] = useState<string | null>(null);
@@ -285,6 +319,28 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     loadPersistentForecasts();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadModel() {
+      try {
+        const response = await fetch('/api/forecast-model-evaluation?ticker=' + encodeURIComponent(selectedStock) + '&horizon=' + horizon);
+        if (!response.ok) throw new Error('Model configuration unavailable');
+        const body = await response.json();
+        if (!cancelled) {
+          setModelVersion(body?.model || 'analogue-v1');
+          setModelConfig(body?.config || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setModelVersion('analogue-v1');
+          setModelConfig(null);
+        }
+      }
+    }
+    loadModel();
+    return () => { cancelled = true; };
+  }, [selectedStock, horizon]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,7 +395,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
   const analysis = useMemo(() => {
     const all = forwardReturns(history, horizon);
-    const analogues = conditionedReturns(history, horizon, metrics.momentum, metrics.volatility);
+    const analogues = conditionedReturns(history, horizon, metrics.momentum, metrics.volatility, modelVersion);
     const base = analogues.length >= 8 ? analogues : all;
     const scenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
     const shift = scenario.adjustment * Math.max(1, stdev(base));
@@ -352,7 +408,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     const positive = adjusted.length ? adjusted.filter(v => v > 0).length / adjusted.length : 0;
     const confidence = adjusted.length >= 20 ? 'Moderate' : adjusted.length >= 8 ? 'Low–Moderate' : 'Insufficient';
     return { sample: adjusted, median, p10, p25, p75, p90, positive, confidence, analogueCount: analogues.length, allCount: all.length };
-  }, [history, horizon, metrics.momentum, metrics.volatility, scenarioId]);
+  }, [history, horizon, metrics.momentum, metrics.volatility, scenarioId, modelVersion]);
 
   const selectedScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
   const meta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', logoColor: '#22c55e' };
@@ -419,7 +475,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     if (!currentPrice || !history.length || analysis.confidence === 'Insufficient') return;
     const snapshot: ForecastSnapshot = {
       id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
-      targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice,
+      targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
       median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending'
     };
     try {
@@ -823,6 +879,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>}
               </div>
               <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
+              <div className="text-[9px] font-mono text-violet-200/60 uppercase">Active forecast model: {modelVersion}{modelConfig?.validation_tests ? ' · validated on ' + modelConfig.validation_tests + ' tests' : ''}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Directional</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
