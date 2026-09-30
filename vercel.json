@@ -6,11 +6,7 @@
   "crons": [
     {
       "path": "/api/forecast-verification",
-      "schedule": "30 22 * * 1-5"
-    },
-    {
-      "path": "/api/forecast-model-evaluation",
-      "schedule": "0 23 * * 0"
+      "schedule": "30 22 * * *"
     }
   ],
   "functions": {
@@ -27,7 +23,7 @@
     "api/earnings-alerts.js": {
       "maxDuration": 30
     },
-    "api/forecast-model-evaluation.js": {
+    "api/forecast-verification.js": {
       "maxDuration": 60
     }
   }
