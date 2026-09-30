@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "crons": [
     {
-      "path": "/api/forecast-verification-cron",
+      "path": "/api/forecast-verification",
       "schedule": "30 22 * * 1-5"
     }
   ],
