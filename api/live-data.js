@@ -246,6 +246,12 @@ async function news() {
   }));
 }
 
+function freshnessSeconds(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? Math.max(0, Math.round((Date.now() - time) / 1000)) : null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
   if (cached && Date.now() - cachedAt < CACHE_MS && !(req.query && req.query.refresh === 'true')) {
@@ -271,7 +277,8 @@ export default async function handler(req, res) {
       source: Object.values(stockPrices)[0]?.source || null,
       provider: Object.values(stockPrices)[0]?.provider || null,
       retrievedAt: new Date().toISOString(),
-      stale: Object.values(stockPrices).some((item) => item?.stale === true)
+      stale: Object.values(stockPrices).some((item) => item?.stale === true),
+      freshnessSeconds: Object.values(stockPrices)[0]?.asOf ? freshnessSeconds(Object.values(stockPrices)[0].asOf) : null
     },
     contracts: {
       status: 'PENDING',
@@ -280,7 +287,8 @@ export default async function handler(req, res) {
     news: {
       status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND',
       count: currentNews.length,
-      source: 'GDELT'
+      source: 'GDELT',
+      freshnessSeconds: currentNews.length ? freshnessSeconds(currentNews[0]?.date) : null
     },
     political: {
       status: 'NOT_FOUND',
@@ -300,8 +308,8 @@ export default async function handler(req, res) {
   const contracts = await fetchSecContracts();
   const congressTrades = await fetchCongressTrades(req);
   const politicalSignalsResult = await politicalSignals().catch(() => []);
-  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR' };
-  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage' };
+  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR', freshnessSeconds: contracts.length ? freshnessSeconds(contracts[0]?.dateSigned) : null };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', freshnessSeconds: politicalSignalsResult.length ? freshnessSeconds(politicalSignalsResult[0]?.date) : null };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API' };
 
   const data = {

@@ -23,6 +23,8 @@ from app.mcp_client.client import MCPClientError
 from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
+from app.jev.evidence import evidence_health
+from app.jev.evidence import evidence_health
 
 
 @dataclass
@@ -369,6 +371,43 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(families))
 
 
+
+FRESHNESS_WINDOWS_SECONDS = {"market":3600,"news":172800,"sec":1209600,"earnings":1209600,"event_study":604800,"congress":2592000,"macro":604800}
+
+def _normalize_evidence(question: str, calls: list[ToolCallRecord]) -> list[dict[str, Any]]:
+    import time
+    from datetime import datetime
+    out=[]
+    for call in calls:
+        if not call.ok: continue
+        family=_evidence_family(call.tool)
+        raw=call.output if isinstance(call.output, list) else [call.output]
+        for item in raw[:30]:
+            if not isinstance(item, dict): continue
+            stamp=next((item.get(k) for k in ("publishedAt","published_at","date","datetime","timestamp","asOf","as_of","retrievedAt","retrieved_at") if item.get(k) is not None),None)
+            try:
+                ts=float(stamp)/(1000 if float(stamp)>10000000000 else 1) if isinstance(stamp,(int,float)) else datetime.fromisoformat(str(stamp).replace("Z","+00:00")).timestamp()
+                age=max(0,time.time()-ts)
+            except Exception:
+                age=None
+            claim=str(item.get("claim") or item.get("status") or item.get("event") or item.get("title") or item.get("details") or item.get("description") or "")[:500]
+            out.append({"family":family,"tool":call.tool,"source":item.get("source") or item.get("provider") or call.tool,"provider":item.get("provider"),"publishedAt":stamp,"freshnessSeconds":round(age,1) if age is not None else None,"stale":bool(age is not None and age>FRESHNESS_WINDOWS_SECONDS.get(family,604800)),"evidenceType":item.get("evidenceType") or family,"ticker":item.get("ticker") or item.get("symbol") or item.get("company"),"claimKey":item.get("claimKey") or item.get("claim_key") or item.get("id"),"claim":claim,"url":item.get("url") or item.get("link")})
+    return out
+
+def _detect_evidence_conflicts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups={}
+    for item in items:
+        text=str(item.get("claim") or "").lower()
+        status="negative" if any(x in text for x in ("cancelled","canceled","terminated","delayed","postponed","rejected","denied")) else "positive" if any(x in text for x in ("signed","executed","entered into","announced","awarded","approved","completed","effective")) else None
+        if not status: continue
+        key=str(item.get("claimKey") or item.get("ticker") or item.get("claim") or "").lower()[:180]
+        groups.setdefault(key,[]).append((status,item))
+    conflicts=[]
+    for key, values in groups.items():
+        if any(s=="positive" for s,_ in values) and any(s=="negative" for s,_ in values) and len({x["family"] for _,x in values})>1:
+            conflicts.append({"status":"CONFLICT","claimKey":key,"severity":"material","needsVerification":True,"claims":[x for _,x in values[:4]]})
+    return conflicts[:10]
+
 def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[str, Any]:
     """Build a typed availability matrix from the actual MCP trajectory."""
     expected = _required_evidence_families(question)
@@ -399,9 +438,15 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     """Run one batched Jev assessment and record the typed gate decision."""
     successful = [call for call in calls if call.ok]
     availability = _evidence_availability(question, calls)
+    normalized_evidence = _normalize_evidence(question, calls)
+    conflicts = _detect_evidence_conflicts(normalized_evidence)
+    health = {"freshness": normalized_evidence, "staleCount": sum(1 for item in normalized_evidence if item.get("stale")), "conflicts": conflicts, "hasMaterialConflict": bool(conflicts)}
     state = {
         "question": question,
         "evidence_availability": availability,
+        "evidence_freshness": health["freshness"][:80],
+        "stale_count": health["staleCount"],
+        "conflicts": health["conflicts"],
         "successful_calls": [
             {
                 "tool": call.tool,
@@ -427,6 +472,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         "action": "continue",
         "fallback": not evaluation.usable,
         "evidence_availability": availability,
+        "evidence_freshness": {"stale_count": health["staleCount"], "item_count": len(health["freshness"])},
+        "conflicts": health["conflicts"],
     }
     if not evaluation.usable:
         gate["error"] = evaluation.error or "Jev evidence gate unavailable"
@@ -440,14 +487,22 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
 
         # Only allow an early stop when Jev explicitly selects stop and the
         # evidence-quality score reaches the Usable/Strong boundary.
-        if (
+        if health["hasMaterialConflict"]:
+            decision = "resolve_conflict"
+        elif (
             choice == "stop"
             and isinstance(score, (int, float))
             and score >= 2.25
             and (confidence is None or confidence >= 0.50)
             and availability["complete"]
+            and not health["hasMaterialConflict"]
+            and health["staleCount"] == 0
         ):
             decision = "stop"
+        elif health["hasMaterialConflict"]:
+            decision = "resolve_conflict"
+        elif health["staleCount"] > 0:
+            decision = "gather_more"
         elif choice in {"gather_more", "resolve_conflict"} or not availability["complete"]:
             decision = "gather_more"
         elif isinstance(score, (int, float)) and score < 1.50:
@@ -466,9 +521,14 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                     if isinstance(score, (int, float))
                     else None
                 ),
+                "stale_count": health["staleCount"],
+                "conflicts": health["conflicts"],
                 "model": evaluation.model,
                 "latency_ms": round(evaluation.latency_ms, 1),
                 "input_tokens": evaluation.input_tokens,
+                "evidence_health": health,
+                "conflicts": health["conflicts"],
+                "freshness": health["freshness"],
             }
         )
     return decision, gate

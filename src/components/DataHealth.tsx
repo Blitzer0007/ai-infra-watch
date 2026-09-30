@@ -31,6 +31,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const available = entries.filter(([, item]) => item?.status === 'AVAILABLE' && !item?.stale).length;
   const stale = entries.filter(([, item]) => item?.stale || item?.status === 'STALE').length;
   const missing = entries.filter(([, item]) => item?.status === 'NOT_FOUND').length;
+  const conflicts = entries.reduce((sum, [, item]) => sum + Number(item?.conflictCount || 0), 0);
+  const conflicts = entries.reduce((sum, [, item]) => sum + Number(item?.conflictCount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -51,6 +53,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <Metric label="Available" value={available} icon={<ShieldCheck className="w-4 h-4"/>}/>
         <Metric label="Stale / fallback" value={stale} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden">
@@ -66,7 +70,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <div className="text-[9px] text-white/30 mt-1">
                   {item?.count != null ? item.count + ' evidence items' : ''}
                   {item?.source ? ' · ' + item.source : ''}
-                  {item?.provider ? ' · provider: ' + item.provider : ''}
+                  {item?.provider ? ' · provider: ' + item.provider : ''}{item?.freshnessSeconds != null ? ' · age: ' + formatAge(item.freshnessSeconds) : ''}{item?.conflictCount ? ' · conflicts: ' + item.conflictCount : ''}
                 </div>
               </div>
               <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + statusClass(status, item?.stale)}>
@@ -88,6 +92,13 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       </div>
     </div>
   );
+}
+
+function formatAge(seconds: number) {
+  if (seconds < 60) return Math.round(seconds) + 's';
+  if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+  if (seconds < 86400) return Math.round(seconds / 3600) + 'h';
+  return Math.round(seconds / 86400) + 'd';
 }
 
 function Metric({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
