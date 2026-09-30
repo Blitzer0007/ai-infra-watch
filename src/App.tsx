@@ -220,7 +220,11 @@ export default function App() {
     handleFetchLiveData(false);
 
     const interval = setInterval(updateTicker, 45000);
-    return () => clearInterval(interval);
+    const feedInterval = setInterval(() => handleFetchLiveData(false), 300000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(feedInterval);
+    };
   }, []);
 
   const handleNavigate = (view: string) => {
