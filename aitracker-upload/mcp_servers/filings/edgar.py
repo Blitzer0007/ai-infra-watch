@@ -291,6 +291,8 @@ class LiveEdgarClient:
         self.base_delay = base_delay
         self.timeout = timeout
         self.min_interval = min_interval
+        self.gateway_url = os.getenv("EDGAR_GATEWAY_URL", "").strip()
+        self.gateway_token = os.getenv("EDGAR_GATEWAY_TOKEN", "").strip()
         self._tickers: dict[str, str] | None = None
         self._last_call = 0.0
 
@@ -303,15 +305,45 @@ class LiveEdgarClient:
             time.sleep(self.min_interval - elapsed)
         self._last_call = time.monotonic()
 
+    def _gateway_target(self, url: str) -> str | None:
+        """Translate supported SEC URLs to the optional Vercel SEC gateway."""
+        if not self.gateway_url:
+            return None
+
+        if url == "https://www.sec.gov/files/company_tickers.json":
+            resource = {"resource": "tickers"}
+        elif url.startswith("https://data.sec.gov/submissions/CIK"):
+            cik = url.rsplit("/CIK", 1)[-1].removesuffix(".json")
+            if not cik.isdigit():
+                return None
+            resource = {"resource": "submissions", "cik": cik}
+        elif url.startswith("https://data.sec.gov/api/xbrl/companyfacts/CIK"):
+            cik = url.rsplit("/CIK", 1)[-1].removesuffix(".json")
+            if not cik.isdigit():
+                return None
+            resource = {"resource": "companyfacts", "cik": cik}
+        elif url.startswith("https://www.sec.gov/Archives/edgar/data/"):
+            resource = {"resource": "archive", "url": url}
+        else:
+            return None
+
+        from urllib.parse import urlencode
+        return self.gateway_url + ("&" if "?" in self.gateway_url else "?") + urlencode(resource)
+
     def _get(self, url: str) -> httpx.Response:
         if not self.user_agent:
             raise EdgarError("NO_UA", "EDGAR requires a descriptive User-Agent")
         last_exc: Exception | None = None
+        request_url = self._gateway_target(url) or url
+        request_headers = self._headers()
+        if request_url != url and self.gateway_token:
+            request_headers["Authorization"] = "Bearer " + self.gateway_token
+
         for attempt in range(self.max_retries + 1):
             self._throttle()
             try:
-                with httpx.Client(timeout=self.timeout, headers=self._headers()) as client:
-                    resp = client.get(url)
+                with httpx.Client(timeout=self.timeout, headers=request_headers) as client:
+                    resp = client.get(request_url)
                 if resp.status_code == 429:
                     if attempt < self.max_retries:
                         time.sleep(self.base_delay * (2 ** attempt))
