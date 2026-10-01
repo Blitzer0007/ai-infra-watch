@@ -178,6 +178,7 @@ export default function UnifiedEventTimeline({
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [spy, setSpy] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [kindFilter, setKindFilter] = useState<'ALL' | TimelineEvent['kind']>('ALL');
 
   useEffect(() => {
     let cancelled = false;
@@ -276,12 +277,17 @@ export default function UnifiedEventTimeline({
       .filter(event => event.date <= new Date().toISOString().slice(0, 10))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 16);
-  }, [symbol, secEvents, contracts, congressTrades, macroRisks, news]);
+  }, [symbol, secEvents, contracts, congressTrades, macroRisks, news, politicalSignals]);
 
-  const rows = useMemo(() => events.map(event => ({
+  const filteredEvents = useMemo(
+    () => kindFilter === 'ALL' ? events : events.filter(event => event.kind === kindFilter),
+    [events, kindFilter],
+  );
+
+  const rows = useMemo(() => filteredEvents.map(event => ({
     event,
     reaction: eventReaction(history, spy, event.date),
-  })), [events, history, spy]);
+  })), [filteredEvents, history, spy]);
 
   const matched = rows.filter(row => row.reaction);
   const avgT1 = matched.length
@@ -290,6 +296,36 @@ export default function UnifiedEventTimeline({
   const avgRel = matched.length
     ? matched.map(row => row.reaction!.relativeT1).filter((x): x is number => x != null).reduce((sum, x, _, arr) => sum + x / arr.length, 0)
     : null;
+
+  const impactMatrix = useMemo(() => {
+    const kinds: TimelineEvent['kind'][] = ['Contract', 'SEC', 'Earnings', 'Political', 'Congress', 'Macro', 'News'];
+    return kinds
+      .map(kind => {
+        const kindRows = events
+          .filter(event => event.kind === kind)
+          .map(event => ({ event, reaction: eventReaction(history, spy, event.date) }));
+        const kindMatched = kindRows.filter(row => row.reaction);
+        const t1 = kindMatched
+          .map(row => row.reaction?.t1 ?? null)
+          .filter((value): value is number => value != null);
+        const rel = kindMatched
+          .map(row => row.reaction?.relativeT1 ?? null)
+          .filter((value): value is number => value != null);
+        return {
+          kind,
+          events: kindRows.length,
+          matched: kindMatched.length,
+          avgT1: t1.length ? t1.reduce((sum, value) => sum + value, 0) / t1.length : null,
+          avgRelativeT1: rel.length ? rel.reduce((sum, value) => sum + value, 0) / rel.length : null,
+        };
+      })
+      .filter(item => item.events > 0);
+  }, [events, history, spy]);
+
+  const availableKinds = useMemo(
+    () => Array.from(new Set(events.map(event => event.kind))),
+    [events],
+  );
 
   return (
     <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
@@ -301,13 +337,66 @@ export default function UnifiedEventTimeline({
           </div>
           <h2 className="text-lg font-black mt-1">What happened → Evidence → What followed</h2>
           <p className="text-[10px] text-white/35 mt-1 max-w-3xl">
-            Aligns SEC events, contracts, public transaction disclosures, macro indicators and matched news with T+1 / T+5 / T+20 market reactions. These are descriptive post-event windows, not causal attribution.
+            Aligns SEC events, contracts, earnings, political/policy signals, public transaction disclosures, macro indicators and matched news with T+1 / T+5 / T+20 market reactions. These are descriptive post-event windows, not causal attribution.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 min-w-[230px]">
           <Metric label="Events" value={String(events.length)} />
           <Metric label="Reactions matched" value={String(matched.length)} />
         </div>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-white/5 bg-white/[.02] p-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Cross-signal impact matrix</div>
+            <div className="text-[10px] text-white/35 mt-1">
+              Compare observed post-event reactions by evidence type. Averages describe historical associations only; they do not identify a causal winner.
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {['ALL', ...availableKinds].map(kind => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => setKindFilter(kind as 'ALL' | TimelineEvent['kind'])}
+                className={
+                  'rounded border px-2 py-1 text-[8px] font-mono uppercase ' +
+                  (kindFilter === kind
+                    ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                    : 'border-white/10 bg-white/[.02] text-white/35 hover:text-white/60')
+                }
+              >
+                {kind === 'ALL' ? 'All signals' : kind}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!impactMatrix.length ? (
+          <div className="mt-3 text-[9px] font-mono text-white/25">No cross-signal history is available yet.</div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+            {impactMatrix.map(item => (
+              <div key={item.kind} className="rounded-lg border border-white/5 bg-black/10 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[8px] font-mono font-black uppercase text-white/55">{item.kind}</span>
+                  <span className="text-[8px] font-mono text-white/20">{item.matched}/{item.events} matched</span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[7px] font-mono uppercase text-white/25">Avg T+1</div>
+                    <div className={'text-sm font-black mt-0.5 ' + tone(item.avgT1)}>{fmt(item.avgT1)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] font-mono uppercase text-white/25">Vs SPY</div>
+                    <div className={'text-sm font-black mt-0.5 ' + tone(item.avgRelativeT1)}>{fmt(item.avgRelativeT1)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading && (
