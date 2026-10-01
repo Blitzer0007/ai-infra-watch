@@ -18,7 +18,6 @@ from mcp_servers.stocks.earnings import EarningsService
 from mcp_servers.stocks.event_study import EventStudyService
 from mcp_servers.stocks.candles import CandleService
 from mcp_servers.stocks.relationships import from_env as relationships_from_env
-from app.agents.rotation import RotationAgent
 from mcp_servers.filings.service import FilingsService
 from mcp_servers.filings.milestones import MilestoneService
 from mcp_servers.filings.contracts import ContractService
@@ -110,6 +109,7 @@ class InProcessMCPToolbox:
         if key == "stocks.get_earnings":
             return self._earnings.get_earnings(str(args.get("symbol", ""))).model_dump()
         if key == "stocks.get_rotation":
+            from app.agents.rotation import RotationAgent
             return RotationAgent(service=self._candles).run().model_dump()
         if key == "stocks.get_event_study":
             return self._event_study.get_study(str(args.get("symbol", "")))
