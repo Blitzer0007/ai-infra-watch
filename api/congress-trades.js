@@ -251,6 +251,9 @@ export default async function handler(req, res) {
         const member = String(trade.politician || '').toUpperCase();
         return trade.stockSymbol === mappedTicker || member.includes(needle);
       });
+      if (!trades.length) {
+        throw new Error('No Bargo matches for search; use OpenRegs fallback');
+      }
     }
 
     const createdAt = Date.now();
