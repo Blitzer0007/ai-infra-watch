@@ -106,20 +106,27 @@ export default function AutonomousResearch() {
   const [busy, setBusy] = useState(false);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [backendMessage, setBackendMessage] = useState('');
+  const [mcpReady, setMcpReady] = useState<boolean | null>(null);
 
   const checkBackend = async () => {
     try {
-      const res = await fetch('/api/agent-ask', { method: 'GET' });
+      const res = await fetch('/api/agent-ask?probe_mcp=true', { method: 'GET' });
       const body = await res.json().catch(() => ({}));
-      const online = res.ok && (body?.ok === true || body?.status === 'ok');
+      const online = res.ok && (body?.ok === true || body?.status === 'ok' || body?.status === 'degraded');
       setBackendOnline(online);
+      setMcpReady(typeof body?.mcp_ready === 'boolean' ? body.mcp_ready : null);
       setBackendMessage(
         online
-          ? body?.service || 'Autonomous backend online'
+          ? body?.mcp_ready === true
+            ? 'Autonomous backend online · MCP ready'
+            : body?.mcp_probe_error
+              ? 'Autonomous backend online · MCP unavailable'
+              : body?.service || 'Autonomous backend online'
           : body?.error || 'Autonomous backend is not connected'
       );
     } catch {
       setBackendOnline(false);
+      setMcpReady(false);
       setBackendMessage('Unable to reach the autonomous backend proxy');
     }
   };
@@ -182,11 +189,18 @@ export default function AutonomousResearch() {
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-wider">
             <span className={`w-2 h-2 rounded-full ${backendOnline === true ? 'bg-emerald-400' : backendOnline === false ? 'bg-rose-400' : 'bg-yellow-400 animate-pulse'}`} />
             <span className="text-white/70">
               {backendOnline === true ? 'AGENT BACKEND ONLINE' : backendOnline === false ? 'AGENT BACKEND OFFLINE' : 'CHECKING AGENT BACKEND'}
             </span>
+            {mcpReady != null && (
+              <span className={'rounded border px-2 py-0.5 text-[8px] ' + (mcpReady
+                ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-300'
+                : 'border-amber-400/20 bg-amber-400/10 text-amber-300')}>
+                MCP {mcpReady ? 'READY' : 'UNAVAILABLE'}
+              </span>
+            )}
           </div>
           <button
             onClick={() => void checkBackend()}
