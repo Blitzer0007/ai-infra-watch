@@ -91,7 +91,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6">
-      <div className="aiw-page-header flex flex-wrap items-end justify-between gap-3">
+      <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>
           <div className="text-2xl font-black mt-2">Portfolio + Watchlist Decision Lab</div>
@@ -102,14 +102,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <span className="px-2 py-1 rounded-full border border-white/10">ADD REVIEWS {addReviews}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">RISK REVIEWS {riskReviews}</span>
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        {([['overview','Overview'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
-          <button key={x[0]} onClick={() => setTab(x[0])} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
-            {x[1]}
-          </button>
-        )}
       </div>
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
@@ -158,6 +150,29 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       </section>
 
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
+        <Metric label="Invested cost" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
+        <Metric label="Current value" value={liveCurrentTotal != null ? '$' + liveCurrentTotal.toFixed(2) : '—'} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' stale'} tone="up" icon={<TrendingUp/>}/>
+        <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '') + '$' + liveUnrealized.toFixed(2) : '—'} suffix={liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : ''} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
+        <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
+        <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
+      </div>
+
+      <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
+        <span className="font-mono text-white/65 uppercase mr-2">BROKER SNAPSHOT</span>
+        {PORTFOLIO_AS_OF} · 1D {PORTFOLIO_SNAPSHOT.oneDayReturn >= 0 ? '+' : ''}{'$'}{PORTFOLIO_SNAPSHOT.oneDayReturn.toFixed(2)} ({PORTFOLIO_SNAPSHOT.oneDayPct.toFixed(2)}%) · buying power {'$'}{PORTFOLIO_SNAPSHOT.buyingPower.toFixed(2)}
+      </div>
+
+
+
+      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
+        {([['overview','Overview'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
+          <button key={x[0]} onClick={() => setTab(x[0])} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
+            {x[1]}
+          </button>
+        )}
+      </div>
+
       <PortfolioSignalFusion
         prices={livePrices}
         contracts={contracts}
@@ -173,21 +188,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         macroRisks={macroRisks}
         news={news}
       />
-
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
-        <Metric label="Invested cost" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
-        <Metric label="Current value" value={liveCurrentTotal != null ? '$' + liveCurrentTotal.toFixed(2) : '—'} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' stale'} tone="up" icon={<TrendingUp/>}/>
-        <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '') + '$' + liveUnrealized.toFixed(2) : '—'} suffix={liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : ''} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
-        <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
-        <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
-      </div>
-
-      <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
-        <span className="font-mono text-white/65 uppercase mr-2">BROKER SNAPSHOT</span>
-        {PORTFOLIO_AS_OF} · 1D {PORTFOLIO_SNAPSHOT.oneDayReturn >= 0 ? '+' : ''}{'$'}{PORTFOLIO_SNAPSHOT.oneDayReturn.toFixed(2)} ({PORTFOLIO_SNAPSHOT.oneDayPct.toFixed(2)}%) · buying power {'$'}{PORTFOLIO_SNAPSHOT.buyingPower.toFixed(2)}
-      </div>
-
-
 
       {tab === 'overview' && (
         <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-4">
