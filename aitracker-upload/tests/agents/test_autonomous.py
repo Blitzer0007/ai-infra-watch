@@ -35,6 +35,51 @@ def _toolbox():
     return tb, session
 
 
+def _complete_gate_toolbox():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_quote",
+                description="Get a current quote.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_snapshot",
+                description="Get a market snapshot.",
+                input_schema={"properties": {}, "required": []},
+            ),
+            dict(
+                name="search",
+                description="Search recent company news.",
+                input_schema={
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+            dict(
+                name="get_filings",
+                description="Get recent SEC filings.",
+                input_schema={"properties": {}, "required": []},
+            ),
+        ],
+        call_returns={
+            "get_quote": {"symbol": "AMD", "price": 180.0},
+            "get_snapshot": {"symbol": "AMD", "volume": 1000},
+            "search": {"query": "Analyze AMD today", "hits": [{"title": "AMD update"}]},
+            "get_filings": {"filings": [{"form": "8-K", "symbol": "AMD"}]},
+        },
+    )
+    tb = MCPToolbox(
+        [_cfg("stocks"), _cfg("news"), _cfg("filings")],
+        _factory({"stocks": session, "news": session, "filings": session}),
+    )
+    tb.connect()
+    return tb, session
+
+
 def test_autonomous_planner_can_choose_tool_and_finalize():
     tb, session = _toolbox()
     plans = [
@@ -389,10 +434,12 @@ def test_jev_low_evidence_quality_forces_another_source():
     finally:
         tb.close()
 
+    # The gate now requires the default market + news + SEC evidence families.
+    # This fixture has no SEC tool, so the run must remain explicitly insufficient.
     assert gate.calls == 2
-    assert result.jev["evidence_gate"]["action"] == "stop"
+    assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert result.jev["evidence_gate"]["checks"] == 2
-    assert result.resolution == "jev_evidence_sufficient"
+    assert result.resolution == "jev_evidence_insufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
@@ -437,15 +484,16 @@ def test_duplicate_planner_call_redirects_to_complementary_evidence():
 
     assert [call.tool for call in result.calls] == ["stocks.get_quote", "news.search"]
     assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
-    assert result.resolution == "jev_evidence_sufficient"
+    assert result.resolution == "jev_evidence_insufficient"
+    assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert any(
         step.node == "plan" and "complementary evidence source" in step.note
         for step in result.trajectory.steps
     )
 
 
-def test_jev_strong_evidence_can_stop_before_step_bound():
-    tb, session = _gate_toolbox()
+def test_jev_strong_evidence_can_stop_when_required_families_are_complete():
+    tb, session = _complete_gate_toolbox()
     gate = _GateJev([("stop", 3.0)])
     plans = [
         {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
@@ -464,10 +512,16 @@ def test_jev_strong_evidence_can_stop_before_step_bound():
     finally:
         tb.close()
 
-    assert gate.calls == 1
+    assert gate.calls == 2
     assert result.jev["evidence_gate"]["action"] == "stop"
     assert result.resolution == "jev_evidence_sufficient"
-    assert len(result.calls) == 2
+    assert len(result.calls) == 4
+    assert [call.tool for call in result.calls] == [
+        "stocks.get_quote",
+        "stocks.get_snapshot",
+        "news.search",
+        "filings.get_filings",
+    ]
 
 
 def test_jev_repeated_gather_more_ends_as_insufficient():
