@@ -36,6 +36,7 @@ class InProcessMCPToolbox:
         from mcp_servers.filings.milestones import MilestoneService
         from mcp_servers.filings.contracts import ContractService
         from mcp_servers.news.service import NewsService
+        from mcp_servers.news.providers import from_env as news_provider_from_env
 
         self._stocks = StockService.from_env(mode)
         self._earnings = EarningsService.from_env(mode)
@@ -44,7 +45,7 @@ class InProcessMCPToolbox:
         self._relationships_from_env = None
         self._milestones = MilestoneService.from_env("live")
         self._contracts = ContractService.from_env("live")
-        self._news = NewsService.from_env("live" if self.live else "fixture")
+        self._news = NewsService(news_provider_from_env("live" if self.live else "fixture"))
         self._tool_map: dict[str, ToolInfo] = {}
         self._register()
 
