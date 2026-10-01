@@ -451,7 +451,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
       <div className="text-[10px] text-white/25 mt-1">Qty {h.quantity.toFixed(6)} · Avg {'$'}{h.averageCost.toFixed(2)} · Snapshot P&L {h.pnlPct >= 0 ? '+' : ''}{h.pnlPct.toFixed(2)}%</div>
     </div><div className="text-right shrink-0">
-      <div className="font-bold text-sm">{h.livePrice != null ? '
+      <div className="font-bold text-sm">{h.livePrice != null ? '</div>
       <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
       <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
     </div></div>
@@ -485,7 +485,7 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
   </div>;
 }
 
- + h.livePrice.toFixed(2) : h.quantity > 0 ? '
+ + h.livePrice.toFixed(2) : h.quantity > 0 ? '</div>
       <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
       <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
     </div></div>
