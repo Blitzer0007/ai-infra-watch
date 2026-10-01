@@ -32,6 +32,14 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const stale = entries.filter(([, item]) => item?.stale || item?.status === 'STALE').length;
   const missing = entries.filter(([, item]) => item?.status === 'NOT_FOUND').length;
 
+  const freshness = (item: any) => {
+    if (!item?.retrievedAt) return null;
+    const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
+    if (!Number.isFinite(ageMs)) return null;
+    const ageMinutes = Math.round(ageMs / 60000);
+    return ageMinutes < 1 ? 'just now' : ageMinutes + 'm ago';
+  };
+
   return (
     <div className="space-y-6">
       <div className="aiw-page-header flex flex-wrap items-end justify-between gap-3">
@@ -67,6 +75,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                   {item?.count != null ? item.count + ' evidence items' : ''}
                   {item?.source ? ' · ' + item.source : ''}
                   {item?.provider ? ' · provider: ' + item.provider : ''}
+                  {freshness(item) ? ' · retrieved ' + freshness(item) : ''}
+                  {item?.refreshIntervalSeconds ? ' · auto-refresh ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
                 </div>
               </div>
               <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + statusClass(status, item?.stale)}>
@@ -84,7 +94,10 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       </div>
 
       <div className="text-[9px] font-mono text-white/25">
-        Last live-data refresh: {timestamp ? new Date(timestamp).toLocaleString() : 'not available'}
+        <div className="text-[9px] font-mono text-white/25 space-y-1">
+          <div>Last live-data refresh: {timestamp ? new Date(timestamp).toLocaleString() : 'not available'}</div>
+          <div>Automatic refresh cadence: feeds 5m · market quotes 60s · manual refresh bypasses server cache.</div>
+        </div>
       </div>
     </div>
   );

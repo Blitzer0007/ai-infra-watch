@@ -323,10 +323,13 @@ export default async function handler(req, res) {
     fetchCongressTrades(req),
     politicalSignals().catch(() => []),
   ]);
-  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT' };
-  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR' };
-  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage' };
-  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API' };
+  const feedRetrievedAt = new Date().toISOString();
+  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.market = { ...evidenceAvailability.market, retrievedAt: Object.values(stockPrices).reduce((latest, item) => item?.retrievedAt && item.retrievedAt > latest ? item.retrievedAt : latest, ''), refreshIntervalSeconds: 60 };
 
   const data = {
     build: {
