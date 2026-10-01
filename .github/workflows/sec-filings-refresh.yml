@@ -44,7 +44,7 @@ jobs:
       - name: Export contract intelligence
         working-directory: aitracker-upload
         env:
-          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT }}
+          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)' }}
         run: |
           python scripts/export_contracts.py --watchlist --output ../data/contracts_sec.json
 
