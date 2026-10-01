@@ -340,16 +340,34 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
 
       <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl border ${verdict.color}`}>
         <div>
-          <span className="text-[9px] uppercase tracking-[0.2em] opacity-60 font-mono font-black block">Calculated System Stress Score</span>
+          <span className="text-[9px] uppercase tracking-[0.2em] opacity-60 font-mono font-black block">Calculated Scenario Stress Index</span>
           <div className="flex items-baseline gap-3 mt-1">
             <span className="text-5xl font-black font-mono">{threatScore} / 100</span>
             <span className="text-[11px] font-black tracking-widest uppercase">{verdict.label}</span>
           </div>
-          <p className="text-[9px] text-white/40 font-mono mt-2">50% TSMC disruption + 25% power grid + 25% export controls. Values are scenario inputs, not forecasts.</p>
+          <p className="text-[9px] text-white/40 font-mono mt-2">50% TSMC disruption + 25% power grid + 25% export controls. These are transparent scenario inputs, not forecasts and not model-generated probabilities.</p>
         </div>
         <div className="flex items-start gap-2 max-w-md text-[10px] text-white/40 leading-normal">
           <AlertCircle className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
-          <span>Adjust the scenario sliders below to recalculate the score.</span>
+          <span>Adjust the scenario sliders to recalculate the local stress index.</span>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.03] p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Evidence provenance</div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white mt-1">Macro &amp; Political Data Sources</h3>
+            <p className="text-[10px] text-white/35 mt-1 font-mono">
+              Risk labels and the scenario index are computed by AI Infra Watch rules. Current political signals are retrieved from GDELT, including a White House-focused query; primary badges require a whitehouse.gov result domain. No generative model is used to create the macro risk score.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[8px] font-mono uppercase tracking-wider">
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-2 text-white/45 text-center">Rule-based risk map</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-2 text-white/45 text-center">GDELT politics</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-2 text-white/45 text-center">White House primary</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-2 text-white/45 text-center">Market / SEC context</span>
+          </div>
         </div>
       </div>
 
