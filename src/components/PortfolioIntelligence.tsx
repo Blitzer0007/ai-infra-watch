@@ -7,6 +7,7 @@ import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
+import { FilterInput, FilterSelect } from './FilterControls';
 
 type Price = {
   price: number;
@@ -191,7 +192,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
         {([['overview','Overview'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
-          <button key={x[0]} onClick={() => changeTab(x[0])} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
+          <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
             {x[1]}
           </button>
         )}
@@ -207,12 +208,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             <Panel title="Held portfolio universe" subtitle="Live portfolio positions · quote freshness · model state · select a holding to update decision context">
               <div className="flex flex-wrap gap-2 mb-3">
                 <div className="relative flex-1 min-w-48">
-                  <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-white/25"/>
-                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search ticker, name or theme" className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs outline-none"/>
+                  <FilterInput
+                    value={q}
+                    onChange={e => setQ(e.target.value)}
+                    placeholder="Search ticker, name or theme"
+                    label="Search held portfolio universe by ticker, name, or theme"
+                    icon={<Search className="w-3.5 h-3.5" />}
+                  />
                 </div>
-                <select value={group} onChange={e => setGroup(e.target.value)} className="bg-[#101318] border border-white/10 rounded-lg px-3 text-xs">
+                <FilterSelect
+                  value={group}
+                  onChange={e => setGroup(e.target.value)}
+                  label="Filter held portfolio universe by group"
+                >
                   {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
-                </select>
+                </FilterSelect>
               </div>
               <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
             </Panel>
