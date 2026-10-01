@@ -25,6 +25,121 @@ async function fetchSec(url) {
   return response.json();
 }
 
+const SEC_CACHE = {
+  tickers: 'public, s-maxage=86400, stale-while-revalidate=604800',
+  submissions: 'public, s-maxage=300, stale-while-revalidate=1800',
+  archive: 'public, s-maxage=3600, stale-while-revalidate=86400',
+  companyfacts: 'public, s-maxage=86400, stale-while-revalidate=604800',
+};
+
+function secTarget(req) {
+  const resource = String(req.query?.sec || '').trim().toLowerCase();
+
+  if (resource === 'tickers') {
+    return {
+      resource,
+      url: 'https://www.sec.gov/files/company_tickers.json',
+      cacheControl: SEC_CACHE.tickers,
+    };
+  }
+
+  if (resource === 'submissions' || resource === 'companyfacts') {
+    const cik = String(req.query?.cik || '').replace(/\D/g, '');
+    if (!/^\d{1,10}$/.test(cik)) return null;
+
+    const base =
+      resource === 'submissions'
+        ? 'https://data.sec.gov/submissions/CIK'
+        : 'https://data.sec.gov/api/xbrl/companyfacts/CIK';
+
+    return {
+      resource,
+      url: base + cik.padStart(10, '0') + '.json',
+      cacheControl: SEC_CACHE[resource],
+    };
+  }
+
+  if (resource === 'archive') {
+    const raw = String(req.query?.url || '');
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      return null;
+    }
+
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.hostname !== 'www.sec.gov' ||
+      !parsed.pathname.startsWith('/Archives/edgar/data/')
+    ) {
+      return null;
+    }
+
+    return {
+      resource,
+      url: parsed.toString(),
+      cacheControl: SEC_CACHE.archive,
+    };
+  }
+
+  return null;
+}
+
+async function handleSecGateway(req, res) {
+  const configuredToken = String(
+    process.env.SEC_GATEWAY_TOKEN || process.env.AIW_CRON_SECRET || ''
+  ).trim();
+  if (!configuredToken) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'SEC gateway secret is not configured.' });
+  }
+
+  const auth = String(req.headers?.authorization || '');
+  if (auth !== 'Bearer ' + configuredToken) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(401).json({ error: 'SEC gateway authentication required.' });
+  }
+
+  const target = secTarget(req);
+  if (!target) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(400).json({
+      error: 'Supported SEC resources: tickers, submissions, companyfacts, archive.',
+    });
+  }
+
+  const userAgent =
+    String(process.env.EDGAR_USER_AGENT || '').trim() ||
+    'AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)';
+
+  try {
+    const upstream = await fetch(target.url, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept-Encoding': 'gzip, deflate',
+        Accept: target.resource === 'archive' ? 'text/html,*/*' : 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    res.setHeader('Cache-Control', target.cacheControl);
+    res.setHeader('X-AIW-SEC-Gateway', 'company-scale');
+    res.setHeader('X-AIW-Upstream-Status', String(upstream.status));
+
+    const contentType = upstream.headers.get('content-type');
+    if (contentType) res.setHeader('Content-Type', contentType);
+
+    const body = await upstream.text();
+    return res.status(upstream.status).send(body);
+  } catch (error) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(504).json({
+      error: 'SEC gateway upstream fetch failed: ' + String(error?.message || error),
+    });
+  }
+}
+
 async function loadTickerMap() {
   if (Date.now() - tickerCache.loadedAt < 86400000 && tickerCache.map.size) {
     return tickerCache.map;
@@ -170,6 +285,10 @@ function scoreTickerMatches(rows, query) {
 }
 
 export default async function handler(req, res) {
+  if (req.query?.sec) {
+    return handleSecGateway(req, res);
+  }
+
   const search = String(req.query?.search || '').trim();
   if (search) {
     res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
