@@ -50,16 +50,19 @@ export function buildPositionAnalyses(
   return PORTFOLIO_POSITIONS.map((position) => {
     const quote = prices[position.symbol];
     const livePrice = quote?.price ?? null;
-    const currentValue = livePrice != null ? livePrice * position.quantity : position.snapshotCurrentValue;
+    const liveIsFresh = livePrice != null && quote?.stale !== true;
+    const currentValue = liveIsFresh ? livePrice * position.quantity : position.snapshotCurrentValue;
     const pnl = currentValue - position.investedValue;
     const pnlPct = position.investedValue ? (pnl / position.investedValue) * 100 : 0;
     const group = intelligence.groups.find((item) => item.name === position.group) ?? null;
 
     const peerReturns = position.peers
-      .map((symbol) => prices[symbol]?.changePct)
+      .map((symbol) => prices[symbol])
+      .filter((peer): peer is PricePoint => peer?.stale !== true)
+      .map((peer) => peer.changePct)
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const peerAverageChange = avg(peerReturns);
-    const dailyChangePct = quote?.changePct ?? null;
+    const dailyChangePct = liveIsFresh ? (quote?.changePct ?? null) : null;
     const vsPeers = dailyChangePct != null && peerAverageChange != null
       ? dailyChangePct - peerAverageChange
       : null;
