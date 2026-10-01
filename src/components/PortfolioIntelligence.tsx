@@ -352,7 +352,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       )}
 
-      {tab === 'network' && <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+      {tab === 'network' && (
+        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
         {selectedAnalysis ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
@@ -421,7 +422,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         ) : (
           <div className="text-[10px] font-mono text-white/30">Select a holding to inspect its peer relationships.</div>
         )}
-      </Panel>
+        </Panel>
+      )}
 
       <div className="text-[10px] text-white/30 flex items-center gap-2"><Globe2 className="w-3 h-3"/> Position states are model outputs for review, not automatic trade instructions.</div>
     </div>
