@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { buildIntelligence } from '../utils/intelligence';
@@ -16,7 +16,11 @@ type Price = {
   stale?: boolean;
   cached?: boolean;
 };
+type PortfolioTab = 'overview' | 'watchlist' | 'events' | 'rotation' | 'network';
+
 type Props = {
+  activeTab?: PortfolioTab;
+  onTabChange?: (tab: PortfolioTab) => void;
   livePrices?: Record<string, Price>;
   contracts?: any[];
   congressTrades?: any[];
@@ -58,11 +62,20 @@ function calculatePortfolioStress(
 }
 
 
-export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
-  const [tab, setTab] = useState('overview');
+export default function PortfolioIntelligence({ activeTab = 'overview', onTabChange, livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
+  const [tab, setTab] = useState<PortfolioTab>(activeTab);
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('All');
   const [selected, setSelected] = useState('NVDA');
+
+  useEffect(() => {
+    setTab(activeTab);
+  }, [activeTab]);
+
+  const changeTab = (nextTab: PortfolioTab) => {
+    setTab(nextTab);
+    onTabChange?.(nextTab);
+  };
 
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const analyses = useMemo(() => buildPositionAnalyses(livePrices, intelligence), [livePrices, intelligence]);
@@ -166,7 +179,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
         {([['overview','Overview'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
-          <button key={x[0]} onClick={() => setTab(x[0])} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
+          <button key={x[0]} onClick={() => changeTab(x[0])} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
             {x[1]}
           </button>
         )}
@@ -290,7 +303,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setTab('events')}
+                    onClick={() => changeTab('events')}
                     className="rounded border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-white/55 hover:text-white"
                   >
                     Open Event Study
