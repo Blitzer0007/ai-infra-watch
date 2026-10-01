@@ -117,11 +117,20 @@ const INITIAL_SOURCE: SourceStatus = {
 };
 
 export default function CongressTrades(_props: CongressTradesProps) {
-  const [search, setSearch] = useState('');
-  const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
-  const [transactionFilter, setTransactionFilter] = useState<'all' | 'buy' | 'sell'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | '30' | '90' | '365'>('all');
-  const [symbolFilter, setSymbolFilter] = useState('NVDA');
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('ct_q') || '');
+  const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>(() => {
+    const value = new URLSearchParams(window.location.search).get('ct_chamber');
+    return value === 'Senate' || value === 'House' ? value : 'all';
+  });
+  const [transactionFilter, setTransactionFilter] = useState<'all' | 'buy' | 'sell'>(() => {
+    const value = new URLSearchParams(window.location.search).get('ct_type');
+    return value === 'buy' || value === 'sell' ? value : 'all';
+  });
+  const [dateFilter, setDateFilter] = useState<'all' | '30' | '90' | '365'>(() => {
+    const value = new URLSearchParams(window.location.search).get('ct_date');
+    return value === '30' || value === '90' || value === '365' ? value : 'all';
+  });
+  const [symbolFilter, setSymbolFilter] = useState(() => new URLSearchParams(window.location.search).get('ct_symbol') || 'NVDA');
   const [trades, setTrades] = useState<CongressTrade[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [searchTrades, setSearchTrades] = useState<CongressTrade[]>([]);
@@ -130,6 +139,31 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceStatus, setSourceStatus] = useState<SourceStatus>(INITIAL_SOURCE);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const keys = ['ct_q', 'ct_chamber', 'ct_type', 'ct_date', 'ct_symbol'];
+    const values: Record<string, string> = {
+      ct_q: search.trim(),
+      ct_chamber: chamberFilter,
+      ct_type: transactionFilter,
+      ct_date: dateFilter,
+      ct_symbol: symbolFilter,
+    };
+
+    for (const key of keys) {
+      const value = values[key];
+      if (!value || (key !== 'ct_q' && ((key === 'ct_chamber' && value === 'all') || (key === 'ct_type' && value === 'all') || (key === 'ct_date' && value === 'all')))) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    }
+
+    const query = params.toString();
+    const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
+    window.history.replaceState(window.history.state, '', url);
+  }, [search, chamberFilter, transactionFilter, dateFilter, symbolFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -420,7 +454,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <Search className="w-4 h-4 text-white/40 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="Search politician or symbol..."
+              placeholder="Search member, company, or ticker..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-white placeholder-white/20 font-mono"

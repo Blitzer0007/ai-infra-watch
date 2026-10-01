@@ -62,14 +62,35 @@ function calculatePortfolioStress(
 
 
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
-  const [tab, setTab] = useState<PortfolioTab>('overview');
-  const [q, setQ] = useState('');
-  const [group, setGroup] = useState('All');
-  const [selected, setSelected] = useState('NVDA');
+  const [tab, setTab] = useState<PortfolioTab>(() => {
+    const value = new URLSearchParams(window.location.search).get('portfolio_tab');
+    return value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
+  });
+  const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
+  const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
+  const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
 
   const changeTab = (nextTab: PortfolioTab) => {
     setTab(nextTab);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('portfolio_tab', tab);
+
+    if (q.trim()) params.set('portfolio_q', q.trim());
+    else params.delete('portfolio_q');
+
+    if (group !== 'All') params.set('portfolio_group', group);
+    else params.delete('portfolio_group');
+
+    if (selected) params.set('portfolio_symbol', selected);
+    else params.delete('portfolio_symbol');
+
+    const query = params.toString();
+    const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
+    window.history.replaceState(window.history.state, '', url);
+  }, [tab, q, group, selected]);
 
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const analyses = useMemo(() => buildPositionAnalyses(livePrices, intelligence), [livePrices, intelligence]);

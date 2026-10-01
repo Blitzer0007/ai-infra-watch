@@ -127,9 +127,34 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   const [events, setEvents] = useState<SecEvent[]>([]);
   const [stockHistory, setStockHistory] = useState<HistoryPoint[]>([]);
   const [spyHistory, setSpyHistory] = useState<HistoryPoint[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('event_symbol') === symbol ? (params.get('event_category') || 'all') : 'all';
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const storedSymbol = params.get('event_symbol');
+    if (storedSymbol !== symbol.trim().toUpperCase()) {
+      setCategoryFilter('all');
+    }
+  }, [symbol]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    params.set('event_symbol', normalizedSymbol);
+    if (categoryFilter === 'all') {
+      params.delete('event_category');
+    } else {
+      params.set('event_category', categoryFilter);
+    }
+    const query = params.toString();
+    const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
+    window.history.replaceState(window.history.state, '', url);
+  }, [symbol, categoryFilter]);
 
   useEffect(() => {
     let cancelled = false;

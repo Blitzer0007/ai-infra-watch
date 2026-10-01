@@ -21,10 +21,34 @@
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
 
 .aiw-scroll-region {
+  position: relative;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,.18) transparent;
+}
+
+.aiw-scroll-region table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.aiw-scroll-region thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0F1115;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.08);
+}
+
+.aiw-table-shell {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 1rem;
+  background: rgba(21,24,30,.3);
 }
 
 .aiw-page-header {

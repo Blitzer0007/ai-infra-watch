@@ -41,17 +41,17 @@ jobs:
             "$SEC_GATEWAY_URL?sec=tickers"
 
           CIK=$(python - <<'PY'
-import json
-with open("/tmp/company_tickers.json", encoding="utf-8") as handle:
-    payload = json.load(handle)
-for row in payload.values():
-    if str(row.get("ticker", "")).upper() == "NVDA":
-        print(str(row.get("cik_str", "")).zfill(10))
-        break
-else:
-    raise SystemExit("NVDA CIK not found through SEC gateway")
-PY
-)
+          import json
+          with open("/tmp/company_tickers.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+          for row in payload.values():
+              if str(row.get("ticker", "")).upper() == "NVDA":
+                  print(str(row.get("cik_str", "")).zfill(10))
+                  break
+          else:
+              raise SystemExit("NVDA CIK not found through SEC gateway")
+          PY
+          )
 
           echo "Checking SEC submissions through Vercel gateway..."
           curl --fail-with-body --silent --show-error --max-time 20 \
