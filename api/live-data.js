@@ -25,6 +25,12 @@ function loadConfiguredSymbols() {
 
 const SYMBOLS = loadConfiguredSymbols();
 
+// Keep a short-lived in-memory cache for warm Vercel invocations.
+// The refresh=true query parameter bypasses this cache explicitly.
+const CACHE_MS = 60 * 1000;
+let cached = null;
+let cachedAt = 0;
+
 async function fetchSecContracts() {
   const ua = { 'User-Agent': process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research dashboard; contact: configured-admin@example.com)' };
   try {
