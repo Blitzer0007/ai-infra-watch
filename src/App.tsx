@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen
+  Menu, X, TrendingUp, Grid, FileText, Calendar, BadgePercent, Settings as SettingsIcon, Bot, BookOpen
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
-import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 
@@ -32,52 +31,12 @@ type LivePrice = {
   cached?: boolean;
 };
 
-type StressSnapshot = {
-  score: number;
-  label: string;
-  breadth: number | null;
-  avgMove: number | null;
-  macroLoad: number;
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function calculatePortfolioStress(
-  prices: Record<string, { price: number; changePct: number }>,
-  macroRisks: any[] = [],
-): StressSnapshot {
-  const portfolioSymbols = PORTFOLIO_POSITIONS.map(position => position.symbol);
-  const moves = portfolioSymbols
-    .map(symbol => prices[symbol]?.changePct)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-
-  const breadth = moves.length
-    ? moves.filter(value => value >= 0).length / moves.length
-    : null;
-  const avgMove = moves.length
-    ? moves.reduce((sum, value) => sum + value, 0) / moves.length
-    : null;
-
-  // Transparent 0-100 model: 40 pts breadth stress, 30 pts move stress,
-  // and 30 pts live macro-risk load. Higher = more observed stress.
-  const breadthStress = breadth == null ? 0 : (1 - breadth) * 40;
-  const moveStress = avgMove == null ? 0 : clamp((-avgMove / 5) * 30, 0, 30);
-  const high = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
-  const medium = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
-  const macroLoad = clamp(high * 12 + medium * 6, 0, 30);
-  const score = Math.round(clamp(breadthStress + moveStress + macroLoad, 0, 100));
-
-  const label = score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained';
-  return { score, label, breadth, avgMove, macroLoad };
-}
-
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
 
   // Live Synthesis Data States
   const [liveData, setLiveData] = useState<{
@@ -143,26 +102,40 @@ export default function App() {
   useEffect(() => {
     if (activeView !== 'portfolio') return;
     let cancelled = false;
+    let timer: number | undefined;
+
     async function updateWatchlistQuotes() {
       const updated: Record<string, LivePrice> = {};
       for (const s of watchlistSymbols) {
         try {
-          const res = await fetchLiveQuote(s, config?.finnhubKey || '');
+          const res = await fetchLiveQuote(s, config?.finnhubKey || '', true);
           if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
-            updated[s] = { price: res.price, changePct: res.changePct, provider: res.provider, retrievedAt: res.retrievedAt, stale: res.stale, cached: res.cached };
+            updated[s] = {
+              price: res.price,
+              changePct: res.changePct,
+              provider: res.provider,
+              retrievedAt: res.retrievedAt,
+              stale: res.stale,
+              cached: res.cached
+            };
           }
-        } catch (e) {
+        } catch {
           // ignore individual quote failures
         }
       }
       if (!cancelled) {
         setTickerPrices(prev => ({ ...prev, ...updated }));
         setLiveData(prev => ({ ...(prev || {}), stockPrices: { ...((prev && prev.stockPrices) || {}), ...updated } }));
+        setLastQuoteRefresh(Date.now());
+        timer = window.setTimeout(updateWatchlistQuotes, 60000);
       }
     }
-    updateWatchlistQuotes();
-    const interval = setInterval(updateWatchlistQuotes, 90000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    void updateWatchlistQuotes();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, [activeView, config]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
@@ -210,38 +183,54 @@ export default function App() {
     const loaded = loadConfig();
     setConfig(loaded);
 
+    let tickerTimer: number | undefined;
+    let feedTimer: number | undefined;
+    let cancelled = false;
+
     async function updateTicker() {
       const updated: Record<string, LivePrice> = {};
-      const allSymbols = STOCK_UNIVERSE_SYMBOLS;
-      for (const s of allSymbols) {
+      for (const s of STOCK_UNIVERSE_SYMBOLS) {
+        if (cancelled) return;
         try {
-          const res = await fetchLiveQuote(s, loaded.finnhubKey);
-          updated[s] = {
-            price: res.price,
-            changePct: res.changePct,
-            provider: res.provider,
-            retrievedAt: res.retrievedAt,
-            stale: res.stale,
-            cached: res.cached
-          };
-        } catch (e) {
-          // ignore
+          const res = await fetchLiveQuote(s, loaded.finnhubKey, true);
+          if (Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
+            updated[s] = {
+              price: res.price,
+              changePct: res.changePct,
+              provider: res.provider,
+              retrievedAt: res.retrievedAt,
+              stale: res.stale,
+              cached: res.cached
+            };
+          }
+        } catch {
+          // ignore individual quote failures
         }
       }
-      setTickerPrices((prev) => ({
-        ...prev,
-        ...updated
-      }));
+
+      if (cancelled) return;
+      setTickerPrices(prev => ({ ...prev, ...updated }));
+      setLastQuoteRefresh(Date.now());
+      tickerTimer = window.setTimeout(updateTicker, 60000);
     }
 
-    updateTicker();
-    handleFetchLiveData(false);
+    void updateTicker();
+    void handleFetchLiveData(false);
 
-    const interval = setInterval(updateTicker, 45000);
-    const feedInterval = setInterval(() => handleFetchLiveData(false), 300000);
+    const scheduleFeedRefresh = () => {
+      if (cancelled) return;
+      feedTimer = window.setTimeout(async () => {
+        if (cancelled) return;
+        await handleFetchLiveData(false);
+        scheduleFeedRefresh();
+      }, 300000);
+    };
+    scheduleFeedRefresh();
+
     return () => {
-      clearInterval(interval);
-      clearInterval(feedInterval);
+      cancelled = true;
+      if (tickerTimer) window.clearTimeout(tickerTimer);
+      if (feedTimer) window.clearTimeout(feedTimer);
     };
   }, []);
 
@@ -272,10 +261,10 @@ export default function App() {
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon },
-    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
+    { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp },
     { id: 'health', label: 'Data Health', index: '10', icon: ShieldAlert },
-    { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp }
+    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
+    { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
 
   return (
@@ -355,21 +344,7 @@ export default function App() {
               );
             })}
 
-            <div className="pt-4 mt-4 border-t border-white/10">
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 block">Independent Pages</span>
-              <a
-                href="/pages/tracker.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight text-white/80 hover:text-white hover:bg-white/5 border border-dashed border-white/10 hover:border-white/30 transition"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <TrendingUp className="w-4 h-4 text-[#10B981]" />
-                  <span>Interactive HTML Tracker</span>
-                </div>
-                <span className="text-[9px] font-mono opacity-50">&nearr;</span>
-              </a>
-            </div>
+            
           </nav>
 
           {/* Sidebar Footer */}
@@ -431,21 +406,7 @@ export default function App() {
                   );
                 })}
 
-                <div className="pt-4 mt-4 border-t border-white/10">
-                  <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 block">Independent Pages</span>
-                  <a
-                    href="/pages/tracker.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-tight text-white/80 hover:text-white hover:bg-white/5 border border-dashed border-white/10 hover:border-white/30 transition"
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <TrendingUp className="w-4 h-4 text-[#10B981]" />
-                      <span>Interactive HTML Tracker</span>
-                    </div>
-                    <span className="text-[10px] font-mono opacity-50">&nearr;</span>
-                  </a>
-                </div>
+                
               </nav>
 
               <div className="border-t border-white/10 pt-4 text-[10px] font-mono text-white/40 space-y-1">
@@ -491,7 +452,7 @@ export default function App() {
                 </span>
               )}
               <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
-                AUTO: FEED 5M · QUOTES 45S
+                AUTO: FEED 5M · QUOTES 60S{lastQuoteRefresh ? ' · LAST QUOTE ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
               </span>
               <button
                 onClick={() => handleFetchLiveData(true)}
@@ -503,66 +464,6 @@ export default function App() {
               </button>
             </div>
           </div>
-
-          {(() => {
-            // Browser-side ticker quotes refresh more frequently than the server feed.
-            // Prefer the freshest ticker value, with liveData as a fallback for symbols the
-            // browser quote provider could not refresh.
-            const prices = { ...(liveData?.stockPrices || {}), ...tickerPrices };
-            const stress = calculatePortfolioStress(
-              prices,
-              liveData?.macroRisks || []
-            );
-            const coverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null && prices[position.symbol]?.stale !== true).length;
-            const staleCoverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null && prices[position.symbol]?.stale === true).length;
-            return (
-              <div className="max-w-7xl mx-auto mb-6 rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/5 p-2">
-                      <ShieldAlert className="w-4 h-4 text-amber-300" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-white/65">Portfolio Stress Score</span>
-                        <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
-                      </div>
-                      <div className="text-[10px] text-white/35 mt-0.5">
-                        Breadth + average daily move + macro risk load · {coverage}/{PORTFOLIO_POSITIONS.length} holdings with fresh quotes{staleCoverage ? ' · ' + staleCoverage + ' stale' : ''}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="w-28 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-300/80 transition-all" style={{ width: stress.score + '%' }} />
-                    </div>
-                    <div className="text-right min-w-24">
-                      <div className="text-xl font-black font-mono text-white">{stress.score}/100</div>
-                      <div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">{stress.label}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Breadth</div>
-                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.breadth == null ? '—' : Math.round(stress.breadth * 100) + '% positive'}</div>
-                  </div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Avg daily move</div>
-                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.avgMove == null ? '—' : (stress.avgMove >= 0 ? '+' : '') + stress.avgMove.toFixed(2) + '%'}</div>
-                  </div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
-                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
-                  </div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
-                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{coverage}/{PORTFOLIO_POSITIONS.length} fresh</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
 
           <AnimatePresence mode="wait">
             <motion.div
