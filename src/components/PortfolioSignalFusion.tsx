@@ -94,20 +94,20 @@ function badge(kind: string) {
 export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const signals = [
     ...contracts
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.company))
+      .filter(x => PORTFOLIO_SYMBOLS.includes(x.company))
       .sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned)))
       .slice(0, 3)
       .map(x => ({
         kind: 'Contract',
         title: x.client || x.details,
-        detail: x.details,
+        detail: x.geminiImpactSummary || x.details,
         when: x.dateSigned,
         affected: symbols([x.company]),
         source: x.source === 'sec-edgar-primary' ? 'SEC EDGAR' : 'Contracts feed',
         url: x.url || null,
       })),
     ...congressTrades
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.stockSymbol))
+      .filter(x => PORTFOLIO_SYMBOLS.includes(x.stockSymbol))
       .sort((a, b) => String(b.transactionDate || b.date).localeCompare(String(a.transactionDate || a.date)))
       .slice(0, 3)
       .map(x => ({
@@ -120,8 +120,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         url: x.filingPortal || null,
       })),
     ...macroRisks.slice(0, 3).map(x => {
-      const riskId = String(x?.id || x?.title || '').toLowerCase();
-      const key = riskId.includes('taiwan') ? 'taiwan' : riskId.includes('power') || riskId.includes('grid') ? 'power' : 'export';
+      const key = x.id.toLowerCase().includes('taiwan') ? 'taiwan' : x.id.toLowerCase().includes('power') ? 'power' : 'export';
       return {
         kind: 'Macro',
         title: x.title,
@@ -133,7 +132,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       };
     }),
     ...politicalSignals
-      .filter(x => x && Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => PORTFOLIO_SYMBOLS.includes(String(symbol).toUpperCase())))
+      .filter(x => Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => PORTFOLIO_SYMBOLS.includes(String(symbol).toUpperCase())))
       .slice(0, 3)
       .map(x => ({
         kind: 'Political',
@@ -146,7 +145,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         url: x.url || null,
       })),
     ...news
-      .filter(x => x && x.title)
+      .filter(x => x.title)
       .map(x => ({ ...x, affected: newsSymbols(x.title || '') }))
       .filter(x => x.affected.length)
       .slice(0, 3)
