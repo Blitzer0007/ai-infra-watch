@@ -36,8 +36,6 @@ function calculatePortfolioStress(
   analyses: PositionAnalysis[],
   macroRisks: any[],
 ) {
-  // Only fresh live quotes should contribute to observed market stress.
-  // Missing/stale quotes must not be treated as positive or negative moves.
   const moves = analyses
     .filter(item => item.livePrice != null && !item.liveStale)
     .map(item => item.dailyChangePct)
@@ -81,9 +79,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())
   ), [analyses, q, group]);
 
-  const breadthMoves = analyses
-    .filter(h => typeof h.dailyChangePct === 'number' && Number.isFinite(h.dailyChangePct))
-    .map(h => h.dailyChangePct as number);
+  const breadthMoves = analyses.filter(h => typeof h.dailyChangePct === 'number' && Number.isFinite(h.dailyChangePct)).map(h => h.dailyChangePct as number);
   const breadthPositive = breadthMoves.filter(value => value >= 0).length;
   const breadthCoverage = breadthMoves.length;
   const addReviews = analyses.filter(h => h.state === 'ADD REVIEW').length;
