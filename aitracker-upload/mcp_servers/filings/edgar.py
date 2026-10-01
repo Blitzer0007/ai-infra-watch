@@ -311,19 +311,19 @@ class LiveEdgarClient:
             return None
 
         if url == "https://www.sec.gov/files/company_tickers.json":
-            resource = {"resource": "tickers"}
+            resource = {"sec": "tickers"}
         elif url.startswith("https://data.sec.gov/submissions/CIK"):
             cik = url.rsplit("/CIK", 1)[-1].removesuffix(".json")
             if not cik.isdigit():
                 return None
-            resource = {"resource": "submissions", "cik": cik}
+            resource = {"sec": "submissions", "cik": cik}
         elif url.startswith("https://data.sec.gov/api/xbrl/companyfacts/CIK"):
             cik = url.rsplit("/CIK", 1)[-1].removesuffix(".json")
             if not cik.isdigit():
                 return None
-            resource = {"resource": "companyfacts", "cik": cik}
+            resource = {"sec": "companyfacts", "cik": cik}
         elif url.startswith("https://www.sec.gov/Archives/edgar/data/"):
-            resource = {"resource": "archive", "url": url}
+            resource = {"sec": "archive", "url": url}
         else:
             return None
 
