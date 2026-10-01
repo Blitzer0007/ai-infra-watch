@@ -3,6 +3,9 @@ run-name: Vercel Production Deploy • ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - one-time-vercel-deploy
 
 permissions:
   contents: read
