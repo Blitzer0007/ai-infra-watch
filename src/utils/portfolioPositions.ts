@@ -58,7 +58,7 @@ export function buildPositionAnalyses(
 
     const peerReturns = position.peers
       .map((symbol) => prices[symbol])
-      .filter((peer): peer is PricePoint => peer != null && peer.stale !== true)
+      .filter((peer): peer is PricePoint => peer?.stale !== true)
       .map((peer) => peer.changePct)
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const peerAverageChange = avg(peerReturns);
