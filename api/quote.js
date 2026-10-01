@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const cached = cache.get(symbol);
   if (cached && Date.now() - cached.at < CACHE_MS) {
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-    return res.status(200).json({ ...cached.data, cached: true });
+    return res.status(200).json({ ...cached.data, cached: true, cacheAgeMs: Date.now() - cached.at });
   }
 
   const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
@@ -51,7 +51,10 @@ export default async function handler(req, res) {
     high: Number(meta.regularMarketDayHigh) || price,
     prevClose: Number(prevClose) || price,
     source: 'live',
-    provider: 'Yahoo Finance'
+    provider: 'Yahoo Finance',
+    retrievedAt: new Date().toISOString(),
+    marketTime: Number.isFinite(meta.regularMarketTime) ? new Date(meta.regularMarketTime * 1000).toISOString() : null,
+    stale: false
   };
   cache.set(symbol, { at: Date.now(), data: quote });
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
