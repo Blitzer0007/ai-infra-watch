@@ -33,18 +33,9 @@ jobs:
       - name: Probe SEC gateway
         env:
           SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
-          SEC_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
-          set -euo pipefail
-
-          test -n "$SEC_GATEWAY_TOKEN" || {
-            echo "::error::AIW_CRON_SECRET is required for the SEC gateway."
-            exit 1
-          }
-
-          echo "Checking SEC ticker directory through Vercel gateway..."
+          set -euo pipefailecho "Checking SEC ticker directory through Vercel gateway..."
           curl --fail-with-body --silent --show-error --max-time 20 \
-            -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
             -o /tmp/company_tickers.json \
             "$SEC_GATEWAY_URL?sec=tickers"
 
@@ -63,7 +54,6 @@ PY
 
           echo "Checking SEC submissions through Vercel gateway..."
           curl --fail-with-body --silent --show-error --max-time 20 \
-            -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
             "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
             -o /tmp/sec_submissions.json
 
@@ -74,7 +64,6 @@ PY
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
           EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
-          EDGAR_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
           set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
@@ -90,7 +79,6 @@ PY
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
           EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
-          EDGAR_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
           set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
