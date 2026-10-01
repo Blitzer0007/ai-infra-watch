@@ -44,7 +44,7 @@ FIXTURE_EDGAR_DIR = Path(__file__).resolve().parent / "fixtures" / "edgar"
 
 # EDGAR requires a descriptive User-Agent (a company/app name + contact).
 # Overridable via EDGAR_USER_AGENT for real deployments.
-DEFAULT_USER_AGENT = "ai-infra-watch/0.1 (research; contact: dev@example.com)"
+DEFAULT_USER_AGENT = "AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
 
 DEFAULT_FORMS: tuple[str, ...] = ("10-K", "10-Q")
 
@@ -321,7 +321,9 @@ class LiveEdgarClient:
                     if _http_retryable(resp.status_code) and attempt < self.max_retries:
                         time.sleep(self.base_delay * (2 ** attempt))
                         continue
-                    raise EdgarError("HTTP_ERROR", f"EDGAR returned {resp.status_code} for {url}")
+                    detail = (resp.text or "").strip().replace("\n", " ")[:240]
+                    suffix = f" ({detail})" if detail else ""
+                    raise EdgarError("HTTP_ERROR", f"EDGAR returned {resp.status_code} for {url}{suffix}")
                 return resp
             except httpx.HTTPError as exc:
                 last_exc = exc
