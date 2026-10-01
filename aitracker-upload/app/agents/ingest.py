@@ -138,9 +138,10 @@ def build_ingest_graph(
                 )
             except Exception as exc:  # EdgarError or malformed payload -> degrade
                 code = getattr(exc, "code", type(exc).__name__)
-                errors.append(f"{symbol}: {code}")
+                detail = str(exc)
+                errors.append(f"{symbol}: {code}: {detail}")
                 steps.append(
-                    tool_call("edgar.query", {"symbol": symbol}, note=code, ok=False)
+                    tool_call("edgar.query", {"symbol": symbol}, note=f"{code}: {detail}", ok=False)
                 )
         return {"refs": refs, "errors": errors, "steps": steps}
 
