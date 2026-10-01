@@ -2,6 +2,64 @@ const CACHE_MS = 5 * 60 * 1000;
 const STALE_CACHE_MS = 24 * 60 * 60 * 1000;
 const cache = new Map();
 
+
+let tickerDirectoryCache = null;
+let tickerDirectoryAt = 0;
+
+function normalizeSearchText(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9.-]+/g, ' ');
+}
+
+async function resolveCompanyTicker(query) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized || normalized.length < 2) return null;
+
+  if (tickerDirectoryCache && Date.now() - tickerDirectoryAt < 10 * 60 * 1000) {
+    return scoreTickerMatches(tickerDirectoryCache, normalized)[0] || null;
+  }
+
+  const response = await fetch('https://www.sec.gov/files/company_tickers.json', {
+    headers: {
+      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)',
+      'Accept-Encoding': 'gzip, deflate'
+    },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) throw new Error('SEC ticker directory HTTP ' + response.status);
+
+  const payload = await response.json();
+  tickerDirectoryCache = Object.values(payload || {})
+    .map((entry) => ({
+      ticker: String(entry?.ticker || '').trim().toUpperCase(),
+      title: String(entry?.title || '').trim()
+    }))
+    .filter((entry) => entry.ticker && entry.title);
+  tickerDirectoryAt = Date.now();
+
+  return scoreTickerMatches(tickerDirectoryCache, normalized)[0] || null;
+}
+
+function scoreTickerMatches(rows, query) {
+  return rows
+    .map((row) => {
+      const ticker = normalizeSearchText(row.ticker);
+      const title = normalizeSearchText(row.title);
+      const tokens = query.split(' ').filter(Boolean);
+      let score = 0;
+      if (ticker === query) score = 1000;
+      else if (title === query) score = 900;
+      else if (title.startsWith(query)) score = 700;
+      else if (title.includes(query)) score = 500;
+      else {
+        const matched = tokens.filter((token) => title.includes(token)).length;
+        score = matched ? 300 + matched * 25 - Math.max(0, tokens.length - matched) * 5 : 0;
+      }
+      return { ...row, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || a.ticker.localeCompare(b.ticker));
+}
+
 const DATA_DAWN_TICKER_ALIASES = {
   VIVO: 'VVPR',
   NVIDIA: 'NVDA',
@@ -168,6 +226,7 @@ function respond(res, {
   stale,
   fetchedAt,
   upstreamError,
+  searchResolution,
 }) {
   const sourceLabel =
     provider === 'bargo'
@@ -195,6 +254,7 @@ function respond(res, {
     stale,
     fetchedAt,
     upstreamError: upstreamError || null,
+    searchResolution: searchResolution || null,
   });
 }
 
@@ -203,6 +263,7 @@ export default async function handler(req, res) {
   const query = String(req.query?.q || '').trim();
   const aliasSymbol = DATA_DAWN_TICKER_ALIASES[requestedSymbol] || requestedSymbol;
   const symbol = aliasSymbol || 'ALL';
+  let searchResolution = null;
 
   res.setHeader(
     'Cache-Control',
@@ -228,7 +289,22 @@ export default async function handler(req, res) {
   let primaryError = null;
 
   try {
-    const rawTrades = await fetchBargo(query ? 'ALL' : symbol);
+    if (query) {
+      try {
+        const resolved = await resolveCompanyTicker(query);
+        if (resolved) {
+          searchResolution = 'Company name matched to ' + resolved.title + ' (' + resolved.ticker + ')';
+        }
+      } catch {
+        // Search must still work for politician names even when SEC resolution is unavailable.
+      }
+    }
+
+    const bargoSymbol = query && searchResolution
+      ? searchResolution.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || 'ALL'
+      : (query ? 'ALL' : symbol);
+
+    const rawTrades = await fetchBargo(bargoSymbol);
     let trades = rawTrades
       .map((trade, index) =>
         normalizeTrade(
@@ -247,9 +323,10 @@ export default async function handler(req, res) {
     if (query) {
       const needle = query.toUpperCase();
       const mappedTicker = DATA_DAWN_TICKER_ALIASES[needle] || needle;
+      const resolvedTicker = searchResolution?.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || null;
       trades = trades.filter((trade) => {
         const member = String(trade.politician || '').toUpperCase();
-        return trade.stockSymbol === mappedTicker || member.includes(needle);
+        return trade.stockSymbol === mappedTicker || trade.stockSymbol === resolvedTicker || member.includes(needle);
       });
       if (!trades.length) {
         throw new Error('No Bargo matches for search; use OpenRegs fallback');
@@ -270,13 +347,17 @@ export default async function handler(req, res) {
       cached: false,
       stale: false,
       fetchedAt: createdAt,
+      searchResolution,
     });
   } catch (error) {
     primaryError = error instanceof Error ? error.message : String(error);
   }
 
   try {
-    const trades = (await fetchDataDawn(symbol, query))
+    const resolvedTicker = searchResolution?.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || null;
+    const fallbackSymbol = query && resolvedTicker ? resolvedTicker : symbol;
+    const fallbackQuery = query && resolvedTicker ? '' : query;
+    const trades = (await fetchDataDawn(fallbackSymbol, fallbackQuery))
       .filter((trade) => trade.stockSymbol)
       .sort((a, b) => String(b.transactionDate).localeCompare(String(a.transactionDate)));
 
@@ -295,6 +376,7 @@ export default async function handler(req, res) {
       stale: false,
       fetchedAt: createdAt,
       upstreamError: primaryError,
+      searchResolution,
     });
   } catch (fallbackError) {
     const fallbackMessage =

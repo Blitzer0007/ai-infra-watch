@@ -331,7 +331,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
           Congressional Trading Signals
         </h1>
         <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
-          Track public congressional disclosure records across searchable tickers and members. Search any supported ticker or politician; the preset buttons are only shortcuts.
+          Track public congressional disclosure records across searchable tickers, company names, and members. The preset buttons are only shortcuts.
         </p>
       </div>
 
