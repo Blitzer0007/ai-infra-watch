@@ -51,7 +51,7 @@ export function formatPct(p: number | undefined): string {
   return `${prefix}${p.toFixed(2)}%`;
 }
 
-export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
+export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefresh = false): Promise<{
   price: number;
   changePct: number;
   low: number;
@@ -64,7 +64,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
   cached?: boolean;
 }> {
   if (!apiKey) {
-    const res = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol));
+    const res = await fetch(
+      '/api/quote?symbol=' + encodeURIComponent(symbol) + (forceRefresh ? '&refresh=true' : ''),
+      { cache: 'no-store' }
+    );
     if (!res.ok) throw new Error('Server quote request failed: HTTP ' + res.status);
     const data = await res.json();
     if (!Number.isFinite(data?.price)) throw new Error('Server quote returned no price');
@@ -106,7 +109,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
     };
   } catch (err) {
     try {
-      const res = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol));
+      const res = await fetch(
+        '/api/quote?symbol=' + encodeURIComponent(symbol) + (forceRefresh ? '&refresh=true' : ''),
+        { cache: 'no-store' }
+      );
       if (!res.ok) throw new Error('Server quote fallback failed: HTTP ' + res.status);
       const data = await res.json();
       if (!Number.isFinite(data?.price)) throw new Error('No live quote available');
