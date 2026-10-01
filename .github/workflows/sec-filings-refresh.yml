@@ -2,8 +2,6 @@ name: Refresh SEC Filings Corpus
 
 on:
   schedule:
-    # Check EDGAR hourly. The ingest agent deduplicates by accession number,
-    # so most runs only perform lightweight metadata checks.
     - cron: "17 * * * *"
   workflow_dispatch:
 
@@ -32,21 +30,23 @@ jobs:
           python -m pip install -r aitracker-upload/requirements.txt
           python -m pip install -r aitracker-upload/requirements-ingest.txt
 
-      # Prefer a repository secret when configured; otherwise use a descriptive SEC-compliant fallback.
-
-      - name: Probe SEC EDGAR gateway
+      - name: Probe SEC gateway
         env:
-          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway          SEC_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
+          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          SEC_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
-            AUTH=(-H "Authorization: Bearer $SEC_GATEWAY_TOKEN")
-          else
-            AUTH=()
-          fi
 
-          echo "Checking Vercel SEC gateway → company ticker endpoint..."
-          curl -sS -L --retry 2 --retry-delay 2 "${AUTH[@]}"             -o /tmp/company_tickers.json             -w "gateway tickers HTTP %{http_code}\n"             "$SEC_GATEWAY_URL?resource=tickers"
+          test -n "$SEC_GATEWAY_TOKEN" || {
+            echo "::error::AIW_CRON_SECRET is required for the SEC gateway."
+            exit 1
+          }
+
+          echo "Checking SEC ticker directory through Vercel gateway..."
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
+            -o /tmp/company_tickers.json \
+            "$SEC_GATEWAY_URL?sec=tickers"
 
           CIK=$(python - <<'PY'
 import json
@@ -61,16 +61,22 @@ else:
 PY
 )
 
-          echo "Checking Vercel SEC gateway → submissions endpoint for CIK $CIK..."
-          curl -sS -L --retry 2 --retry-delay 2 "${AUTH[@]}"             -o /tmp/sec_submissions.json             -w "gateway submissions HTTP %{http_code}\n"             "$SEC_GATEWAY_URL?resource=submissions&cik=$CIK"
+          echo "Checking SEC submissions through Vercel gateway..."
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
+            "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
+            -o /tmp/sec_submissions.json
+
+          echo "SEC gateway probe passed."
 
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
-          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
-          EDGAR_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          EDGAR_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
+          set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
             UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
           else
@@ -83,9 +89,10 @@ PY
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
-          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
-          EDGAR_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          EDGAR_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
+          set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
             UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
           else
@@ -96,6 +103,7 @@ PY
 
       - name: Commit corpus changes
         run: |
+          set -euo pipefail
           if git diff --quiet -- aitracker-upload/data/filings data/contracts_sec.json; then
             echo "No new SEC filing content."
             exit 0
