@@ -17,6 +17,9 @@ export type PortfolioPosition = {
 
 export type PositionAnalysis = PortfolioPosition & {
   livePrice: number | null;
+  liveRetrievedAt: string | null;
+  liveProvider: string | null;
+  liveStale: boolean;
   currentValue: number;
   pnl: number;
   pnlPct: number;
@@ -101,6 +104,9 @@ export function buildPositionAnalyses(
     return {
       ...position,
       livePrice,
+      liveRetrievedAt: quote?.retrievedAt ?? null,
+      liveProvider: quote?.provider ?? null,
+      liveStale: quote?.stale === true,
       currentValue,
       pnl,
       pnlPct,
