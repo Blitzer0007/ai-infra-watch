@@ -59,53 +59,16 @@ function secTarget(req) {
     };
   }
 
-  if (resource === 'archive') {
-    const raw = String(req.query?.url || '');
-    let parsed;
-    try {
-      parsed = new URL(raw);
-    } catch {
-      return null;
-    }
-
-    if (
-      parsed.protocol !== 'https:' ||
-      parsed.hostname !== 'www.sec.gov' ||
-      !parsed.pathname.startsWith('/Archives/edgar/data/')
-    ) {
-      return null;
-    }
-
-    return {
-      resource,
-      url: parsed.toString(),
-      cacheControl: SEC_CACHE.archive,
-    };
-  }
 
   return null;
 }
 
 async function handleSecGateway(req, res) {
-  const configuredToken = String(
-    process.env.SEC_GATEWAY_TOKEN || process.env.AIW_CRON_SECRET || ''
-  ).trim();
-  if (!configuredToken) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(503).json({ error: 'SEC gateway secret is not configured.' });
-  }
-
-  const auth = String(req.headers?.authorization || '');
-  if (auth !== 'Bearer ' + configuredToken) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(401).json({ error: 'SEC gateway authentication required.' });
-  }
-
   const target = secTarget(req);
   if (!target) {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(400).json({
-      error: 'Supported SEC resources: tickers, submissions, companyfacts, archive.',
+      error: 'Supported SEC resources: tickers, submissions, companyfacts.',
     });
   }
 
