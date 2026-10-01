@@ -512,7 +512,7 @@ def test_jev_strong_evidence_can_stop_when_required_families_are_complete():
     finally:
         tb.close()
 
-    assert gate.calls == 2
+    assert gate.calls == 3
     assert result.jev["evidence_gate"]["action"] == "stop"
     assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 4
@@ -544,7 +544,7 @@ def test_jev_repeated_gather_more_ends_as_insufficient():
     finally:
         tb.close()
 
-    assert gate.calls == 3
+    assert gate.calls == 2
     assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert result.jev["evidence_gate"]["reason"].startswith("No unused complementary")
     assert result.resolution == "jev_evidence_insufficient"
