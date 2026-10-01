@@ -1,7 +1,14 @@
 import portfolio from '../../data/portfolio_snapshot.json';
 import { STOCK_UNIVERSE, type StockUniverseEntry } from './stockUniverse';
 
-export type PricePoint = { price: number; changePct: number };
+export type PricePoint = {
+  price: number;
+  changePct: number;
+  provider?: string;
+  retrievedAt?: string;
+  stale?: boolean;
+  cached?: boolean;
+};
 export type IntelligenceGroup = {
   name: string;
   members: string[];
