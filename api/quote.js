@@ -14,8 +14,9 @@ export default async function handler(req, res) {
   const symbol = String(req.query?.symbol || '').trim().toUpperCase();
   if (!validateSymbol(symbol)) return res.status(400).json({ error: 'Valid symbol is required' });
 
+  const forceRefresh = String(req.query?.refresh || '').toLowerCase() === 'true' || req.query?.refresh === '1';
   const cached = cache.get(symbol);
-  if (cached && Date.now() - cached.at < CACHE_MS) {
+  if (!forceRefresh && cached && Date.now() - cached.at < CACHE_MS) {
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return res.status(200).json({ ...cached.data, cached: true, cacheAgeMs: Date.now() - cached.at });
   }
@@ -57,6 +58,6 @@ export default async function handler(req, res) {
     stale: false
   };
   cache.set(symbol, { at: Date.now(), data: quote });
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 's-maxage=60, stale-while-revalidate=300');
   return res.status(200).json(quote);
 }
