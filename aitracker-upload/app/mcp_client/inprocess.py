@@ -51,36 +51,36 @@ class InProcessMCPToolbox:
     def _register(self) -> None:
         definitions = {
             "stocks": [
-                ("get_quote", "Get a real-time quote for one stock symbol."),
-                ("get_quotes", "Get real-time quotes for several stock symbols."),
-                ("get_snapshot", "Get quotes for the configured watchlist."),
-                ("get_earnings", "Get past and upcoming earnings and historical price reaction."),
-                ("get_event_study", "Compute earnings-event T+1, T+5 and T+20 session returns."),
-                ("get_relationships", "Resolve configured AI Infra Watch peer relationships."),
-                ("list_watchlist", "List tracked watchlist symbols."),
-                ("health", "Stocks service health snapshot."),
+                ("get_quote", "Get a real-time quote for one stock symbol.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_quotes", "Get real-time quotes for several stock symbols.", {"type": "object", "properties": {"symbols": {"type": "array", "items": {"type": "string"}}}, "required": ["symbols"]}),
+                ("get_snapshot", "Get quotes for the configured watchlist.", {"type": "object", "properties": {}}),
+                ("get_earnings", "Get past and upcoming earnings and historical price reaction.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_event_study", "Compute earnings-event T+1, T+5 and T+20 session returns.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_relationships", "Resolve configured AI Infra Watch peer relationships.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("list_watchlist", "List tracked watchlist symbols.", {"type": "object", "properties": {}}),
+                ("health", "Stocks service health snapshot.", {"type": "object", "properties": {}}),
             ],
             "filings": [
-                ("get_milestones", "Get recent SEC 8-K milestones for a symbol."),
-                ("get_catalysts", "Get current SEC 8-K material-event and contract evidence."),
-                ("get_contracts", "Get contract-related primary SEC disclosures."),
-                ("health", "SEC evidence service health snapshot."),
+                ("get_milestones", "Get recent SEC 8-K milestones for a symbol.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_catalysts", "Get current SEC 8-K material-event and contract evidence.", {"type": "object", "properties": {"symbols": {"type": "array", "items": {"type": "string"}}}, "required": ["symbols"]}),
+                ("get_contracts", "Get contract-related primary SEC disclosures.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("health", "SEC evidence service health snapshot.", {"type": "object", "properties": {}}),
             ],
             "news": [
-                ("search", "Search recent market news by keywords."),
-                ("company", "Get recent company news for one symbol."),
-                ("sector", "Get recent news for an AI infrastructure sector."),
-                ("global", "Get latest general market news."),
-                ("geopolitical", "Search recent geopolitical news."),
-                ("health", "News service health snapshot."),
+                ("search", "Search recent market news by keywords.", {"type": "object", "properties": {"query": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}} , "required": ["query"]}),
+                ("company", "Get recent company news for one symbol.", {"type": "object", "properties": {"symbol": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}}, "required": ["symbol"]}),
+                ("sector", "Get recent news for an AI infrastructure sector.", {"type": "object", "properties": {"sector": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 7}}, "required": ["sector"]}),
+                ("global", "Get latest general market news.", {"type": "object", "properties": {"days": {"type": "integer", "minimum": 1, "maximum": 7}}}),
+                ("geopolitical", "Search recent geopolitical news.", {"type": "object", "properties": {"topic": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 7}}}),
+                ("health", "News service health snapshot.", {"type": "object", "properties": {}}),
             ],
         }
         # Rotation currently depends on LangGraph, which is intentionally not
         # part of the small Vercel Python dependency set. Keep the live catalog
         # serverless-safe rather than advertising a tool that cannot execute.
         for server, items in definitions.items():
-            for name, description in items:
-                info = ToolInfo(server=server, name=name, description=description, input_schema={})
+            for name, description, input_schema in items:
+                info = ToolInfo(server=server, name=name, description=description, input_schema=input_schema)
                 self._tool_map[info.qualified_name] = info
 
     def tools(self) -> list[ToolInfo]:
@@ -140,10 +140,6 @@ class InProcessMCPToolbox:
             return {"symbols": result, "source": "sec-edgar-primary"}
         if key == "filings.get_contracts":
             return self._contracts.get_timeline(str(args.get("symbol", ""))).model_dump()
-        if key == "filings.list_documents":
-            return self._filings.list_documents()
-        if key == "filings.get_document":
-            return self._filings.get_document(str(args.get("document_id", "")))
         if key == "filings.health":
             return {
                 "mode": "live",
