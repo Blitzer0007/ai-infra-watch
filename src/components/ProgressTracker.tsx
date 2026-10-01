@@ -58,6 +58,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [secMilestoneLoading, setSecMilestoneLoading] = useState(false);
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
   const [tickerInput, setTickerInput] = useState('');
+  const [tickerResolving, setTickerResolving] = useState(false);
+  const [tickerResolveError, setTickerResolveError] = useState<string | null>(null);
+  const [resolvedIssuer, setResolvedIssuer] = useState<string | null>(null);
 
 
   // Combine the curated timeline with live SEC milestones for the selected symbol.
@@ -136,6 +139,49 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     : [...historyData];
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
+
+  const resolveAndTrack = async () => {
+    const rawInput = tickerInput.trim();
+    if (!rawInput || tickerResolving) return;
+
+    const normalized = rawInput.toUpperCase().replace(/[^A-Z0-9.-]/g, '');
+    const aliased = TRACKER_SYMBOL_ALIASES[normalized];
+    if (aliased) {
+      setTickerResolveError(null);
+      setResolvedIssuer(null);
+      setSelectedStock(aliased);
+      setActiveMilestoneId(null);
+      return;
+    }
+
+    if (/^[A-Z0-9.-]{1,20}$/.test(rawInput) && !rawInput.includes(' ')) {
+      setTickerResolveError(null);
+      setResolvedIssuer(null);
+      setSelectedStock(normalized);
+      setActiveMilestoneId(null);
+      return;
+    }
+
+    setTickerResolving(true);
+    setTickerResolveError(null);
+    try {
+      const response = await fetch('/api/ticker-search?q=' + encodeURIComponent(rawInput), { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(body?.matches) || !body.matches.length) {
+        throw new Error(body?.error || 'No public ticker match found');
+      }
+
+      const match = body.matches[0];
+      setSelectedStock(String(match.ticker).toUpperCase());
+      setResolvedIssuer(match.title || null);
+      setActiveMilestoneId(null);
+    } catch (err: any) {
+      setResolvedIssuer(null);
+      setTickerResolveError(err?.message || 'Ticker lookup failed');
+    } finally {
+      setTickerResolving(false);
+    }
+  };
 
   const getAccuratePrice = (m: Milestone) => {
     // Prefer an exact trading-day match. For month-only milestones, use the
@@ -219,8 +265,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && tickerInput.trim()) {
-                      setSelectedStock(resolveTrackerSymbol(tickerInput));
-                      setActiveMilestoneId(null);
+                      void resolveAndTrack();
                     }
                   }}
                   placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
@@ -230,18 +275,26 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
               <button
                 type="button"
                 onClick={() => {
-                  if (!tickerInput.trim()) return;
-                  setSelectedStock(resolveTrackerSymbol(tickerInput));
-                  setActiveMilestoneId(null);
+                  void resolveAndTrack();
                 }}
                 className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
               >
-                Track
+                {tickerResolving ? 'Resolving…' : 'Track'}
               </button>
             </div>
             <p className="text-[9px] text-white/30 font-mono mt-1.5">
-              Public tickers use live market history plus recent SEC 8-K milestones. Private/non-SEC issuers may have price history without SEC events.
+              Enter a ticker or company name. Company names are resolved against the SEC public company ticker directory, then loaded from live market history and recent SEC 8-K milestones.
             </p>
+            {resolvedIssuer && (
+              <p className="text-[9px] text-cyan-300/80 font-mono mt-1">
+                Resolved: {resolvedIssuer} → {selectedStock}
+              </p>
+            )}
+            {tickerResolveError && (
+              <p className="text-[9px] text-amber-300 font-mono mt-1">
+                {tickerResolveError}
+              </p>
+            )}
           </div>
         </div>
 
