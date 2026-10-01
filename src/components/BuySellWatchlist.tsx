@@ -8,6 +8,7 @@ import EarningsAlerts from './EarningsAlerts';
 export default function BuySellWatchlist() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, number>>({});
+  const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [newSymbol, setNewSymbol] = useState('NBIS');
   const [newTargetPrice, setNewTargetPrice] = useState('');
   const [newType, setNewType] = useState<'above' | 'below'>('above');
@@ -29,23 +30,39 @@ export default function BuySellWatchlist() {
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
-    const symbols = [...new Set([...config.watchlist, ...config.alerts.map(a => a.symbol)])];
-    Promise.all(symbols.map(async symbol => {
-      try {
-        const res = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol));
-        if (!res.ok) return null;
-        const data = await res.json();
-        return [symbol, Number(data.price)] as const;
-      } catch { return null; }
-    })).then(results => {
+    let timer: number | undefined;
+
+    const refreshQuotes = async () => {
+      const symbols = [...new Set([...config.watchlist, ...config.alerts.map(a => a.symbol)])];
+      const results = await Promise.all(symbols.map(async symbol => {
+        try {
+          const res = await fetch(
+            '/api/quote?symbol=' + encodeURIComponent(symbol) + '&refresh=true',
+            { cache: 'no-store' }
+          );
+          if (!res.ok) return null;
+          const data = await res.json();
+          return [symbol, Number(data.price)] as const;
+        } catch {
+          return null;
+        }
+      }));
+
       if (cancelled) return;
       const next: Record<string, number> = {};
       results.forEach(item => {
         if (item && Number.isFinite(item[1])) next[item[0]] = item[1];
       });
-      setLiveQuotes(next);
-    });
-    return () => { cancelled = true; };
+      setLiveQuotes(prev => ({ ...prev, ...next }));
+      setLastQuoteRefresh(Date.now());
+      timer = window.setTimeout(refreshQuotes, 60000);
+    };
+
+    void refreshQuotes();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, [config]);
 
   if (!config) return null;
@@ -107,6 +124,9 @@ export default function BuySellWatchlist() {
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 06 / Signals</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Alert Targets &amp; Watchlist</h1>
         <p className="text-xs text-white/60 max-w-3xl leading-relaxed">Monitor configured price thresholds using the live server market feed.</p>
+        <div className="text-[9px] font-mono uppercase tracking-wider text-white/30 mt-1">
+          AUTO QUOTES 60S{lastQuoteRefresh ? ' · LAST CHECK ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
+        </div>
       </div>
 
       <EarningsAlerts />
