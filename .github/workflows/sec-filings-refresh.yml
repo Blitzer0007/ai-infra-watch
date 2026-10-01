@@ -34,7 +34,8 @@ jobs:
         env:
           SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
         run: |
-          set -euo pipefailecho "Checking SEC ticker directory through Vercel gateway..."
+          set -euo pipefail
+          echo "Checking SEC ticker directory through Vercel gateway..."
           curl --fail-with-body --silent --show-error --max-time 20 \
             -o /tmp/company_tickers.json \
             "$SEC_GATEWAY_URL?sec=tickers"
