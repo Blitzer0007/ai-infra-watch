@@ -28,9 +28,27 @@ function statusClass(status: string, stale?: boolean) {
 
 export default function DataHealth({ evidenceAvailability, timestamp, isLoading, error, onRefresh }: Props) {
   const entries = Object.entries(evidenceAvailability || {});
-  const available = entries.filter(([, item]) => item?.status === 'AVAILABLE' && !item?.stale).length;
-  const stale = entries.filter(([, item]) => item?.stale || item?.status === 'STALE').length;
-  const missing = entries.filter(([, item]) => item?.status === 'NOT_FOUND').length;
+
+  const sourceHealth = (item: any) => {
+    const status = String(item?.status || 'NOT_FOUND');
+    if (status === 'NOT_FOUND') return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
+    if (status === 'PENDING') return { label: 'PENDING', tone: 'text-sky-300 border-sky-400/20 bg-sky-400/5' };
+    if (item?.stale || status === 'STALE') return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+    if (!item?.retrievedAt) return { label: status === 'AVAILABLE' ? 'HEALTHY' : status, tone: status === 'AVAILABLE' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]' };
+
+    const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
+    if (!Number.isFinite(ageMs)) return { label: 'UNKNOWN', tone: 'text-white/45 border-white/10 bg-white/[.02]' };
+
+    const ageSeconds = ageMs / 1000;
+    const cadence = Number(item?.refreshIntervalSeconds) > 0 ? Number(item.refreshIntervalSeconds) : null;
+    if (cadence && ageSeconds > cadence * 5) {
+      return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+    }
+    if (cadence && ageSeconds > cadence * 2) {
+      return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+    }
+    return { label: 'HEALTHY', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' };
+  };
 
   const freshness = (item: any) => {
     if (!item?.retrievedAt) return null;
@@ -39,6 +57,11 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
     const ageMinutes = Math.round(ageMs / 60000);
     return ageMinutes < 1 ? 'just now' : ageMinutes + 'm ago';
   };
+
+  const healthy = entries.filter(([, item]) => sourceHealth(item).label === 'HEALTHY').length;
+  const aging = entries.filter(([, item]) => sourceHealth(item).label === 'AGING').length;
+  const stale = entries.filter(([, item]) => sourceHealth(item).label === 'STALE').length;
+  const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
 
   return (
     <div className="space-y-6">
@@ -55,10 +78,12 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
 
       {error && <div className="rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-200">{error}</div>}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Metric label="Available" value={available} icon={<ShieldCheck className="w-4 h-4"/>}/>
-        <Metric label="Stale / fallback" value={stale} icon={<Activity className="w-4 h-4"/>}/>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <Metric label="Healthy" value={healthy} icon={<ShieldCheck className="w-4 h-4"/>}/>
+        <Metric label="Aging" value={aging} icon={<Activity className="w-4 h-4"/>}/>
+        <Metric label="Stale" value={stale} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Total channels" value={entries.length} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden">
@@ -67,21 +92,27 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         </div>
         {entries.map(([key, item]) => {
           const status = String(item?.status || 'NOT_FOUND');
+          const health = sourceHealth(item);
           return (
             <div key={key} className="grid grid-cols-[1fr_auto] gap-3 items-center px-4 py-3 border-b border-white/5 last:border-0">
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs font-bold">{LABELS[key] || key}</div>
-                <div className="text-[9px] text-white/30 mt-1">
+                <div className="text-[9px] text-white/30 mt-1 break-words">
                   {item?.count != null ? item.count + ' evidence items' : ''}
                   {item?.source ? ' · ' + item.source : ''}
                   {item?.provider ? ' · provider: ' + item.provider : ''}
                   {freshness(item) ? ' · retrieved ' + freshness(item) : ''}
-                  {item?.refreshIntervalSeconds ? ' · auto-refresh ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
+                  {item?.refreshIntervalSeconds ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
+                  {item?.fallback ? ' · fallback' : ''}
+                  {item?.upstreamError ? ' · upstream issue' : ''}
                 </div>
               </div>
-              <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + statusClass(status, item?.stale)}>
-                {item?.stale ? 'STALE' : status}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + health.tone}>
+                  {health.label}
+                </span>
+                <span className="text-[8px] font-mono uppercase text-white/20">{status}</span>
+              </div>
             </div>
           );
         })}
