@@ -49,7 +49,7 @@ export interface MacroRisk {
   impactRating: 'low' | 'medium' | 'high';
   description: string;
   dateUpdated: string;
-  geminiImpactSummary?: string;
+  impactSummary?: string;
 }
 
 export interface WatchlistItem {
