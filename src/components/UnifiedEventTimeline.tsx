@@ -5,12 +5,12 @@ type HistoryPoint = { date: string; price: number };
 
 type TimelineEvent = {
   id: string;
-  kind: 'SEC' | 'Contract' | 'Congress' | 'Macro' | 'News';
+  kind: 'SEC' | 'Contract' | 'Congress' | 'Macro' | 'News' | 'Political';
   date: string;
   title: string;
   detail: string;
   source: string;
-  sourceLevel: 'PRIMARY' | 'PUBLIC DISCLOSURE' | 'RISK LEDGER' | 'NEWS';
+  sourceLevel: 'PRIMARY' | 'PUBLIC DISCLOSURE' | 'RISK LEDGER' | 'NEWS' | 'POLICY COVERAGE';
   url?: string | null;
 };
 
@@ -82,6 +82,13 @@ function newsSymbols(title: string): string[] {
     .map(([symbol]) => symbol);
 }
 
+function normalizePoliticalDate(value: unknown): string {
+  const text = String(value ?? '');
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})/);
+  return compact ? compact[1] + '-' + compact[2] + '-' + compact[3] : '';
+}
+
 function macroHolds(symbol: string, macroId: string): boolean {
   const id = clean(macroId);
   const holdings: Record<string, string[]> = {
@@ -97,6 +104,7 @@ function sourceLevel(kind: TimelineEvent['kind']): TimelineEvent['sourceLevel'] 
   if (kind === 'SEC' || kind === 'Contract') return 'PRIMARY';
   if (kind === 'Congress') return 'PUBLIC DISCLOSURE';
   if (kind === 'Macro') return 'RISK LEDGER';
+  if (kind === 'Political') return 'POLICY COVERAGE';
   return 'NEWS';
 }
 
@@ -139,6 +147,7 @@ function evidenceBadge(level: TimelineEvent['sourceLevel']): string {
   if (level === 'PRIMARY') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
   if (level === 'PUBLIC DISCLOSURE') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
   if (level === 'RISK LEDGER') return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
+  if (level === 'POLICY COVERAGE') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
   return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
 }
 
@@ -146,7 +155,7 @@ function iconFor(kind: TimelineEvent['kind']) {
   if (kind === 'SEC') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Contract') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Congress') return <Landmark className="w-3.5 h-3.5" />;
-  if (kind === 'Macro') return <Globe2 className="w-3.5 h-3.5" />;
+  if (kind === 'Macro' || kind === 'Political') return <Globe2 className="w-3.5 h-3.5" />;
   return <Newspaper className="w-3.5 h-3.5" />;
 }
 
@@ -156,12 +165,14 @@ export default function UnifiedEventTimeline({
   congressTrades = [],
   macroRisks = [],
   news = [],
+  politicalSignals = [],
 }: {
   symbol: string;
   contracts?: any[];
   congressTrades?: any[];
   macroRisks?: any[];
   news?: any[];
+  politicalSignals?: any[];
 }) {
   const [secEvents, setSecEvents] = useState<TimelineEvent[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -233,6 +244,20 @@ export default function UnifiedEventTimeline({
       }))
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
+    const politicalEvents: TimelineEvent[] = (politicalSignals || [])
+      .filter(item => Array.isArray(item?.relatedSymbols) && item.relatedSymbols.map((x: unknown) => String(x).toUpperCase()).includes(ticker))
+      .map(item => ({
+        id: 'political-' + String(item?.id || item?.date || item?.title),
+        kind: 'Political' as const,
+        date: normalizePoliticalDate(item?.date),
+        title: String(item?.title || 'Political / policy signal'),
+        detail: String(item?.eventType || 'Political statement / coverage') + ' · ' + String(item?.topic || 'AI / Technology'),
+        source: String(item?.source || 'GDELT'),
+        sourceLevel: 'POLICY COVERAGE' as const,
+        url: item?.url || null,
+      }))
+      .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
+
     const newsEvents: TimelineEvent[] = (news || [])
       .filter(item => item?.title && newsSymbols(String(item.title)).includes(ticker))
       .map(item => ({
@@ -247,7 +272,7 @@ export default function UnifiedEventTimeline({
       }))
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
-    return [...secEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...newsEvents]
+    return [...secEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents]
       .filter(event => event.date <= new Date().toISOString().slice(0, 10))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 16);
