@@ -22,6 +22,7 @@ type Props = {
   congressTrades?: any[];
   macroRisks?: any[];
   news?: any[];
+  politicalSignals?: any[];
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
@@ -59,7 +60,7 @@ function calculatePortfolioStress(
 }
 
 
-export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [] }: Props) {
+export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState('overview');
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('All');
@@ -187,6 +188,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         congressTrades={congressTrades}
         macroRisks={macroRisks}
         news={news}
+        politicalSignals={politicalSignals}
       />
 
       {tab === 'overview' && (
