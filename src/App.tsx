@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen
@@ -57,47 +57,36 @@ export default function App() {
   const watchlistSymbols = Object.keys(STOCK_METADATA);
 
   // Alert engine: keep price thresholds and large-move alerts active across the dashboard.
+  const quoteAlertsInitialized = useRef(false);
+
   useEffect(() => {
-    if (!config) return;
-    let cancelled = false;
-    let initialized = false;
+    if (!config || Object.keys(tickerPrices).length === 0) return;
 
-    const checkAlerts = async () => {
-      const symbols = [...new Set([
-        ...config.watchlist,
-        ...config.alerts.map(alert => alert.symbol),
-        ...STOCK_UNIVERSE_SYMBOLS
-      ])];
+    const symbols = [...new Set([
+      ...config.watchlist,
+      ...config.alerts.map(alert => alert.symbol),
+      ...STOCK_UNIVERSE_SYMBOLS
+    ])];
 
-      const quotes: Record<string, LivePrice> = {};
-      for (const symbol of symbols) {
-        try {
-          const quote = await fetchLiveQuote(symbol, config.finnhubKey || '', true);
-          if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
-            quotes[symbol] = { price: quote.price, changePct: quote.changePct, provider: quote.provider, retrievedAt: quote.retrievedAt, stale: quote.stale, cached: quote.cached };
-          }
-        } catch {
-          // A single quote failure should not stop alert evaluation for other symbols.
-        }
+    const quotes: Record<string, LivePrice> = {};
+    for (const symbol of symbols) {
+      const quote = tickerPrices[symbol];
+      if (quote && Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
+        quotes[symbol] = quote;
       }
+    }
 
-      if (cancelled) return;
+    const events = evaluateQuoteAlerts(
+      config,
+      quotes,
+      !quoteAlertsInitialized.current
+    );
+    quoteAlertsInitialized.current = true;
 
-      const events = evaluateQuoteAlerts(config, quotes, !initialized);
-      initialized = true;
-
-      if (config.browserNotifications) {
-        events.forEach(notifyBrowser);
-      }
-    };
-
-    checkAlerts();
-    const interval = setInterval(checkAlerts, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [config]);
+    if (config.browserNotifications) {
+      events.forEach(notifyBrowser);
+    }
+  }, [config, tickerPrices]);
 
   useEffect(() => {
     if (activeView !== 'portfolio') return;
