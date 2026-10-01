@@ -155,8 +155,8 @@ export default function EarningsAlerts() {
   };
 
   const events = (data?.upcoming || []).filter(event => event.days_until >= 0);
-  const historicalRows = Object.values(historical)
-    .flat()
+  const historicalRows: HistoricalEarnings[] = Object.keys(historical)
+    .flatMap(symbol => historical[symbol] || [])
     .sort((a, b) => b.reportDate.localeCompare(a.reportDate) || a.symbol.localeCompare(b.symbol));
   const serverReady = Boolean(data?.configuration?.finnhub_configured && data?.configuration?.webhook_configured);
 
