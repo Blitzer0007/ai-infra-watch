@@ -34,22 +34,20 @@ jobs:
 
       # Prefer a repository secret when configured; otherwise use a descriptive SEC-compliant fallback.
 
-      - name: Probe SEC EDGAR connectivity
+      - name: Probe SEC EDGAR gateway
         env:
-          SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
+          SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
         run: |
-          if [ -n "$SEC_CONTACT_EMAIL" ]; then
-            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
+          set -euo pipefail
+          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
+            AUTH=(-H "Authorization: Bearer $SEC_GATEWAY_TOKEN")
           else
-            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+            AUTH=()
           fi
 
-          echo "Checking SEC company ticker endpoint..."
-          curl -sS -L --retry 2 --retry-delay 2 \
-            -H "User-Agent: $UA" \
-            -o /tmp/company_tickers.json \
-            -w "company_tickers HTTP %{http_code}\n" \
-            https://www.sec.gov/files/company_tickers.json
+          echo "Checking Vercel SEC gateway → company ticker endpoint..."
+          curl -sS -L --retry 2 --retry-delay 2 "${AUTH[@]}"             -o /tmp/company_tickers.json             -w "gateway tickers HTTP %{http_code}\n"             "$SEC_GATEWAY_URL?resource=tickers"
 
           CIK=$(python - <<'PY'
 import json
@@ -60,21 +58,19 @@ for row in payload.values():
         print(str(row.get("cik_str", "")).zfill(10))
         break
 else:
-    raise SystemExit("NVDA CIK not found")
+    raise SystemExit("NVDA CIK not found through SEC gateway")
 PY
 )
 
-          echo "Checking SEC submissions endpoint for CIK $CIK..."
-          curl -sS -L --retry 2 --retry-delay 2 \
-            -H "User-Agent: $UA" \
-            -o /tmp/sec_submissions.json \
-            -w "submissions HTTP %{http_code}\n" \
-            "https://data.sec.gov/submissions/CIK${CIK}.json"
+          echo "Checking Vercel SEC gateway → submissions endpoint for CIK $CIK..."
+          curl -sS -L --retry 2 --retry-delay 2 "${AUTH[@]}"             -o /tmp/sec_submissions.json             -w "gateway submissions HTTP %{http_code}\n"             "$SEC_GATEWAY_URL?resource=submissions&cik=$CIK"
 
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
+          EDGAR_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
         run: |
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
             UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
@@ -88,6 +84,8 @@ PY
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
+          EDGAR_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
         run: |
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
             UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
