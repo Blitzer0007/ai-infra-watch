@@ -16,6 +16,26 @@ type EarningsAlert = {
   source?: string;
 };
 
+type HistoricalEarnings = {
+  symbol: string;
+  period: string;
+  reportDate: string;
+  hour?: string | null;
+  epsActual?: number | null;
+  epsEstimate?: number | null;
+  surprise?: number | null;
+  surprisePercent?: number | null;
+  reaction?: {
+    anchorDate: string;
+    anchorPrice: number;
+    eventTradingDate: string;
+    eventPrice: number;
+    t1: number | null;
+    t5: number | null;
+    t20: number | null;
+  } | null;
+};
+
 type EarningsResponse = {
   ok: boolean;
   source?: string;
@@ -23,6 +43,7 @@ type EarningsResponse = {
   lead_days?: number;
   lookahead_days?: number;
   upcoming?: EarningsAlert[];
+  historical?: Record<string, HistoricalEarnings[]>;
   notification?: { configured?: boolean; sent?: number; error?: string | null };
   configuration?: {
     finnhub_configured?: boolean;
@@ -56,6 +77,8 @@ export default function EarningsAlerts() {
   const [data, setData] = useState<EarningsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [browserStatus, setBrowserStatus] = useState<'unknown' | 'enabled' | 'blocked'>('unknown');
+  const [historical, setHistorical] = useState<Record<string, HistoricalEarnings[]>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -63,6 +86,26 @@ export default function EarningsAlerts() {
       const payload = await res.json();
       setData(payload);
       setLoading(false);
+
+      const monitored = Array.isArray(payload?.monitored_symbols)
+        ? payload.monitored_symbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
+        : [];
+      const symbols = monitored.slice(0, 10);
+      if (symbols.length) {
+        setHistoryLoading(true);
+        try {
+          const historyRes = await fetch(
+            '/api/earnings-history?symbols=' + encodeURIComponent(symbols.join(',')) + '&limit=4',
+            { cache: 'no-store' }
+          );
+          const historyPayload = await historyRes.json().catch(() => ({}));
+          setHistorical(historyPayload?.historical || {});
+        } catch {
+          setHistorical({});
+        } finally {
+          setHistoryLoading(false);
+        }
+      }
 
       const enabled = localStorage.getItem('aiw_earnings_browser_alerts') === '1';
       if (enabled && 'Notification' in window && Notification.permission === 'granted') {
@@ -112,6 +155,9 @@ export default function EarningsAlerts() {
   };
 
   const events = (data?.upcoming || []).filter(event => event.days_until >= 0);
+  const historicalRows = Object.values(historical)
+    .flat()
+    .sort((a, b) => b.reportDate.localeCompare(a.reportDate) || a.symbol.localeCompare(b.symbol));
   const serverReady = Boolean(data?.configuration?.finnhub_configured && data?.configuration?.webhook_configured);
 
   return (
@@ -253,6 +299,84 @@ export default function EarningsAlerts() {
                 </div>
               </article>
             ))}
+          </div>
+        )}
+
+        {!loading && data?.ok && (
+          <div className="rounded-xl border border-white/5 bg-black/15 p-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+              <div>
+                <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Recent earnings reaction history</div>
+                <p className="text-[10px] text-white/35 mt-1">
+                  Historical report surprise is shown next to the observed stock move after the report. This is descriptive, not a causal signal.
+                </p>
+              </div>
+              {historyLoading && (
+                <span className="text-[8px] font-mono uppercase text-white/25">Loading recent history…</span>
+              )}
+            </div>
+
+            {!historyLoading && !historicalRows.length && (
+              <div className="mt-3 text-[10px] font-mono text-white/30">
+                No recent reported earnings reactions were returned for the monitored symbols.
+              </div>
+            )}
+
+            {historicalRows.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[760px] text-[9px] font-mono">
+                  <thead className="text-white/25 uppercase tracking-wider">
+                    <tr className="border-b border-white/5">
+                      <th className="text-left py-2 pr-3">Report</th>
+                      <th className="text-right py-2 px-2">EPS actual</th>
+                      <th className="text-right py-2 px-2">EPS est.</th>
+                      <th className="text-right py-2 px-2">Surprise</th>
+                      <th className="text-right py-2 px-2">Event price</th>
+                      <th className="text-right py-2 px-2">Next day</th>
+                      <th className="text-right py-2 pl-2">5D / 20D</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historicalRows.slice(0, 12).map(row => (
+                      <tr key={row.symbol + ':' + row.reportDate + ':' + row.period} className="border-t border-white/5">
+                        <td className="py-2 pr-3">
+                          <div className="font-black text-white">{row.symbol}</div>
+                          <div className="text-white/30 mt-0.5">{row.reportDate} · {row.period}</div>
+                        </td>
+                        <td className="text-right px-2 text-white/65">{typeof row.epsActual === 'number' ? row.epsActual.toFixed(2) : '—'}</td>
+                        <td className="text-right px-2 text-white/40">{typeof row.epsEstimate === 'number' ? row.epsEstimate.toFixed(2) : '—'}</td>
+                        <td className={'text-right px-2 font-bold ' + (row.surprisePercent == null ? 'text-white/30' : row.surprisePercent >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                          {row.surprisePercent == null ? '—' : (row.surprisePercent >= 0 ? '+' : '') + row.surprisePercent.toFixed(1) + '%'}
+                        </td>
+                        <td className="text-right px-2 text-white/65">{row.reaction ? '
+          <div className="flex items-start gap-2 rounded-xl border border-white/5 bg-black/15 p-3 text-[9px] leading-relaxed text-white/35">
+            <CheckCircle2 className="mt-0.5 w-3.5 h-3.5 text-amber-300/70 flex-shrink-0" />
+            <p>
+              To make the alert independent of the open browser, set <span className="text-white/65">FINNHUB_API_KEY</span> and
+              <span className="text-white/65"> NOTIFY_WEBHOOK_URL</span> in Vercel, then set matching <span className="text-white/65">CRON_SECRET</span> in Vercel
+              and <span className="text-white/65">AIW_CRON_SECRET</span> in GitHub Actions secrets.
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+ + row.reaction.eventPrice.toFixed(2) : '—'}</td>
+                        <td className={'text-right px-2 font-bold ' + (row.reaction?.t1 == null ? 'text-white/30' : row.reaction.t1 >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                          {row.reaction?.t1 == null ? '—' : (row.reaction.t1 >= 0 ? '+' : '') + row.reaction.t1.toFixed(2) + '%'}
+                        </td>
+                        <td className="text-right pl-2 text-white/50">
+                          {row.reaction?.t5 == null ? '—' : (row.reaction.t5 >= 0 ? '+' : '') + row.reaction.t5.toFixed(1) + '%'}
+                          {' / '}
+                          {row.reaction?.t20 == null ? '—' : (row.reaction.t20 >= 0 ? '+' : '') + row.reaction.t20.toFixed(1) + '%'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
