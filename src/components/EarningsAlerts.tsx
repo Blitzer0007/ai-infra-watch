@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Bell, CheckCircle2, Clock3, ExternalLink, ShieldAlert } from 'lucide-react';
-import JevDecisionPanel from './JevDecisionPanel';
 
 type EarningsAlert = {
   id: string;
@@ -92,24 +91,7 @@ export default function EarningsAlerts() {
   useEffect(() => {
     load();
     const timer = setInterval(load, 30 * 60 * 1000);
-    const jevState = data
-    ? {
-        as_of: data.as_of,
-        lookahead_days: data.lookahead_days,
-        lead_days: data.lead_days,
-        upcoming_count: (data.upcoming || []).length,
-        upcoming: (data.upcoming || []).slice(0, 8).map((event) => ({
-          symbol: event.symbol,
-          date: event.date,
-          hour: event.hour,
-          days_until: event.days_until,
-          direct_holdings: event.direct_holdings,
-          linked_holdings: event.linked_holdings,
-          reasons: event.impact_reasons.slice(0, 3),
-          consensus: event.consensus,
-        })),
-      }
-    : { status: 'earnings feed loading' };
+
 
   return () => clearInterval(timer);
   }, []);

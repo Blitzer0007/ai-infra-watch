@@ -122,14 +122,18 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return () => { cancelled = true; };
   }, [selectedStock]);
 
-  const chartHistory = [...historyData];
-  if (livePrices?.[selectedStock]) {
-    const liveObj = livePrices[selectedStock];
-    const today = new Date().toISOString().slice(0, 10);
-    const lastItem = chartHistory[chartHistory.length - 1];
-    if (lastItem?.date === today) lastItem.price = liveObj.price;
-    else chartHistory.push({ date: today, price: liveObj.price });
-  }
+  const chartHistory = livePrices?.[selectedStock]
+    ? (() => {
+        const liveObj = livePrices[selectedStock];
+        const today = new Date().toISOString().slice(0, 10);
+        const updated = historyData.map((point) =>
+          point.date === today ? { ...point, price: liveObj.price } : point
+        );
+        return updated.some((point) => point.date === today)
+          ? updated
+          : [...updated, { date: today, price: liveObj.price }];
+      })()
+    : [...historyData];
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
 
@@ -227,7 +231,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                 type="button"
                 onClick={() => {
                   if (!tickerInput.trim()) return;
-                  setSelectedStock(tickerInput.trim().toUpperCase());
+                  setSelectedStock(resolveTrackerSymbol(tickerInput));
                   setActiveMilestoneId(null);
                 }}
                 className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
