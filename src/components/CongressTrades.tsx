@@ -184,6 +184,60 @@ export default function CongressTrades(_props: CongressTradesProps) {
   }, [symbolFilter]);
 
   useEffect(() => {
+    const needle = search.trim();
+    if (!needle) {
+      setSearchTrades([]);
+      setGlobalLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setGlobalLoading(true);
+      try {
+        const res = await fetch(
+          '/api/congress-trades?symbol=ALL&q=' + encodeURIComponent(needle),
+          { headers: { Accept: 'application/json' } }
+        );
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data?.upstreamError || data?.error || 'Congress search failed');
+        }
+
+        if (!cancelled) {
+          setSearchTrades(Array.isArray(data?.trades) ? data.trades : []);
+          setSourceStatus({
+            label: data?.sourceLabel || 'Congress search source',
+            kind:
+              data?.source === 'datadawn'
+                ? 'fallback'
+                : data?.source === 'cache'
+                  ? 'cache'
+                  : 'bargo',
+            stale: Boolean(data?.stale),
+            sourceUrl: data?.sourceUrl || null,
+            upstreamError: data?.upstreamError || null,
+          });
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSearchTrades([]);
+          setError(err instanceof Error ? err.message : 'Congress search failed');
+        }
+      } finally {
+        if (!cancelled) setGlobalLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search]);
+
+  useEffect(() => {
     if (symbolFilter === 'ALL') {
       setHistory([]);
       return;
