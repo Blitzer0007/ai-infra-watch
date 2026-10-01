@@ -33,7 +33,6 @@ class InProcessMCPToolbox:
         from mcp_servers.stocks.earnings import EarningsService
         from mcp_servers.stocks.event_study import EventStudyService
         from mcp_servers.stocks.candles import CandleService
-        from mcp_servers.filings.service import FilingsService
         from mcp_servers.filings.milestones import MilestoneService
         from mcp_servers.filings.contracts import ContractService
         from mcp_servers.news.service import NewsService
@@ -43,7 +42,6 @@ class InProcessMCPToolbox:
         self._candles = CandleService.from_env(mode)
         self._event_study = EventStudyService(earnings=self._earnings, candles=self._candles)
         self._relationships_from_env = None
-        self._filings = FilingsService.from_env(mode)
         self._milestones = MilestoneService.from_env("live")
         self._contracts = ContractService.from_env("live")
         self._news = NewsService.from_env("live" if self.live else "fixture")
@@ -57,21 +55,16 @@ class InProcessMCPToolbox:
                 ("get_quotes", "Get real-time quotes for several stock symbols."),
                 ("get_snapshot", "Get quotes for the configured watchlist."),
                 ("get_earnings", "Get past and upcoming earnings and historical price reaction."),
-                ("get_rotation", "Detect AI infrastructure capital-rotation signals."),
                 ("get_event_study", "Compute earnings-event T+1, T+5 and T+20 session returns."),
                 ("get_relationships", "Resolve configured AI Infra Watch peer relationships."),
                 ("list_watchlist", "List tracked watchlist symbols."),
                 ("health", "Stocks service health snapshot."),
             ],
             "filings": [
-                ("search_filings", "Search the SEC filing corpus."),
-                ("answer_question", "Answer a question about filings with citations."),
                 ("get_milestones", "Get recent SEC 8-K milestones for a symbol."),
                 ("get_catalysts", "Get current SEC 8-K material-event and contract evidence."),
                 ("get_contracts", "Get contract-related primary SEC disclosures."),
-                ("list_documents", "List filing document IDs."),
-                ("get_document", "Return one filing document."),
-                ("health", "Filings service health snapshot."),
+                ("health", "SEC evidence service health snapshot."),
             ],
             "news": [
                 ("search", "Search recent market news by keywords."),
@@ -82,6 +75,9 @@ class InProcessMCPToolbox:
                 ("health", "News service health snapshot."),
             ],
         }
+        # Rotation currently depends on LangGraph, which is intentionally not
+        # part of the small Vercel Python dependency set. Keep the live catalog
+        # serverless-safe rather than advertising a tool that cannot execute.
         for server, items in definitions.items():
             for name, description in items:
                 info = ToolInfo(server=server, name=name, description=description, input_schema={})
@@ -125,10 +121,6 @@ class InProcessMCPToolbox:
         if key == "stocks.health":
             return self._stocks.health().model_dump()
 
-        if key == "filings.search_filings":
-            return self._filings.search_filings(str(args.get("query", "")), top_k=int(args.get("top_k", 5))).model_dump()
-        if key == "filings.answer_question":
-            return self._filings.answer_question(str(args.get("question", ""))).model_dump()
         if key == "filings.get_milestones":
             return self._milestones.get_timeline(str(args.get("symbol", ""))).model_dump()
         if key == "filings.get_catalysts":
@@ -153,7 +145,11 @@ class InProcessMCPToolbox:
         if key == "filings.get_document":
             return self._filings.get_document(str(args.get("document_id", "")))
         if key == "filings.health":
-            return self._filings.health().model_dump()
+            return {
+                "mode": "live",
+                "ok": True,
+                "detail": "SEC 8-K milestone and contract tools ready",
+            }
 
         if key == "news.search":
             return self._news.search(str(args.get("query", "")), days=int(args.get("days", 7))).model_dump()
