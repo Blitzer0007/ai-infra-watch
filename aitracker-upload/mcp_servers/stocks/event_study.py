@@ -2,7 +2,7 @@
 
 Computes post-event persistence from an earnings event and daily candles.
 The event date is anchored against the last close strictly before the report;
-the target for T+1/T+5/T+20 is the corresponding post-event trading session.
+the targets are the first, fifth, and twentieth post-event trading sessions.
 For bmo reports the event-date close is eligible; for amc/unknown reports the
 first strictly later close is used. Missing history yields None rather than a
 guessed number.

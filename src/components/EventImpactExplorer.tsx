@@ -316,8 +316,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 <th className="text-left p-3">Date</th>
                 <th className="text-right p-3">Event Day</th>
                 <th className="text-right p-3">Next Trading Day</th>
-                <th className="text-right p-3">5 Trading Days Later</th>
-                <th className="text-right p-3">20 Trading Days Later</th>
+                <th className="text-right p-3">5th Trading Day</th>
+                <th className="text-right p-3">20th Trading Day</th>
                 <th className="text-right p-3">Next Trading Day vs Market</th>
               </tr>
             </thead>
@@ -377,7 +377,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       )}
 
       <div className="mt-3 text-[9px] text-white/30 font-mono">
-        Event Day = the first trading day on or after the filing date · Next Trading Day = the first market session after Event Day · 5/20 Trading Days Later = forward market sessions.
+        Event Day = the first trading day on or after the filing date · Next Trading Day = the first market session after Event Day · 5th/20th Trading Day = forward market sessions.
       </div>
 
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
