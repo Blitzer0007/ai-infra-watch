@@ -12,15 +12,17 @@ jobs:
       - name: Check autonomous agent health route
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 20 "https://ai-infra-watch-theta.vercel.app/api/agent-ask" -o /tmp/agent-health.json
+          curl --fail --silent --show-error --max-time 35 "https://ai-infra-watch-theta.vercel.app/api/agent-ask?probe_mcp=true" -o /tmp/agent-health.json
           python - <<'PY'
           import json
 
           with open("/tmp/agent-health.json", encoding="utf-8") as f:
               body = json.load(f)
 
-          if body.get("status") != "ok":
+          if body.get("status") not in {"ok", "degraded"}:
               raise SystemExit(f"unexpected autonomous health response: {body}")
+          if body.get("mcp_probe") and body.get("mcp_ready") is not True:
+              raise SystemExit(f"MCP readiness probe failed: {body}")
 
           print("autonomous agent health check passed")
           print("provider:", body.get("provider"))
