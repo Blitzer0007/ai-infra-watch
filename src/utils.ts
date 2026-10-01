@@ -58,6 +58,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
   high: number;
   prevClose: number;
   source: 'live';
+  provider?: string;
+  retrievedAt?: string;
+  stale?: boolean;
+  cached?: boolean;
 }> {
   if (!apiKey) {
     const res = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol));
@@ -70,7 +74,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
       low: Number(data.low) || data.price,
       high: Number(data.high) || data.price,
       prevClose: Number(data.prevClose) || data.price,
-      source: 'live'
+      source: 'live',
+      provider: data.provider,
+      retrievedAt: data.retrievedAt,
+      stale: data.stale === true,
+      cached: data.cached === true
     };
   }
 
@@ -90,7 +98,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
       low: data.l,
       high: data.h,
       prevClose: data.pc,
-      source: 'live'
+      source: 'live',
+      provider: data.provider,
+      retrievedAt: data.retrievedAt,
+      stale: data.stale === true,
+      cached: data.cached === true
     };
   } catch (err) {
     try {
@@ -104,7 +116,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
         low: Number(data.low) || data.price,
         high: Number(data.high) || data.price,
         prevClose: Number(data.prevClose) || data.price,
-        source: 'live'
+        source: 'live',
+        provider: data.provider,
+        retrievedAt: data.retrievedAt,
+        stale: data.stale === true,
+        cached: data.cached === true
       };
     } catch {
       throw err;
