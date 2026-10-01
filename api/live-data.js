@@ -28,13 +28,14 @@ const SYMBOLS = loadConfiguredSymbols();
 // Keep a short-lived in-memory cache for warm Vercel invocations.
 // The refresh=true query parameter bypasses this cache explicitly.
 const CACHE_MS = 60 * 1000;
+const FEED_TIMEOUT_MS = 7000;
 let cached = null;
 let cachedAt = 0;
 
 async function fetchSecContracts() {
   const ua = { 'User-Agent': process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research dashboard; contact: configured-admin@example.com)' };
   try {
-    const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua });
+    const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
     if (!tickerResponse.ok) return [];
     const tickerMap = await tickerResponse.json();
     const cikByTicker = {};
@@ -48,7 +49,7 @@ async function fetchSecContracts() {
 
     const results = await Promise.all(candidates.map(async ({ symbol, cik }) => {
       try {
-        const response = await fetch('https://data.sec.gov/submissions/CIK' + cik + '.json', { headers: ua });
+        const response = await fetch('https://data.sec.gov/submissions/CIK' + cik + '.json', { headers: ua, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
         if (!response.ok) return [];
         const payload = await response.json();
         const recent = payload?.filings?.recent;
@@ -250,7 +251,7 @@ async function politicalSignals() {
 async function news() {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
   const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&format=json&maxrecords=20&timespan=24h';
-  const r = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' } });
+  const r = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' }, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
   if (!r.ok) return [];
   const j = await r.json();
   return (j && j.articles || []).slice(0,20).map(a => ({
@@ -269,7 +270,6 @@ export default async function handler(req, res) {
     try { stockPrices[symbol] = await routedQuote(symbol); } catch {}
   }));
 
-  const currentNews = await news().catch(() => []);
   const today = new Date().toISOString().slice(0,10);
   const macroRisks = [
     { id:'taiwan', category:'Supply Chain', title:'Taiwan advanced-node exposure', impactRating:'high', description:'Monitor events that could affect advanced-node manufacturing, packaging and accelerator supply.', dateUpdated:today, impactSummary:'Geopolitics → wafer supply → accelerator availability → NVDA/AMD/TSM/DRAM.' },
@@ -309,9 +309,12 @@ export default async function handler(req, res) {
     }
   };
 
-  const contracts = await fetchSecContracts();
-  const congressTrades = await fetchCongressTrades(req);
-  const politicalSignalsResult = await politicalSignals().catch(() => []);
+  const [currentNews, contracts, congressTrades, politicalSignalsResult] = await Promise.all([
+    news().catch(() => []),
+    fetchSecContracts(),
+    fetchCongressTrades(req),
+    politicalSignals().catch(() => []),
+  ]);
   evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR' };
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage' };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API' };
