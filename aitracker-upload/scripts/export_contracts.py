@@ -8,9 +8,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from mcp_servers.filings.contracts import ContractService
+# Ensure `python scripts/export_contracts.py` works from the repo root or
+# with this script as the current working entry point. The package root is
+# aitracker-upload/, which contains app/ and mcp_servers/.
+PYTHON_ROOT = Path(__file__).resolve().parents[1]
+if str(PYTHON_ROOT) not in sys.path:
+    sys.path.insert(0, str(PYTHON_ROOT))
+
+from mcp_servers.filings.contracts import ContractService  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WATCHLIST_PATH = ROOT / "data" / "stock_watchlist.json"
