@@ -473,7 +473,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
         <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono">
           {stockMilestones.length === 0 ? (
-            <p className="text-xs text-white/40">No events logged yet. Use the journal card below to declare custom milestones.</p>
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
           ) : (
             stockMilestones.map((m) => {
               const isActive = m.id === activeMilestone?.id;

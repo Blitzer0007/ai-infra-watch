@@ -211,12 +211,19 @@ export default function App() {
     setConfig(loaded);
 
     async function updateTicker() {
-      const updated: Record<string, { price: number; changePct: number }> = {};
+      const updated: Record<string, LivePrice> = {};
       const allSymbols = STOCK_UNIVERSE_SYMBOLS;
       for (const s of allSymbols) {
         try {
           const res = await fetchLiveQuote(s, loaded.finnhubKey);
-          updated[s] = { price: res.price, changePct: res.changePct };
+          updated[s] = {
+            price: res.price,
+            changePct: res.changePct,
+            provider: res.provider,
+            retrievedAt: res.retrievedAt,
+            stale: res.stale,
+            cached: res.cached
+          };
         } catch (e) {
           // ignore
         }
@@ -482,6 +489,9 @@ export default function App() {
                 <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider">
                   SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
                 </span>
+              <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
+                AUTO: FEED 5M · QUOTES 45S
+              </span>
               )}
               <button
                 onClick={() => handleFetchLiveData(true)}
