@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
-import { Cpu, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, Award, Search, Loader2 } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2 } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
@@ -49,7 +49,7 @@ function resolveTrackerSymbol(value: string): string {
 
 export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [selectedStock, setSelectedStock] = useState<string>('NBIS');
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [milestones] = useState<Milestone[]>(INITIAL_MILESTONES);
   const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<{ date: string; price: number }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -59,8 +59,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
   const [tickerInput, setTickerInput] = useState('');
 
-  // Curated milestones only; live SEC milestones are added below.
- []);
 
   // Combine the curated timeline with live SEC milestones for the selected symbol.
   const stockMilestones = [
