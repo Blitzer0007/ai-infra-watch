@@ -161,7 +161,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       </section>
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
-        <Metric label="Invested cost" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
+        <Metric label="Invest amount" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
         <Metric label="Current value" value={liveCurrentTotal != null ? '$' + liveCurrentTotal.toFixed(2) : '—'} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' stale'} tone="up" icon={<TrendingUp/>}/>
         <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '') + '$' + liveUnrealized.toFixed(2) : '—'} suffix={liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : ''} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
@@ -179,11 +179,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'overview' && (
         <>
-          <div className="grid grid-cols-1 xl:grid-cols-[.9fr_1.1fr] gap-4 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.25fr] gap-4 items-start">
             <div>
               {selectedAnalysis && <PositionDetail h={selectedAnalysis}/>}
             </div>
-            <Panel title="Held portfolio universe" subtitle="Screenshot-backed positions with live quote and model state">
+            <Panel title="Held portfolio universe" subtitle="Live portfolio positions · quote freshness · model state · select a holding to update decision context">
               <div className="flex flex-wrap gap-2 mb-3">
                 <div className="relative flex-1 min-w-48">
                   <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-white/25"/>
