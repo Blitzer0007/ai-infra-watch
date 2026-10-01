@@ -22,6 +22,15 @@ const DATA_DAWN_TICKER_ALIASES = {
   AMD: 'AMD',
   PHARVARIS: 'PHVS',
   'DIGI POWER X': 'DGXX',
+  SALESFORCE: 'CRM',
+  'SERVICE NOW': 'NOW',
+  'SANDISK CORPORATION': 'SNDK',
+  'PALANTIR TECHNOLOGIES': 'PLTR',
+  'ADVANCED MICRO DEVICES': 'AMD',
+  'NVIDIA CORPORATION': 'NVDA',
+  'MICROSOFT CORPORATION': 'MSFT',
+  'AMAZON.COM': 'AMZN',
+  'ALPHABET': 'GOOGL',
 };
 
 function normalizeDate(value) {
@@ -93,7 +102,7 @@ async function fetchBargo(symbol) {
       ? 'https://www.bargo.ai/free-apis/congress/v1/trades?limit=100'
       : 'https://www.bargo.ai/free-apis/congress/v1/trades/' +
         encodeURIComponent(symbol) +
-        '?limit=100';
+        '?limit=500';
 
   const payload = await fetchJson(url, 'Bargo API');
   return Array.isArray(payload?.trades) ? payload.trades : [];
@@ -219,8 +228,8 @@ export default async function handler(req, res) {
   let primaryError = null;
 
   try {
-    const rawTrades = query ? [] : await fetchBargo(symbol);
-    const trades = rawTrades
+    const rawTrades = await fetchBargo(query ? 'ALL' : symbol);
+    let trades = rawTrades
       .map((trade, index) =>
         normalizeTrade(
           trade,
@@ -231,6 +240,18 @@ export default async function handler(req, res) {
       )
       .filter((trade) => trade.stockSymbol)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+    // Bargo's public endpoint is ticker-oriented. For free-text search,
+    // fetch the global disclosure feed and filter locally so company names
+    // and arbitrary tickers are not restricted to the preset watchlist.
+    if (query) {
+      const needle = query.toUpperCase();
+      const mappedTicker = DATA_DAWN_TICKER_ALIASES[needle] || needle;
+      trades = trades.filter((trade) => {
+        const member = String(trade.politician || '').toUpperCase();
+        return trade.stockSymbol === mappedTicker || member.includes(needle);
+      });
+    }
 
     const createdAt = Date.now();
     cache.set(cacheKey, {
