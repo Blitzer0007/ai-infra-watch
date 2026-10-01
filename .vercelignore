@@ -2,3 +2,4 @@
 # Runtime/source files remain available to Vercel's Python function tracer.
 node_modules/**
 *.zip
+aitracker-upload/data/filings/**

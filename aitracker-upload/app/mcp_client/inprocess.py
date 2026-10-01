@@ -57,6 +57,7 @@ class InProcessMCPToolbox:
                 ("get_snapshot", "Get quotes for the configured watchlist.", {"type": "object", "properties": {}}),
                 ("get_earnings", "Get past and upcoming earnings and historical price reaction.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("get_event_study", "Compute earnings-event T+1, T+5 and T+20 session returns.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_rotation", "Detect AI hardware versus application capital rotation over 1d, 5d and 20d windows.", {"type": "object", "properties": {}}),
                 ("get_relationships", "Resolve configured AI Infra Watch peer relationships.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("list_watchlist", "List tracked watchlist symbols.", {"type": "object", "properties": {}}),
                 ("health", "Stocks service health snapshot.", {"type": "object", "properties": {}}),

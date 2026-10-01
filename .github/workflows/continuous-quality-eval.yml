@@ -1,0 +1,63 @@
+name: Continuous Quality Eval
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "aitracker-upload/app/assertions/**"
+      - "aitracker-upload/app/eval/**"
+      - "aitracker-upload/app/llm/**"
+      - "aitracker-upload/app/synthesis/**"
+      - "aitracker-upload/data/eval/**"
+      - "aitracker-upload/scripts/quality_gate.py"
+      - "aitracker-upload/requirements.txt"
+      - ".github/workflows/continuous-quality-eval.yml"
+  pull_request:
+    paths:
+      - "aitracker-upload/app/assertions/**"
+      - "aitracker-upload/app/eval/**"
+      - "aitracker-upload/app/llm/**"
+      - "aitracker-upload/app/synthesis/**"
+      - "aitracker-upload/data/eval/**"
+      - "aitracker-upload/scripts/quality_gate.py"
+      - "aitracker-upload/requirements.txt"
+      - ".github/workflows/continuous-quality-eval.yml"
+  schedule:
+    - cron: "31 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: continuous-quality-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install evaluation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r aitracker-upload/requirements.txt
+
+      - name: Run deterministic golden eval gate
+        working-directory: aitracker-upload
+        env:
+          PYTHONPATH: .
+          EVAL_STUB: "true"
+        run: |
+          python scripts/quality_gate.py --min-pass-rate 0.90 --output ../quality-report.json
+
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-infra-quality-report
+          path: quality-report.json
