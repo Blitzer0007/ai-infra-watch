@@ -245,8 +245,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           symbol,
           events_returned: events.length,
           reactions_matched: summary.events,
-          average_next_day_reaction_pct: summary.avgT1,
-          average_next_day_vs_spy_pct_points: summary.avgRelativeT1,
+          average_next_trading_day_reaction_pct: summary.avgT1,
+          average_next_trading_day_vs_spy_pct_points: summary.avgRelativeT1,
           categories: categories.slice(0, 8),
           recent_events: events.slice(0, 8).map((event) => ({
             date: event.date,
@@ -265,7 +265,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
             <div key={item.category} className="rounded-lg border border-white/5 bg-black/10 p-3">
               <div className="text-[9px] uppercase font-mono font-bold text-white/55 leading-4">{item.category}</div>
               <div className={'text-base font-black mt-2 ' + tone(item.avgT1)}>{formatPct(item.avgT1)}</div>
-              <div className="text-[9px] text-white/25 font-mono mt-1">avg next-day · {item.count} event{item.count === 1 ? '' : 's'}</div>
+              <div className="text-[9px] text-white/25 font-mono mt-1">avg next trading day · {item.count} event{item.count === 1 ? '' : 's'}</div>
               <div className={'text-[9px] font-mono mt-2 ' + tone(item.avgRelativeT1)}>vs market {formatPct(item.avgRelativeT1)}</div>
             </div>
           ))}
@@ -278,13 +278,13 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
         <Metric label="Events matched" value={String(summary.events)} suffix="SEC events" />
         <Metric
-          label="Avg Next-Day Reaction"
+          label="Avg Next Trading Day Reaction"
           value={formatPct(summary.avgT1)}
           suffix=""
           valueClass={tone(summary.avgT1)}
         />
         <Metric
-          label="Avg Next-Day vs Market"
+          label="Avg Next Trading Day vs Market"
           value={formatPct(summary.avgRelativeT1)}
           suffix="pts vs SPY"
           valueClass={tone(summary.avgRelativeT1)}
@@ -314,11 +314,11 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
               <tr>
                 <th className="text-left p-3">Event</th>
                 <th className="text-left p-3">Date</th>
-                <th className="text-right p-3">Event Day (T0)</th>
+                <th className="text-right p-3">Event Day</th>
                 <th className="text-right p-3">Next Trading Day</th>
                 <th className="text-right p-3">5 Trading Days Later</th>
                 <th className="text-right p-3">20 Trading Days Later</th>
-                <th className="text-right p-3">Next Day vs Market</th>
+                <th className="text-right p-3">Next Trading Day vs Market</th>
               </tr>
             </thead>
             <tbody>
@@ -377,7 +377,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       )}
 
       <div className="mt-3 text-[9px] text-white/30 font-mono">
-        Event Day = the first trading day on or after the filing date · Next Trading Day = the following market session · 5/20 Trading Days Later = forward market sessions.
+        Event Day = the first trading day on or after the filing date · Next Trading Day = the first market session after Event Day · 5/20 Trading Days Later = forward market sessions.
       </div>
 
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -389,7 +389,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
         <Callout
           icon={<ShieldAlert />}
           title="Market context"
-          body="The SPY-relative column helps separate a stock-specific move from a broader market move. It is still descriptive, not a causal attribution."
+          body="The SPY-relative comparison helps separate a stock-specific move from a broader market move. It is still descriptive, not a causal attribution."
         />
       </div>
     </Panel>
