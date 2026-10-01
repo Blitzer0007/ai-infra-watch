@@ -332,11 +332,17 @@ export default function UnifiedEventTimeline({
   })), [filteredEvents, history, spy]);
 
   const matched = rows.filter(row => row.reaction);
-  const avgT1 = matched.length
-    ? matched.map(row => row.reaction!.t1).filter((x): x is number => x != null).reduce((sum, x, _, arr) => sum + x / arr.length, 0)
+  const t1Values = matched
+    .map(row => row.reaction!.t1)
+    .filter((x): x is number => x != null && Number.isFinite(x));
+  const relativeT1Values = matched
+    .map(row => row.reaction!.relativeT1)
+    .filter((x): x is number => x != null && Number.isFinite(x));
+  const avgT1 = t1Values.length
+    ? t1Values.reduce((sum, x) => sum + x, 0) / t1Values.length
     : null;
-  const avgRel = matched.length
-    ? matched.map(row => row.reaction!.relativeT1).filter((x): x is number => x != null).reduce((sum, x, _, arr) => sum + x / arr.length, 0)
+  const avgRel = relativeT1Values.length
+    ? relativeT1Values.reduce((sum, x) => sum + x, 0) / relativeT1Values.length
     : null;
 
   const impactMatrix = useMemo(() => {
