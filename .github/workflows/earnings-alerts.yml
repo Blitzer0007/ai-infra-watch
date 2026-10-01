@@ -30,6 +30,9 @@ jobs:
             --request GET \
             --header "Authorization: Bearer $AIW_CRON_SECRET" \
             --header "User-Agent: ai-infra-watch-github-actions/1.0" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 2 \
             "https://ai-infra-watch-theta.vercel.app/api/earnings-alerts?days=14&notify=1"
 
       - name: Record completion
