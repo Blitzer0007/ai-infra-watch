@@ -302,6 +302,7 @@ export default function EarningsAlerts() {
           </div>
         )}
 
+
         {!loading && data?.ok && (
           <div className="rounded-xl border border-white/5 bg-black/15 p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
@@ -348,21 +349,7 @@ export default function EarningsAlerts() {
                         <td className={'text-right px-2 font-bold ' + (row.surprisePercent == null ? 'text-white/30' : row.surprisePercent >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
                           {row.surprisePercent == null ? '—' : (row.surprisePercent >= 0 ? '+' : '') + row.surprisePercent.toFixed(1) + '%'}
                         </td>
-                        <td className="text-right px-2 text-white/65">{row.reaction ? '
-          <div className="flex items-start gap-2 rounded-xl border border-white/5 bg-black/15 p-3 text-[9px] leading-relaxed text-white/35">
-            <CheckCircle2 className="mt-0.5 w-3.5 h-3.5 text-amber-300/70 flex-shrink-0" />
-            <p>
-              To make the alert independent of the open browser, set <span className="text-white/65">FINNHUB_API_KEY</span> and
-              <span className="text-white/65"> NOTIFY_WEBHOOK_URL</span> in Vercel, then set matching <span className="text-white/65">CRON_SECRET</span> in Vercel
-              and <span className="text-white/65">AIW_CRON_SECRET</span> in GitHub Actions secrets.
-            </p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
- + row.reaction.eventPrice.toFixed(2) : '—'}</td>
+                        <td className="text-right px-2 text-white/65">{row.reaction ? ('$' + row.reaction.eventPrice.toFixed(2)) : '—'}</td>
                         <td className={'text-right px-2 font-bold ' + (row.reaction?.t1 == null ? 'text-white/30' : row.reaction.t1 >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
                           {row.reaction?.t1 == null ? '—' : (row.reaction.t1 >= 0 ? '+' : '') + row.reaction.t1.toFixed(2) + '%'}
                         </td>
