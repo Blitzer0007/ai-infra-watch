@@ -20,7 +20,7 @@ async function resolveCompanyTicker(query) {
 
   const response = await fetch('https://www.sec.gov/files/company_tickers.json', {
     headers: {
-      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)',
+      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: github-actions[bot]@users.noreply.github.com)',
       'Accept-Encoding': 'gzip, deflate'
     },
     signal: AbortSignal.timeout(8000)
@@ -198,6 +198,96 @@ function buildDataDawnUrl(symbol, query = '') {
   );
 }
 
+function looksLikePersonQuery(query) {
+  const raw = String(query || '').trim();
+  const normalized = normalizeSearchText(raw);
+  if (!normalized) return false;
+
+  // Known company aliases and conventional uppercase ticker-style queries
+  // should go directly to company/ticker resolution.
+  if (DATA_DAWN_TICKER_ALIASES[normalized]) return false;
+  if (/^[A-Z0-9.-]{1,6}$/.test(raw) && raw === raw.toUpperCase()) return false;
+
+  return /^[A-Za-z][A-Za-z.' -]*$/.test(raw);
+}
+
+function buildPersonSearchUrl(query) {
+  const safeQuery = String(query || '').trim().replaceAll("'", "''");
+  const sql =
+    'SELECT member_name, transaction_date, ticker, transaction_type, amount_range, owner, chamber, source_url ' +
+    "FROM stock_trades WHERE UPPER(member_name) LIKE UPPER('%" + safeQuery + "%')" +
+    ' ORDER BY transaction_date DESC LIMIT 500';
+
+  return (
+    'https://regs.datadawn.org/openregs.json?sql=' +
+    encodeURIComponent(sql) +
+    '&_shape=objects'
+  );
+}
+
+function scorePersonMatch(memberName, query) {
+  const name = normalizeSearchText(memberName);
+  const needle = normalizeSearchText(query);
+  if (!name || !needle) return 0;
+
+  const nameTokens = name.split(' ').filter(Boolean);
+  const queryTokens = needle.split(' ').filter(Boolean);
+
+  if (name === needle) return 1200;
+
+  if (
+    queryTokens.length === 1 &&
+    nameTokens[0] === queryTokens[0]
+  ) {
+    return 1100;
+  }
+
+  if (
+    queryTokens.length === 1 &&
+    nameTokens.includes(queryTokens[0])
+  ) {
+    return 1000;
+  }
+
+  if (
+    queryTokens.length > 1 &&
+    queryTokens.every((token) => nameTokens.includes(token))
+  ) {
+    return 1050;
+  }
+
+  if (name.startsWith(needle + ' ')) return 900;
+
+  return 0;
+}
+
+async function fetchPersonMatches(query) {
+  const payload = await fetchJson(buildPersonSearchUrl(query), 'OpenRegs person search');
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.rows)
+      ? payload.rows
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+
+  return rows
+    .map((row, index) => {
+      const trade = normalizeTrade(row, index, undefined, 'datadawn');
+      return {
+        trade,
+        score: scorePersonMatch(trade.politician, query),
+      };
+    })
+    .filter((row) => row.score >= 900)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        String(b.trade.transactionDate).localeCompare(String(a.trade.transactionDate))
+    )
+    .map((row) => row.trade);
+}
+
 async function fetchDataDawn(symbol, query = '') {
   const payload = await fetchJson(buildDataDawnUrl(symbol, query), 'OpenRegs fallback');
   const rows = Array.isArray(payload)
@@ -289,6 +379,32 @@ export default async function handler(req, res) {
   let primaryError = null;
 
   try {
+    if (query && looksLikePersonQuery(query)) {
+      try {
+        const personTrades = await fetchPersonMatches(query);
+        if (personTrades.length) {
+          searchResolution = 'Congress member name matched "' + query + '"';
+          const createdAt = Date.now();
+          cache.set(cacheKey, {
+            createdAt,
+            trades: personTrades,
+            provider: 'datadawn',
+          });
+          return respond(res, {
+            symbol,
+            trades: personTrades,
+            provider: 'datadawn',
+            cached: false,
+            stale: false,
+            fetchedAt: createdAt,
+            searchResolution,
+          });
+        }
+      } catch {
+        // Fall through to company/ticker resolution when the person search is unavailable.
+      }
+    }
+
     if (query) {
       try {
         const resolved = await resolveCompanyTicker(query);
