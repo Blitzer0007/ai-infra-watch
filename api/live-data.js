@@ -26,7 +26,7 @@ function loadConfiguredSymbols() {
 const SYMBOLS = loadConfiguredSymbols();
 
 async function fetchSecContracts() {
-  const ua = { 'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)' };
+  const ua = { 'User-Agent': process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research dashboard; contact: configured-admin@example.com)' };
   try {
     const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua });
     if (!tickerResponse.ok) return [];
@@ -261,8 +261,8 @@ export default async function handler(req, res) {
   const today = new Date().toISOString().slice(0,10);
   const macroRisks = [
     { id:'taiwan', category:'Supply Chain', title:'Taiwan advanced-node exposure', impactRating:'high', description:'Monitor events that could affect advanced-node manufacturing, packaging and accelerator supply.', dateUpdated:today, impactSummary:'Geopolitics → wafer supply → accelerator availability → NVDA/AMD/TSM/DRAM.' },
-    { id:'controls', category:'Trade Policy', title:'AI-chip export controls', impactRating:'high', description:'Monitor restrictions affecting high-end accelerator shipments and China demand.', dateUpdated:today, geminiImpactSummary:'Policy → addressable market → product mix → relative reaction for NVDA/AMD.' },
-    { id:'power', category:'Infrastructure', title:'Data-center power availability', impactRating:'medium', description:'Track grid interconnection, power procurement and AI capacity announcements.', dateUpdated:today, geminiImpactSummary:'Power → AI capacity → GPU hosting demand → DGXX/NBIS/IREN/VIVO.' }
+    { id:'controls', category:'Trade Policy', title:'AI-chip export controls', impactRating:'high', description:'Monitor restrictions affecting high-end accelerator shipments and China demand.', dateUpdated:today, impactSummary:'Policy → addressable market → product mix → relative reaction for NVDA/AMD.' },
+    { id:'power', category:'Infrastructure', title:'Data-center power availability', impactRating:'medium', description:'Track grid interconnection, power procurement and AI capacity announcements.', dateUpdated:today, impactSummary:'Power → AI capacity → GPU hosting demand → DGXX/NBIS/IREN/VIVO.' }
   ];
 
   const evidenceAvailability = {
