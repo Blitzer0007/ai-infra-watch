@@ -37,16 +37,16 @@ jobs:
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
         env:
-          EDGAR_USER_AGENT: "AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
         run: |
-          python scripts/ingest_filings.py --mode live --watchlist
+          EDGAR_USER_AGENT="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)" \
+            python scripts/ingest_filings.py --mode live --watchlist
 
       - name: Export contract intelligence
         working-directory: aitracker-upload
         env:
-          EDGAR_USER_AGENT: AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)
         run: |
-          python scripts/export_contracts.py --watchlist --output ../data/contracts_sec.json
+          EDGAR_USER_AGENT="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)" \
+            python scripts/export_contracts.py --watchlist --output ../data/contracts_sec.json
 
       - name: Commit corpus changes
         run: |
