@@ -12,8 +12,8 @@ jobs:
     name: Deploy latest main to Vercel
     runs-on: ubuntu-latest
     env:
-      VERCEL_ORG_ID: team_Ws1BysoBDemarhql3G252EqG
-      VERCEL_PROJECT_ID: prj_5TIo61X4jiqprrwzFU9JxWA87Yj4
+      VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
+      VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
     steps:
