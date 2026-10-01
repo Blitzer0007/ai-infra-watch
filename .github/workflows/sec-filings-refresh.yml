@@ -33,50 +33,33 @@ jobs:
           python -m pip install -r aitracker-upload/requirements.txt
           python -m pip install -r aitracker-upload/requirements-ingest.txt
 
-      - name: Probe SEC upstream
+      - name: Probe SEC gateway
         env:
           SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
           SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
         run: |
           set -euo pipefail
-          if [ -n "$SEC_CONTACT_EMAIL" ]; then
-            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
-          else
-            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
-          fi
-
+          echo "Checking SEC ticker directory through Vercel gateway..."
           if [ -n "$SEC_GATEWAY_TOKEN" ]; then
-            echo "Checking SEC ticker directory through the configured Vercel gateway..."
-            curl --fail-with-body --silent --show-error --max-time 20 \
-              -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
-              -o /tmp/company_tickers.json \
-              "$SEC_GATEWAY_URL?sec=tickers"
+            AUTH_HEADER=( -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" )
           else
-            echo "SEC gateway token is not configured; probing SEC directly..."
-            curl --fail-with-body --silent --show-error --max-time 20 \
-              -A "$UA" \
-              -o /tmp/company_tickers.json \
-              "https://www.sec.gov/files/company_tickers.json"
+            AUTH_HEADER=()
           fi
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            "${AUTH_HEADER[@]}" \
+            -o /tmp/company_tickers.json \
+            "$SEC_GATEWAY_URL?sec=tickers"
 
-          CIK=$(python -c 'import json,sys; payload=json.load(open("/tmp/company_tickers.json", encoding="utf-8")); rows=[r for r in payload.values() if str(r.get("ticker","")).upper()=="NVDA"]; print(str(rows[0]["cik_str"]).zfill(10) if rows else sys.exit("NVDA CIK not found"))')
+          CIK=$(python -c 'import json,sys; payload=json.load(open("/tmp/company_tickers.json", encoding="utf-8")); rows=[r for r in payload.values() if str(r.get("ticker","")).upper()=="NVDA"]; print(str(rows[0]["cik_str"]).zfill(10) if rows else sys.exit("NVDA CIK not found through SEC gateway"))')
 
-          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
-            echo "Checking SEC submissions through the configured Vercel gateway..."
-            curl --fail-with-body --silent --show-error --max-time 20 \
-              -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
-              "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
-              -o /tmp/sec_submissions.json
-          else
-            echo "Checking SEC submissions directly..."
-            curl --fail-with-body --silent --show-error --max-time 20 \
-              -A "$UA" \
-              "https://data.sec.gov/submissions/CIK$CIK.json" \
-              -o /tmp/sec_submissions.json
-          fi
+          echo "Checking SEC submissions through Vercel gateway..."
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            "${AUTH_HEADER[@]}" \
+            "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
+            -o /tmp/sec_submissions.json
 
-          echo "SEC upstream probe passed."
+          echo "SEC gateway probe passed."
 
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
@@ -94,7 +77,6 @@ jobs:
           if [ -n "$SEC_GATEWAY_TOKEN" ]; then
             export EDGAR_GATEWAY_TOKEN="$SEC_GATEWAY_TOKEN"
           else
-            unset EDGAR_GATEWAY_URL
             unset EDGAR_GATEWAY_TOKEN
           fi
           EDGAR_USER_AGENT="$UA" \
@@ -116,7 +98,6 @@ jobs:
           if [ -n "$SEC_GATEWAY_TOKEN" ]; then
             export EDGAR_GATEWAY_TOKEN="$SEC_GATEWAY_TOKEN"
           else
-            unset EDGAR_GATEWAY_URL
             unset EDGAR_GATEWAY_TOKEN
           fi
           EDGAR_USER_AGENT="$UA" \
