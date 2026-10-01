@@ -3,9 +3,18 @@ import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Newspaper, ShieldAl
 
 type HistoryPoint = { date: string; price: number };
 
+type EarningsRow = {
+  symbol: string;
+  period: string;
+  reportDate: string;
+  epsActual?: number | null;
+  epsEstimate?: number | null;
+  surprisePercent?: number | null;
+};
+
 type TimelineEvent = {
   id: string;
-  kind: 'SEC' | 'Contract' | 'Congress' | 'Macro' | 'News' | 'Political';
+  kind: 'SEC' | 'Contract' | 'Earnings' | 'Congress' | 'Macro' | 'News' | 'Political';
   date: string;
   title: string;
   detail: string;
@@ -37,6 +46,37 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
       .catch(() => []);
   }
   return historyCache[key];
+}
+
+async function loadEarningsEvents(symbol: string): Promise<TimelineEvent[]> {
+  try {
+    const response = await fetch(
+      '/api/earnings-history?symbols=' + encodeURIComponent(symbol) + '&limit=6',
+      { cache: 'no-store' }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return [];
+    const rows = Array.isArray(payload?.historical?.[symbol]) ? payload.historical[symbol] as EarningsRow[] : [];
+    return rows.map(row => {
+      const surprise = typeof row.surprisePercent === 'number'
+        ? ' · EPS surprise ' + (row.surprisePercent >= 0 ? '+' : '') + row.surprisePercent.toFixed(1) + '%'
+        : '';
+      return {
+        id: 'earnings-' + symbol + '-' + row.reportDate + '-' + row.period,
+        kind: 'Earnings' as const,
+        date: String(row.reportDate),
+        title: symbol + ' earnings · ' + String(row.period),
+        detail: 'Reported EPS ' + (typeof row.epsActual === 'number' ? row.epsActual.toFixed(2) : 'n/a')
+          + ' vs estimate ' + (typeof row.epsEstimate === 'number' ? row.epsEstimate.toFixed(2) : 'n/a')
+          + surprise,
+        source: 'Finnhub earnings history',
+        sourceLevel: 'PRIMARY' as const,
+        url: 'https://finnhub.io/',
+      };
+    }).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
+  } catch {
+    return [];
+  }
 }
 
 async function loadSecEvents(symbol: string): Promise<TimelineEvent[]> {
@@ -152,7 +192,7 @@ function evidenceBadge(level: TimelineEvent['sourceLevel']): string {
 }
 
 function iconFor(kind: TimelineEvent['kind']) {
-  if (kind === 'SEC') return <FileText className="w-3.5 h-3.5" />;
+  if (kind === 'SEC' || kind === 'Earnings') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Contract') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Congress') return <Landmark className="w-3.5 h-3.5" />;
   if (kind === 'Macro' || kind === 'Political') return <Globe2 className="w-3.5 h-3.5" />;
@@ -175,6 +215,7 @@ export default function UnifiedEventTimeline({
   politicalSignals?: any[];
 }) {
   const [secEvents, setSecEvents] = useState<TimelineEvent[]>([]);
+  const [earningsEvents, setEarningsEvents] = useState<TimelineEvent[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [spy, setSpy] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,10 +227,11 @@ export default function UnifiedEventTimeline({
     if (!ticker) return;
 
     setLoading(true);
-    Promise.all([loadSecEvents(ticker), loadHistory(ticker), loadHistory('SPY')])
-      .then(([sec, stock, benchmark]) => {
+    Promise.all([loadSecEvents(ticker), loadEarningsEvents(ticker), loadHistory(ticker), loadHistory('SPY')])
+      .then(([sec, earnings, stock, benchmark]) => {
         if (cancelled) return;
         setSecEvents(sec);
+        setEarningsEvents(earnings);
         setHistory(stock);
         setSpy(benchmark);
       })
@@ -273,11 +315,11 @@ export default function UnifiedEventTimeline({
       }))
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
-    return [...secEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents]
+    return [...secEvents, ...earningsEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents]
       .filter(event => event.date <= new Date().toISOString().slice(0, 10))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 16);
-  }, [symbol, secEvents, contracts, congressTrades, macroRisks, news, politicalSignals]);
+  }, [symbol, secEvents, earningsEvents, contracts, congressTrades, macroRisks, news, politicalSignals]);
 
   const filteredEvents = useMemo(
     () => kindFilter === 'ALL' ? events : events.filter(event => event.kind === kindFilter),
