@@ -582,6 +582,24 @@ export default async function handler(req, res) {
       due_alerts: due.map(event => event.id),
       delivery: delivered,
     }));
+
+    // The scheduler must fail when an alert was due but delivery did not
+    // succeed. Returning HTTP 200 here would make GitHub Actions report a
+    // successful run even though the notification was never delivered.
+    if (due.length > 0 && (!delivered.configured || delivered.error || delivered.sent !== due.length)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(502).json({
+        ok: false,
+        source: 'finnhub',
+        as_of: new Date().toISOString(),
+        lead_days: leadDays,
+        lookahead_days: lookaheadDays,
+        monitored_symbols: Array.from(profiles.keys()),
+        upcoming,
+        notification: delivered,
+        error: delivered.error || 'Notification delivery did not confirm all due alerts.',
+      });
+    }
   }
 
   res.setHeader('Cache-Control', 'no-store');
