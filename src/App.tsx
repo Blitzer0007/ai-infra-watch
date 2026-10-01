@@ -333,7 +333,6 @@ export default function App() {
               return (
                 <div key={item.id}>
                   <button
-                    key={item.id}
                     onClick={() => item.id === 'portfolio' ? handlePortfolioNavigate('overview') : handleNavigate(item.id)}
                     className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
                       isActive
@@ -415,8 +414,7 @@ export default function App() {
                   return (
                     <div key={item.id}>
                       <button
-                      key={item.id}
-                      onClick={() => handleNavigate(item.id)}
+                      onClick={() => item.id === 'portfolio' ? handlePortfolioNavigate('overview') : handleNavigate(item.id)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
                         isActive
                           ? 'bg-white/10 text-emerald-400 border border-white/15'
