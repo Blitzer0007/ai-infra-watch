@@ -339,6 +339,7 @@ export default async function handler(req, res) {
     fetchCongressTrades(req),
     politicalSignals().catch(() => []),
   ]);
+  const currentNews = newsResult?.items || [];
   const feedRetrievedAt = new Date().toISOString();
   evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
   evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
