@@ -374,20 +374,10 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   {activeMilestone.description}
                 </p>
               </div>
-
-              {activeMilestone.id.startsWith('custom_') && (
-                <button
-                  onClick={() => handleRemoveMilestone(activeMilestone.id)}
-                  className="text-xs font-mono text-rose-400 hover:text-rose-300 flex items-center space-x-1.5 cursor-pointer pt-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Custom Entry</span>
-                </button>
-              )}
             </div>
           ) : (
             <div className="text-center py-12 text-white/40 font-mono text-xs">
-              No milestones available for this stock. Log one below!
+              No milestones available for this stock.
             </div>
           )}
 
