@@ -78,15 +78,15 @@ export default function ContractEventStudy({ symbol, eventDate }: ContractEventS
           <span className="text-white font-bold">{reaction ? '$' + reaction.anchorPrice.toFixed(2) : '—'}</span>
         </div>
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">T+1</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">Next Trading Day</span>
           <span className={reaction?.t1 != null && reaction.t1 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t1 ?? null)}</span>
         </div>
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">T+5</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">5 Trading Days Later</span>
           <span className={reaction?.t5 != null && reaction.t5 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t5 ?? null)}</span>
         </div>
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">T+20</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">20 Trading Days Later</span>
           <span className={reaction?.t20 != null && reaction.t20 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t20 ?? null)}</span>
         </div>
       </div>
