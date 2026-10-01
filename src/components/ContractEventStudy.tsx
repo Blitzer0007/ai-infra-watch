@@ -74,7 +74,7 @@ export default function ContractEventStudy({ symbol, eventDate }: ContractEventS
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">Anchor</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">Prior Trading Day</span>
           <span className="text-white font-bold">{reaction ? '$' + reaction.anchorPrice.toFixed(2) : '—'}</span>
         </div>
         <div>
@@ -82,16 +82,16 @@ export default function ContractEventStudy({ symbol, eventDate }: ContractEventS
           <span className={reaction?.t1 != null && reaction.t1 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t1 ?? null)}</span>
         </div>
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">5 Trading Days Later</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">5th Trading Day</span>
           <span className={reaction?.t5 != null && reaction.t5 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t5 ?? null)}</span>
         </div>
         <div>
-          <span className="text-[8px] text-white/35 block uppercase tracking-widest">20 Trading Days Later</span>
+          <span className="text-[8px] text-white/35 block uppercase tracking-widest">20th Trading Day</span>
           <span className={reaction?.t20 != null && reaction.t20 >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-300 font-bold'}>{formatReaction(reaction?.t20 ?? null)}</span>
         </div>
       </div>
       <p className="text-[9px] text-white/35 leading-relaxed">
-        Uses the last trading close before the SEC filing date as the anchor, then measures the 1st, 5th, and 20th subsequent trading sessions. This measures price reaction around the filing date; it does not establish causation.
+        Uses the prior trading-day close as the baseline, then measures the 1st, 5th, and 20th trading sessions after Event Day. This measures price reaction around the filing date; it does not establish causation.
       </p>
     </div>
   );  

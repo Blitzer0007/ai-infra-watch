@@ -334,7 +334,8 @@ export default function EarningsAlerts() {
                       <th className="text-right py-2 px-2">Surprise</th>
                       <th className="text-right py-2 px-2">Event price</th>
                       <th className="text-right py-2 px-2">Next Trading Day</th>
-                      <th className="text-right py-2 pl-2">5 Trading Days / 20 Trading Days</th>
+                      <th className="text-right py-2 px-2">5th Trading Day</th>
+                      <th className="text-right py-2 pl-2">20th Trading Day</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -355,8 +356,6 @@ export default function EarningsAlerts() {
                         </td>
                         <td className="text-right pl-2 text-white/50">
                           {row.reaction?.t5 == null ? '—' : (row.reaction.t5 >= 0 ? '+' : '') + row.reaction.t5.toFixed(1) + '%'}
-                          {' / '}
-                          {row.reaction?.t20 == null ? '—' : (row.reaction.t20 >= 0 ? '+' : '') + row.reaction.t20.toFixed(1) + '%'}
                         </td>
                       </tr>
                     ))}
