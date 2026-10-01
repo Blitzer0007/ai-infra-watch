@@ -161,40 +161,61 @@ def _normalize_status(value: Any) -> str | None:
             return normalized
     return None
 
+def _record_claim_context(record: dict[str, Any]) -> tuple[str, str]:
+    """Extract entity/claim text from the same response record as its status."""
+    entity = ""
+    claim = ""
+    for key, value in record.items():
+        if str(key) in ENTITY_KEYS and isinstance(value, str):
+            candidate = value.strip()
+            if (
+                candidate
+                and len(candidate) <= 120
+                and candidate.upper() not in {"SEC", "EDGAR", "NEWS"}
+            ):
+                entity = candidate
+                break
+    for key, value in record.items():
+        if str(key) in CLAIM_KEYS and isinstance(value, str):
+            candidate = value.strip()
+            if candidate and len(candidate) <= 500:
+                claim = candidate
+                break
+    return entity, claim
+
+
+def _iter_status_records(value: Any):
+    """Yield dictionaries that directly contain a lifecycle/status field."""
+    if isinstance(value, dict):
+        if any(str(key) in STATUS_KEYS for key in value):
+            yield value
+        for child in value.values():
+            yield from _iter_status_records(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_status_records(child)
+
+
 def _extract_claims(tool_name: str, output: Any) -> list[dict[str, Any]]:
     family = _family_from_tool(tool_name)
     claims: list[dict[str, Any]] = []
-    for path, key, value in _walk(output):
-        if str(key) not in STATUS_KEYS:
-            continue
-        status = _normalize_status(value)
-        if not status:
-            continue
-        parts = path.split(".")
-        parent: dict[str, Any] = output
-        # Recover a nearby entity without requiring a fixed response schema.
-        entity = ""
-        for _, pkey, pvalue in _walk(output):
-            if str(pkey) in ENTITY_KEYS and isinstance(pvalue, str):
-                candidate = pvalue.strip()
-                if candidate and len(candidate) <= 120:
-                    entity = candidate
-                    if candidate.upper() in {"SEC", "EDGAR", "NEWS"}:
-                        continue
-                    break
-        claim = ""
-        for _, pkey, pvalue in _walk(output):
-            if str(pkey) in CLAIM_KEYS and isinstance(pvalue, str):
-                candidate = pvalue.strip()
-                if candidate and len(candidate) <= 500:
-                    claim = candidate
-                    break
-        claims.append({
-            "family": family, "status": status, "entity": entity,
-            "claim": claim, "path": path, "tool": tool_name,
-        })
+    for record in _iter_status_records(output):
+        for key, value in record.items():
+            if str(key) not in STATUS_KEYS:
+                continue
+            status = _normalize_status(value)
+            if not status:
+                continue
+            entity, claim = _record_claim_context(record)
+            claims.append({
+                "family": family,
+                "status": status,
+                "entity": entity,
+                "claim": claim,
+                "path": str(key),
+                "tool": tool_name,
+            })
     return claims
-
 def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
     """Find conservative same-claim contradictions across successful calls.
 

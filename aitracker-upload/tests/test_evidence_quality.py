@@ -47,3 +47,48 @@ def test_signed_then_delayed_is_not_automatically_conflict():
     ]
     report = detect_conflicts(calls)
     assert report["detected"] is False
+
+
+def test_conflict_scoping_does_not_cross_contaminate_records():
+    now = datetime.now(timezone.utc)
+    calls = [
+        call(
+            "filings.get_catalysts",
+            {
+                "records": [
+                    {"status": "announced", "symbol": "NVDA", "summary": "New partnership"},
+                    {"status": "cancelled", "symbol": "AMD", "summary": "Old agreement"},
+                ],
+                "filing_date": (now - timedelta(days=2)).isoformat(),
+            },
+        ),
+    ]
+    report = detect_conflicts(calls)
+    assert report["detected"] is False
+
+
+def test_conflict_scoping_keeps_same_record_contradiction():
+    now = datetime.now(timezone.utc)
+    calls = [
+        call(
+            "filings.get_catalysts",
+            {
+                "records": [
+                    {"status": "announced", "symbol": "NVDA", "summary": "New partnership"},
+                ],
+                "filing_date": (now - timedelta(days=2)).isoformat(),
+            },
+        ),
+        call(
+            "news.search",
+            {
+                "records": [
+                    {"status": "cancelled", "symbol": "NVDA", "summary": "New partnership"},
+                ],
+                "published_at": (now - timedelta(hours=3)).isoformat(),
+            },
+        ),
+    ]
+    report = detect_conflicts(calls)
+    assert report["detected"] is True
+    assert report["items"][0]["entity"] == "NVDA"

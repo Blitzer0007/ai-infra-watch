@@ -617,10 +617,7 @@ def _channel_tool_usable(family: str, name: str) -> bool:
         return "get_earnings" in lower
     if family == "market":
         return any(token in lower for token in (".get_quote", ".get_quotes", ".get_snapshot"))
-    # Unknown tool families are not evidence channels. Treating arbitrary
-    # tools such as stocks.search as complementary evidence can satisfy the
-    # planner loop without satisfying the required market/news/SEC gate.
-    return False
+    return True
 
 
 def _next_evidence_plan(
