@@ -105,7 +105,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       return {
         kind: 'Macro',
         title: x.title,
-        detail: x.geminiImpactSummary || x.description,
+        detail: x.impactSummary || x.description,
         when: x.dateUpdated,
         affected: symbols(MACRO_HOLDINGS[key]),
         source: 'Live macro risk ledger',
