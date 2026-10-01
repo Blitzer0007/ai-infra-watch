@@ -67,7 +67,8 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export function buildIntelligence(prices: Record<string, PricePoint>): IntelligenceSnapshot {
-  const allReturns = Object.values(prices)
+  const freshPrices = Object.values(prices).filter(x => x?.stale !== true);
+  const allReturns = freshPrices
     .map(x => x?.changePct)
     .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
 
@@ -75,7 +76,9 @@ export function buildIntelligence(prices: Record<string, PricePoint>): Intellige
 
   const groups = Object.entries(GROUP_MEMBERS).map(([name, members]) => {
     const returns = members
-      .map(t => prices[t]?.changePct)
+      .map(t => prices[t])
+      .filter((x) => x?.stale !== true)
+      .map(x => x?.changePct)
       .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
 
     const avgChange = avg(returns);
@@ -88,13 +91,16 @@ export function buildIntelligence(prices: Record<string, PricePoint>): Intellige
 
   const portfolioSymbols = portfolio.positions.map((item) => item.symbol);
   const portfolioReturns = portfolioSymbols
-    .map(t => prices[t]?.changePct)
+    .map(t => prices[t])
+    .filter((x) => x?.stale !== true)
+    .map(x => x?.changePct)
     .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
 
   const pairSignals = PAIRS.map(([left,right,label]) => ({
     left,
     right,
-    spread: typeof prices[left]?.changePct === 'number' && typeof prices[right]?.changePct === 'number'
+    spread: prices[left]?.stale !== true && prices[right]?.stale !== true &&
+      typeof prices[left]?.changePct === 'number' && typeof prices[right]?.changePct === 'number'
       ? prices[left].changePct - prices[right].changePct
       : null,
     label,
