@@ -4,12 +4,24 @@ import JevDecisionPanel from './JevDecisionPanel';
 
 type Price = { price: number; changePct: number };
 type NewsItem = { title?: string; source?: string; url?: string; date?: string };
+type PoliticalSignal = {
+  id?: string;
+  title?: string;
+  source?: string;
+  url?: string | null;
+  date?: string | null;
+  topic?: string;
+  eventType?: string;
+  sourceType?: 'primary' | 'secondary';
+  relatedSymbols?: string[];
+};
 type Props = {
   prices?: Record<string, Price>;
   contracts?: Contract[];
   congressTrades?: CongressTrade[];
   macroRisks?: MacroRisk[];
   news?: NewsItem[];
+  politicalSignals?: PoliticalSignal[];
 };
 
 const PORTFOLIO_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
@@ -45,7 +57,12 @@ function newsSymbols(title: string) {
   return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => text.includes(term))).map(([key]) => key));
 }
 
-function evidenceProfile(kind: string, source: string) {
+function evidenceProfile(kind: string, source: string, sourceType?: string) {
+  if (kind === 'Political') {
+    return sourceType === 'primary'
+      ? { level: 'PRIMARY', note: 'Primary official source' }
+      : { level: 'POLICY COVERAGE', note: 'Secondary political/policy coverage' };
+  }
   if (kind === 'Contract' && source === 'SEC EDGAR') {
     return { level: 'PRIMARY', note: 'Primary SEC filing' };
   }
@@ -59,6 +76,7 @@ function evidenceProfile(kind: string, source: string) {
 }
 
 function evidenceBadge(level: string) {
+  if (level === 'POLICY COVERAGE') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
   if (level === 'PRIMARY') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
   if (level === 'PUBLIC DISCLOSURE') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
   if (level === 'RISK LEDGER') return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
@@ -66,13 +84,14 @@ function evidenceBadge(level: string) {
 }
 
 function badge(kind: string) {
+  if (kind === 'Political') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
   if (kind === 'Contract') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
   if (kind === 'Congress') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
   if (kind === 'Macro') return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
   return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
 }
 
-export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [] }: Props) {
+export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const signals = [
     ...contracts
       .filter(x => PORTFOLIO_SYMBOLS.includes(x.company))
@@ -112,6 +131,19 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         url: null,
       };
     }),
+    ...politicalSignals
+      .filter(x => Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => PORTFOLIO_SYMBOLS.includes(String(symbol).toUpperCase())))
+      .slice(0, 3)
+      .map(x => ({
+        kind: 'Political',
+        title: x.title || x.topic || 'Political / policy signal',
+        detail: (x.eventType || 'Political statement / coverage') + ' · ' + (x.topic || 'AI / Technology'),
+        when: x.date || undefined,
+        affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase())),
+        source: x.source || 'GDELT',
+        sourceType: x.sourceType || 'secondary',
+        url: x.url || null,
+      })),
     ...news
       .filter(x => x.title)
       .map(x => ({ ...x, affected: newsSymbols(x.title || '') }))
@@ -171,7 +203,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       ) : (
         <div className="space-y-2">
           {signals.map((signal, index) => {
-            const evidence = evidenceProfile(signal.kind, signal.source);
+            const evidence = evidenceProfile(signal.kind, signal.source, (signal as any).sourceType);
             return (
             <div key={signal.kind + signal.title + index} className="rounded-xl border border-white/5 bg-white/[.02] p-3">
               <div className="flex flex-col lg:flex-row gap-3">
