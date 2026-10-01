@@ -528,7 +528,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       {/* Timeline of All Stock Milestones */}
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
-        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono">
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono max-h-[640px] overflow-y-auto pr-2 aiw-scroll-region">
           {stockMilestones.length === 0 ? (
             <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
           ) : (

@@ -202,7 +202,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       {signals.length === 0 ? (
         <div className="rounded-xl border border-white/5 bg-white/[.02] p-4 text-xs text-white/35">No combined signals are available from the current refresh.</div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1 aiw-scroll-region">
           {signals.map((signal, index) => {
             const evidence = evidenceProfile(signal.kind, signal.source, (signal as any).sourceType);
             return (

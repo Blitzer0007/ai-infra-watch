@@ -204,7 +204,7 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
           No recent political / AI policy signals were returned by the configured live feeds.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 aiw-scroll-region">
           {signals.map((signal, index) => (
             <article
               key={signal.id || signal.url || signal.title || index}

@@ -308,7 +308,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       )}
 
       {!loading && !error && rows.length > 0 && (
-        <div className="overflow-x-auto border border-white/5 rounded-xl">
+        <div className="overflow-x-auto max-h-[560px] overflow-y-auto border border-white/5 rounded-xl aiw-scroll-region">
           <table className="w-full text-[10px] font-mono">
             <thead className="bg-white/[.03] text-white/35 uppercase tracking-wider">
               <tr>

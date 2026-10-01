@@ -285,7 +285,7 @@ export default function AutonomousResearch() {
                   Answer source: {answerSourceLabel(result.answer_source)}
                 </span>
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-6 text-white/80">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-white/80 max-h-64 overflow-y-auto pr-1 aiw-scroll-region">
                 {result.summary || result.error || 'No synthesis was returned.'}
               </p>
               {result.resolution && (

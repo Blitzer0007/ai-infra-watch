@@ -154,7 +154,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
       </div>
 
       {/* Contracts Cards List */}
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[760px] overflow-y-auto pr-1 aiw-scroll-region">
         {filteredContracts.length === 0 ? (
           <div className="text-center py-12 border border-white/10 rounded text-white/40 text-xs font-mono">
             No live SEC-linked contracts are available for the current data refresh.

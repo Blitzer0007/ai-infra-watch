@@ -243,7 +243,7 @@ export default function EarningsAlerts() {
         )}
 
         {!loading && data?.ok && events.length > 0 && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[680px] overflow-y-auto pr-1 aiw-scroll-region">
             {events.slice(0, 6).map(event => (
               <article key={event.id} className="rounded-xl border border-white/8 bg-[#0F1115]/55 p-4">
                 <div className="flex items-start justify-between gap-3">

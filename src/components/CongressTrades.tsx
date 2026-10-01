@@ -478,7 +478,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       )}
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">
           <table className="w-full border-collapse text-left text-xs font-mono">
             <thead>
               <tr className="border-b border-white/10 bg-[#0F1115]/60 text-white/40 uppercase tracking-widest text-[9px] font-black">

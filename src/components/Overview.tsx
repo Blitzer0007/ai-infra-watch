@@ -599,7 +599,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
 
           {/* Details Sidebar Column */}
           <div className="bg-[#15181E]/40 rounded-xl border border-white/10 p-4 md:p-5 flex flex-col justify-between space-y-4">
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[560px] overflow-y-auto pr-1 aiw-scroll-region">
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Node Insight</span>

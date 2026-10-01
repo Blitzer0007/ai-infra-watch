@@ -167,7 +167,7 @@ export default function ContractTerms({ symbol, accession, url }: Props) {
                 <div className="text-[8px] font-mono uppercase tracking-widest text-white/35 mb-2">
                   Evidence from primary filing
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-2 aiw-scroll-region">
                   {detail.evidence.length ? (
                     detail.evidence.map((item, index) => (
                       <div
