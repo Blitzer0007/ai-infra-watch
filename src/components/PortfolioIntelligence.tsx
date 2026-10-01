@@ -26,8 +26,6 @@ type Props = {
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
-const NETWORK_NODES: Array<[string, number, number]> = [['NVDA',140,210],['AMD',330,100],['MU',330,320],['META',550,100],['NOW',550,320],['NBIS',790,150],['CRM',790,290]];
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -354,18 +352,76 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       )}
 
-      {tab === 'network' && <Panel title="Relationship graph" subtitle="Competition and second-order exposure — click a node">
-        <svg viewBox="0 0 920 420" className="w-full rounded-xl bg-[#0D1015] border border-white/5">
-          {NETWORK_NODES.map(n => <g key={n[0]} onClick={() => setSelected(n[0])} style={{cursor:'pointer'}}>
-            <circle cx={n[1]} cy={n[2]} r="38" fill={selected === n[0] ? '#153528' : '#15181E'} stroke={selected === n[0] ? '#34d399' : '#334155'} strokeWidth="2"/>
-            <text x={n[1]} y={n[2]+5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700">{n[0]}</text>
-          </g>)}
-          <line x1="178" y1="195" x2="292" y2="115" stroke="#34d399" strokeWidth="3"/><line x1="178" y1="225" x2="292" y2="305" stroke="#fbbf24" strokeWidth="2"/><line x1="368" y1="100" x2="512" y2="100" stroke="#60a5fa" strokeWidth="2"/><line x1="368" y1="320" x2="512" y2="320" stroke="#fb7185" strokeWidth="2"/><line x1="588" y1="115" x2="752" y2="145" stroke="#34d399" strokeWidth="2"/><line x1="588" y1="305" x2="752" y2="290" stroke="#fb7185" strokeWidth="2"/>
-        </svg>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-          <Insight title="NVDA ↔ AMD" body="Direct accelerator competition." icon={<Activity/>}/><Insight title="MU ↔ SK Hynix" body="Memory-cycle relationship." icon={<Network/>}/><Insight title="NOW ↔ CRM" body="Enterprise-software relative strength." icon={<FileText/>}/>
-        </div>
-      </Panel>}
+      {tab === 'network' && <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        {selectedAnalysis ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-emerald-300">Selected holding</div>
+                <div className="text-2xl font-black mt-2">{selectedAnalysis.symbol}</div>
+                <div className="text-[10px] text-white/40 mt-1">{selectedAnalysis.name} · {selectedAnalysis.group}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Info label="Daily move" value={selectedAnalysis.dailyChangePct == null ? '—' : (selectedAnalysis.dailyChangePct >= 0 ? '+' : '') + selectedAnalysis.dailyChangePct.toFixed(2) + '%'} />
+                  <Info label="Peer average" value={selectedAnalysis.peerAverageChange == null ? '—' : (selectedAnalysis.peerAverageChange >= 0 ? '+' : '') + selectedAnalysis.peerAverageChange.toFixed(2) + '%'} />
+                </div>
+              </div>
+
+              <div className="hidden lg:flex items-center justify-center text-white/15">
+                <Network className="w-7 h-7" />
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Connected peers</div>
+                <div className="mt-3 space-y-2">
+                  {selectedAnalysis.peers.length === 0 && (
+                    <div className="text-[10px] font-mono text-white/30">No configured peer relationships for this holding.</div>
+                  )}
+                  {selectedAnalysis.peers.map(peerSymbol => {
+                    const peer = analyses.find(item => item.symbol === peerSymbol);
+                    const peerQuote = livePrices[peerSymbol];
+                    const selectedMove = selectedAnalysis.dailyChangePct;
+                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
+                    const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
+                    return (
+                      <button
+                        key={peerSymbol}
+                        type="button"
+                        onClick={() => setSelected(peerSymbol)}
+                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-black text-white">{peerSymbol}</div>
+                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
+                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
+                            </div>
+                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Insight title="Direct relationship" body={selectedAnalysis.peers.length + ' configured peer connection' + (selectedAnalysis.peers.length === 1 ? '' : 's') + ' for ' + selectedAnalysis.symbol + '.'} icon={<Network/>}/>
+              <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
+              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
+            </div>
+          </>
+        ) : (
+          <div className="text-[10px] font-mono text-white/30">Select a holding to inspect its peer relationships.</div>
+        )}
+      </Panel>
 
       <div className="text-[10px] text-white/30 flex items-center gap-2"><Globe2 className="w-3 h-3"/> Position states are model outputs for review, not automatic trade instructions.</div>
     </div>
