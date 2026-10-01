@@ -262,13 +262,111 @@ def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
         "eligible_claims": len(claims),
     }
 
+SOURCE_KEYS = {
+    "url", "source_url", "sourceUrl", "link", "html_url", "display_url",
+    "accession", "accession_number", "document_id", "documentId", "citation",
+}
+
+def _iter_evidence_records(value: Any):
+    if isinstance(value, dict):
+        keys = {str(key) for key in value.keys()}
+        has_identity = bool(keys & (SOURCE_KEYS | {"title", "headline", "name", "summary", "claim", "statement"}))
+        if has_identity:
+            yield value
+        for child in value.values():
+            yield from _iter_evidence_records(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_evidence_records(child)
+
+def _record_fingerprint(record: dict[str, Any]) -> str:
+    for key in SOURCE_KEYS:
+        value = record.get(key)
+        if value:
+            return "source:" + str(value).strip().lower()
+    title = next(
+        (str(record.get(key)).strip().lower() for key in ("title", "headline", "name", "summary", "claim", "statement") if record.get(key)),
+        "",
+    )
+    date = next(
+        (str(record.get(key)).strip().lower() for key in DATE_KEYS if record.get(key)),
+        "",
+    )
+    entity = next(
+        (str(record.get(key)).strip().lower() for key in ENTITY_KEYS if record.get(key)),
+        "",
+    )
+    return "claim:" + "|".join((entity, title, date))
+
+def deduplicate_evidence(calls: list[Any]) -> dict[str, Any]:
+    seen: dict[str, dict[str, Any]] = {}
+    observed = 0
+    for call in calls:
+        if not getattr(call, "ok", False):
+            continue
+        tool = getattr(call, "tool", "")
+        family = _family_from_tool(tool)
+        for record in _iter_evidence_records(getattr(call, "output", None)):
+            fingerprint = _record_fingerprint(record)
+            if fingerprint.endswith("claim:||"):
+                continue
+            observed += 1
+            entry = seen.setdefault(fingerprint, {"families": set(), "tools": set()})
+            entry["families"].add(family)
+            entry["tools"].add(tool)
+
+    duplicates = max(0, observed - len(seen))
+    cross_source = sum(
+        1
+        for entry in seen.values()
+        if len(entry["families"]) > 1
+    )
+    return {
+        "observed_records": observed,
+        "unique_records": len(seen),
+        "duplicates_removed": duplicates,
+        "cross_source_duplicates": cross_source,
+    }
+
+def citation_coverage(calls: list[Any]) -> dict[str, Any]:
+    observed = 0
+    cited = 0
+    by_family: dict[str, dict[str, int]] = {}
+    for call in calls:
+        if not getattr(call, "ok", False):
+            continue
+        family = _family_from_tool(getattr(call, "tool", ""))
+        family_entry = by_family.setdefault(family, {"records": 0, "cited": 0})
+        for record in _iter_evidence_records(getattr(call, "output", None)):
+            if not any(record.get(key) for key in SOURCE_KEYS):
+                continue
+            observed += 1
+            family_entry["records"] += 1
+            if any(record.get(key) for key in SOURCE_KEYS if key != "citation") or record.get("citation"):
+                cited += 1
+                family_entry["cited"] += 1
+    return {
+        "observed_records": observed,
+        "cited_records": cited,
+        "coverage": (cited / observed) if observed else None,
+        "by_family": by_family,
+    }
+
 def enrich_calls(calls: list[Any]) -> list[dict[str, Any]]:
     return [
         {
             "tool": getattr(call, "tool", ""),
             "freshness": normalize_freshness(getattr(call, "tool", ""), getattr(call, "output", None)),
+            "citation_coverage": citation_coverage([call]),
         }
         for call in calls if getattr(call, "ok", False)
     ]
 
-__all__ = ["normalize_freshness", "detect_conflicts", "enrich_calls", "FRESHNESS_WINDOWS_HOURS"]
+__all__ = [
+    "normalize_freshness",
+    "detect_conflicts",
+    "enrich_calls",
+    "deduplicate_evidence",
+    "citation_coverage",
+    "FRESHNESS_WINDOWS_HOURS",
+]

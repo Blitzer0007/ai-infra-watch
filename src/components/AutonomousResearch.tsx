@@ -72,6 +72,17 @@ type ResearchResponse = {
         eligible_claims?: number;
         items?: Array<Record<string, unknown>>;
       };
+      deduplication?: {
+        observed_records?: number;
+        unique_records?: number;
+        duplicates_removed?: number;
+        cross_source_duplicates?: number;
+      };
+      citation_coverage?: {
+        observed_records?: number;
+        cited_records?: number;
+        coverage?: number | null;
+      };
     };
   };
   error?: string | null;
@@ -349,6 +360,26 @@ export default function AutonomousResearch() {
                   <p className="mt-2 text-[10px] leading-5 text-rose-100/65">
                     Non-stale evidence contains materially incompatible lifecycle claims. Both claims remain visible and the discrepancy is routed for investigation rather than resolved by the UI.
                   </p>
+                </div>
+              )}
+
+              {result.jev?.evidence_gate?.deduplication && (
+                <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">Evidence quality</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-[9px] font-mono">
+                    <span className="rounded border border-white/10 px-2 py-1 text-white/45">Observed: {result.jev.evidence_gate.deduplication.observed_records ?? 0}</span>
+                    <span className="rounded border border-white/10 px-2 py-1 text-white/45">Unique: {result.jev.evidence_gate.deduplication.unique_records ?? 0}</span>
+                    <span className="rounded border border-white/10 px-2 py-1 text-white/45">Duplicates: {result.jev.evidence_gate.deduplication.duplicates_removed ?? 0}</span>
+                  </div>
+                  {result.jev.evidence_gate.citation_coverage && (
+                    <div className="mt-2 text-[9px] font-mono text-white/30">
+                      Citation coverage: {typeof result.jev.evidence_gate.citation_coverage.coverage === 'number'
+                        ? Math.round(result.jev.evidence_gate.citation_coverage.coverage * 100) + '%'
+                        : '—'}
+                      {' · '}
+                      {result.jev.evidence_gate.citation_coverage.cited_records ?? 0}/{result.jev.evidence_gate.citation_coverage.observed_records ?? 0} source-bearing records
+                    </div>
+                  )}
                 </div>
               )}
 

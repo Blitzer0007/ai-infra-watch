@@ -23,7 +23,7 @@ from app.mcp_client.client import MCPClientError
 from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
-from app.agents.evidence_quality import detect_conflicts, enrich_calls
+from app.agents.evidence_quality import citation_coverage, deduplicate_evidence, detect_conflicts, enrich_calls
 
 
 @dataclass
@@ -465,11 +465,15 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
     availability = _evidence_availability(question, calls)
     evidence_quality = enrich_calls(successful)
     conflict_report = detect_conflicts(successful)
+    dedupe_report = deduplicate_evidence(successful)
+    citation_report = citation_coverage(successful)
     state = {
         "question": question,
         "evidence_availability": availability,
         "evidence_freshness": evidence_quality,
         "conflict_detection": conflict_report,
+        "deduplication": dedupe_report,
+        "citation_coverage": citation_report,
         "successful_calls": [
             {
                 "tool": call.tool,
@@ -497,6 +501,8 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         "evidence_availability": availability,
         "evidence_freshness": evidence_quality,
         "conflict_detection": conflict_report,
+        "deduplication": dedupe_report,
+        "citation_coverage": citation_report,
     }
     if not evaluation.usable:
         gate["error"] = evaluation.error or "Jev evidence gate unavailable"
