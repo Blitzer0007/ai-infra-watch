@@ -322,8 +322,6 @@ class LiveEdgarClient:
             if not cik.isdigit():
                 return None
             resource = {"sec": "companyfacts", "cik": cik}
-        elif url.startswith("https://www.sec.gov/Archives/edgar/data/"):
-            resource = {"sec": "archive", "url": url}
         else:
             return None
 
