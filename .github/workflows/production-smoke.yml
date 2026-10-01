@@ -12,7 +12,7 @@ jobs:
       - name: Check autonomous agent health route
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 20 "https://ai-infra-watch.vercel.app/api/agent-ask" -o /tmp/agent-health.json
+          curl --fail --silent --show-error --max-time 20 "https://ai-infra-watch-theta.vercel.app/api/agent-ask" -o /tmp/agent-health.json
           python - <<'PY'
           import json
 
@@ -30,7 +30,7 @@ jobs:
       - name: Check production live-data endpoint
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 25 "https://ai-infra-watch.vercel.app/api/live-data?refresh=true" -o /tmp/live-data.json
+          curl --fail --silent --show-error --max-time 25 "https://ai-infra-watch-theta.vercel.app/api/live-data?refresh=true" -o /tmp/live-data.json
           python - <<'PY'
           import json
 
@@ -66,7 +66,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 70             -H "Content-Type: application/json"             -X POST             "https://ai-infra-watch.vercel.app/api/agent-ask"             --data "$(python -c 'import json, os; print(json.dumps({"question": os.environ["QUESTION"]}))')"             -o /tmp/autonomous-smoke.json
+          curl --fail --silent --show-error --max-time 70             -H "Content-Type: application/json"             -X POST             "https://ai-infra-watch-theta.vercel.app/api/agent-ask"             --data "$(python -c 'import json, os; print(json.dumps({"question": os.environ["QUESTION"]}))')"             -o /tmp/autonomous-smoke.json
           python - <<'PY'
           import json
 
