@@ -95,9 +95,19 @@ async function fetchSecContracts() {
       }
     }));
 
-    return results.flat().sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned))).slice(0, 40);
-  } catch {
-    return [];
+    return {
+      items: results.flat().sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned))).slice(0, 40),
+      source: 'SEC EDGAR',
+      stale: false,
+      upstreamError: null,
+    };
+  } catch (error) {
+    return {
+      items: [],
+      source: 'SEC EDGAR unavailable',
+      stale: true,
+      upstreamError: error?.message || 'SEC contracts feed failed',
+    };
   }
 }
 
@@ -114,12 +124,22 @@ async function fetchCongressTrades(req) {
       signal: AbortSignal.timeout(9000),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) throw new Error('Congress API HTTP ' + response.status);
 
     const payload = await response.json();
-    return Array.isArray(payload?.trades) ? payload.trades : [];
-  } catch {
-    return [];
+    return {
+      items: Array.isArray(payload?.trades) ? payload.trades : [],
+      source: payload?.sourceLabel || payload?.source || 'Congress API',
+      stale: Boolean(payload?.stale),
+      upstreamError: payload?.upstreamError || null,
+    };
+  } catch (error) {
+    return {
+      items: [],
+      source: 'Congress API unavailable',
+      stale: true,
+      upstreamError: error?.message || 'Congress feed failed',
+    };
   }
 }
 
@@ -332,7 +352,7 @@ export default async function handler(req, res) {
     }
   };
 
-  const [newsResult, contracts, congressTrades, politicalSignalsResult] = await Promise.all([
+  const [newsResult, contractsResult, congressResult, politicalSignalsResult] = await Promise.all([
     news(),
 
     fetchSecContracts(),
@@ -340,11 +360,13 @@ export default async function handler(req, res) {
     politicalSignals().catch(() => []),
   ]);
   const currentNews = newsResult?.items || [];
+  const contracts = contractsResult?.items || [];
+  const congressTrades = congressResult?.items || [];
   const feedRetrievedAt = new Date().toISOString();
-  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
+  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback) };
+  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: contractsResult?.source || 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(contractsResult?.stale), upstreamError: contractsResult?.upstreamError || null };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: politicalSignalsResult.length === 0 };
+  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
   evidenceAvailability.market = { ...evidenceAvailability.market, retrievedAt: Object.values(stockPrices).reduce((latest, item) => item?.retrievedAt && item.retrievedAt > latest ? item.retrievedAt : latest, ''), refreshIntervalSeconds: 60 };
 
