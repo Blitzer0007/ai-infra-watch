@@ -283,7 +283,7 @@ export default function AutonomousResearch() {
                     Evidence coverage
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(result.jev.evidence_availability?.channels || {}).map(([family, channel]) => (
+                    {(Object.entries(result.jev.evidence_availability?.channels || {}) as Array<[string, { status?: string }]>).map(([family, channel]) => (
                       <span
                         key={family}
                         className={
