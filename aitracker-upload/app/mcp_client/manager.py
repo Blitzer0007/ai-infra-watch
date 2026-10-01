@@ -163,6 +163,7 @@ def toolbox_status() -> dict[str, Any]:
         }
     return {
         "connected": True,
+        "transport": "in-process" if isinstance(_toolbox, InProcessMCPToolbox) else "stdio",
         "servers": servers,
         "tool_count": len(tools),
         "tools": [t.qualified_name for t in tools],
