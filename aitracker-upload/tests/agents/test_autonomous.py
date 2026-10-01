@@ -341,6 +341,51 @@ def _gate_toolbox():
 
 
 
+def _complete_gate_toolbox():
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_quote",
+                description="Get a current quote.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+            dict(
+                name="get_snapshot",
+                description="Get a market snapshot.",
+                input_schema={"properties": {}, "required": []},
+            ),
+            dict(
+                name="search",
+                description="Search recent company news.",
+                input_schema={
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+            dict(
+                name="get_filings",
+                description="Get recent SEC filings.",
+                input_schema={"properties": {}, "required": []},
+            ),
+        ],
+        call_returns={
+            "get_quote": {"symbol": "AMD", "price": 180.0},
+            "get_snapshot": {"symbol": "AMD", "volume": 1000},
+            "search": {"query": "Analyze AMD today", "hits": [{"title": "AMD update"}]},
+            "get_filings": {"filings": [{"form": "8-K", "symbol": "AMD"}]},
+        },
+    )
+    tb = MCPToolbox(
+        [_cfg("stocks"), _cfg("news"), _cfg("filings")],
+        _factory({"stocks": session, "news": session, "filings": session}),
+    )
+    tb.connect()
+    return tb, session
+
+
 def test_jev_insufficient_finalization_is_explicitly_provisional():
     calls = [
         ToolCallRecord(
