@@ -390,9 +390,9 @@ def test_jev_low_evidence_quality_forces_another_source():
         tb.close()
 
     assert gate.calls == 2
-    assert result.jev["evidence_gate"]["action"] == "stop"
+    assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert result.jev["evidence_gate"]["checks"] == 2
-    assert result.resolution == "jev_evidence_sufficient"
+    assert result.resolution == "jev_evidence_insufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
@@ -437,7 +437,7 @@ def test_duplicate_planner_call_redirects_to_complementary_evidence():
 
     assert [call.tool for call in result.calls] == ["stocks.get_quote", "news.search"]
     assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
-    assert result.resolution == "jev_evidence_sufficient"
+    assert result.resolution == "jev_evidence_insufficient"
     assert any(
         step.node == "plan" and "complementary evidence source" in step.note
         for step in result.trajectory.steps
@@ -445,7 +445,7 @@ def test_duplicate_planner_call_redirects_to_complementary_evidence():
 
 
 def test_jev_strong_evidence_can_stop_before_step_bound():
-    tb, session = _gate_toolbox()
+    tb, session = _complete_gate_toolbox()
     gate = _GateJev([("stop", 3.0)])
     plans = [
         {"action": "tool", "tool": "stocks.get_quote", "arguments": {}, "reason": "quote"},
@@ -458,17 +458,22 @@ def test_jev_strong_evidence_can_stop_before_step_bound():
             planner=lambda q, tools, history: plans.pop(0),
             jev=gate,
             client=LLMClient(provider="stub", model="stub"),
-            max_steps=3,
+            max_steps=4,
         )
         result = agent.run("Analyze AMD today")
     finally:
         tb.close()
 
-    assert gate.calls == 1
+    assert gate.calls == 3
     assert result.jev["evidence_gate"]["action"] == "stop"
     assert result.resolution == "jev_evidence_sufficient"
-    assert len(result.calls) == 2
-
+    assert len(result.calls) == 4
+    assert [call.tool for call in result.calls] == [
+        "stocks.get_quote",
+        "stocks.get_snapshot",
+        "news.search",
+        "filings.get_filings",
+    ]
 
 def test_jev_repeated_gather_more_ends_as_insufficient():
     tb, _ = _gate_toolbox()
@@ -490,7 +495,7 @@ def test_jev_repeated_gather_more_ends_as_insufficient():
     finally:
         tb.close()
 
-    assert gate.calls == 3
+    assert gate.calls == 2
     assert result.jev["evidence_gate"]["action"] == "insufficient"
     assert result.jev["evidence_gate"]["reason"].startswith("No unused complementary")
     assert result.resolution == "jev_evidence_insufficient"

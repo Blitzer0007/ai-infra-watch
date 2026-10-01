@@ -617,7 +617,9 @@ def _channel_tool_usable(family: str, name: str) -> bool:
         return "get_earnings" in lower
     if family == "market":
         return any(token in lower for token in (".get_quote", ".get_quotes", ".get_snapshot"))
-    return True
+    # Unknown tools are not evidence channels; only recognized evidence
+    # families may be selected as complementary research sources.
+    return False
 
 
 def _next_evidence_plan(
