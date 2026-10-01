@@ -30,7 +30,7 @@ jobs:
             --request GET \
             --header "Authorization: Bearer $AIW_CRON_SECRET" \
             --header "User-Agent: ai-infra-watch-github-actions/1.0" \
-            "https://ai-infra-watch.vercel.app/api/earnings-alerts?days=14&notify=1"
+            "https://ai-infra-watch-theta.vercel.app/api/earnings-alerts?days=14&notify=1"
 
       - name: Record completion
         run: echo "Earnings alert check completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
