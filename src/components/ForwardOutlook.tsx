@@ -90,6 +90,90 @@ function forwardReturns(history: PricePoint[], horizon: number): number[] {
   return result;
 }
 
+type VerificationDrift = {
+  sampleSize: number;
+  recentCount: number;
+  priorCount: number;
+  recentDirection: number | null;
+  priorDirection: number | null;
+  recentMedianAbsError: number | null;
+  priorMedianAbsError: number | null;
+  errorChange: number | null;
+  state: 'limited' | 'stable' | 'watch' | 'drift-signal';
+};
+
+function calculateVerificationDrift(
+  items: ForecastSnapshot[],
+  ticker: string,
+  horizon: Horizon,
+): VerificationDrift {
+  const verified = items
+    .filter(item =>
+      item.status === 'verified' &&
+      item.ticker === ticker &&
+      item.horizon === horizon &&
+      item.actualReturn != null &&
+      item.medianError != null &&
+      item.verifiedAt
+    )
+    .sort((a, b) => String(a.verifiedAt).localeCompare(String(b.verifiedAt)));
+
+  if (verified.length < 10) {
+    return {
+      sampleSize: verified.length,
+      recentCount: 0,
+      priorCount: 0,
+      recentDirection: null,
+      priorDirection: null,
+      recentMedianAbsError: null,
+      priorMedianAbsError: null,
+      errorChange: null,
+      state: 'limited',
+    };
+  }
+
+  const split = Math.floor(verified.length / 2);
+  const prior = verified.slice(0, split);
+  const recent = verified.slice(split);
+
+  const directionRate = (rows: ForecastSnapshot[]) => {
+    const eligible = rows.filter(row => row.median !== 0 && row.actualReturn !== 0);
+    return eligible.length
+      ? eligible.filter(row => Math.sign(row.median) === Math.sign(row.actualReturn!)).length / eligible.length
+      : null;
+  };
+
+  const medianAbsError = (rows: ForecastSnapshot[]) => {
+    const values = rows.map(row => Math.abs(Number(row.medianError))).filter(Number.isFinite);
+    return values.length ? percentile(values, 0.5) : null;
+  };
+
+  const recentError = medianAbsError(recent);
+  const priorError = medianAbsError(prior);
+  const errorChange =
+    recentError != null && priorError != null && priorError > 0
+      ? ((recentError - priorError) / priorError) * 100
+      : null;
+
+  let state: VerificationDrift['state'] = 'stable';
+  if (errorChange != null) {
+    if (errorChange >= 50) state = 'drift-signal';
+    else if (errorChange >= 25) state = 'watch';
+  }
+
+  return {
+    sampleSize: verified.length,
+    recentCount: recent.length,
+    priorCount: prior.length,
+    recentDirection: directionRate(recent),
+    priorDirection: directionRate(prior),
+    recentMedianAbsError: recentError,
+    priorMedianAbsError: priorError,
+    errorChange,
+    state,
+  };
+}
+
 
 type BacktestRow = {
   asOfDate: string;
@@ -289,6 +373,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
   const [jevValidationError, setJevValidationError] = useState<string | null>(null);
+
+  const verificationDrift = useMemo(
+    () => calculateVerificationDrift(forecasts, selectedStock, horizon),
+    [forecasts, selectedStock, horizon],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -860,6 +949,28 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+          </div>
+          <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Verification drift monitor</div>
+                <div className="text-[9px] text-white/35 mt-1">
+                  Heuristic comparison of the newest half of verified forecasts for the selected ticker and horizon with the older half. Requires at least 10 verified forecasts.
+                </div>
+              </div>
+              <span className="px-2 py-1 rounded-full border border-white/10 text-[9px] font-mono uppercase text-white/55">
+                {verificationDrift.state === 'drift-signal' ? 'DRIFT SIGNAL' : verificationDrift.state === 'watch' ? 'WATCH' : verificationDrift.state === 'limited' ? 'LIMITED SAMPLE' : 'STABLE'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+              <div><div className="text-[8px] text-white/20 uppercase font-mono">Recent error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.recentMedianAbsError == null ? '—' : verificationDrift.recentMedianAbsError.toFixed(1) + ' pp'}</div></div>
+              <div><div className="text-[8px] text-white/20 uppercase font-mono">Prior error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.priorMedianAbsError == null ? '—' : verificationDrift.priorMedianAbsError.toFixed(1) + ' pp'}</div></div>
+              <div><div className="text-[8px] text-white/20 uppercase font-mono">Error change</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.errorChange == null ? '—' : (verificationDrift.errorChange >= 0 ? '+' : '') + verificationDrift.errorChange.toFixed(0) + '%'}</div></div>
+              <div><div className="text-[8px] text-white/20 uppercase font-mono">Verified sample</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.sampleSize}</div></div>
+            </div>
+            <div className="mt-2 text-[8px] font-mono uppercase text-white/20">
+              Recent direction {verificationDrift.recentDirection == null ? '—' : (verificationDrift.recentDirection * 100).toFixed(0) + '%'} · prior direction {verificationDrift.priorDirection == null ? '—' : (verificationDrift.priorDirection * 100).toFixed(0) + '%'} · heuristic: ≥25% error increase = watch, ≥50% = drift signal.
+            </div>
           </div>
         </div>
 
