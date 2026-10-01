@@ -489,10 +489,10 @@ export default function App() {
                 <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider">
                   SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
                 </span>
+              )}
               <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
                 AUTO: FEED 5M · QUOTES 45S
               </span>
-              )}
               <button
                 onClick={() => handleFetchLiveData(true)}
                 disabled={isLiveLoading}
