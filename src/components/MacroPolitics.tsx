@@ -195,7 +195,7 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
           </p>
         </div>
         <div className="text-[9px] font-mono uppercase tracking-wider text-white/30">
-          {signals.length} signal{signals.length === 1 ? '' : 's'} · last 24h
+          {signals.length} signal{signals.length === 1 ? '' : 's'} · recent feed window
         </div>
       </div>
 
