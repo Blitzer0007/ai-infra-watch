@@ -391,9 +391,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         </div>
 
         {/* Milestone Detail Sidebar */}
-        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4 min-h-0">
           {activeMilestone ? (
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[420px] lg:max-h-[520px] overflow-y-auto pr-2 aiw-scroll-region min-h-0">
               <div className="flex justify-between items-start border-b border-white/10 pb-3">
                 <div className="space-y-1">
                   <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Selected Progression</span>
@@ -528,7 +528,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       {/* Timeline of All Stock Milestones */}
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
-        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono max-h-[640px] overflow-y-auto pr-2 aiw-scroll-region">
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
           {stockMilestones.length === 0 ? (
             <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
           ) : (

@@ -119,6 +119,8 @@ const INITIAL_SOURCE: SourceStatus = {
 export default function CongressTrades(_props: CongressTradesProps) {
   const [search, setSearch] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>('all');
+  const [transactionFilter, setTransactionFilter] = useState<'all' | 'buy' | 'sell'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | '30' | '90' | '365'>('all');
   const [symbolFilter, setSymbolFilter] = useState('NVDA');
   const [trades, setTrades] = useState<CongressTrade[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -263,11 +265,18 @@ export default function CongressTrades(_props: CongressTradesProps) {
     // This prevents "Search politician or symbol" from appearing broken just
     // because the currently selected ticker has no matching record.
     const sourceTrades = needle ? searchTrades : trades;
+    const now = Date.now();
 
     return sourceTrades.filter((t) => {
       const matchesSymbol = symbolFilter === 'ALL' || needle ? true : t.stockSymbol === symbolFilter;
       const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
-      return matchesSymbol && matchesChamber;
+      const matchesType = transactionFilter === 'all' || t.transactionType === transactionFilter;
+      const tradeDate = t.transactionDate || t.date;
+      const ageDays = tradeDate
+        ? (now - new Date(tradeDate + 'T00:00:00Z').getTime()) / 86400000
+        : Number.POSITIVE_INFINITY;
+      const matchesDate = dateFilter === 'all' || ageDays <= Number(dateFilter);
+      return matchesSymbol && matchesChamber && matchesType && matchesDate;
     });
   }, [trades, searchTrades, chamberFilter, search, symbolFilter]);
 
@@ -383,6 +392,30 @@ export default function CongressTrades(_props: CongressTradesProps) {
             ))}
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={transactionFilter}
+              onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')}
+              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2.5 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
+              aria-label="Filter Congress trades by transaction type"
+            >
+              <option value="all">All Types</option>
+              <option value="buy">Buy only</option>
+              <option value="sell">Sell only</option>
+            </select>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')}
+              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2.5 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
+              aria-label="Filter Congress trades by transaction age"
+            >
+              <option value="all">All Dates</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last 365 Days</option>
+            </select>
+          </div>
+
           <div className="relative w-full lg:w-80">
             <Search className="w-4 h-4 text-white/40 absolute left-3 top-3" />
             <input
@@ -476,6 +509,23 @@ export default function CongressTrades(_props: CongressTradesProps) {
           </div>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-widest text-white/30">
+        <span>{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setSearch('');
+            setChamberFilter('all');
+            setTransactionFilter('all');
+            setDateFilter('all');
+            setSymbolFilter('ALL');
+          }}
+          className="rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/50 hover:text-white hover:bg-white/10 transition"
+        >
+          Clear table filters
+        </button>
+      </div>
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">

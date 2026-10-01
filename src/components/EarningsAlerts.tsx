@@ -78,6 +78,7 @@ export default function EarningsAlerts() {
   const [loading, setLoading] = useState(true);
   const [browserStatus, setBrowserStatus] = useState<'unknown' | 'enabled' | 'blocked'>('unknown');
   const [historical, setHistorical] = useState<Record<string, HistoricalEarnings[]>>({});
+  const [historySymbolFilter, setHistorySymbolFilter] = useState('all');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
@@ -164,6 +165,10 @@ export default function EarningsAlerts() {
   const historicalRows: HistoricalEarnings[] = Object.keys(historical)
     .flatMap(symbol => historical[symbol] || [])
     .sort((a, b) => b.reportDate.localeCompare(a.reportDate) || a.symbol.localeCompare(b.symbol));
+  const visibleHistoricalRows = historySymbolFilter === 'all'
+    ? historicalRows
+    : historicalRows.filter(row => row.symbol === historySymbolFilter);
+
   const serverReady = Boolean(data?.configuration?.finnhub_configured && data?.configuration?.webhook_configured);
 
   return (
@@ -334,6 +339,19 @@ export default function EarningsAlerts() {
               {historyLoading && (
                 <span className="text-[8px] font-mono uppercase text-white/25">Loading recent history…</span>
               )}
+              {!historyLoading && historicalRows.length > 0 && (
+                <select
+                  value={historySymbolFilter}
+                  onChange={(e) => setHistorySymbolFilter(e.target.value)}
+                  className="rounded border border-white/10 bg-[#0F1115] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
+                  aria-label="Filter earnings history table by symbol"
+                >
+                  <option value="all">All Symbols</option>
+                  {Array.from(new Set(historicalRows.map(row => row.symbol))).sort().map(symbol => (
+                    <option key={symbol} value={symbol}>{symbol}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {!historyLoading && !historicalRows.length && (
@@ -343,7 +361,7 @@ export default function EarningsAlerts() {
             )}
 
             {historicalRows.length > 0 && (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 overflow-x-auto max-h-[520px] overflow-y-auto aiw-scroll-region">
                 <table className="w-full min-w-[760px] text-[9px] font-mono">
                   <thead className="text-white/25 uppercase tracking-wider">
                     <tr className="border-b border-white/5">
@@ -358,7 +376,7 @@ export default function EarningsAlerts() {
                     </tr>
                   </thead>
                   <tbody>
-                    {historicalRows.slice(0, 12).map(row => (
+                    {visibleHistoricalRows.slice(0, 12).map(row => (
                       <tr key={row.symbol + ':' + row.reportDate + ':' + row.period} className="border-t border-white/5">
                         <td className="py-2 pr-3">
                           <div className="font-black text-white">{row.symbol}</div>

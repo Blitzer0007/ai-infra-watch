@@ -127,6 +127,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   const [events, setEvents] = useState<SecEvent[]>([]);
   const [stockHistory, setStockHistory] = useState<HistoryPoint[]>([]);
   const [spyHistory, setSpyHistory] = useState<HistoryPoint[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -208,6 +209,13 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       }))
       .sort((a, b) => b.count - a.count);
   }, [rows]);
+
+  const visibleRows = useMemo(
+    () => categoryFilter === 'all'
+      ? rows
+      : rows.filter((row) => (row.event.category || 'Other') === categoryFilter),
+    [rows, categoryFilter]
+  );
 
   const summary = useMemo(() => {
     const valid = rows
@@ -308,7 +316,25 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       )}
 
       {!loading && !error && rows.length > 0 && (
-        <div className="overflow-x-auto max-h-[560px] overflow-y-auto border border-white/5 rounded-xl aiw-scroll-region">
+        <>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[.02] p-3">
+            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">
+              Table filter · {visibleRows.length} of {rows.length} events
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
+              aria-label="Filter event study table by event category"
+            >
+              <option value="all">All Event Types</option>
+              {Array.from(new Set(rows.map((row) => row.event.category || 'Other'))).sort().map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="overflow-x-auto max-h-[560px] overflow-y-auto border border-white/5 rounded-xl aiw-scroll-region">
           <table className="w-full text-[10px] font-mono">
             <thead className="bg-white/[.03] text-white/35 uppercase tracking-wider">
               <tr>
@@ -322,7 +348,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ event, reaction }) => {
+              {visibleRows.map(({ event, reaction }) => {
                 const t1Relative = reaction
                   ? relative(reaction.t1, reaction.spyT1)
                   : null;
@@ -373,7 +399,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="mt-3 text-[9px] text-white/30 font-mono">

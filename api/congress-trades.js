@@ -300,12 +300,59 @@ export default async function handler(req, res) {
       }
     }
 
-    const bargoSymbol = query && searchResolution
-      ? searchResolution.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || 'ALL'
-      : (query ? 'ALL' : symbol);
+    // Company/ticker searches can use Bargo after SEC resolution. Person-name
+    // searches use the broader OpenRegs dataset so older filings are searchable
+    // instead of being limited to Bargo's latest global page.
+    if (query && searchResolution) {
+      const resolvedTicker = searchResolution.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || null;
+      if (!resolvedTicker) throw new Error('Company search could not resolve a ticker');
+      const rawTrades = await fetchBargo(resolvedTicker);
+      const needle = query.toUpperCase();
+      const trades = rawTrades
+        .map((trade, index) => normalizeTrade(trade, index, resolvedTicker, 'bargo'))
+        .filter((trade) => trade.stockSymbol && (
+          trade.stockSymbol === resolvedTicker ||
+          String(trade.politician || '').toUpperCase().includes(needle)
+        ))
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-    const rawTrades = await fetchBargo(bargoSymbol);
-    let trades = rawTrades
+      if (!trades.length) throw new Error('No Bargo matches for resolved company; use OpenRegs fallback');
+
+      const createdAt = Date.now();
+      cache.set(cacheKey, { createdAt, trades, provider: 'bargo' });
+      return respond(res, {
+        symbol,
+        trades,
+        provider: 'bargo',
+        cached: false,
+        stale: false,
+        fetchedAt: createdAt,
+        searchResolution,
+      });
+    }
+
+    if (query) {
+      const trades = (await fetchDataDawn('ALL', query))
+        .filter((trade) => trade.stockSymbol)
+        .sort((a, b) => String(b.transactionDate).localeCompare(String(a.transactionDate)));
+
+      if (!trades.length) throw new Error('No public congressional disclosure matches found');
+
+      const createdAt = Date.now();
+      cache.set(cacheKey, { createdAt, trades, provider: 'datadawn' });
+      return respond(res, {
+        symbol,
+        trades,
+        provider: 'datadawn',
+        cached: false,
+        stale: false,
+        fetchedAt: createdAt,
+        searchResolution,
+      });
+    }
+
+    const rawTrades = await fetchBargo(symbol);
+    const trades = rawTrades
       .map((trade, index) =>
         normalizeTrade(
           trade,
@@ -316,22 +363,6 @@ export default async function handler(req, res) {
       )
       .filter((trade) => trade.stockSymbol)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-
-    // Bargo's public endpoint is ticker-oriented. For free-text search,
-    // fetch the global disclosure feed and filter locally so company names
-    // and arbitrary tickers are not restricted to the preset watchlist.
-    if (query) {
-      const needle = query.toUpperCase();
-      const mappedTicker = DATA_DAWN_TICKER_ALIASES[needle] || needle;
-      const resolvedTicker = searchResolution?.match(/\(([A-Z0-9.^=-]+)\)$/)?.[1] || null;
-      trades = trades.filter((trade) => {
-        const member = String(trade.politician || '').toUpperCase();
-        return trade.stockSymbol === mappedTicker || trade.stockSymbol === resolvedTicker || member.includes(needle);
-      });
-      if (!trades.length) {
-        throw new Error('No Bargo matches for search; use OpenRegs fallback');
-      }
-    }
 
     const createdAt = Date.now();
     cache.set(cacheKey, {
