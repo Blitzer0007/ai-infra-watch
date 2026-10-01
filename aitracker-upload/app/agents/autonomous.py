@@ -382,10 +382,40 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     matrix: dict[str, Any] = {}
 
     def has_payload(value: Any) -> bool:
+        """Return True only when a tool response contains usable evidence.
+
+        MCP adapters commonly return structured envelopes such as
+        {"data": [], "error": ...} or {"events": [], "status": "ok"}.
+        A non-empty envelope must not be mistaken for evidence merely because
+        it contains metadata or an error string.
+        """
         if value is None:
             return False
-        if isinstance(value, (list, tuple, set, dict, str)):
-            return len(value) > 0
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, (list, tuple, set)):
+            return any(has_payload(item) for item in value)
+        if isinstance(value, dict):
+            # Explicit provider/tool errors are failures or empty evidence,
+            # not usable payloads. The actual ToolCallRecord.ok flag still
+            # determines whether the channel is classified as FAILED.
+            if value.get("error") and not any(
+                key in value and has_payload(value.get(key))
+                for key in ("data", "results", "records", "items", "events", "hits", "quotes", "filings", "contracts", "trades", "articles")
+            ):
+                return False
+            evidence_keys = (
+                "data", "results", "records", "items", "events", "hits",
+                "quotes", "filings", "contracts", "trades", "articles",
+                "price", "changePct", "change_pct", "event", "summary",
+                "narrative", "content", "document", "documents", "claims",
+            )
+            if any(key in value and has_payload(value.get(key)) for key in evidence_keys):
+                return True
+            # Small scalar evidence objects are valid when they are not just
+            # transport/status metadata.
+            metadata_only = {"status", "ok", "success", "cached", "source", "provider", "timestamp", "retrievedAt"}
+            return any(key not in metadata_only and has_payload(child) for key, child in value.items())
         return True
 
     for family in expected:
