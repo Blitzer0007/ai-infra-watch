@@ -175,22 +175,20 @@ async function politicalSignals() {
   const queries = [
     {
       label: 'GDELT political coverage',
-      query: '(Donald Trump OR "JD Vance" OR "White House" OR "Trump administration") (AI OR "artificial intelligence" OR "AI infrastructure" OR "data center" OR power OR electricity OR semiconductor OR GPU OR chip OR export OR regulation OR innovation OR investment)',
-      evidence: 'secondary-coverage'
+      query: '(Donald Trump OR "JD Vance" OR "White House" OR "Trump administration") (AI OR "artificial intelligence" OR "AI infrastructure" OR "data center" OR power OR electricity OR semiconductor OR GPU OR chip OR export OR regulation OR innovation OR investment)'
     },
     {
       label: 'White House primary coverage',
-      query: 'domain:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)',
-      evidence: 'primary'
+      query: 'domain:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)'
     }
   ];
 
-  const batches = await Promise.all(queries.map(async item => {
+  async function runQuery(item, timespan) {
     try {
       const url =
         'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
         encodeURIComponent(item.query) +
-        '&mode=ArtList&format=json&maxrecords=20&timespan=24h&sort=datedesc';
+        '&mode=ArtList&format=json&maxrecords=20&timespan=' + timespan + '&sort=datedesc';
       const response = await fetch(url, {
         headers: { 'User-Agent': 'ai-infra-watch/1.0' },
         signal: AbortSignal.timeout(7000),
@@ -232,10 +230,20 @@ async function politicalSignals() {
     } catch {
       return [];
     }
-  }));
+  }
+
+  // Prefer current 24-hour coverage. If that window is empty, broaden to
+  // 72 hours so a temporary quiet period does not look like a broken feed.
+  let articles = (await Promise.all(queries.map(item => runQuery(item, '24h')))).flat();
+
+  if (!articles.length) {
+    articles = await runQuery({
+      query: '(Trump OR "White House" OR "U.S. administration" OR "JD Vance") (AI OR "artificial intelligence" OR technology OR semiconductor OR chip OR GPU OR "data center" OR power OR energy OR export OR regulation OR investment OR infrastructure)'
+    }, '72h');
+  }
 
   const unique = new Map();
-  batches.flat().forEach(item => {
+  articles.forEach(item => {
     const key = item.url || item.title.toLowerCase();
     const existing = unique.get(key);
     if (!existing || (item.sourceType === 'primary' && existing.sourceType !== 'primary')) {
