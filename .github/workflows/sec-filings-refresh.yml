@@ -1,6 +1,9 @@
 name: Refresh SEC Filings Corpus
 
 on:
+  push:
+    paths:
+      - ".github/workflows/sec-filings-refresh.yml"
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
@@ -40,18 +43,7 @@ jobs:
             -o /tmp/company_tickers.json \
             "$SEC_GATEWAY_URL?sec=tickers"
 
-          CIK=$(python - <<'PY'
-          import json
-          with open("/tmp/company_tickers.json", encoding="utf-8") as handle:
-              payload = json.load(handle)
-          for row in payload.values():
-              if str(row.get("ticker", "")).upper() == "NVDA":
-                  print(str(row.get("cik_str", "")).zfill(10))
-                  break
-          else:
-              raise SystemExit("NVDA CIK not found through SEC gateway")
-          PY
-          )
+          CIK=$(python -c 'import json,sys; payload=json.load(open("/tmp/company_tickers.json", encoding="utf-8")); rows=[r for r in payload.values() if str(r.get("ticker","")).upper()=="NVDA"]; print(str(rows[0]["cik_str"]).zfill(10) if rows else sys.exit("NVDA CIK not found through SEC gateway"))')
 
           echo "Checking SEC submissions through Vercel gateway..."
           curl --fail-with-body --silent --show-error --max-time 20 \
