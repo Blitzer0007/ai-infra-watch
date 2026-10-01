@@ -81,7 +81,7 @@ async function handleSecGateway(req, res) {
       headers: {
         'User-Agent': userAgent,
         'Accept-Encoding': 'gzip, deflate',
-        Accept: target.resource === 'archive' ? 'text/html,*/*' : 'application/json',
+        Accept: 'application/json',
       },
       signal: AbortSignal.timeout(8000),
     });
