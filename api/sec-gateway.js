@@ -1,4 +1,3 @@
-const SEC_HOSTS = new Set(['www.sec.gov', 'data.sec.gov']);
 const CACHE = {
   tickers: 'public, s-maxage=86400, stale-while-revalidate=604800',
   submissions: 'public, s-maxage=300, stale-while-revalidate=1800',
@@ -75,12 +74,16 @@ export default async function handler(req, res) {
     return bad(res, 405, 'Only GET is supported.');
   }
 
-  const configuredToken = String(process.env.SEC_GATEWAY_TOKEN || '').trim();
-  if (configuredToken) {
-    const auth = String(req.headers?.authorization || '');
-    if (auth !== 'Bearer ' + configuredToken) {
-      return bad(res, 401, 'SEC gateway authentication required.');
-    }
+  const configuredToken = String(
+    process.env.SEC_GATEWAY_TOKEN || process.env.AIW_CRON_SECRET || ''
+  ).trim();
+  if (!configuredToken) {
+    return bad(res, 503, 'SEC gateway secret is not configured.');
+  }
+
+  const auth = String(req.headers?.authorization || '');
+  if (auth !== 'Bearer ' + configuredToken) {
+    return bad(res, 401, 'SEC gateway authentication required.');
   }
 
   const target = upstreamUrl(req);
