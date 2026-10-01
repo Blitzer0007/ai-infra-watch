@@ -82,11 +82,21 @@ def _shape(result: Any) -> dict[str, Any]:
 
 
 @app.get("/api/agent-python")
-def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+def health(
+    authorization: str | None = Header(default=None),
+    probe_mcp: bool = Query(default=False),
+) -> dict[str, Any]:
     _require_auth(authorization)
     config = settings.get_settings()
+    probe_error = None
+    if probe_mcp:
+        try:
+            get_toolbox()
+        except Exception as exc:  # noqa: BLE001 — expose structured readiness diagnostics
+            probe_error = f"{type(exc).__name__}: {exc}"
+    mcp = toolbox_status()
     return {
-        "status": "ok",
+        "status": "ok" if not probe_error else "degraded",
         "service": "autonomous-mcp",
         "provider": config["provider"],
         "model": config["model"],
@@ -95,7 +105,10 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         ),
         "jev_enabled": settings.JEV_ENABLED,
         "jev_api_key_configured": bool(settings.JEV_API_KEY),
-        "mcp": toolbox_status(),
+        "mcp": mcp,
+        "mcp_probe": probe_mcp,
+        "mcp_ready": bool(mcp.get("connected")) if probe_mcp else None,
+        "mcp_probe_error": probe_error,
     }
 
 
