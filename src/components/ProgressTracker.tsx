@@ -165,7 +165,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     setTickerResolving(true);
     setTickerResolveError(null);
     try {
-      const response = await fetch('/api/ticker-search?q=' + encodeURIComponent(rawInput), { cache: 'no-store' });
+      const response = await fetch('/api/company-scale?search=' + encodeURIComponent(rawInput), { cache: 'no-store' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(body?.matches) || !body.matches.length) {
         throw new Error(body?.error || 'No public ticker match found');
