@@ -38,7 +38,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const upstream = await fetch(`${base}/api/agent-python`, {
+      const probe = String(req.query?.probe_mcp || '').trim();
+      const healthUrl = probe
+        ? `${base}/api/agent-python?probe_mcp=${encodeURIComponent(probe)}`
+        : `${base}/api/agent-python`;
+      const upstream = await fetch(healthUrl, {
         method: 'GET',
         headers: backendHeaders(),
         signal: withTimeout(8000),
