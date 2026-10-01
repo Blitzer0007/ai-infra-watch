@@ -36,8 +36,7 @@ jobs:
 
       - name: Probe SEC EDGAR gateway
         env:
-          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway
-          SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
+          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/sec-gateway          SEC_GATEWAY_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
           set -euo pipefail
           if [ -n "$SEC_GATEWAY_TOKEN" ]; then
