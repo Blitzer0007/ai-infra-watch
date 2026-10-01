@@ -55,6 +55,23 @@ type ResearchResponse = {
       checked_after_successful_calls?: number;
       fallback?: boolean;
       error?: string;
+      evidence_freshness?: Array<{
+        tool?: string;
+        freshness?: {
+          family?: string;
+          status?: string;
+          age_hours?: number | null;
+          observed_at?: string | null;
+          fresh_within_hours?: number;
+          aging_within_hours?: number;
+        };
+      }>;
+      conflict_detection?: {
+        detected?: boolean;
+        count?: number;
+        eligible_claims?: number;
+        items?: Array<Record<string, unknown>>;
+      };
     };
   };
   error?: string | null;
@@ -316,6 +333,47 @@ export default function AutonomousResearch() {
                         {family}: {channel.status || 'UNKNOWN'}
                       </span>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {result.jev?.evidence_gate?.conflict_detection?.detected && (
+                <div className="mt-3 rounded-lg border border-rose-400/20 bg-rose-400/5 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-wider text-rose-200">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Evidence conflict detected
+                    <span className="rounded border border-rose-400/20 px-1.5 py-0.5">
+                      {result.jev.evidence_gate.conflict_detection.count || 0} conflict(s)
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[10px] leading-5 text-rose-100/65">
+                    Non-stale evidence contains materially incompatible lifecycle claims. Both claims remain visible and the discrepancy is routed for investigation rather than resolved by the UI.
+                  </p>
+                </div>
+              )}
+
+              {result.jev?.evidence_gate?.evidence_freshness && result.jev.evidence_gate.evidence_freshness.length > 0 && (
+                <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">Evidence freshness</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.jev.evidence_gate.evidence_freshness.map((entry, index) => {
+                      const freshness = entry.freshness;
+                      const status = freshness?.status || 'UNKNOWN';
+                      const tone =
+                        status === 'FRESH'
+                          ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
+                          : status === 'AGING'
+                            ? 'border-amber-400/20 bg-amber-400/5 text-amber-300'
+                            : status === 'STALE'
+                              ? 'border-rose-400/20 bg-rose-400/5 text-rose-300'
+                              : 'border-white/10 bg-white/5 text-white/40';
+                      return (
+                        <span key={entry.tool || String(index)} className={'rounded border px-1.5 py-0.5 ' + tone}>
+                          {(freshness?.family || entry.tool || 'evidence')}: {status}
+                          {typeof freshness?.age_hours === 'number' ? ' · ' + freshness.age_hours.toFixed(1) + 'h' : ''}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
