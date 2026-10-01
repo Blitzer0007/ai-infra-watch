@@ -180,6 +180,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         congressTrades={congressTrades}
         macroRisks={macroRisks}
         news={news}
+        politicalSignals={politicalSignals}
       />
 
       <UnifiedEventTimeline
