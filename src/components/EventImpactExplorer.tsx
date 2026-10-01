@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, ShieldAlert } from 'lucide-react';
 import JevDecisionPanel from './JevDecisionPanel';
+import { FilterSelect } from './FilterControls';
 
 type HistoryPoint = { date: string; price: number };
 
@@ -346,17 +347,17 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
             <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">
               Table filter · {visibleRows.length} of {rows.length} events
             </div>
-            <select
+            <FilterSelect
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
-              aria-label="Filter event study table by event category"
+              label="Filter event study table by event category"
+              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
             >
               <option value="all">All Event Types</option>
               {Array.from(new Set(rows.map((row) => row.event.category || 'Other'))).sort().map((category) => (
                 <option key={category} value={category}>{category}</option>
               ))}
-            </select>
+            </FilterSelect>
           </div>
 
           <div className="overflow-x-auto max-h-[560px] overflow-y-auto border border-white/5 rounded-xl aiw-scroll-region">
