@@ -23,6 +23,15 @@ import ForwardOutlook from './components/ForwardOutlook';
 import AutonomousResearch from './components/AutonomousResearch';
 import DataHealth from './components/DataHealth';
 
+type LivePrice = {
+  price: number;
+  changePct: number;
+  provider?: string;
+  retrievedAt?: string;
+  stale?: boolean;
+  cached?: boolean;
+};
+
 type StressSnapshot = {
   score: number;
   label: string;
@@ -67,12 +76,12 @@ function calculatePortfolioStress(
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [tickerPrices, setTickerPrices] = useState<Record<string, { price: number; changePct: number }>>({});
+  const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Live Synthesis Data States
   const [liveData, setLiveData] = useState<{
-    stockPrices?: Record<string, { price: number; changePct: number }>;
+    stockPrices?: Record<string, LivePrice>;
     contracts?: any[];
     congressTrades?: any[];
     news?: any[];
@@ -101,12 +110,12 @@ export default function App() {
         ...STOCK_UNIVERSE_SYMBOLS
       ])];
 
-      const quotes: Record<string, { price: number; changePct: number }> = {};
+      const quotes: Record<string, LivePrice> = {};
       for (const symbol of symbols) {
         try {
           const quote = await fetchLiveQuote(symbol, config.finnhubKey || '');
           if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
-            quotes[symbol] = { price: quote.price, changePct: quote.changePct };
+            quotes[symbol] = { price: quote.price, changePct: quote.changePct, provider: quote.provider, retrievedAt: quote.retrievedAt, stale: quote.stale, cached: quote.cached };
           }
         } catch {
           // A single quote failure should not stop alert evaluation for other symbols.
@@ -135,12 +144,12 @@ export default function App() {
     if (activeView !== 'portfolio') return;
     let cancelled = false;
     async function updateWatchlistQuotes() {
-      const updated: Record<string, { price: number; changePct: number }> = {};
+      const updated: Record<string, LivePrice> = {};
       for (const s of watchlistSymbols) {
         try {
           const res = await fetchLiveQuote(s, config?.finnhubKey || '');
           if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
-            updated[s] = { price: res.price, changePct: res.changePct };
+            updated[s] = { price: res.price, changePct: res.changePct, provider: res.provider, retrievedAt: res.retrievedAt, stale: res.stale, cached: res.cached };
           }
         } catch (e) {
           // ignore individual quote failures
@@ -494,7 +503,8 @@ export default function App() {
               prices,
               liveData?.macroRisks || []
             );
-            const coverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null).length;
+            const coverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null && prices[position.symbol]?.stale !== true).length;
+            const staleCoverage = PORTFOLIO_POSITIONS.filter(position => prices[position.symbol]?.price != null && prices[position.symbol]?.stale === true).length;
             return (
               <div className="max-w-7xl mx-auto mb-6 rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -508,7 +518,7 @@ export default function App() {
                         <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
                       </div>
                       <div className="text-[10px] text-white/35 mt-0.5">
-                        Breadth + average daily move + macro risk load · {coverage}/{PORTFOLIO_POSITIONS.length} holdings with live quotes
+                        Breadth + average daily move + macro risk load · {coverage}/{PORTFOLIO_POSITIONS.length} holdings with fresh quotes{staleCoverage ? ' · ' + staleCoverage + ' stale' : ''}
                       </div>
                     </div>
                   </div>
@@ -537,7 +547,7 @@ export default function App() {
                   </div>
                   <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
                     <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
-                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{coverage}/{PORTFOLIO_POSITIONS.length} live</div>
+                    <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{coverage}/{PORTFOLIO_POSITIONS.length} fresh</div>
                   </div>
                 </div>
               </div>
