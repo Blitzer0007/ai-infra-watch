@@ -290,8 +290,8 @@ export default async function handler(req, res) {
       count: 0
     },
     news: {
-      status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND',
-      count: currentNews.length,
+      status: 'PENDING',
+      count: 0,
       source: 'GDELT'
     },
     political: {
@@ -315,6 +315,7 @@ export default async function handler(req, res) {
     fetchCongressTrades(req),
     politicalSignals().catch(() => []),
   ]);
+  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT' };
   evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: 'SEC EDGAR' };
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage' };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: 'Bargo Congress Trades API' };
