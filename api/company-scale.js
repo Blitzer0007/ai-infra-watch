@@ -12,7 +12,7 @@ function cleanSymbol(value) {
 async function fetchSec(url) {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)',
+      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: github-actions[bot]@users.noreply.github.com)',
       'Accept-Encoding': 'gzip, deflate',
     },
     signal: AbortSignal.timeout(8000),
