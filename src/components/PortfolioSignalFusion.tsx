@@ -100,7 +100,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       .map(x => ({
         kind: 'Contract',
         title: x.client || x.details,
-        detail: x.impactSummary || x.details,
+        detail: x.details,
         when: x.dateSigned,
         affected: symbols([x.company]),
         source: x.source === 'sec-edgar-primary' ? 'SEC EDGAR' : 'Contracts feed',
