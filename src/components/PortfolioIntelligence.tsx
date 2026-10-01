@@ -464,8 +464,16 @@ function PositionDetail({h}:{h:PositionAnalysis}) {
       <Info label="Snapshot invested" value={'$' + h.investedValue.toFixed(2)}/><Info label="Snapshot current" value={'$' + h.snapshotCurrentValue.toFixed(2)}/><Info label="Snapshot P&L" value={(h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/><Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
       <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/><Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/><Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div><div className="text-sm mt-2">{h.rationale}</div></div>
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div><div className="text-[10px] font-mono uppercase text-white/35">Decision context</div><div className="text-[9px] text-white/25 mt-1">Evidence-backed review state · not an automatic trade instruction</div></div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-3 leading-6">{h.rationale}</div>
+    </div>
     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/><RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/></div>
+    <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[.03] p-4">
+      <div className="text-[9px] font-mono uppercase text-cyan-300/80">What to watch next</div>
+      <div className="text-[10px] text-white/50 mt-2 leading-5">Track quote freshness, peer spread, group breadth and relevant catalysts before treating the current state as persistent.</div>
+      <div className="mt-3 flex flex-wrap gap-2"><Info label="Quote" value={h.livePrice == null ? 'Unavailable' : h.liveStale ? 'Stale' : 'Fresh'}/><Info label="Peer spread" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/></div>
+    </div>
     <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4"><div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div><div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div><div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div></div>
   </Panel>;
 }
