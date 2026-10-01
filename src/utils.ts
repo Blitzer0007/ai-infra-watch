@@ -99,10 +99,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string): Promise<{
       high: data.h,
       prevClose: data.pc,
       source: 'live',
-      provider: data.provider,
-      retrievedAt: data.retrievedAt,
-      stale: data.stale === true,
-      cached: data.cached === true
+      provider: 'Finnhub',
+      retrievedAt: new Date().toISOString(),
+      stale: false,
+      cached: false
     };
   } catch (err) {
     try {
