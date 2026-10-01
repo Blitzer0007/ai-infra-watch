@@ -315,9 +315,9 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 <th className="text-left p-3">Event</th>
                 <th className="text-left p-3">Date</th>
                 <th className="text-right p-3">Event Day (T0)</th>
-                <th className="text-right p-3">Next Trading Day (T+1)</th>
-                <th className="text-right p-3">5 Trading Days Later (T+5)</th>
-                <th className="text-right p-3">20 Trading Days Later (T+20)</th>
+                <th className="text-right p-3">Next Trading Day</th>
+                <th className="text-right p-3">5 Trading Days Later</th>
+                <th className="text-right p-3">20 Trading Days Later</th>
                 <th className="text-right p-3">Next Day vs Market</th>
               </tr>
             </thead>
