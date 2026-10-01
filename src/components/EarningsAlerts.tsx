@@ -95,7 +95,7 @@ export default function EarningsAlerts() {
         setHistoryLoading(true);
         try {
           const historyRes = await fetch(
-            '/api/earnings-history?symbols=' + encodeURIComponent(symbols.join(',')) + '&limit=4',
+            '/api/earnings-alerts?history=1&symbols=' + encodeURIComponent(symbols.join(',')) + '&limit=4',
             { cache: 'no-store' }
           );
           const historyPayload = await historyRes.json().catch(() => ({}));
@@ -174,7 +174,7 @@ export default function EarningsAlerts() {
                   Earnings Alert Watch
                 </h2>
                 <span className="rounded border border-amber-400/20 px-1.5 py-0.5 text-[8px] font-mono uppercase text-amber-300">
-                  T-{data?.lead_days ?? 1}
+                  {(data?.lead_days ?? 1) + (data?.lead_days === 1 ? ' day before' : ' days before')}
                 </span>
               </div>
               <p className="mt-1 text-[10px] leading-relaxed text-white/45">
@@ -333,8 +333,8 @@ export default function EarningsAlerts() {
                       <th className="text-right py-2 px-2">EPS est.</th>
                       <th className="text-right py-2 px-2">Surprise</th>
                       <th className="text-right py-2 px-2">Event price</th>
-                      <th className="text-right py-2 px-2">Next day</th>
-                      <th className="text-right py-2 pl-2">5D / 20D</th>
+                      <th className="text-right py-2 px-2">Next Trading Day</th>
+                      <th className="text-right py-2 pl-2">5 Trading Days / 20 Trading Days</th>
                     </tr>
                   </thead>
                   <tbody>
