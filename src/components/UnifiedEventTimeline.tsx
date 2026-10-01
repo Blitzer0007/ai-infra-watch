@@ -379,7 +379,7 @@ export default function UnifiedEventTimeline({
           </div>
           <h2 className="text-lg font-black mt-1">What happened → Evidence → What followed</h2>
           <p className="text-[10px] text-white/35 mt-1 max-w-3xl">
-            Aligns SEC events, contracts, earnings, political/policy signals, public transaction disclosures, macro indicators and matched news with T+1 / T+5 / T+20 market reactions. These are descriptive post-event windows, not causal attribution.
+            Aligns SEC events, contracts, earnings, political/policy signals, public transaction disclosures, macro indicators and matched news with next trading day / 5-trading-day / 20-trading-day reactions. These are descriptive post-event windows, not causal attribution.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 min-w-[230px]">
@@ -427,7 +427,7 @@ export default function UnifiedEventTimeline({
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-[7px] font-mono uppercase text-white/25">Avg T+1</div>
+                    <div className="text-[7px] font-mono uppercase text-white/25">Avg Next Trading Day</div>
                     <div className={'text-sm font-black mt-0.5 ' + tone(item.avgT1)}>{fmt(item.avgT1)}</div>
                   </div>
                   <div>
@@ -454,10 +454,10 @@ export default function UnifiedEventTimeline({
       {!loading && events.length > 0 && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
-            <Metric label="Avg T+1" value={fmt(avgT1)} valueClass={tone(avgT1)} />
-            <Metric label="Avg T+1 vs SPY" value={fmt(avgRel)} valueClass={tone(avgRel)} />
-            <Metric label="T+5 tracked" value={String(rows.filter(row => row.reaction?.t5 != null).length)} />
-            <Metric label="T+20 tracked" value={String(rows.filter(row => row.reaction?.t20 != null).length)} />
+            <Metric label="Avg Next Trading Day" value={fmt(avgT1)} valueClass={tone(avgT1)} />
+            <Metric label="Avg Next Trading Day vs SPY" value={fmt(avgRel)} valueClass={tone(avgRel)} />
+            <Metric label="5 Trading Days Tracked" value={String(rows.filter(row => row.reaction?.t5 != null).length)} />
+            <Metric label="20 Trading Days Tracked" value={String(rows.filter(row => row.reaction?.t20 != null).length)} />
           </div>
 
           <div className="overflow-x-auto border border-white/5 rounded-xl">
@@ -467,10 +467,10 @@ export default function UnifiedEventTimeline({
                   <th className="text-left p-3">Event / Evidence</th>
                   <th className="text-left p-3">Date</th>
                   <th className="text-right p-3">Event price</th>
-                  <th className="text-right p-3">T+1</th>
-                  <th className="text-right p-3">T+5</th>
-                  <th className="text-right p-3">T+20</th>
-                  <th className="text-right p-3">T+1 vs SPY</th>
+                  <th className="text-right p-3">Next Trading Day</th>
+                  <th className="text-right p-3">5 Trading Days Later</th>
+                  <th className="text-right p-3">20 Trading Days Later</th>
+                  <th className="text-right p-3">Next Trading Day vs SPY</th>
                 </tr>
               </thead>
               <tbody>
