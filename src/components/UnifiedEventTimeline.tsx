@@ -51,7 +51,7 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
 async function loadEarningsEvents(symbol: string): Promise<TimelineEvent[]> {
   try {
     const response = await fetch(
-      '/api/earnings-history?symbols=' + encodeURIComponent(symbol) + '&limit=6',
+      '/api/earnings-alerts?history=1&symbols=' + encodeURIComponent(symbol) + '&limit=6',
       { cache: 'no-store' }
     );
     const payload = await response.json().catch(() => ({}));
