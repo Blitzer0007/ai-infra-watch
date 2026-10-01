@@ -64,6 +64,27 @@ jobs:
           print("political signals:", len(body["politicalSignals"]))
           PY
 
+      - name: Check consolidated earnings history endpoint
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 35 "https://ai-infra-watch-theta.vercel.app/api/earnings-alerts?history=1&symbols=NVDA&limit=2" -o /tmp/earnings-history.json
+          python - <<'PY'
+          import json
+
+          with open("/tmp/earnings-history.json", encoding="utf-8") as f:
+              body = json.load(f)
+
+          if "historical" not in body or not isinstance(body["historical"], dict):
+              raise SystemExit(f"invalid earnings history response: {body}")
+          if body.get("ok") is not True:
+              raise SystemExit(f"earnings history endpoint unavailable: {body}")
+          if "NVDA" not in body["historical"]:
+              raise SystemExit(f"NVDA history missing from response: {body}")
+
+          print("consolidated earnings history smoke check passed")
+          print("NVDA rows:", len(body["historical"]["NVDA"]))
+          PY
+
       - name: Run manual autonomous research smoke
         if: github.event_name == 'workflow_dispatch'
         run: |
