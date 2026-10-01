@@ -1,5 +1,4 @@
 # Only omit build artifacts and local dependency directories.
 # Runtime/source files remain available to Vercel's Python function tracer.
 node_modules/**
-dist/**
 *.zip
