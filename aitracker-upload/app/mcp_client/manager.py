@@ -32,6 +32,7 @@ from typing import Any
 from app.mcp_client import MCPToolbox, ServerConfig, ToolInfo
 from app.mcp_client.client import MCPClientError
 from app.mcp_client.servers import research_configs
+from app.mcp_client.inprocess import InProcessMCPToolbox
 
 _toolbox: MCPToolbox | None = None
 _lock = threading.Lock()
@@ -43,6 +44,16 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _use_inprocess_transport() -> bool:
+    """Use direct service calls on Vercel, where long-lived stdio children are unreliable."""
+    requested = os.getenv("MCP_TRANSPORT", "").strip().lower()
+    if requested in {"inprocess", "direct"}:
+        return True
+    if requested in {"stdio", "subprocess"}:
+        return False
+    return bool(os.getenv("VERCEL"))
 
 
 def use_mcp() -> bool:
@@ -79,6 +90,12 @@ def get_toolbox(
             return _toolbox
         cfgs = list(configs or research_configs())
         errors_this_call: list[str] = []
+
+        if _use_inprocess_transport() and session_factory is None:
+            # Vercel/serverless path: expose the same logical MCP tool catalog
+            # without spawning subprocesses that may be torn down between invocations.
+            _toolbox = InProcessMCPToolbox()
+            return _toolbox
 
         for i in range(len(cfgs), 0, -1):
             subset = cfgs[:i]
