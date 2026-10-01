@@ -33,6 +33,7 @@ type LivePrice = {
 
 export default function App() {
   const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
+  const [portfolioTab, setPortfolioTab] = useState<'overview' | 'watchlist' | 'events' | 'rotation' | 'network'>('overview');
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -231,6 +232,12 @@ export default function App() {
     setIsMobileMenuOpen(false);
   };
 
+  const handlePortfolioNavigate = (tab: 'overview' | 'watchlist' | 'events' | 'rotation' | 'network') => {
+    setPortfolioTab(tab);
+    setActiveView('portfolio');
+    setIsMobileMenuOpen(false);
+  };
+
   const reloadSettings = () => {
     setConfig(loadConfig());
   };
@@ -246,17 +253,23 @@ export default function App() {
   // Sidebar link details
   const navigationItems = [
     { id: 'overview', label: 'Overview', index: '01', icon: Grid },
-    { id: 'contracts', label: 'Contracts', index: '02', icon: FileText },
-    { id: 'tracker', label: 'Progress Tracker', index: '03', icon: Calendar },
-    { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
-    { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
-    { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
-    { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
-    { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp },
-    { id: 'health', label: 'Data Health', index: '10', icon: ShieldAlert },
+    { id: 'portfolio', label: 'Portfolio Intelligence', index: '02', icon: TrendingUp },
+    { id: 'contracts', label: 'Contracts', index: '03', icon: FileText },
+    { id: 'tracker', label: 'Progress Tracker', index: '04', icon: Calendar },
+    { id: 'congress', label: 'Congress Trades', index: '05', icon: BadgePercent },
+    { id: 'macro', label: 'Macro & Politics', index: '06', icon: ShieldAlert },
+    { id: 'research', label: 'AI Research', index: '07', icon: Bot },
+    { id: 'outlook', label: 'Forward Outlook', index: '08', icon: TrendingUp },
+    { id: 'health', label: 'Data Health', index: '09', icon: ShieldAlert },
     { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
+  ];
+
+  const portfolioSubItems = [
+    { id: 'watchlist' as const, label: 'Watchlist' },
+    { id: 'events' as const, label: 'Event Study' },
+    { id: 'rotation' as const, label: 'Money Rotation' },
+    { id: 'network' as const, label: 'Relationship Graph' },
   ];
 
   return (
@@ -318,21 +331,41 @@ export default function App() {
               const IconComp = item.icon;
               const isActive = activeView === item.id;
               return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavigate(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
-                    isActive
-                      ? 'bg-white/10 text-emerald-400 border border-white/15'
-                      : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <IconComp className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-white/40'}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  <span className="text-[9px] font-mono opacity-50">{item.index}</span>
-                </button>
+                <div key={item.id}>
+                  <button
+                    key={item.id}
+                    onClick={() => item.id === 'portfolio' ? handlePortfolioNavigate('overview') : handleNavigate(item.id)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
+                      isActive
+                        ? 'bg-white/10 text-emerald-400 border border-white/15'
+                        : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <IconComp className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-white/40'}`} />
+                      <span>{item.label}</span>
+                    </div>
+                    <span className="text-[9px] font-mono opacity-50">{item.index}</span>
+                  </button>
+                  {item.id === 'portfolio' && activeView === 'portfolio' && (
+                    <div className="ml-7 mt-1 mb-2 space-y-0.5 border-l border-white/10 pl-2">
+                      {portfolioSubItems.map((subItem) => (
+                        <button
+                          key={subItem.id}
+                          type="button"
+                          onClick={() => handlePortfolioNavigate(subItem.id)}
+                          className={`w-full text-left px-2.5 py-2 rounded-md text-[10px] font-mono uppercase tracking-tight transition ${
+                            portfolioTab === subItem.id
+                              ? 'bg-emerald-400/10 text-emerald-300'
+                              : 'text-white/40 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {subItem.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
 
@@ -380,7 +413,8 @@ export default function App() {
                   const IconComp = item.icon;
                   const isActive = activeView === item.id;
                   return (
-                    <button
+                    <div key={item.id}>
+                      <button
                       key={item.id}
                       onClick={() => handleNavigate(item.id)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
@@ -394,7 +428,26 @@ export default function App() {
                         <span>{item.label}</span>
                       </div>
                       <span className="text-[10px] font-mono opacity-50">{item.index}</span>
-                    </button>
+                      </button>
+                      {item.id === 'portfolio' && activeView === 'portfolio' && (
+                        <div className="ml-6 mt-1 mb-2 space-y-0.5 border-l border-white/10 pl-2">
+                          {portfolioSubItems.map((subItem) => (
+                            <button
+                              key={subItem.id}
+                              type="button"
+                              onClick={() => handlePortfolioNavigate(subItem.id)}
+                              className={`w-full text-left px-2.5 py-2 rounded-md text-[10px] font-mono uppercase tracking-tight transition ${
+                                portfolioTab === subItem.id
+                                  ? 'bg-emerald-400/10 text-emerald-300'
+                                  : 'text-white/40 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              {subItem.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
 
@@ -473,7 +526,7 @@ export default function App() {
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
               {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
-              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence activeTab={portfolioTab} onTabChange={setPortfolioTab} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
