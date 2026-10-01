@@ -79,13 +79,17 @@ export default function EarningsAlerts() {
   const [browserStatus, setBrowserStatus] = useState<'unknown' | 'enabled' | 'blocked'>('unknown');
   const [historical, setHistorical] = useState<Record<string, HistoricalEarnings[]>>({});
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
 
-  const load = async () => {
+  const load = async (manual = false) => {
+    if (manual) setRefreshing(true);
     try {
       const res = await fetch('/api/earnings-alerts?days=14', { cache: 'no-store' });
       const payload = await res.json();
       setData(payload);
       setLoading(false);
+      setLastLoadedAt(Date.now());
 
       const monitored = Array.isArray(payload?.monitored_symbols)
         ? payload.monitored_symbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
@@ -128,12 +132,14 @@ export default function EarningsAlerts() {
       console.error('Earnings alert feed failed:', error);
       setLoading(false);
       setData({ ok: false, error: 'Unable to load the earnings alert feed.' });
+    } finally {
+      if (manual) setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 30 * 60 * 1000);
+    void load();
+    const timer = setInterval(() => { void load(); }, 15 * 60 * 1000);
 
 
   return () => clearInterval(timer);
@@ -185,6 +191,18 @@ export default function EarningsAlerts() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase">
+            {lastLoadedAt && (
+              <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/35">
+                Checked {new Date(lastLoadedAt).toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={() => { void load(true); }}
+              disabled={refreshing || loading}
+              className="rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/65 hover:text-white hover:bg-white/10 transition disabled:opacity-40"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh earnings'}
+            </button>
             <span className={serverReady
               ? 'rounded border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-300'
               : 'rounded border border-rose-400/20 bg-rose-400/10 px-2 py-1 text-rose-300'
@@ -202,8 +220,9 @@ export default function EarningsAlerts() {
         </div>
 
         <div className="rounded-xl border border-white/5 bg-black/15 px-3 py-2 text-[9px] font-mono text-white/30">
-          <span className="text-white/50">GitHub Actions schedule:</span> daily pre-earnings check at 08:30 IST ·
-          <span className="text-white/50"> Source:</span> Finnhub earnings calendar ·
+          <span className="text-white/50">Server alert schedule:</span> daily pre-earnings check at 08:30 IST ·
+          <span className="text-white/50"> Calendar:</span> Finnhub earnings calendar ·
+          <span className="text-white/50"> Dashboard refresh:</span> every 15 minutes ·
           <span className="text-white/50"> Browser alert:</span> only while this dashboard is open
         </div>
 
