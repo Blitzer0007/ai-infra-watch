@@ -256,20 +256,35 @@ async function politicalSignals() {
     .slice(0, 20);
 }
 
-async function news() {
+async function fetchGdeltNews(timespan) {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
-  const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&format=json&maxrecords=20&timespan=24h';
+  const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&format=json&maxrecords=20&timespan=' + timespan + '&sort=datedesc';
   const r = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' }, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error('GDELT news HTTP ' + r.status);
   const j = await r.json();
   return (j && j.articles || []).slice(0,20).map(a => ({
     title:a.title, source:a.domain || a.source || 'GDELT', url:a.url, date:a.seendate
   }));
 }
 
+async function news() {
+  try {
+    const recent = await fetchGdeltNews('24h');
+    if (recent.length) return { items: recent, window: '24h', fallback: false };
+  } catch {}
+
+  try {
+    const fallback = await fetchGdeltNews('72h');
+    return { items: fallback, window: '72h', fallback: true };
+  } catch {
+    return { items: [], window: null, fallback: true };
+  }
+}
+
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-  if (cached && Date.now() - cachedAt < CACHE_MS && !(req.query && req.query.refresh === 'true')) {
+  const forceRefresh = req.query && req.query.refresh === 'true';
+  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 's-maxage=60, stale-while-revalidate=300');
+  if (cached && Date.now() - cachedAt < CACHE_MS && !forceRefresh) {
     return res.status(200).json({ ...cached, cached:true, timestamp:cachedAt });
   }
 
@@ -317,8 +332,9 @@ export default async function handler(req, res) {
     }
   };
 
-  const [currentNews, contracts, congressTrades, politicalSignalsResult] = await Promise.all([
-    news().catch(() => []),
+  const [newsResult, contracts, congressTrades, politicalSignalsResult] = await Promise.all([
+    news(),
+
     fetchSecContracts(),
     fetchCongressTrades(req),
     politicalSignals().catch(() => []),
@@ -344,7 +360,12 @@ export default async function handler(req, res) {
     politicalSignals: politicalSignalsResult,
     evidenceAvailability,
     marketSentiment:'Live quotes + AI-infrastructure, political and policy news feeds active.',
-    sources:['Yahoo Finance chart data','GDELT AI-infrastructure news','GDELT political/policy coverage','SEC EDGAR','Bargo Congress Trades API']
+    feedStatus: {
+      newsWindow: newsResult?.window || null,
+      newsFallback: Boolean(newsResult?.fallback),
+      politicalFallback: politicalSignalsResult.length === 0
+    },
+    sources:['Yahoo Finance chart data → Finnhub → Alpha Vantage','GDELT AI-infrastructure news (24h → 72h fallback)','GDELT political/policy coverage (24h → 72h fallback)','SEC EDGAR','Bargo Congress Trades API → fallback providers']
   };
   cached = data;
   cachedAt = Date.now();
