@@ -278,7 +278,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       const matchesDate = dateFilter === 'all' || ageDays <= Number(dateFilter);
       return matchesSymbol && matchesChamber && matchesType && matchesDate;
     });
-  }, [trades, searchTrades, chamberFilter, search, symbolFilter]);
+  }, [trades, searchTrades, chamberFilter, transactionFilter, dateFilter, search, symbolFilter]);
 
   const reactions = useMemo(() => {
     if (symbolFilter === 'ALL') return [];
