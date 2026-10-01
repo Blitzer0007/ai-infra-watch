@@ -202,7 +202,13 @@ async function politicalSignals() {
         const source = String(article?.domain || article?.source || 'GDELT');
         const date = article?.seendate || null;
         const text = title + ' ' + source;
-        const primary = source.toLowerCase().includes('whitehouse.gov') || item.evidence === 'primary';
+        let sourceHost = '';
+        try {
+          sourceHost = new URL(urlValue).hostname.toLowerCase();
+        } catch {}
+        const primary =
+          sourceHost === 'whitehouse.gov' ||
+          sourceHost.endsWith('.whitehouse.gov');
 
         return {
           id: 'political-' + Buffer.from((urlValue || title).slice(0, 160)).toString('base64url').slice(0, 32),
