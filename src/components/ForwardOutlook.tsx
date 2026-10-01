@@ -294,7 +294,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     let cancelled = false;
     async function loadPersistentForecasts() {
       try {
-        const response = await fetch('/api/forecast-verification');
+        const response = await fetch('/api/forecast-verification', { cache: 'no-store' });
         if (!response.ok) throw new Error('Persistent forecast storage unavailable');
         const body = await response.json();
         const remote: ForecastSnapshot[] = Array.isArray(body.forecasts) ? body.forecasts : [];

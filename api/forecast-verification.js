@@ -212,6 +212,10 @@ function normalize(row) {
 }
 
 export default async function handler(req, res) {
+  // Forecast snapshots are user-specific application state. Prevent browser
+  // revalidation from serving an older snapshot list after a new save.
+  res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
+
   const missing = missingConfig();
   if (missing.length) return send(res, 503, {
     error: 'Supabase forecast storage is not configured for this deployment.',
