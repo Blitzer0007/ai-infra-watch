@@ -72,7 +72,7 @@ export default function App() {
       const quotes: Record<string, LivePrice> = {};
       for (const symbol of symbols) {
         try {
-          const quote = await fetchLiveQuote(symbol, config.finnhubKey || '');
+          const quote = await fetchLiveQuote(symbol, config.finnhubKey || '', true);
           if (Number.isFinite(quote.price) && Number.isFinite(quote.changePct)) {
             quotes[symbol] = { price: quote.price, changePct: quote.changePct, provider: quote.provider, retrievedAt: quote.retrievedAt, stale: quote.stale, cached: quote.cached };
           }
@@ -142,7 +142,10 @@ export default function App() {
     setIsLiveLoading(true);
     setLiveError(null);
     try {
-      const res = await fetch(`/api/live-data${forceRefresh ? '?refresh=true' : ''}`);
+      const res = await fetch(
+        `/api/live-data?refresh=true`,
+        { cache: 'no-store' }
+      );
       if (!res.ok) throw new Error('Failed to fetch live data from server');
       const data = await res.json();
       if (data.error) {
@@ -215,13 +218,13 @@ export default function App() {
     }
 
     void updateTicker();
-    void handleFetchLiveData(false);
+    void handleFetchLiveData(true);
 
     const scheduleFeedRefresh = () => {
       if (cancelled) return;
       feedTimer = window.setTimeout(async () => {
         if (cancelled) return;
-        await handleFetchLiveData(false);
+        await handleFetchLiveData(true);
         scheduleFeedRefresh();
       }, 300000);
     };
