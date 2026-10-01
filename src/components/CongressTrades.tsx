@@ -3,6 +3,7 @@ import { Search, AlertTriangle, Loader2, ExternalLink, Activity } from 'lucide-r
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
 import JevDecisionPanel from './JevDecisionPanel';
+import { FilterInput, FilterSelect } from './FilterControls';
 
 interface CongressTradesProps {
   liveTrades?: CongressTrade[];
@@ -427,41 +428,40 @@ export default function CongressTrades(_props: CongressTradesProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <FilterSelect
               value={transactionFilter}
               onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')}
-              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2.5 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
-              aria-label="Filter Congress trades by transaction type"
+              label="Filter Congress trades by transaction type"
+              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
             >
               <option value="all">All Types</option>
               <option value="buy">Buy only</option>
               <option value="sell">Sell only</option>
-            </select>
-            <select
+            </FilterSelect>
+            <FilterSelect
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')}
-              className="rounded border border-white/10 bg-[#0F1115] px-3 py-2.5 text-[10px] font-mono uppercase tracking-wider text-white/60 focus:outline-none focus:border-white/30"
-              aria-label="Filter Congress trades by transaction age"
+              label="Filter Congress trades by transaction age"
+              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
             >
               <option value="all">All Dates</option>
               <option value="30">Last 30 Days</option>
               <option value="90">Last 90 Days</option>
               <option value="365">Last 365 Days</option>
-            </select>
+            </FilterSelect>
           </div>
 
           <div className="relative w-full lg:w-80">
-            <Search className="w-4 h-4 text-white/40 absolute left-3 top-3" />
-            <input
+            <FilterInput
               type="text"
               placeholder="Search member, company, or ticker..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-white placeholder-white/20 font-mono"
-              aria-label="Search Congress trades by politician, symbol, type, amount, or date"
+              label="Search Congress trades by politician, company, symbol, type, amount, or date"
+              className="font-mono"
             />
             {search.trim() && globalLoading && (
-              <Loader2 className="w-3.5 h-3.5 text-cyan-300 absolute right-3 top-3 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 text-cyan-300 absolute right-3 top-1/2 -translate-y-1/2" aria-label="Searching Congress trades" />
             )}
           </div>
         </div>
@@ -545,7 +545,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-widest text-white/30">
-        <span>{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
+        <span aria-live="polite">{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
         <button
           type="button"
           onClick={() => {
