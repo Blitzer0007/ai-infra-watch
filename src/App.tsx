@@ -6,6 +6,7 @@ import {
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
+import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 
 // Component Views
@@ -54,7 +55,10 @@ export default function App() {
   const [isLiveLoading, setIsLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  const watchlistSymbols = Object.keys(STOCK_METADATA);
+  const watchlistSymbols = [...new Set([
+    ...STOCK_UNIVERSE_SYMBOLS,
+    ...PORTFOLIO_POSITIONS.map(position => position.symbol),
+  ])];
 
   // Alert engine: keep price thresholds and large-move alerts active across the dashboard.
   const quoteAlertsInitialized = useRef(false);

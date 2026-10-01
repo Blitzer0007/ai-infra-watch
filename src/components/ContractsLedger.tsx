@@ -229,7 +229,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                     <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 space-y-1.5">
                       <div className="flex items-center space-x-1.5 text-emerald-400 font-mono text-[9px] font-black uppercase tracking-widest">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>🤖 Gemini Stock Impact Summary</span>
+                        <span>Stock Impact Summary</span>
                       </div>
                       <p className="text-xs text-[#A7F3D0] leading-relaxed font-sans font-normal">
                         {c.geminiImpactSummary}
