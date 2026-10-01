@@ -34,16 +34,67 @@ jobs:
 
       # Prefer a repository secret when configured; otherwise use a descriptive SEC-compliant fallback.
 
+      - name: Probe SEC EDGAR connectivity
+        env:
+          SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+        run: |
+          if [ -n "$SEC_CONTACT_EMAIL" ]; then
+            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
+          else
+            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+          fi
+
+          echo "Checking SEC company ticker endpoint..."
+          curl -sS -L --retry 2 --retry-delay 2 \
+            -H "User-Agent: $UA" \
+            -o /tmp/company_tickers.json \
+            -w "company_tickers HTTP %{http_code}\n" \
+            https://www.sec.gov/files/company_tickers.json
+
+          CIK=$(python - <<'PY'
+import json
+with open("/tmp/company_tickers.json", encoding="utf-8") as handle:
+    payload = json.load(handle)
+for row in payload.values():
+    if str(row.get("ticker", "")).upper() == "NVDA":
+        print(str(row.get("cik_str", "")).zfill(10))
+        break
+else:
+    raise SystemExit("NVDA CIK not found")
+PY
+)
+
+          echo "Checking SEC submissions endpoint for CIK $CIK..."
+          curl -sS -L --retry 2 --retry-delay 2 \
+            -H "User-Agent: $UA" \
+            -o /tmp/sec_submissions.json \
+            -w "submissions HTTP %{http_code}\n" \
+            "https://data.sec.gov/submissions/CIK${CIK}.json"
+
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
+        env:
+          SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
         run: |
-          EDGAR_USER_AGENT="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)" \
+          if [ -n "$SEC_CONTACT_EMAIL" ]; then
+            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
+          else
+            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+          fi
+          EDGAR_USER_AGENT="$UA" \
             python scripts/ingest_filings.py --mode live --watchlist
 
       - name: Export contract intelligence
         working-directory: aitracker-upload
+        env:
+          SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
         run: |
-          EDGAR_USER_AGENT="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)" \
+          if [ -n "$SEC_CONTACT_EMAIL" ]; then
+            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
+          else
+            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+          fi
+          EDGAR_USER_AGENT="$UA" \
             python scripts/export_contracts.py --watchlist --output ../data/contracts_sec.json
 
       - name: Commit corpus changes
