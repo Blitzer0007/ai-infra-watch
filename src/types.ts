@@ -19,6 +19,7 @@ export interface Contract {
   status: string;
   statusLevel: 'high-verified' | 'low-rumour' | 'in-progress';
   dateSigned: string;
+  geminiImpactSummary?: string;
   source?: string;
   accession?: string;
   url?: string;

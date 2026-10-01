@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Info, ShieldCheck, DollarSign, Sparkles } from 'lucide-react';
+import { Search, Info, ShieldCheck, DollarSign } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
 import ContractEventStudy from './ContractEventStudy';
@@ -183,12 +183,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                       >
                         {companyName} ({c.company})
                       </span>
-                      {c.geminiImpactSummary && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
-                          <Sparkles className="w-2.5 h-2.5 mr-1" />
-                          Live Synthesized
-                        </span>
-                      )}
+
                       <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Signed/Filed: {c.dateSigned}</span>
                       {c.source === 'sec-edgar-primary' && (
                         <span className="text-[8px] font-mono uppercase tracking-wider text-cyan-300 border border-cyan-400/20 bg-cyan-400/5 px-1.5 py-0.5 rounded">
@@ -225,17 +220,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
                 <div className="text-xs text-white/60 leading-relaxed space-y-3">
                   <p>{c.details}</p>
                   
-                  {c.geminiImpactSummary && (
-                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 space-y-1.5">
-                      <div className="flex items-center space-x-1.5 text-emerald-400 font-mono text-[9px] font-black uppercase tracking-widest">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Stock Impact Summary</span>
-                      </div>
-                      <p className="text-xs text-[#A7F3D0] leading-relaxed font-sans font-normal">
-                        {c.geminiImpactSummary}
-                      </p>
-                    </div>
-                  )}
+
 
                   <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/40 font-mono border-t border-white/5 pt-3">
                     <div className="flex items-center space-x-1.5">
