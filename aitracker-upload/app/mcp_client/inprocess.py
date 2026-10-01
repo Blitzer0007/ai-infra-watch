@@ -13,15 +13,6 @@ import os
 from typing import Any
 
 from app.mcp_client.client import MCPClientError, ToolInfo
-from mcp_servers.stocks.service import StockService
-from mcp_servers.stocks.earnings import EarningsService
-from mcp_servers.stocks.event_study import EventStudyService
-from mcp_servers.stocks.candles import CandleService
-from mcp_servers.stocks.relationships import from_env as relationships_from_env
-from mcp_servers.filings.service import FilingsService
-from mcp_servers.filings.milestones import MilestoneService
-from mcp_servers.filings.contracts import ContractService
-from mcp_servers.news.service import NewsService
 
 def _live_default() -> bool:
     raw = os.getenv("AI_INFRA_AGENT_LIVE_DATA")
@@ -35,10 +26,23 @@ class InProcessMCPToolbox:
     def __init__(self, live: bool | None = None) -> None:
         self.live = _live_default() if live is None else bool(live)
         mode = "live" if self.live else "fixture"
+        # Delay service imports until the toolbox is actually constructed.
+        # This keeps the Vercel entrypoint import lightweight and avoids pulling
+        # optional RAG/scientific dependencies into every health invocation.
+        from mcp_servers.stocks.service import StockService
+        from mcp_servers.stocks.earnings import EarningsService
+        from mcp_servers.stocks.event_study import EventStudyService
+        from mcp_servers.stocks.candles import CandleService
+        from mcp_servers.filings.service import FilingsService
+        from mcp_servers.filings.milestones import MilestoneService
+        from mcp_servers.filings.contracts import ContractService
+        from mcp_servers.news.service import NewsService
+
         self._stocks = StockService.from_env(mode)
         self._earnings = EarningsService.from_env(mode)
         self._candles = CandleService.from_env(mode)
         self._event_study = EventStudyService(earnings=self._earnings, candles=self._candles)
+        self._relationships_from_env = None
         self._filings = FilingsService.from_env(mode)
         self._milestones = MilestoneService.from_env("live")
         self._contracts = ContractService.from_env("live")
@@ -114,6 +118,7 @@ class InProcessMCPToolbox:
         if key == "stocks.get_event_study":
             return self._event_study.get_study(str(args.get("symbol", "")))
         if key == "stocks.get_relationships":
+            from mcp_servers.stocks.relationships import from_env as relationships_from_env
             return relationships_from_env().get(str(args.get("symbol", "")).strip().upper())
         if key == "stocks.list_watchlist":
             return self._stocks.list_watchlist()
