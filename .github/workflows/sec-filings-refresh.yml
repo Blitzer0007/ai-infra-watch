@@ -33,29 +33,56 @@ jobs:
           python -m pip install -r aitracker-upload/requirements.txt
           python -m pip install -r aitracker-upload/requirements-ingest.txt
 
-      - name: Probe SEC gateway
+      - name: Probe SEC upstream
         env:
           SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
+          SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
         run: |
           set -euo pipefail
-          echo "Checking SEC ticker directory through Vercel gateway..."
-          curl --fail-with-body --silent --show-error --max-time 20 \
-            -o /tmp/company_tickers.json \
-            "$SEC_GATEWAY_URL?sec=tickers"
+          if [ -n "$SEC_CONTACT_EMAIL" ]; then
+            UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
+          else
+            UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+          fi
 
-          CIK=$(python -c 'import json,sys; payload=json.load(open("/tmp/company_tickers.json", encoding="utf-8")); rows=[r for r in payload.values() if str(r.get("ticker","")).upper()=="NVDA"]; print(str(rows[0]["cik_str"]).zfill(10) if rows else sys.exit("NVDA CIK not found through SEC gateway"))')
+          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
+            echo "Checking SEC ticker directory through the configured Vercel gateway..."
+            curl --fail-with-body --silent --show-error --max-time 20 \
+              -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
+              -o /tmp/company_tickers.json \
+              "$SEC_GATEWAY_URL?sec=tickers"
+          else
+            echo "SEC gateway token is not configured; probing SEC directly..."
+            curl --fail-with-body --silent --show-error --max-time 20 \
+              -A "$UA" \
+              -o /tmp/company_tickers.json \
+              "https://www.sec.gov/files/company_tickers.json"
+          fi
 
-          echo "Checking SEC submissions through Vercel gateway..."
-          curl --fail-with-body --silent --show-error --max-time 20 \
-            "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
-            -o /tmp/sec_submissions.json
+          CIK=$(python -c 'import json,sys; payload=json.load(open("/tmp/company_tickers.json", encoding="utf-8")); rows=[r for r in payload.values() if str(r.get("ticker","")).upper()=="NVDA"]; print(str(rows[0]["cik_str"]).zfill(10) if rows else sys.exit("NVDA CIK not found"))')
 
-          echo "SEC gateway probe passed."
+          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
+            echo "Checking SEC submissions through the configured Vercel gateway..."
+            curl --fail-with-body --silent --show-error --max-time 20 \
+              -H "Authorization: Bearer $SEC_GATEWAY_TOKEN" \
+              "$SEC_GATEWAY_URL?sec=submissions&cik=$CIK" \
+              -o /tmp/sec_submissions.json
+          else
+            echo "Checking SEC submissions directly..."
+            curl --fail-with-body --silent --show-error --max-time 20 \
+              -A "$UA" \
+              "https://data.sec.gov/submissions/CIK$CIK.json" \
+              -o /tmp/sec_submissions.json
+          fi
+
+          echo "SEC upstream probe passed."
 
       - name: Fetch and ingest latest filings
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+          SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
           EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
         run: |
           set -euo pipefail
@@ -64,6 +91,12 @@ jobs:
           else
             UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
           fi
+          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
+            export EDGAR_GATEWAY_TOKEN="$SEC_GATEWAY_TOKEN"
+          else
+            unset EDGAR_GATEWAY_URL
+            unset EDGAR_GATEWAY_TOKEN
+          fi
           EDGAR_USER_AGENT="$UA" \
             python scripts/ingest_filings.py --mode live --watchlist
 
@@ -71,6 +104,7 @@ jobs:
         working-directory: aitracker-upload
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+          SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
           EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
         run: |
           set -euo pipefail
@@ -78,6 +112,12 @@ jobs:
             UA="AI Infra Watch/1.0 ($SEC_CONTACT_EMAIL)"
           else
             UA="AI Infra Watch/1.0 (SEC research; contact: github-actions[bot]@users.noreply.github.com)"
+          fi
+          if [ -n "$SEC_GATEWAY_TOKEN" ]; then
+            export EDGAR_GATEWAY_TOKEN="$SEC_GATEWAY_TOKEN"
+          else
+            unset EDGAR_GATEWAY_URL
+            unset EDGAR_GATEWAY_TOKEN
           fi
           EDGAR_USER_AGENT="$UA" \
             python scripts/export_contracts.py --watchlist --output ../data/contracts_sec.json
