@@ -274,6 +274,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const reactions = useMemo(() => {
     if (symbolFilter === 'ALL') return [];
     return filtered
+      .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
         reaction: reactionFor(history, trade.transactionDate || trade.date),
