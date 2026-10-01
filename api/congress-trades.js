@@ -257,7 +257,7 @@ export default async function handler(req, res) {
       .sort((a, b) => String(b.transactionDate).localeCompare(String(a.transactionDate)));
 
     const createdAt = Date.now();
-    cache.set(symbol, {
+    cache.set(cacheKey, {
       createdAt,
       trades,
       provider: 'datadawn',
