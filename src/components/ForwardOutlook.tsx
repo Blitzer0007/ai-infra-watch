@@ -1031,6 +1031,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
               )}
+              </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
                 <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
