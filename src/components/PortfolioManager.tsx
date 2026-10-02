@@ -55,7 +55,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
         <div className="text-sm font-black mt-1">Your holdings are stored in Supabase, not cache.</div>
         <div className="text-[10px] text-white/35 mt-1">Quantity · average buy price · purchase date · notes.</div>
       </div>
-      <button type="button" onClick={add} className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-mono uppercase text-emerald-300"><Plus className="w-3.5 h-3.5"/> Add holding</button>
+      <button type="button" data-testid="portfolio-add-holding" onClick={add} className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-mono uppercase text-emerald-300"><Plus className="w-3.5 h-3.5"/> Add holding</button>
     </div>
     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {holdings.map(h=><div key={h.id} className="rounded-xl border border-white/5 bg-black/10 p-3">
@@ -69,18 +69,18 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
     {open && <div className="mt-4 rounded-xl border border-white/10 bg-[#0F1115] p-4">
       <div className="flex items-center justify-between"><div className="text-xs font-bold">{editing?'Edit holding':'Add holding'}</div><button type="button" onClick={()=>setOpen(false)} className="text-white/35 hover:text-white"><X className="w-4 h-4"/></button></div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3">
-        <Field label="Ticker" value={form.symbol} onChange={v=>setForm({...form,symbol:v})} placeholder="NVDA"/>
-        <Field label="Quantity" value={form.quantity} onChange={v=>setForm({...form,quantity:v})} placeholder="10" type="number"/>
-        <Field label="Average buy price" value={form.averageCost} onChange={v=>setForm({...form,averageCost:v})} placeholder="100" type="number"/>
-        <Field label="Purchase date" value={form.purchaseDate} onChange={v=>setForm({...form,purchaseDate:v})} type="date"/>
-        <Field label="Notes" value={form.notes} onChange={v=>setForm({...form,notes:v})} placeholder="Original thesis"/>
+        <Field testId="portfolio-field-ticker" label="Ticker" value={form.symbol} onChange={v=>setForm({...form,symbol:v})} placeholder="NVDA"/>
+        <Field testId="portfolio-field-quantity" label="Quantity" value={form.quantity} onChange={v=>setForm({...form,quantity:v})} placeholder="10" type="number"/>
+        <Field testId="portfolio-field-average-cost" label="Average buy price" value={form.averageCost} onChange={v=>setForm({...form,averageCost:v})} placeholder="100" type="number"/>
+        <Field testId="portfolio-field-purchase-date" label="Purchase date" value={form.purchaseDate} onChange={v=>setForm({...form,purchaseDate:v})} type="date"/>
+        <Field testId="portfolio-field-notes" label="Notes" value={form.notes} onChange={v=>setForm({...form,notes:v})} placeholder="Original thesis"/>
       </div>
       {error && <div className="mt-2 text-[10px] text-rose-300">{error}</div>}
-      <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={save} className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-mono uppercase text-emerald-300"><Save className="w-3 h-3"/> {busy?'Saving…':'Save holding'}</button><button type="button" onClick={()=>setOpen(false)} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-mono uppercase text-white/45">Cancel</button></div>
+      <div className="mt-3 flex gap-2"><button type="button" data-testid="portfolio-save-holding" disabled={busy} onClick={save} className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-mono uppercase text-emerald-300"><Save className="w-3 h-3"/> {busy?'Saving…':'Save holding'}</button><button type="button" onClick={()=>setOpen(false)} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-mono uppercase text-white/45">Cancel</button></div>
     </div>}
   </section>;
 }
 
-function Field({label,value,onChange,placeholder,type='text'}:{label:string;value:string;onChange:(v:string)=>void;placeholder?:string;type?:string}) {
-  return <label className="text-[9px] font-mono text-white/35">{label}<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-white outline-none focus:border-emerald-400/30"/></label>;
+function Field({testId,label,value,onChange,placeholder,type='text'}:{testId?:string;label:string;value:string;onChange:(v:string)=>void;placeholder?:string;type?:string}) {
+  return <label className="text-[9px] font-mono text-white/35">{label}<input data-testid={testId} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-white outline-none focus:border-emerald-400/30"/></label>;
 }

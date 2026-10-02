@@ -24,7 +24,15 @@ def mock_local_apis(page):
         if '/api/live-data' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'stockPrices':{'NVDA':{'price':200,'changePct':1}},'contracts':[],'congressTrades':[],'macroRisks':[],'marketSentiment':'QA mocked'})); return
         if '/api/portfolio' in url:
-            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]})); return
+            if route.request.method == 'POST':
+                route.fulfill(status=201, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-new','symbol':'AMD','quantity':2,'averageCost':100,'purchaseDate':'2026-01-02','notes':'QA holding'}}))
+            elif route.request.method == 'PUT':
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':'updated'}}))
+            elif route.request.method == 'DELETE':
+                route.fulfill(status=204, body='')
+            else:
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]}))
+            return
         if '/api/forecast-verification' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'forecasts':[],'analytics':{'sampleSize':0,'byTickerHorizon':[],'byScenario':[],'byModel':[],'byDirection':[],'longTerm':{'verifiedCount':0}}})); return
         if '/api/ai-quality' in url:
@@ -93,3 +101,18 @@ def test_ai_quality_lab_mounts(page):
     lab = page.get_by_test_id("ai-quality-lab")
     lab.wait_for(state="attached", timeout=30000)
     assert "AI QUALITY LAB" in lab.inner_text()
+
+def test_portfolio_manager_create_flow(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="attached", timeout=30000)
+    page.get_by_test_id("portfolio-add-holding").click()
+    page.get_by_test_id("portfolio-field-ticker").fill("AMD")
+    page.get_by_test_id("portfolio-field-quantity").fill("2")
+    page.get_by_test_id("portfolio-field-average-cost").fill("100")
+    page.get_by_test_id("portfolio-field-purchase-date").fill("2026-01-02")
+    page.get_by_test_id("portfolio-field-notes").fill("QA holding")
+    page.get_by_test_id("portfolio-save-holding").click()
+    portfolio.get_by_text("AMD", exact=True).wait_for(state="visible", timeout=30000)

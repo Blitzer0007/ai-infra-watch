@@ -54,6 +54,14 @@ def test_history_api_contract_and_payload(client):
     assert isinstance(points[0]["date"], str) and float(points[0]["price"]) > 0
     assert isinstance(points[-1]["date"], str) and float(points[-1]["price"]) > 0
 
+def test_history_api_rejects_unsupported_range(client):
+    response = client.get("/api/company-scale", params={"action":"history","symbol":"NVDA","range":"7y"})
+    assert response.status_code == 400
+
+def test_portfolio_api_rejects_invalid_post(client):
+    response = client.post("/api/portfolio", json={"symbol":"QA_TEST_INVALID","quantity":0,"averageCost":100})
+    assert response.status_code == 400
+
 def test_milestones_api_contract(client):
     response = client.get("/api/company-scale", params={"action":"milestones","symbol":"NVDA","limit":12})
     assert response.status_code == 200, response.text[:500]
