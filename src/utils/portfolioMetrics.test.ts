@@ -18,7 +18,7 @@ test('portfolio concentration uses current value and calculates top-three weight
   const result = calculatePortfolioConcentration(baseInputs);
   assert.equal(result.topHolding?.symbol, 'A');
   assert.equal(result.topHolding?.weight, 0.6);
-  assert.equal(result.top3Weight, 1);
+  assert.ok(Math.abs(result.top3Weight - 1) < 1e-9);
   assert.equal(result.groupWeights[0]?.group, 'AI');
   assert.equal(result.groupWeights[0]?.weight, 0.9);
   assert.ok(result.hhi != null);
