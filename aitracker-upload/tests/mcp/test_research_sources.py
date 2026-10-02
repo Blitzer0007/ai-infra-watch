@@ -72,3 +72,22 @@ def test_issuer_official_filters_to_company_domain():
     assert len(snapshot.official_articles) == 1
     assert snapshot.official_articles[0]["url"] == "https://www.example.com/news/update"
     assert all("news.example.net" not in item["url"] for item in snapshot.official_articles)
+
+
+def test_analyst_service_keeps_partial_results_when_endpoint_is_unavailable():
+    from mcp_servers.stocks.providers import QuoteError
+
+    provider = FakeFinnhubResearchProvider()
+    original = provider._get
+
+    def partial(path, params):
+        if path == "/stock/eps-estimate":
+            raise QuoteError("HTTP_ERROR", "endpoint unavailable")
+        return original(path, params)
+
+    provider._get = partial
+    snapshot = AnalystService(provider).get("EXM")
+    assert snapshot.price_target["targetMean"] == 225
+    assert snapshot.recommendation["buy"] == 7
+    assert snapshot.eps_estimates == []
+    assert snapshot.revenue_estimates[0]["avg"] == 100000000
