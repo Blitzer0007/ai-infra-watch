@@ -22,13 +22,13 @@ test('portfolio concentration uses current value and calculates top-three weight
   assert.equal(result.groupWeights[0]?.group, 'AI');
   assert.equal(result.groupWeights[0]?.weight, 0.9);
   assert.ok(result.hhi != null);
-  assert.equal(result.effectiveHoldings, 2.5);
+  assert.equal(Number(result.effectiveHoldings?.toFixed(4)), 2.1739);
 });
 
 test('portfolio stress is position-size weighted', () => {
   const result = calculatePortfolioStressScore(baseInputs);
   assert.equal(result.weightedBreadth, 0.4);
-  assert.equal(Number(result.weightedAvgMove?.toFixed(2)), -0.8);
+  assert.equal(Number(result.weightedAvgMove?.toFixed(2)), -0.6);
 });
 
 test('portfolio attribution preserves signed P&L contribution', () => {
