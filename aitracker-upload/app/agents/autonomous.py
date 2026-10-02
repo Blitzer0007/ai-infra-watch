@@ -24,6 +24,7 @@ from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
 from app.agents.evidence_quality import citation_coverage, deduplicate_evidence, detect_conflicts, enrich_calls
+from app.agents.hallucination import audit as hallucination_audit
 
 
 @dataclass
@@ -34,6 +35,7 @@ class AutonomousResult:
     discovered: list[str]
     trajectory: AgentTrajectory
     jev: dict[str, Any] = field(default_factory=dict)
+    hallucination: dict[str, Any] = field(default_factory=dict)
     answer_source: str = "agent-llm"
     error: str = ""
     resolution: str = "completed"
@@ -858,6 +860,7 @@ class AutonomousMCPAgent:
         # instead of marking a successful investigation as degraded.
         if self.client.stub:
             final_text = _result_preview(successful[-1].output, 4000)
+            hallucination = hallucination_audit(final_text, successful)
             steps.append(Step(node="finalize", kind="node", note="deterministic evidence synthesis"))
             return AutonomousResult(
                 question,
@@ -866,6 +869,7 @@ class AutonomousMCPAgent:
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
                 jev=self.last_jev,
+                hallucination=hallucination,
                 answer_source="deterministic-evidence",
                 resolution=resolution,
             )
@@ -895,6 +899,7 @@ class AutonomousMCPAgent:
         except Exception as exc:
             final_text = _deterministic_summary(question, calls, evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else ""))
             error = f"finalization_failed: {type(exc).__name__}: {exc}"
+            hallucination = hallucination_audit(final_text, successful)
             steps.append(Step(node="finalize", kind="node", note=error))
             return AutonomousResult(
                 question,
@@ -903,10 +908,19 @@ class AutonomousMCPAgent:
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
                 jev=self.last_jev,
+                hallucination=hallucination,
                 answer_source="deterministic-fallback",
                 error=error,
                 resolution=resolution,
             )
+        hallucination = hallucination_audit(final_text, successful)
+        steps.append(
+            Step(
+                node="hallucination_audit",
+                kind="node",
+                note="deterministic claim grounding audit",
+            )
+        )
         steps.append(llm_call("autonomous.finalize", note="evidence synthesis"))
         final_note = {
             "jev_evidence_sufficient": "evidence sufficient",
@@ -921,6 +935,7 @@ class AutonomousMCPAgent:
             [tool.qualified_name for tool in self.toolbox.tools()],
             AgentTrajectory(steps=steps),
             jev=self.last_jev,
+            hallucination=hallucination,
             resolution=resolution,
         )
 
