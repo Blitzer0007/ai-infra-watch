@@ -701,8 +701,164 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="Average cost" value={'$' + h.averageCost.toFixed(2)} />
+      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
+      <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
+      <Info label="Average cost" value={'
+      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
+      <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
+    </div>
+    <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+      <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+      {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
+      {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
+      {scenarios.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-[10px]">
+            <thead className="text-white/25 uppercase font-mono">
+              <tr>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Sale value</th>
+                <th className="py-2 pr-3">Profit / loss</th>
+                <th className="py-2 pr-3">Return</th>
+                <th className="py-2">From current</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => {
+                const saleValue = scenario.price * h.quantity;
+                const profit = saleValue - h.investedValue;
+                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
+                const fromCurrent = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0
+                  ? ((scenario.price / h.livePrice) - 1) * 100
+                  : null;
+                return (
+                  <tr key={scenario.label} className="border-t border-white/5">
+                    <td className="py-2 pr-3 text-white/60">
+                      {scenario.label}
+                      {scenario.date ? <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span> : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{'$' + scenario.price.toFixed(2)}</td>
+                    <td className="py-2 pr-3 font-mono">{'$' + saleValue.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%'}</td>
+                    <td className={'py-2 font-mono ' + (fromCurrent == null ? 'text-white/25' : fromCurrent >= 0 ? 'text-cyan-300' : 'text-rose-300')}>{fromCurrent == null ? '—' : (fromCurrent >= 0 ? '+' : '') + fromCurrent.toFixed(2) + '%'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Info label="52-week high distance" value={distanceTo52wHigh == null ? '—' : '+' + distanceTo52wHigh.toFixed(2) + '% from current'} />
+        <Info label="Historical high distance" value={distanceToHistoricalHigh == null ? '—' : '+' + distanceToHistoricalHigh.toFixed(2) + '% from current'} />
+      </div>
+      <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+        <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Custom target price</div>
+        <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={customTarget}
+            onChange={e => setCustomTarget(e.target.value)}
+            placeholder="Enter price"
+            aria-label="Custom target price"
+            className="w-full sm:w-44 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-mono text-white outline-none focus:border-cyan-400/30"
+          />
+          <div className="text-[9px] text-white/30">Adds a hypothetical full-position sale row; it is not a forecast or trading instruction.</div>
+        </div>
+      </div>
+    </div>
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
+      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : 'Use the gate breakdown below to see which conditions are currently preventing an average-in review.'}</div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+        {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}
+      </div>
+    </div>
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
+      <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
+    </div>
+    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
+      <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
+      <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
+      <div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div>
+    </div>
+  </Panel>;
+}
+
+function GateCheck({label,passed,detail}:{label:string;passed:boolean;detail:string;key?: string}) {
+  return <div className="border border-white/5 rounded-xl p-3 bg-black/10">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] font-mono uppercase text-white/55">{label}</span>
+      <span className={'text-[8px] font-mono font-bold uppercase ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span>
+    </div>
+    <div className="text-[10px] text-white/35 mt-2">{detail}</div>
+  </div>;
+}
+function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div>
+    <div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div>
+  </div>;
+}
+
+function StatePill({state}:{state:PositionAnalysis['state']}) {
+  const cls = state === 'ADD REVIEW'
+    ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
+    : state === 'RISK REVIEW'
+      ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
+  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
+}
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
+}
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
+}
+ + h.averageCost.toFixed(2)} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
       <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
     </div>
