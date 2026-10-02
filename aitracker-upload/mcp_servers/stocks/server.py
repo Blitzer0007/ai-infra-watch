@@ -32,6 +32,7 @@ from .providers import QuoteError
 from .schemas import QuoteBatch, ServerHealth
 from .research_sources import AnalystService, IssuerOfficialService
 from .service import StockService, from_env as _from_env
+from .social_research import WebSearchService, ExecutiveSignalsService
 
 
 def build_server(service: StockService | None = None) -> MCPServer:
@@ -115,6 +116,20 @@ def build_server(service: StockService | None = None) -> MCPServer:
     )
     def get_issuer_official(symbol: str, days: int = 14) -> dict:
         return IssuerOfficialService().get(symbol, days=days).model_dump()
+
+    @server.tool(
+        name="search_web",
+        description="Search current web evidence using Brave or Tavily, with an explicit GDELT discovery fallback.",
+    )
+    def search_web(query: str, domains: list[str] | None = None, days: int = 7, limit: int = 10) -> dict:
+        return WebSearchService().search(query, domains=domains, days=days, limit=limit)
+
+    @server.tool(
+        name="get_executive_signals",
+        description="Discover recent public executive signals from official X, LinkedIn, company sites and corroborating web coverage.",
+    )
+    def get_executive_signals(executive: str | None = None, organization: str | None = None, days: int = 7, limit: int = 12) -> dict:
+        return ExecutiveSignalsService().get(executive=executive, organization=organization, days=days, limit=limit)
 
     @server.tool(
         name="get_relationships",

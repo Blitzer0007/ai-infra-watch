@@ -130,7 +130,11 @@ def _family_from_tool(tool_name: str) -> str:
     reason about provenance instead of treating every source as equivalent.
     """
     name = tool_name.lower()
-    if name.startswith("news."):
+    if "get_executive_signals" in name or "executive" in name:
+        return "executive"
+    if "search_web" in name or name.startswith("web."):
+        return "web_search"
+        if name.startswith("news."):
         return "news"
     if any(token in name for token in ("analyst.", "analyst_", "price_target", "target_price", "consensus", "estimate_revision", "recommendation", "ratings")):
         return "analyst_consensus"

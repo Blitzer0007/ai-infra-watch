@@ -747,6 +747,10 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
         priorities.extend(["portfolio", "market", "news", "issuer_primary"])
     if any(term in lower for term in ("analyst", "price target", "target price", "consensus", "wall street", "estimate revision", "rating")):
         priorities.append("analyst_consensus")
+    if any(term in lower for term in ("ceo", "founder", "management", "executive", "musk", "volozh", "jensen huang", "lisa su", "satya nadella", "zuckerberg")):
+        priorities.extend(["executive", "web_search", "issuer_primary", "news"])
+    if any(term in lower for term in ("web search", "search the web", "search online", "internet")):
+        priorities.insert(0, "web_search")
     if any(term in lower for term in ("official documentation", "official docs", "company docs", "product documentation", "investor relations", "company announcement")):
         priorities.append("issuer_primary")
     if any(term in lower for term in ("earnings", "earning", "eps", "revenue surprise")):
@@ -763,7 +767,7 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
         priorities.extend(["market", "news", "issuer_primary", "analyst_consensus", "regulatory_primary", "event_study"])
     priorities.extend([
         "market", "news", "issuer_primary", "regulatory_primary",
-        "analyst_consensus", "earnings", "event_study", "macro", "congress",
+        "analyst_consensus", "executive", "web_search", "earnings", "event_study", "macro", "congress",
         "portfolio", "forecast", "quality",
     ])
     return tuple(dict.fromkeys(priorities))
@@ -772,7 +776,11 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
 def _channel_tool_usable(family: str, name: str) -> bool:
     """Reject tool names that only happen to belong to a family but are not evidence queries."""
     lower = name.lower()
-    if family == "news":
+    if family == "executive":
+        return "get_executive_signals" in lower
+    if family == "web_search":
+        return "search_web" in lower or lower.startswith("web.")
+        if family == "news":
         return any(
             token in lower
             for token in ("news.search", "news.company", "news.sector", "news.global", "news.geopolitical", "news.health")

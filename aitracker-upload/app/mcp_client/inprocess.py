@@ -41,6 +41,9 @@ class InProcessMCPToolbox:
         from mcp_servers.stocks.research_sources import AnalystService, IssuerOfficialService
         self._analysts = AnalystService()
         self._issuer_official = IssuerOfficialService()
+        from mcp_servers.stocks.social_research import WebSearchService, ExecutiveSignalsService
+        self._web_search = WebSearchService()
+        self._executive_signals = ExecutiveSignalsService(search=self._web_search)
 
         self._stocks = StockService.from_env(mode)
         self._application = ApplicationResearchService(live=self.live, stocks=self._stocks)
@@ -66,6 +69,9 @@ class InProcessMCPToolbox:
                 ("get_relationships", "Resolve configured AI Infra Watch peer relationships.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("get_analyst_expectations", "Get analyst recommendation trends, price targets, EPS estimates and revenue estimates.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("get_issuer_official", "Get issuer profile and recent official-domain company evidence.", {"type": "object", "properties": {"symbol": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}}, "required": ["symbol"]}),
+                ("search_web", "Search current web evidence using Brave or Tavily, with an explicit GDELT discovery fallback.", {"type":"object","properties":{"query":{"type":"string"},"domains":{"type":"array","items":{"type":"string"}},"days":{"type":"integer","minimum":1,"maximum":30},"limit":{"type":"integer","minimum":1,"maximum":10}},"required":["query"]}),
+                ("get_executive_signals", "Discover recent public executive signals from official X, LinkedIn, company sites and corroborating web coverage.", {"type":"object","properties":{"executive":{"type":"string"},"organization":{"type":"string"},"days":{"type":"integer","minimum":1,"maximum":14},"limit":{"type":"integer","minimum":1,"maximum":20}}}),
+
                 ("list_watchlist", "List tracked watchlist symbols.", {"type": "object", "properties": {}}),
                 ("health", "Stocks service health snapshot.", {"type": "object", "properties": {}}),
             ],
@@ -138,6 +144,21 @@ class InProcessMCPToolbox:
                 str(args.get("symbol", "")),
                 days=int(args.get("days", 14)),
             ).model_dump()
+        if key == "stocks.search_web":
+            return self._web_search.search(
+                str(args.get("query", "")),
+                domains=[str(x) for x in args.get("domains", []) if str(x).strip()],
+                days=int(args.get("days", 7)),
+                limit=int(args.get("limit", 10)),
+            )
+        if key == "stocks.get_executive_signals":
+            return self._executive_signals.get(
+                executive=args.get("executive"),
+                organization=args.get("organization"),
+                days=int(args.get("days", 7)),
+                limit=int(args.get("limit", 12)),
+            )
+
         if key == "stocks.get_relationships":
             from mcp_servers.stocks.relationships import from_env as relationships_from_env
             return relationships_from_env().get(str(args.get("symbol", "")).strip().upper())
