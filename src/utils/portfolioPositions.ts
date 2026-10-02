@@ -14,6 +14,13 @@ export type PortfolioPosition = {
   investedValue: number;
   snapshotCurrentValue: number;
   notes?: string;
+  decisionThesis?: string;
+  lossLimitPct?: number | null;
+  exitRuleType?: string | null;
+  exitRuleValue?: number | null;
+  exitRuleText?: string;
+  practicalNotes?: string;
+  brokerAlertPrices?: number[];
   id?: string;
   purchaseDate?: string | null;
   purchaseLotCount?: number;
@@ -77,6 +84,13 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     investedValue,
     snapshotCurrentValue: investedValue,
     notes: holding.notes,
+    decisionThesis: holding.decisionThesis || holding.notes || '',
+    lossLimitPct: holding.lossLimitPct ?? null,
+    exitRuleType: holding.exitRuleType ?? null,
+    exitRuleValue: holding.exitRuleValue ?? null,
+    exitRuleText: holding.exitRuleText || '',
+    practicalNotes: holding.practicalNotes || '',
+    brokerAlertPrices: holding.brokerAlertPrices || [],
     purchaseDate: firstPurchaseDate,
     purchaseLotCount: lots.length,
     firstPurchaseDate,

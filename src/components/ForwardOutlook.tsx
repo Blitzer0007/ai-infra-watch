@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
-import { fetchPortfolioHoldings } from '../utils/portfolioApi';
+import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfolioApi';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
@@ -21,6 +21,7 @@ type Horizon = 5 | 20 | 60 | 120 | 252;
 type ForecastSnapshot = {
   id: string; ticker: string; createdAt: string; targetDate: string; horizon: Horizon; scenarioId: string;
   entryPrice: number; median: number; p25: number; p75: number; p10: number; p90: number;
+  decisionThesis?: string; lossLimitPct?: number | null; exitRuleType?: string | null; exitRuleValue?: number | null; exitRuleText?: string; practicalNotes?: string; brokerAlertPrices?: number[];
   modelVersion?: string;
   status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
 };
@@ -388,11 +389,32 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevValidationError, setJevValidationError] = useState<string | null>(null);
   const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
   const [portfolioLoadError, setPortfolioLoadError] = useState<string | null>(null);
+  const [decisionEditing, setDecisionEditing] = useState(false);
+  const [decisionSaving, setDecisionSaving] = useState(false);
+  const [decisionMessage, setDecisionMessage] = useState<string | null>(null);
+  const [decisionDraft, setDecisionDraft] = useState({
+    thesis: '', lossLimitPct: '', exitRuleType: 'trailing_stop', exitRuleValue: '', exitRuleText: '', practicalNotes: '', brokerAlerts: '',
+  });
 
   const verificationDrift = useMemo(
     () => calculateVerificationDrift(forecasts, selectedStock, horizon),
     [forecasts, selectedStock, horizon],
   );
+
+  useEffect(() => {
+    const holding = portfolioPositions.find(position => position.symbol === selectedStock);
+    setDecisionDraft({
+      thesis: holding?.decisionThesis || holding?.notes || '',
+      lossLimitPct: holding?.lossLimitPct == null ? '' : String(holding.lossLimitPct),
+      exitRuleType: holding?.exitRuleType || 'trailing_stop',
+      exitRuleValue: holding?.exitRuleValue == null ? '' : String(holding.exitRuleValue),
+      exitRuleText: holding?.exitRuleText || '',
+      practicalNotes: holding?.practicalNotes || '',
+      brokerAlerts: (holding?.brokerAlertPrices || []).join(', '),
+    });
+    setDecisionEditing(false);
+    setDecisionMessage(null);
+  }, [portfolioPositions, selectedStock]);
 
   useEffect(() => {
     let cancelled = false;
@@ -573,6 +595,46 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     };
   }, [analysis.sample]);
 
+  const saveDecisionContext = async () => {
+    const holding = portfolioContext.holding;
+    if (!holding?.id) return;
+    const lossLimitPct = decisionDraft.lossLimitPct.trim() === '' ? null : Number(decisionDraft.lossLimitPct);
+    const exitRuleValue = decisionDraft.exitRuleValue.trim() === '' ? null : Number(decisionDraft.exitRuleValue);
+    if (lossLimitPct != null && (!Number.isFinite(lossLimitPct) || lossLimitPct < 0 || lossLimitPct > 100)) {
+      setDecisionMessage('Loss limit must be between 0% and 100%.'); return;
+    }
+    if (exitRuleValue != null && (!Number.isFinite(exitRuleValue) || exitRuleValue < 0 || exitRuleValue > 100)) {
+      setDecisionMessage('Exit rule percentage must be between 0% and 100%.'); return;
+    }
+    const brokerAlertPrices = decisionDraft.brokerAlerts.split(',').map(value => Number(value.trim())).filter(value => Number.isFinite(value) && value > 0);
+    setDecisionSaving(true); setDecisionMessage(null);
+    try {
+      const saved = await updatePortfolioHolding({
+        id: holding.id,
+        symbol: holding.symbol,
+        quantity: holding.quantity,
+        averageCost: holding.averageCost,
+        purchaseDate: holding.purchaseDate,
+        notes: holding.notes || '',
+        decisionThesis: decisionDraft.thesis.trim(),
+        lossLimitPct,
+        exitRuleType: decisionDraft.exitRuleType || null,
+        exitRuleValue,
+        exitRuleText: decisionDraft.exitRuleText.trim(),
+        practicalNotes: decisionDraft.practicalNotes.trim(),
+        brokerAlertPrices,
+        purchaseLots: [],
+      });
+      setPortfolioPositions(prev => prev.map(position => position.id === saved.id ? mapStoredPortfolioHoldings([saved])[0] : position));
+      setDecisionEditing(false);
+      setDecisionMessage('Decision rules saved to this holding.');
+    } catch (error: any) {
+      setDecisionMessage(error?.message || 'Unable to save decision rules.');
+    } finally {
+      setDecisionSaving(false);
+    }
+  };
+
   const runJevEvidenceCheck = async () => {
     if (!history.length || loading) return;
     setJevLoading(true);
@@ -649,7 +711,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     const snapshot: ForecastSnapshot = {
       id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
       targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
-      median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending'
+      median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending',
+      decisionThesis: portfolioContext.holding?.decisionThesis || portfolioContext.thesis || '',
+      lossLimitPct: portfolioContext.holding?.lossLimitPct ?? null,
+      exitRuleType: portfolioContext.holding?.exitRuleType ?? null,
+      exitRuleValue: portfolioContext.holding?.exitRuleValue ?? null,
+      exitRuleText: portfolioContext.holding?.exitRuleText || '',
+      practicalNotes: portfolioContext.holding?.practicalNotes || '',
+      brokerAlertPrices: portfolioContext.holding?.brokerAlertPrices || []
     };
     try {
       const response = await fetch('/api/forecast-verification', {
@@ -657,7 +726,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       });
       if (!response.ok) throw new Error('Persistent forecast storage failed (HTTP ' + response.status + ')');
       const body = await response.json();
-      const saved = body?.forecast || snapshot;
+      const saved = { ...snapshot, ...(body?.forecast || {}) };
       const next = [...forecasts.filter(f => f.id !== saved.id), saved];
       setForecasts(next);
       saveForecasts(next);
@@ -897,7 +966,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {!loading && error && <div className="text-xs font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{error}</div>}
 
         {!loading && !error && (
-          <>
+          <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
                 ['10th percentile', analysis.p10],
@@ -931,16 +1000,39 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div> : <div className="text-[9px] text-white/35">No saved holding for {selectedStock}. Forecast is being shown without position context.</div>}
               </div>
               <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[.03] p-4">
-                <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision context</span></div>
-                <div className="text-[8px] text-white/25 uppercase font-mono">Recorded thesis</div>
-                <div className="text-[10px] text-white/65 mt-1 leading-relaxed">{portfolioContext.thesis || 'No thesis recorded. Forecast does not invent a reason to own the stock.'}</div>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div><div className="text-[9px] font-mono text-white/45 mt-1">Not recorded</div></div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">Not recorded</div></div>
-                </div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision context</span></div>
+                {portfolioContext.hasHolding && <button onClick={() => setDecisionEditing(value => !value)} className="text-[8px] font-mono uppercase tracking-widest text-amber-200/70 hover:text-amber-100">{decisionEditing ? 'Close' : 'Edit rules'}</button>}
               </div>
-            </div>
-
+              {portfolioContext.hasHolding && decisionEditing &&
+                <div className="space-y-2">
+                  <label className="block text-[8px] text-white/30 uppercase font-mono">Reason to own / thesis<textarea value={decisionDraft.thesis} onChange={e => setDecisionDraft(d => ({ ...d, thesis: e.target.value }))} rows={2} placeholder="Write the reason you own this holding." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Loss limit %<input value={decisionDraft.lossLimitPct} onChange={e => setDecisionDraft(d => ({ ...d, lossLimitPct: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Exit rule<select value={decisionDraft.exitRuleType} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleType: e.target.value }))} className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none"><option value="trailing_stop">Trailing stop</option><option value="price_stop">Price stop</option><option value="thesis_break">Thesis break</option><option value="time_limit">Time limit</option><option value="custom">Custom</option></select></label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Rule %<input value={decisionDraft.exitRuleValue} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleValue: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 15 or 20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Broker alert prices<input value={decisionDraft.brokerAlerts} onChange={e => setDecisionDraft(d => ({ ...d, brokerAlerts: e.target.value }))} placeholder="56.46, 84.68" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                  </div>
+                  <label className="block text-[8px] text-white/30 uppercase font-mono">Exit rule / invalidation notes<textarea value={decisionDraft.exitRuleText} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleText: e.target.value }))} rows={2} placeholder="Use closing price; gaps can skip the stop; document what invalidates the thesis." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                  <label className="block text-[8px] text-white/30 uppercase font-mono">Practical notes<textarea value={decisionDraft.practicalNotes} onChange={e => setDecisionDraft(d => ({ ...d, practicalNotes: e.target.value }))} rows={3} placeholder="Broker alerts, fractional-share limitations, review date, etc." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                  <div className="flex items-center justify-between gap-2"><button disabled={decisionSaving} onClick={saveDecisionContext} className="rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[8px] font-mono uppercase tracking-widest text-amber-100 disabled:opacity-40">{decisionSaving ? 'Saving…' : 'Save rules'}</button>{decisionMessage && <span className="text-[8px] font-mono text-white/45">{decisionMessage}</span>}</div>
+                </div>
+              }
+              {(!portfolioContext.hasHolding || !decisionEditing) &&
+                <div>
+                  <div className="text-[8px] text-white/25 uppercase font-mono">Recorded thesis</div>
+                  <div className="text-[10px] text-white/65 mt-1 leading-relaxed">{portfolioContext.holding?.decisionThesis || portfolioContext.thesis || 'No thesis recorded. Forecast does not invent a reason to own the stock.'}</div>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.lossLimitPct == null ? 'Not recorded' : portfolioContext.holding.lossLimitPct + '%'}</div></div>
+                    <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? ((portfolioContext.holding.exitRuleType.replace('_', ' ')) + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div></div>
+                  </div>
+                  {portfolioContext.holding?.brokerAlertPrices?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker alerts: {portfolioContext.holding.brokerAlertPrices.map(price => formatPrice(price)).join(', ')}</div> : null}
+                  {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
+                </div>
+              }
+              </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
                 <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
@@ -998,24 +1090,23 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <Sparkles className="w-4 h-4 text-violet-300" />
                     <span className="text-[9px] font-mono uppercase tracking-widest text-violet-200/70">JEV evidence & context</span>
                   </div>
-                  <p className="text-[10px] text-white/45 max-w-3xl">
-                    JEV does not generate the numerical forecast. It evaluates current evidence around the historical result and flags support, conflict, or insufficient evidence.
-                  </p>
+                  <p className="text-[10px] text-white/45 max-w-3xl">JEV does not generate the numerical forecast. It evaluates current evidence around the historical result and flags support, conflict, or insufficient evidence.</p>
                 </div>
-                <button
-                  onClick={runJevEvidenceCheck}
-                  disabled={jevLoading}
-                  className="shrink-0 px-4 py-2.5 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase tracking-wider disabled:opacity-50"
-                >
-                  {jevLoading ? 'JEV CHECKING…' : 'Run JEV Evidence Check'}
-                </button>
+                <button onClick={runJevEvidenceCheck} disabled={jevLoading} className="shrink-0 px-4 py-2.5 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase tracking-wider disabled:opacity-50">{jevLoading ? 'JEV CHECKING…' : 'Run JEV Evidence Check'}</button>
               </div>
-
               {jevError && <div className="mt-3 text-[10px] font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{jevError}</div>}
-
-              {!jevLoading && !jevError && !jevResult && (
-                <div className="mt-3 text-[10px] text-white/35">Run the check to have JEV assess the current evidence for {selectedStock} without changing the historical numbers above.</div>
-              )}
+              {jevResult && <div className="mt-4 space-y-3">
+                <div className="text-sm text-white/75 leading-relaxed">{jevResult.summary}</div>
+                <div className="flex flex-wrap gap-2">
+                  {jevResult.choice && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV route: {jevResult.choice}</span>}
+                  {jevResult.evidenceGate && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence gate: {jevResult.evidenceGate}</span>}
+                  {jevResult.rawScore != null && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV evidence quality: {jevResult.rawScore.toFixed(2)} / 3</span>}
+                  {jevResult.evidenceQuality != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence quality: {jevResult.evidenceQuality.toFixed(0)} / 100</span>}
+                  {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence.toFixed(2)} / 1</span>}
+                  {jevResult.answer_source && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Source: {jevResult.answer_source}</span>}
+                </div>
+              </div>}
+            </div>
 
               {jevResult && (
                 <div className="mt-4 space-y-3">
@@ -1031,7 +1122,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -1061,6 +1152,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[9px] font-mono">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
             <div className="mt-1 text-white/40">Forecast median {formatReturn(f.median)} · middle 50% {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
+            {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
       </div>
