@@ -1,6 +1,21 @@
 import { requireAccess } from './_access-auth.js';
 
 const DEFAULT_TIMEOUT_MS = 55000;
+const rateState = new Map();
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = 12;
+
+function rateLimited(req) {
+  const ip = String(req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || 'unknown').split(',')[0].trim();
+  const now = Date.now();
+  const current = rateState.get(ip);
+  if (!current || now >= current.resetAt) {
+    rateState.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  current.count += 1;
+  return current.count > RATE_LIMIT;
+}
 
 function backendUrl(req) {
   const configured = String(process.env.AI_INFRA_AGENT_URL || '').trim().replace(/\/+$/, '');
@@ -16,7 +31,7 @@ function backendHeaders() {
   // Keep AI_INFRA_AGENT_TOKEN for separate-backend deployments, but fall back to
   // the native token so /api/agent-ask -> /api/agent-python does not self-401.
   const token = String(
-    process.env.AGENT_API_TOKEN || process.env.AI_INFRA_AGENT_TOKEN || ''
+    process.env.AGENT_API_TOKEN || process.env.AIW_ACCESS_TOKEN || process.env.AI_INFRA_AGENT_TOKEN || ''
   ).trim();
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
@@ -28,6 +43,10 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 
 export default async function handler(req, res) {
   if (!requireAccess(req, res)) return;
+  if (rateLimited(req)) {
+    res.status(429).json({ ok: false, error: 'Too many autonomous research requests' });
+    return;
+  }
   const base = backendUrl(req);
 
   if (!base) {
