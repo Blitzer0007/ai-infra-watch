@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration } from './measurement';
+import { calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration, summarizeValidationMatrix } from './measurement';
 
 describe('stress score', () => {
   it('returns zero stress for neutral inputs', () => {
@@ -61,5 +61,63 @@ describe('calibration summary', () => {
     assert.equal(result[3].n, 2);
     assert.equal(result[3].observedPositiveRate, 1);
     assert.equal(result[3].meanExcessReturnPct, 4);
+
+  it('uses stable bucket boundaries and ignores invalid confidence values', () => {
+    const result = summarizeCalibration([
+      { confidence: 0.2, positive: true, excessReturnPct: 2 },
+      { confidence: 0.4, positive: false, excessReturnPct: -1 },
+      { confidence: 0.8, positive: true, excessReturnPct: 3 },
+      { confidence: -0.1, positive: true, excessReturnPct: 9 },
+      { confidence: Number.NaN, positive: true, excessReturnPct: 9 },
+    ]);
+    assert.equal(result[0].n, 0);
+    assert.equal(result[1].n, 1);
+    assert.equal(result[1].observedPositiveRate, 0);
+    assert.equal(result[2].n, 1);
+    assert.equal(result[4].n, 1);
+    assert.equal(result[4].observedPositiveRate, 1);
+  });
+});
+
+describe('validation matrix summary', () => {
+  it('aggregates valid ticker/horizon runs and preserves measured rows', () => {
+    const result = summarizeValidationMatrix([
+      {
+        ticker: 'AAA',
+        horizon: 5,
+        summary: {
+          rows: [
+            { positiveProbability: 0.7, actual: 2, median: 1 },
+            { positiveProbability: 0.3, actual: -1, median: 0 },
+          ],
+          directionalAccuracy: 0.5,
+          medianAbsoluteError: 1.5,
+          p25p75Coverage: 0.5,
+          p10p90Coverage: 1,
+          baselineDirectionalAccuracy: 0.4,
+          baselineMedianAbsoluteError: 2,
+        },
+      },
+      {
+        ticker: 'BBB',
+        horizon: 20,
+        summary: {
+          rows: [],
+          directionalAccuracy: 0,
+          medianAbsoluteError: 0,
+          p25p75Coverage: 0,
+          p10p90Coverage: 0,
+          baselineDirectionalAccuracy: 0,
+          baselineMedianAbsoluteError: 0,
+        },
+      },
+    ]);
+    assert.equal(result.tests, 2);
+    assert.equal(result.details.length, 1);
+    assert.equal(result.details[0].ticker, 'AAA');
+    assert.equal(result.direction, 0.5);
+    assert.equal(result.baselineError, 2);
+    assert.equal(result.calibration[1].n, 1);
+    assert.equal(result.calibration[3].n, 1);
   });
 });
