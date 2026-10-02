@@ -220,6 +220,31 @@ def _jev_route(question: str, tools: list[ToolInfo], client: JevClient) -> JevDe
         criteria={**JEV_ROUTE_CRITERIA},
     )
 
+def _record_jev_route(question: str, tools: list[ToolInfo], client: Any, *, action: str) -> dict[str, Any]:
+    """Record a structured JEV route without losing usable fields on fallback.
+
+    The route is execution metadata: if JEV returns a typed decision, preserve
+    its choice/confidence/probabilities/model. If routing itself fails, return
+    an explicit fallback state rather than silently dropping the route object.
+    """
+    try:
+        decision = _jev_route(question, tools, client)
+        return {
+            "enabled": True,
+            "choice": str(getattr(decision, "choice", "") or ""),
+            "confidence": float(getattr(decision, "confidence", 0.0) or 0.0),
+            "probabilities": dict(getattr(decision, "probabilities", None) or {}),
+            "model": str(getattr(decision, "model", "") or ""),
+            "latency_ms": round(float(getattr(decision, "latency_ms", 0.0) or 0.0), 1),
+            "action": action,
+        }
+    except Exception as exc:
+        return {
+            "enabled": True,
+            "action": "fallback",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
 def _tool_for_jev_route(route: str, tools: list[ToolInfo]) -> ToolInfo | None:
     patterns = JEV_ROUTE_PATTERNS.get(route, ())
     if not patterns:
@@ -1375,23 +1400,12 @@ class AutonomousMCPAgent:
                     )
                 )
             ):
-                try:
-                    decision = _jev_route(question, tools, self.jev)
-                    self.last_jev = {
-                        "enabled": True,
-                        "choice": decision.choice,
-                        "confidence": decision.confidence,
-                        "probabilities": decision.probabilities or {},
-                        "model": decision.model,
-                        "latency_ms": round(decision.latency_ms, 1),
-                        "action": "forced_driver_plan",
-                    }
-                except Exception as exc:
-                    self.last_jev = {
-                        "enabled": True,
-                        "action": "fallback",
-                        "error": f"{type(exc).__name__}: {exc}",
-                    }
+                self.last_jev = _record_jev_route(
+                    question,
+                    tools,
+                    self.jev,
+                    action="forced_driver_plan",
+                )
 
             gate = self.last_jev.get("evidence_gate") or {}
             successful_count = sum(1 for call in calls if call.ok)
