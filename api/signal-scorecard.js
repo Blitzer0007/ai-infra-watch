@@ -177,6 +177,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      if (isCron(req)) {
+        const evaluated = await evaluateDue();
+        return res.status(200).json({ ok: true, ...evaluated });
+      }
       const result = await supabase('portfolio_signal_family_scorecard?select=*&order=signal_type.asc', { method: 'GET' });
       return res.status(200).json({ families: result });
     }
