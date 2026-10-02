@@ -39,6 +39,13 @@ function normalizeLot(row) {
     executionPrice: Number(row.execution_price),
     quantity: Number(row.quantity),
     notes: row.notes || '',
+    decisionThesis: row.decision_thesis || '',
+    lossLimitPct: row.loss_limit_pct == null ? null : Number(row.loss_limit_pct),
+    exitRuleType: row.exit_rule_type || null,
+    exitRuleValue: row.exit_rule_value == null ? null : Number(row.exit_rule_value),
+    exitRuleText: row.exit_rule_text || '',
+    practicalNotes: row.practical_notes || '',
+    brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -151,6 +158,13 @@ export default async function handler(req, res) {
       if (body.averageCost != null) payload.average_cost = Number(body.averageCost);
       if (body.purchaseDate !== undefined) payload.purchase_date = body.purchaseDate || null;
       if (body.notes !== undefined) payload.notes = body.notes || null;
+      if (body.decisionThesis !== undefined) payload.decision_thesis = body.decisionThesis || null;
+      if (body.lossLimitPct !== undefined) payload.loss_limit_pct = body.lossLimitPct == null || body.lossLimitPct === '' ? null : Number(body.lossLimitPct);
+      if (body.exitRuleType !== undefined) payload.exit_rule_type = body.exitRuleType || null;
+      if (body.exitRuleValue !== undefined) payload.exit_rule_value = body.exitRuleValue == null || body.exitRuleValue === '' ? null : Number(body.exitRuleValue);
+      if (body.exitRuleText !== undefined) payload.exit_rule_text = body.exitRuleText || null;
+      if (body.practicalNotes !== undefined) payload.practical_notes = body.practicalNotes || null;
+      if (body.brokerAlertPrices !== undefined) payload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
       if (payload.quantity != null && (!Number.isFinite(payload.quantity) || payload.quantity <= 0)) return res.status(400).json({ error: 'quantity must be positive' });
       if (payload.average_cost != null && (!Number.isFinite(payload.average_cost) || payload.average_cost < 0)) return res.status(400).json({ error: 'averageCost must be non-negative' });
       const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(id), {
