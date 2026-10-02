@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { authFetch } from '../utils/apiAuth';
 import {
   Bot,
   CheckCircle2,
@@ -161,7 +162,7 @@ export default function AutonomousResearch() {
 
   const checkBackend = async () => {
     try {
-      const res = await fetch('/api/agent-ask?probe_mcp=true', { method: 'GET' });
+      const res = await authFetch('/api/agent-ask?probe_mcp=true', { method: 'GET' });
       const body = await res.json().catch(() => ({}));
       const online = res.ok && (body?.ok === true || body?.status === 'ok' || body?.status === 'degraded');
       setBackendOnline(online);
@@ -194,7 +195,7 @@ export default function AutonomousResearch() {
     setResult(null);
 
     try {
-      const res = await fetch('/api/agent-ask', {
+      const res = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q }),
