@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck
         run: npm run lint
 
+      - name: Measurement unit tests
+        run: npm run test:unit
+
       - name: Production build
         run: npm run build
 
