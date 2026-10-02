@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.eval.synthetic import coverage, generate_synthetic_cases
+from app.eval.synthetic import coverage, generate_synthetic_cases, validate_catalog
 from app.mcp_client.client import ToolInfo
 from app.mcp_client.inprocess import InProcessMCPToolbox
 
@@ -44,3 +44,10 @@ def test_synthetic_cases_cover_full_inprocess_research_catalog():
         "analyst_consensus", "earnings", "event_study", "congress",
         "macro", "portfolio", "forecast", "quality", "relationship",
     }.issubset(families)
+
+
+def test_real_catalog_schema_integrity():
+    toolbox = InProcessMCPToolbox(live=False)
+    report = validate_catalog(toolbox.tools())
+    assert report["passed"] is True
+    assert report["toolCount"] >= 20

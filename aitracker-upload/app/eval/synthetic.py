@@ -99,6 +99,34 @@ def generate_synthetic_cases(tools: Iterable[ToolInfo]) -> list[SyntheticCase]:
     return cases
 
 
+def validate_catalog(tools: Iterable[ToolInfo]) -> dict[str, Any]:
+    """Validate that every discovered tool has a usable description/schema."""
+    rows = []
+    for tool in tools:
+        schema = tool.input_schema or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else None
+        required = schema.get("required") if isinstance(schema, dict) else None
+        required = required if isinstance(required, list) else []
+        missing_required = [str(name) for name in required if str(name) not in (properties or {})]
+        rows.append({
+            "tool": tool.qualified_name,
+            "descriptionPresent": bool(str(tool.description or "").strip()),
+            "schemaValid": isinstance(schema, dict),
+            "requiredFieldsPresent": not missing_required,
+            "missingRequired": missing_required,
+        })
+    failures = [
+        row for row in rows
+        if not row["descriptionPresent"] or not row["schemaValid"] or not row["requiredFieldsPresent"]
+    ]
+    return {
+        "toolCount": len(rows),
+        "passed": len(failures) == 0,
+        "failures": failures,
+        "rows": rows,
+    }
+
+
 def coverage(cases: Iterable[SyntheticCase]) -> dict[str, Any]:
     rows = list(cases)
     families = sorted({case.expected_family for case in rows})
@@ -109,4 +137,4 @@ def coverage(cases: Iterable[SyntheticCase]) -> dict[str, Any]:
     }
 
 
-__all__ = ["SyntheticCase", "generate_synthetic_cases", "coverage"]
+__all__ = ["SyntheticCase", "generate_synthetic_cases", "coverage", "validate_catalog"]

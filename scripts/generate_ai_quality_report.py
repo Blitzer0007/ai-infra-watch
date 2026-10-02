@@ -67,5 +67,5 @@ lines += [
     "- Regression thresholds should be reviewed when the evaluator or dataset changes.",
 ]
 
-Path(args.output).write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+Path(args.output).write_text("\n".join(lines) + "\n", encoding="utf-8")
 print(f"Wrote {args.output}")

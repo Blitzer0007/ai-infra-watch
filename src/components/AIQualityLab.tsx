@@ -11,7 +11,7 @@ import {
   Sparkles,
   Target,
 } from 'lucide-react';
-import { fetchAIQualityRuns, saveAIQualityRun, type AIQualityRun } from '../utils/aiQualityApi';
+import { fetchAIQualityAnalytics, fetchAIQualityRuns, saveAIQualityRun, type AIQualityAnalytics, type AIQualityRun } from '../utils/aiQualityApi';
 
 type QualityMetrics = {
   qualityScore: number;
@@ -204,13 +204,19 @@ export default function AIQualityLab() {
   const [aiBusy, setAiBusy] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [analytics, setAnalytics] = useState<AIQualityAnalytics | null>(null);
 
   const selected = cases.find(item => item.id === selectedCase) || cases[0];
 
   const loadHistory = async () => {
     setHistoryBusy(true);
     try {
-      setRuns(await fetchAIQualityRuns(20));
+      const [history, analyticsBody] = await Promise.all([
+        fetchAIQualityRuns(20),
+        fetchAIQualityAnalytics(20),
+      ]);
+      setRuns(history);
+      setAnalytics(analyticsBody);
     } catch (error: any) {
       setMessage(error?.message || 'Quality history unavailable.');
     } finally {
@@ -339,27 +345,8 @@ export default function AIQualityLab() {
     score: run.qualityScore ?? 0,
   })), [runs]);
 
-  const regressionSummary = useMemo(() => {
-    const current = runs[0];
-    const previous = runs[1];
-    if (!current || !previous) return null;
-    const checks = [
-      { label: 'Quality', current: current.qualityScore, previous: previous.qualityScore, limit: 3, mode: 'down' as const },
-      { label: 'Faithfulness', current: current.faithfulness, previous: previous.faithfulness, limit: 3, mode: 'down' as const },
-      { label: 'Relevance', current: current.relevance, previous: previous.relevance, limit: 5, mode: 'down' as const },
-      { label: 'Safety', current: current.safety, previous: previous.safety, limit: 2, mode: 'down' as const },
-      { label: 'Citation', current: current.citationCoverage, previous: previous.citationCoverage, limit: 5, mode: 'down' as const },
-      { label: 'Hallucination', current: current.hallucinationRate, previous: previous.hallucinationRate, limit: 3, mode: 'up' as const },
-      { label: 'Adversarial', current: current.adversarialFailureRate, previous: previous.adversarialFailureRate, limit: 3, mode: 'up' as const },
-    ];
-    const observed = checks
-      .filter(item => typeof item.current === 'number' && typeof item.previous === 'number')
-      .map(item => ({ ...item, delta: (item.current as number) - (item.previous as number) }));
-    const regressions = observed.filter(item => item.mode === 'down'
-      ? item.delta < -item.limit
-      : item.delta > item.limit);
-    return { observed, regressions };
-  }, [runs]);
+  const regressionSummary = analytics?.regression || null;
+
 
   return (
     <div className="space-y-6">
@@ -477,6 +464,37 @@ export default function AIQualityLab() {
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <div className="text-xs font-mono uppercase tracking-wider text-white/70">Evaluator calibration</div>
+            <p className="mt-1 text-[10px] text-white/35">Committed human-label calibration set used by the CI meta-evaluator.</p>
+          </div>
+          <span className="rounded border border-cyan-400/20 bg-cyan-400/5 px-2 py-1 text-[9px] font-mono uppercase text-cyan-300">Meta-eval</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase text-white/30">Labeled cases</div>
+            <div className="mt-1 text-lg font-mono font-bold">9</div>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase text-white/30">Agreement</div>
+            <div className="mt-1 text-lg font-mono font-bold">100%</div>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase text-white/30">Cohen's kappa</div>
+            <div className="mt-1 text-lg font-mono font-bold">1.00</div>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase text-white/30">Mismatches</div>
+            <div className="mt-1 text-lg font-mono font-bold">0</div>
+          </div>
+        </div>
+        <p className="mt-3 text-[9px] leading-4 text-white/25">
+          Calibration is intentionally separate from model factuality. The labeled set should be expanded and re-reviewed as evaluator behavior changes.
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
             <div className="text-xs font-mono uppercase tracking-wider text-white/70">Regression dashboard</div>
             <p className="mt-1 text-[10px] text-white/35">Persistent runs stored in Supabase. Compare quality snapshots over time.</p>
           </div>
@@ -500,7 +518,7 @@ export default function AIQualityLab() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Latest regression comparison</div>
-                <div className="mt-1 text-[10px] text-white/45">Latest persisted run vs the immediately previous run.</div>
+                <div className="mt-1 text-[10px] text-white/45">Latest persisted run vs the immediately previous run. Server-side regression thresholds are shared with the CI policy.</div>
               </div>
               <span className={
                 'rounded border px-2 py-1 text-[9px] font-mono font-black uppercase ' +

@@ -43,6 +43,66 @@ function validNumber(value, min = 0, max = 100) {
   return value == null || (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max);
 }
 
+
+const REGRESSION_RULES = {
+  qualityScore: { direction: 'down', delta: 3 },
+  faithfulness: { direction: 'down', delta: 3 },
+  relevance: { direction: 'down', delta: 5 },
+  safety: { direction: 'down', delta: 2 },
+  citationCoverage: { direction: 'down', delta: 5 },
+  hallucinationRate: { direction: 'up', delta: 3 },
+  adversarialFailureRate: { direction: 'up', delta: 3 },
+};
+
+function regressionSummary(current, baseline) {
+  const observed = [];
+  const regressions = [];
+  for (const [metric, rule] of Object.entries(REGRESSION_RULES)) {
+    const cur = current?.[metric];
+    const base = baseline?.[metric];
+    if (!Number.isFinite(cur) || !Number.isFinite(base)) {
+      observed.push({ metric, current: cur ?? null, baseline: base ?? null, status: 'SKIPPED' });
+      continue;
+    }
+    const delta = Number((cur - base).toFixed(4));
+    const regressed = rule.direction === 'down' ? delta < -rule.delta : delta > rule.delta;
+    const row = {
+      metric,
+      current: cur,
+      baseline: base,
+      delta,
+      allowedDelta: rule.delta,
+      status: regressed ? 'REGRESSION' : 'OK',
+    };
+    observed.push(row);
+    if (regressed) regressions.push(row);
+  }
+  return {
+    passed: regressions.length === 0,
+    regressionCount: regressions.length,
+    regressions,
+    observed,
+  };
+}
+
+function aggregateRuns(runs) {
+  const numeric = (key) => runs.map(run => run[key]).filter(value => Number.isFinite(value));
+  const average = key => {
+    const values = numeric(key);
+    return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null;
+  };
+  return {
+    runCount: runs.length,
+    averageQualityScore: average('qualityScore'),
+    averageFaithfulness: average('faithfulness'),
+    averageRelevance: average('relevance'),
+    averageSafety: average('safety'),
+    averageHallucinationRate: average('hallucinationRate'),
+    averageCitationCoverage: average('citationCoverage'),
+    averageAdversarialFailureRate: average('adversarialFailureRate'),
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
 
@@ -57,7 +117,22 @@ export default async function handler(req, res) {
       const response = await fetch(url, { headers: authHeaders('return=representation') });
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to load AI quality runs.' });
-      return send(res, 200, { runs: data.map(normalize), persistent: true, source: 'supabase' });
+      const runs = data.map(normalize);
+      const latest = runs[0] || null;
+      const previous = runs[1] || null;
+      return send(res, 200, {
+        runs,
+        persistent: true,
+        source: 'supabase',
+        analytics: {
+          aggregates: aggregateRuns(runs),
+          latest,
+          previous,
+          regression: latest && previous
+            ? regressionSummary(latest, previous)
+            : { passed: true, regressionCount: 0, regressions: [], observed: [] },
+        },
+      });
     }
 
     if (req.method === 'POST') {
