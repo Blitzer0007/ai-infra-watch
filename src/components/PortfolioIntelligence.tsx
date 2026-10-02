@@ -10,7 +10,6 @@ import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import { FilterInput, FilterSelect } from './FilterControls';
-
 type Price = {
   price: number;
   changePct: number;
