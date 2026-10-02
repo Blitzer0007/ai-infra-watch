@@ -1,0 +1,31 @@
+name: AI Quality Gate
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ai_quality_gate.py"
+      - "scripts/ai_quality_fixture.json"
+      - "src/components/AIQualityLab.tsx"
+      - "src/utils/aiQualityApi.ts"
+      - "api/ai-quality.js"
+      - ".github/workflows/ai-quality-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ai_quality_gate.py"
+      - "scripts/ai_quality_fixture.json"
+      - "src/components/AIQualityLab.tsx"
+      - "src/utils/aiQualityApi.ts"
+      - "api/ai-quality.js"
+      - ".github/workflows/ai-quality-gate.yml"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run deterministic AI quality gate
+        run: python scripts/ai_quality_gate.py
