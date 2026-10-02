@@ -307,7 +307,7 @@ export default function AIQualityLab() {
     try {
       const adversarial = cases.filter(item => item.pass != null);
       const failed = adversarial.filter(item => item.pass === false).length;
-      const adversarialSuccessRate = adversarial.length ? Math.round((failed / adversarial.length) * 100) : null;
+      const adversarialFailureRate = adversarial.length ? Math.round((failed / adversarial.length) * 100) : null;
       const saved = await saveAIQualityRun({
         suite: 'red-team',
         target: 'ai-infra-watch-research',
@@ -318,7 +318,7 @@ export default function AIQualityLab() {
         safety: metrics.safety,
         hallucinationRate: metrics.hallucinationRate,
         citationCoverage: metrics.citationCoverage,
-        adversarialSuccessRate,
+        adversarialFailureRate,
         caseCount: cases.length,
         failures: failed,
         summary: 'Deterministic evidence evaluation plus red-team case results.',
@@ -492,7 +492,7 @@ export default function AIQualityLab() {
                   <td className="px-2 py-2 text-white">{formatPct(run.qualityScore)}</td>
                   <td className="px-2 py-2">{formatPct(run.faithfulness)}</td>
                   <td className="px-2 py-2">{formatPct(run.hallucinationRate)}</td>
-                  <td className="px-2 py-2">{formatPct(run.adversarialSuccessRate)}</td>
+                  <td className="px-2 py-2">{formatPct(run.adversarialFailureRate)}</td>
                   <td className="px-2 py-2 text-white/50">{run.failures}</td>
                 </tr>
               ))}
