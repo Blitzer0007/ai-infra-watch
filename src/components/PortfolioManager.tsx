@@ -67,7 +67,11 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
         purchaseDate: purchaseForm.purchaseDate || null,
         notes: purchaseForm.notes.trim(),
       });
-      onChanged(holdings.map(x => x.id === saved.holding.id ? saved.holding : x));
+      const updatedHolding = {
+        ...saved.holding,
+        purchaseLots: [...(h.purchaseLots || []), saved.lot],
+      };
+      onChanged(holdings.map(x => x.id === saved.holding.id ? updatedHolding : x));
       setLots(prev => [...prev, saved.lot].sort((a, b) => (a.purchaseDate || '').localeCompare(b.purchaseDate || '') || (a.createdAt || '').localeCompare(b.createdAt || '')));
       setPurchaseOpen(null);
       window.dispatchEvent(new Event('portfolio-holdings-changed'));
