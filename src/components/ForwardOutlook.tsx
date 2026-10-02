@@ -5,7 +5,7 @@ import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfol
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
-import { summarizeCalibration, type CalibrationBucket } from '../utils/measurement';
+import { summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 
 type PricePoint = { date: string; price: number };
 
@@ -814,20 +814,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         return { ticker, points: Array.isArray(body.points) ? body.points : [] };
       }));
       const summaryRows = histories.flatMap(item => HORIZONS.map(h => ({ ticker: item.ticker, horizon: h.days, summary: historicalBacktest(item.points, h.days) })));
-      const valid = summaryRows.filter(item => item.summary.rows.length);
-      const rows = valid.flatMap(item => item.summary.rows);
-      const details = valid.map(item => ({ ticker: item.ticker, horizon: item.horizon, tests: item.summary.rows.length, direction: item.summary.directionalAccuracy, error: item.summary.medianAbsoluteError, coverage50: item.summary.p25p75Coverage, coverage80: item.summary.p10p90Coverage, baselineDirection: item.summary.baselineDirectionalAccuracy, baselineError: item.summary.baselineMedianAbsoluteError }));
-      setMatrix({
-        tests: rows.length,
-        direction: valid.length ? mean(valid.map(item => item.summary.directionalAccuracy)) : 0,
-        error: valid.length ? mean(valid.map(item => item.summary.medianAbsoluteError)) : 0,
-        coverage50: valid.length ? mean(valid.map(item => item.summary.p25p75Coverage)) : 0,
-        coverage80: valid.length ? mean(valid.map(item => item.summary.p10p90Coverage)) : 0,
-        baselineDirection: valid.length ? mean(valid.map(item => item.summary.baselineDirectionalAccuracy)) : 0,
-        baselineError: valid.length ? mean(valid.map(item => item.summary.baselineMedianAbsoluteError)) : 0,
-        calibration: summarizeCalibration(rows.map(row => ({ confidence: row.positiveProbability, positive: row.actual > 0, excessReturnPct: row.actual - row.median }))),
-        details
-      });
+      const summary = summarizeValidationMatrix(summaryRows);
+      setMatrix(summary);
       setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
     } catch (err: any) {
       setMatrixMessage(err?.message || 'Validation matrix failed.');
