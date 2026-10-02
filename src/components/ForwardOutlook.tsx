@@ -1111,6 +1111,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         )}
       </div>
 
+            {/* Keep validation analytics outside the forecast content conditional so production builds remain structurally stable. */}
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
         <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Verified forecasts aggregated by ticker, horizon, scenario and model.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}</span></div>
