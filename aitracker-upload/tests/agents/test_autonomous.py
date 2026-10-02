@@ -476,7 +476,9 @@ def test_company_official_and_analyst_tools_are_distinct_evidence_families():
 
 
 def test_gate_can_stop_on_three_usable_families_without_sec():
-    tb, _ = _gate_toolbox()
+    from app.agents.autonomous import _store_evidence_gate
+    from app.agents.schemas import ToolCallRecord
+
     gate = _GateJev([("gather_more", 2.0)])
     calls = [
         ToolCallRecord(
@@ -491,19 +493,25 @@ def test_gate_can_stop_on_three_usable_families_without_sec():
             ok=True,
             output={"articles": [{"title": "AMD update"}]},
         ),
+        ToolCallRecord(
+            tool="filings.get_filings",
+            arguments={"symbol": "AMD"},
+            ok=True,
+            output={"filings": [{"form": "8-K", "symbol": "AMD"}]},
+        ),
     ]
-    try:
-        from app.agents.autonomous import _store_evidence_gate
-        decision, report = _store_evidence_gate(
-            "Why did AMD move today?",
-            calls,
-            gate,
-        )
-    finally:
-        tb.close()
 
-    assert decision == "gather_more"
-    assert report["usable_family_count"] if "usable_family_count" in report else True
+    decision, report = _store_evidence_gate(
+        "Why did AMD move today?",
+        calls,
+        gate,
+    )
+
+    assert decision == "stop"
+    assert report["usable_family_count"] == 3
+    assert set(report["usable_families"]) == {"market", "news", "regulatory_primary"}
+    assert report["minimum_independent_families"] == 2
+
 
 def test_jev_low_evidence_quality_forces_another_source():
     tb, session = _gate_toolbox()
@@ -526,9 +534,9 @@ def test_jev_low_evidence_quality_forces_another_source():
         tb.close()
 
     assert gate.calls == 2
-    assert result.jev["evidence_gate"]["action"] == "insufficient"
+    assert result.jev["evidence_gate"]["action"] == "stop"
     assert result.jev["evidence_gate"]["checks"] == 2
-    assert result.resolution == "jev_evidence_insufficient"
+    assert result.resolution == "jev_evidence_sufficient"
     assert len(result.calls) == 3
     assert result.calls[-1].tool == "news.search"
     assert result.calls[-1].arguments == {"query": "Analyze AMD today"}
@@ -573,7 +581,8 @@ def test_duplicate_planner_call_redirects_to_complementary_evidence():
 
     assert [call.tool for call in result.calls] == ["stocks.get_quote", "news.search"]
     assert result.calls[-1].arguments == {"query": "Analyze AMD today and explain the drivers"}
-    assert result.resolution == "jev_evidence_insufficient"
+    assert result.resolution == "jev_evidence_sufficient"
+    assert result.jev["evidence_gate"]["usable_family_count"] == 2
     assert any(
         step.node == "plan" and "complementary evidence source" in step.note
         for step in result.trajectory.steps
