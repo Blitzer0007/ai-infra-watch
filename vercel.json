@@ -10,6 +10,14 @@
     {
       "path": "/api/forecast-verification",
       "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/portfolio-digest",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/signal-scorecard",
+      "schedule": "30 23 * * *"
     }
   ],
   "functions": {
