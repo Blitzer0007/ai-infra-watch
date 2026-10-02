@@ -4,6 +4,7 @@ import { STOCK_METADATA } from '../data';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
+import { authHeaders } from '../utils/apiAuth';
 
 type PricePoint = { date: string; price: number };
 
@@ -610,7 +611,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
       const response = await fetch('/api/agent-ask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ question: prompt })
       });
       if (!response.ok) throw new Error('JEV evidence check failed (HTTP ' + response.status + ')');
