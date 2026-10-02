@@ -32,7 +32,7 @@ def mock_local_apis(page):
         route.fulfill(status=200, content_type='application/json', body='{}')
     page.route('**/api/**', api_route)
 def goto_app(page):
-    page.on("pageerror", lambda error: print("PAGEERROR:", error))
+    page.on("pageerror", lambda error: print("PAGEERROR:", error, getattr(error, "stack", "")))
     page.goto("/", wait_until="domcontentloaded", timeout=60000)
     page.get_by_text("AI INFRA WATCH", exact=False).first.wait_for(state="visible", timeout=30000)
 
