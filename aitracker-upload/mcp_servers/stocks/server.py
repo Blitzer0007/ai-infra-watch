@@ -30,6 +30,7 @@ from mcp.types import ToolResultContent  # noqa: F401  (re-export for contract t
 
 from .providers import QuoteError
 from .schemas import QuoteBatch, ServerHealth
+from .research_sources import AnalystService, IssuerOfficialService
 from .service import StockService, from_env as _from_env
 
 
@@ -100,6 +101,20 @@ def build_server(service: StockService | None = None) -> MCPServer:
 
         mode = os.getenv("STOCKS_MODE", "fixture") or "fixture"
         return EventStudyService.from_env(mode).get_study(symbol)
+
+    @server.tool(
+        name="get_analyst_expectations",
+        description="Get secondary analyst expectations for a US stock: recommendation trends, price-target data, EPS estimates, and revenue estimates when available.",
+    )
+    def get_analyst_expectations(symbol: str) -> dict:
+        return AnalystService().get(symbol).model_dump()
+
+    @server.tool(
+        name="get_issuer_official",
+        description="Get company/issuer-primary web evidence: issuer profile plus recent company-news items whose URLs are hosted on the issuer's own official domain.",
+    )
+    def get_issuer_official(symbol: str, days: int = 14) -> dict:
+        return IssuerOfficialService().get(symbol, days=days).model_dump()
 
     @server.tool(
         name="get_relationships",
