@@ -9,24 +9,27 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Check autonomous agent health route
+      - name: Check production access gate
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 35 "https://ai-infra-watch-theta.vercel.app/api/agent-ask?probe_mcp=true" -o /tmp/agent-health.json
+          status="$(curl --silent --show-error --max-time 20 -o /tmp/auth.json -w '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "https://ai-infra-watch-theta.vercel.app/api/auth" \
+            --data '{"token":""}')"
+          printf '%s' "$status" > /tmp/auth-status.txt
           python - <<'PY'
           import json
 
-          with open("/tmp/agent-health.json", encoding="utf-8") as f:
+          with open("/tmp/auth-status.txt", encoding="utf-8") as f:
+              status = f.read().strip()
+          with open("/tmp/auth.json", encoding="utf-8") as f:
               body = json.load(f)
 
-          if body.get("status") not in {"ok", "degraded"}:
-              raise SystemExit(f"unexpected autonomous health response: {body}")
-          if body.get("mcp_probe") and body.get("mcp_ready") is not True:
-              raise SystemExit(f"MCP readiness probe failed: {body}")
+          if status != "401":
+              raise SystemExit(f"expected unauthenticated access gate to return 401, got {status}: {body}")
 
-          print("autonomous agent health check passed")
-          print("provider:", body.get("provider"))
-          print("mcp connected:", (body.get("mcp") or {}).get("connected"))
+          print("production access gate is active")
           PY
 
       - name: Check production live-data endpoint
@@ -85,62 +88,23 @@ jobs:
           print("NVDA rows:", len(body["historical"]["NVDA"]))
           PY
 
-      - name: Run manual autonomous research smoke
-        if: github.event_name == 'workflow_dispatch'
+      - name: Check protected portfolio API rejects anonymous access
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 70             -H "Content-Type: application/json"             -X POST             "https://ai-infra-watch-theta.vercel.app/api/agent-ask"             --data "$(python -c 'import json, os; print(json.dumps({"question": os.environ["QUESTION"]}))')"             -o /tmp/autonomous-smoke.json
+          status="$(curl --silent --show-error --max-time 20 -o /tmp/portfolio-auth.json -w '%{http_code}' \
+            "https://ai-infra-watch-theta.vercel.app/api/portfolio")"
+          printf '%s' "$status" > /tmp/portfolio-status.txt
           python - <<'PY'
-          import json
+          with open("/tmp/portfolio-status.txt", encoding="utf-8") as f:
+              status = f.read().strip()
 
-          with open("/tmp/autonomous-smoke.json", encoding="utf-8") as f:
-              body = json.load(f)
+          if status != "401":
+              raise SystemExit(f"expected protected portfolio API to return 401, got {status}")
 
-          if body.get("mode") != "autonomous-mcp":
-              raise SystemExit(f"unexpected autonomous mode: {body}")
-
-          calls = body.get("calls") or []
-          trajectory = body.get("trajectory") or []
-          if not calls:
-              raise SystemExit(f"autonomous smoke returned no evidence calls: {body}")
-          if not trajectory:
-              raise SystemExit(f"autonomous smoke returned no trajectory: {body}")
-
-          allowed_resolutions = {
-              "completed",
-              "jev_evidence_sufficient",
-              "jev_evidence_insufficient",
-              "max_steps",
-          }
-          resolution = body.get("resolution")
-          if resolution not in allowed_resolutions:
-              raise SystemExit(f"unexpected autonomous resolution: {resolution}")
-
-          successful_tools = [
-              str(item.get("tool"))
-              for item in calls
-              if item.get("ok")
-          ]
-          if not successful_tools:
-              raise SystemExit(f"autonomous smoke returned no successful evidence tool calls: {body}")
-
-          server_names = {
-              name.split(".", 1)[0]
-              for name in successful_tools
-              if "." in name
-          }
-          if len(server_names) < 2:
-              raise SystemExit(
-                  "autonomous smoke did not use complementary evidence servers: "
-                  + ", ".join(successful_tools)
-              )
-
-          print("autonomous research smoke check passed")
-          print("resolution:", resolution)
-          print("answer source:", body.get("answer_source"))
-          print("successful tools:", successful_tools)
-          print("evidence servers:", sorted(server_names))
-          print("trajectory nodes:", [item.get("node") for item in trajectory])
+          print("protected portfolio API correctly rejects anonymous access")
           PY
-        env:
-          QUESTION: What recent developments could affect NVIDIA's stock price? Check news, SEC/filings, and historical market data, and distinguish confirmed facts from hypotheses.
+
+      - name: Production smoke summary
+        run: |
+          echo "Production smoke checks passed."
+          echo "Autonomous research remains protected by the private access token and is validated separately by CI agent tests and the authenticated dashboard smoke."
