@@ -138,6 +138,17 @@ export function buildPositionAnalyses(
       ? 'Reassess exposure when group score falls below 45 or the position trails tracked peers by ≥1.5 percentage points while group breadth is weak.'
       : 'Reassess exposure when group score ≤38 with a ≥10% position drawdown, or when the position trails tracked peers by ≥1.0 point with group breadth below 50%.';
 
+    const averageInAlert = liveIsFresh &&
+      pnlPct < 0 &&
+      groupScore != null &&
+      groupBreadth != null &&
+      relativeToUniverse != null &&
+      vsPeers != null &&
+      groupScore >= (isLeveraged ? 68 : 62) &&
+      groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
+      relativeToUniverse >= 0 &&
+      vsPeers >= 0;
+
     return {
       ...position,
       livePrice,
@@ -166,16 +177,7 @@ export function buildPositionAnalyses(
           : groupScore >= 48 && groupBreadth >= 0.4
             ? 'MIXED'
             : 'WEAK',
-      averageInAlert: liveIsFresh &&
-        pnlPct < 0 &&
-        groupScore != null &&
-        groupBreadth != null &&
-        relativeToUniverse != null &&
-        vsPeers != null &&
-        groupScore >= (isLeveraged ? 68 : 62) &&
-        groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
-        relativeToUniverse >= 0 &&
-        vsPeers >= 0,
+      averageInAlert,
       strategyContext: averageInAlert
         ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
         : state === 'RISK REVIEW'
