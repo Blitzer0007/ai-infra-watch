@@ -229,95 +229,66 @@ function relatedSymbols(text) {
   return Array.from(symbols);
 }
 
-async function politicalSignals() {
-  const queries = [
-    {
-      label: 'GDELT political coverage',
-      query: '(Donald Trump OR "JD Vance" OR "White House" OR "Trump administration") (AI OR "artificial intelligence" OR "AI infrastructure" OR "data center" OR power OR electricity OR semiconductor OR GPU OR chip OR export OR regulation OR innovation OR investment)'
-    },
-    {
-      label: 'White House primary coverage',
-      query: 'domainis:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)'
-    }
-  ];
-
-  async function runQuery(item, timespan) {
-    const result = await fetchGdeltJson(item.query, timespan, item.label);
-    const signals = result.articles.map(article => {
-      const title = String(article?.title || '').trim();
-      const urlValue = String(article?.url || '').trim();
-      const source = String(article?.domain || article?.source || 'GDELT');
-      const date = article?.seendate || null;
-      const text = title + ' ' + source;
-      let sourceHost = '';
-      try { sourceHost = new URL(urlValue).hostname.toLowerCase(); } catch {}
-
-      const primary = sourceHost === 'whitehouse.gov' || sourceHost.endsWith('.whitehouse.gov');
-
-      return {
-        id: 'political-' + Buffer.from((urlValue || title).slice(0, 160)).toString('base64url').slice(0, 32),
-        actor: detectPoliticalActor(text),
-        title,
-        source,
-        sourceType: primary ? 'primary' : 'secondary',
-        topic: classifyPoliticalTopic(text),
-        eventType: /(executive order|presidential memorandum|fact sheet|signed into law|executive action|announces|announced|directive)/i.test(title)
-          ? 'Policy / official action'
-          : 'Political statement / coverage',
-        date,
-        url: urlValue || null,
-        relatedSymbols: relatedSymbols(text),
-        note: primary
-          ? 'Primary White House source signal.'
-          : 'Media coverage signal; verify the underlying statement or official action before treating the headline as a quote.'
-      };
-    }).filter(item => item.title);
-
-    return { signals, error: result.error };
+async function fetchPolicyWebSearch(query, days = 3) {
+  const brave = String(process.env.BRAVE_SEARCH_API_KEY || '').trim();
+  if (brave) {
+    const response = await fetch('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=20&search_lang=en&country=us&freshness=' + (days <= 1 ? 'pd' : 'pm'), { headers: { Accept: 'application/json', 'X-Subscription-Token': brave }, signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('Brave Search HTTP ' + response.status);
+    const payload = await response.json();
+    return { provider: 'brave-web', articles: payload?.web?.results || [] };
   }
-
-  // Use one broad 72-hour query first. GDELT's DOC API can apply soft
-  // rate limits; sequential requests with bounded retry avoid the previous
-  // pattern of firing multiple requests simultaneously and receiving empty
-  // results during throttling.
-  let first = await runQuery(queries[0], '72h');
-  let articles = first.signals;
-  let errors = first.error ? [first.error] : [];
-
-  if (articles.length < 10) {
-    const second = await runQuery(queries[1], '72h');
-    articles = articles.concat(second.signals);
-    if (second.error) errors.push(second.error);
+  const tavily = String(process.env.TAVILY_API_KEY || '').trim();
+  if (tavily) {
+    const response = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: tavily, query, search_depth: 'advanced', max_results: 20, include_answer: false, days }), signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('Tavily Search HTTP ' + response.status);
+    const payload = await response.json();
+    return { provider: 'tavily-web', articles: payload?.results || [] };
   }
-
-  // Last bounded fallback with a simpler query if both specialized queries
-  // yielded nothing.
-  if (!articles.length) {
-    const fallback = await runQuery({
-      label: 'GDELT AI policy fallback',
-      query: '(Trump OR "White House" OR "JD Vance") (AI OR technology OR semiconductor OR chip OR GPU OR "data center" OR power OR energy OR export OR regulation OR investment OR infrastructure)'
-    }, '72h');
-    articles = fallback.signals;
-    if (fallback.error) errors.push(fallback.error);
-  }
-
-  const unique = new Map();
-  articles.forEach(item => {
-    const key = item.url || item.title.toLowerCase();
-    const existing = unique.get(key);
-    if (!existing || (item.sourceType === 'primary' && existing.sourceType !== 'primary')) {
-      unique.set(key, item);
-    }
-  });
-
-  return {
-    items: Array.from(unique.values())
-      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-      .slice(0, 20),
-    upstreamError: errors.length && !unique.size ? errors.join('; ') : null,
-  };
+  throw new Error('No web search provider configured');
 }
-
+async function politicalSignals() {
+  const query = '"White House" OR Trump OR "JD Vance" (AI OR chip OR semiconductor OR GPU OR "data center" OR power OR export OR regulation OR technology OR infrastructure)';
+  const rows = [];
+  let provider = 'none';
+  let upstreamError = null;
+  try {
+    const result = await fetchPolicyWebSearch(query, 3);
+    provider = result.provider;
+    for (const article of result.articles || []) {
+      const title = String(article?.title || '').trim();
+      const url = String(article?.url || '').trim();
+      if (!title || !url) continue;
+      let host = ''; try { host = new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch {}
+      const official = host === 'whitehouse.gov' || host.endsWith('.whitehouse.gov') || host.endsWith('.gov');
+      const body = title + ' ' + String(article?.description || article?.content || '');
+      rows.push({
+        id: 'political-web-' + Buffer.from(url).toString('base64url').slice(0, 32),
+        actor: detectPoliticalActor(body), title, source: host || provider, sourceType: official ? 'primary' : 'secondary',
+        topic: classifyPoliticalTopic(body),
+        eventType: /(executive order|presidential memorandum|fact sheet|directive|executive action|signed into law)/i.test(title) ? 'Policy / official action' : 'Political statement / coverage',
+        date: article?.published || article?.published_at || null, url, relatedSymbols: relatedSymbols(body),
+        note: official ? 'Government-domain search result; verify the underlying official document.' : 'Web search result; verify the underlying statement or official action before relying on wording.'
+      });
+    }
+  } catch (error) { upstreamError = String(error?.message || error); }
+  if (!rows.length) {
+    try {
+      const fallback = await fetchGdeltJson(query, '72h', 'GDELT policy fallback');
+      provider = 'gdelt-discovery';
+      upstreamError = upstreamError || fallback.error || null;
+      for (const article of fallback.articles || []) {
+        const title = String(article?.title || '').trim(); const url = String(article?.url || '').trim();
+        if (!title || !url) continue;
+        let host = ''; try { host = new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch {}
+        const official = host === 'whitehouse.gov' || host.endsWith('.whitehouse.gov') || host.endsWith('.gov');
+        rows.push({ id: 'political-gdelt-' + Buffer.from(url).toString('base64url').slice(0,32), actor: detectPoliticalActor(title), title, source: host || 'GDELT', sourceType: official ? 'primary' : 'secondary', topic: classifyPoliticalTopic(title), eventType: 'Political statement / coverage', date: article?.seendate || null, url, relatedSymbols: relatedSymbols(title), note: official ? 'Government-domain discovery result.' : 'GDELT discovery result; verify the source.' });
+      }
+    } catch (error) { upstreamError = upstreamError || String(error?.message || error); }
+  }
+  const unique = new Map();
+  rows.forEach(row => { const key = row.url || row.title.toLowerCase(); if (!unique.has(key)) unique.set(key, row); });
+  return { items: Array.from(unique.values()).sort((a,b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0,20), provider, upstreamError: upstreamError && unique.size ? 'Provider degraded: ' + upstreamError : upstreamError };
+}
 async function fetchGdeltNews(timespan) {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
   const result = await fetchGdeltJson(q, timespan, 'GDELT news');
