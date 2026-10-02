@@ -98,8 +98,9 @@ export function calculatePeerCounterfactual(input: {
   peer: PeerCandidate | null;
   peerHistory: Array<{ date: string; price: number }>;
   peerCurrentPrice: number | null;
+  actualCurrentPrice: number | null;
 }): PeerCounterfactual {
-  const { holding, peer, peerHistory, peerCurrentPrice } = input;
+  const { holding, peer, peerHistory, peerCurrentPrice, actualCurrentPrice } = input;
   if (!peer) {
     return {
       peer: null, purchaseDate: holding.purchaseDate ?? null, peerEntryDate: null, peerEntryPrice: null,
@@ -137,8 +138,16 @@ export function calculatePeerCounterfactual(input: {
   const hypotheticalValue = hypotheticalShares * peerCurrentPrice;
   const hypotheticalProfit = hypotheticalValue - holding.investedValue;
   const hypotheticalReturnPct = holding.investedValue ? (hypotheticalProfit / holding.investedValue) * 100 : null;
-  const actualProfit = peerCurrentPrice != null ? null : null;
-  const actualReturnPct = null;
+  const actualProfit = actualCurrentPrice != null && Number.isFinite(actualCurrentPrice)
+    ? actualCurrentPrice * holding.quantity - holding.investedValue
+    : null;
+  const actualReturnPct = actualProfit != null && holding.investedValue
+    ? (actualProfit / holding.investedValue) * 100
+    : null;
+  const difference = actualProfit != null ? hypotheticalProfit - actualProfit : null;
+  const differencePctPoints = actualReturnPct != null && hypotheticalReturnPct != null
+    ? hypotheticalReturnPct - actualReturnPct
+    : null;
 
   return {
     peer,
