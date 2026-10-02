@@ -9,6 +9,8 @@ on:
       - "scripts/ai_quality_regression.py"
       - "scripts/ai_red_team_fixture.json"
       - "scripts/ai_quality_baseline.json"
+      - "scripts/ai_quality_human_labels.json"
+      - "scripts/ai_quality_meta_predictions.json"
       - "src/components/AIQualityLab.tsx"
       - "src/utils/aiQualityApi.ts"
       - "api/ai-quality.js"
@@ -57,3 +59,12 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
         run: python scripts/ai_quality_regression.py --current /tmp/current-quality.json --baseline scripts/ai_quality_baseline.json
+      - name: Generate AI Quality Report
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python scripts/generate_ai_quality_report.py --current /tmp/current-quality.json --baseline scripts/ai_quality_baseline.json --output /tmp/AI_Quality_Report.md
+      - name: Upload AI Quality Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-quality-report
+          path: /tmp/AI_Quality_Report.md
