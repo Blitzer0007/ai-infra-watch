@@ -119,7 +119,7 @@ describe('validation matrix summary', () => {
     assert.equal(result.direction, 0.5);
     assert.equal(result.baselineError, 2);
     assert.equal(result.calibration[1].n, 1);
-    assert.equal(result.calibration[3].n, 0);
-    assert.equal(result.calibration[4].n, 1);
+    assert.equal(result.calibration[3].n, 1);
+    assert.equal(result.calibration[4].n, 0);
   });
 });
