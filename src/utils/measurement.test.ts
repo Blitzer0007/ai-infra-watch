@@ -46,7 +46,6 @@ describe('sample statistics', () => {
   });
 });
 
-
 describe('calibration summary', () => {
   it('keeps confidence bands separate from measured outcomes', () => {
     const result = summarizeCalibration([
@@ -61,6 +60,7 @@ describe('calibration summary', () => {
     assert.equal(result[3].n, 2);
     assert.equal(result[3].observedPositiveRate, 1);
     assert.equal(result[3].meanExcessReturnPct, 4);
+  });
 
   it('uses stable bucket boundaries and ignores invalid confidence values', () => {
     const result = summarizeCalibration([
@@ -72,8 +72,9 @@ describe('calibration summary', () => {
     ]);
     assert.equal(result[0].n, 0);
     assert.equal(result[1].n, 1);
-    assert.equal(result[1].observedPositiveRate, 0);
+    assert.equal(result[1].observedPositiveRate, 1);
     assert.equal(result[2].n, 1);
+    assert.equal(result[2].observedPositiveRate, 0);
     assert.equal(result[4].n, 1);
     assert.equal(result[4].observedPositiveRate, 1);
   });
@@ -118,6 +119,7 @@ describe('validation matrix summary', () => {
     assert.equal(result.direction, 0.5);
     assert.equal(result.baselineError, 2);
     assert.equal(result.calibration[1].n, 1);
-    assert.equal(result.calibration[3].n, 1);
+    assert.equal(result.calibration[3].n, 0);
+    assert.equal(result.calibration[4].n, 1);
   });
 });
