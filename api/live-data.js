@@ -28,7 +28,7 @@ const SYMBOLS = loadConfiguredSymbols();
 // Keep a short-lived in-memory cache for warm Vercel invocations.
 // The refresh=true query parameter bypasses this cache explicitly.
 const CACHE_MS = 60 * 1000;
-const FEED_TIMEOUT_MS = 7000;
+const FEED_TIMEOUT_MS = 3500;
 let cached = null;
 let cachedAt = 0;
 
@@ -155,7 +155,7 @@ async function fetchGdeltJson(query, timespan, label = 'GDELT') {
     '&sort=datedesc';
 
   let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': 'ai-infra-watch/1.0' },
@@ -170,12 +170,12 @@ async function fetchGdeltJson(query, timespan, label = 'GDELT') {
       }
 
       lastError = new Error(label + ' HTTP ' + response.status);
-      if (![408, 425, 429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
+      if (![408, 425, 429, 500, 502, 503, 504].includes(response.status) || attempt === 1) break;
     } catch (error) {
       lastError = error;
-      if (attempt === 2) break;
+      if (attempt === 1) break;
     }
-    await new Promise(resolve => setTimeout(resolve, 450 * (2 ** attempt)));
+    await new Promise(resolve => setTimeout(resolve, 250 * (2 ** attempt)));
   }
 
   return {
