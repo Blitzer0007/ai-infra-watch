@@ -677,9 +677,22 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     # "missing" is reserved for explicit user-required families. An
     # observed-but-empty/failed optional source is degraded evidence, not a
     # hard completeness failure.
+    portfolio_research = (
+        any(term in question.lower() for term in ("portfolio", "my holdings", "my positions", "held stocks", "holdings"))
+        and "sec" not in question.lower()
+        and "edgar" not in question.lower()
+        and "filing" not in question.lower()
+        and "10-k" not in question.lower()
+        and "10-q" not in question.lower()
+        and "8-k" not in question.lower()
+    )
+    # For the automatic portfolio packet, EMPTY means the source was checked
+    # and returned no matching records. That is different from MISSING/FAILED
+    # and should be disclosed in the packet without blocking synthesis.
+    required_ok_statuses = {"AVAILABLE", "EMPTY"} if portfolio_research else {"AVAILABLE"}
     missing = [
         family for family in expected
-        if matrix.get(family, {}).get("status") != "AVAILABLE"
+        if matrix.get(family, {}).get("status") not in required_ok_statuses
     ]
     usable_families = [
         family for family, item in matrix.items()
