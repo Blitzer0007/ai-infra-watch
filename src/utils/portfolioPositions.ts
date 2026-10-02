@@ -1,5 +1,7 @@
 import snapshot from '../../data/portfolio_snapshot.json';
 import type { IntelligenceSnapshot, PricePoint } from './intelligence';
+import type { StoredPortfolioHolding } from './portfolioApi';
+import { STOCK_UNIVERSE } from './stockUniverse';
 
 export type PortfolioPosition = {
   symbol: string;
@@ -13,6 +15,8 @@ export type PortfolioPosition = {
   investedValue: number;
   snapshotCurrentValue: number;
   notes?: string;
+  id?: string;
+  purchaseDate?: string | null;
 };
 
 export type PositionAnalysis = PortfolioPosition & {
@@ -33,11 +37,40 @@ export type PositionAnalysis = PortfolioPosition & {
   rationale: string;
   addTrigger: string;
   riskTrigger: string;
+  whatIfProfitAt10Pct: number | null;
+  whatIfProfitAt20Pct: number | null;
+  potentialUpsideSignal: 'SUPPORTED' | 'MIXED' | 'WEAK' | 'INSUFFICIENT DATA';
+  averageInAlert: boolean;
+  strategyContext: string;
 };
 
 export const PORTFOLIO_SNAPSHOT = snapshot.portfolio;
 export const PORTFOLIO_AS_OF = snapshot.asOf;
 export const PORTFOLIO_POSITIONS: PortfolioPosition[] = snapshot.positions;
+
+function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
+  const meta = STOCK_UNIVERSE.find(item => item.symbol === holding.symbol);
+  const investedValue = holding.quantity * holding.averageCost;
+  return {
+    id: holding.id,
+    symbol: holding.symbol,
+    name: meta?.name ?? holding.symbol,
+    group: meta?.group ?? 'Custom Holding',
+    theme: meta?.theme ?? 'Custom holding',
+    peers: meta?.peers ?? [],
+    geo: meta?.geo ?? 'Not configured',
+    quantity: holding.quantity,
+    averageCost: holding.averageCost,
+    investedValue,
+    snapshotCurrentValue: investedValue,
+    notes: holding.notes,
+    purchaseDate: holding.purchaseDate,
+  };
+}
+
+export function mapStoredPortfolioHoldings(holdings: StoredPortfolioHolding[]): PortfolioPosition[] {
+  return holdings.map(enrichHolding);
+}
 
 function avg(values: number[]) {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
@@ -46,8 +79,9 @@ function avg(values: number[]) {
 export function buildPositionAnalyses(
   prices: Record<string, PricePoint>,
   intelligence: IntelligenceSnapshot,
+  positions: PortfolioPosition[] = PORTFOLIO_POSITIONS,
 ): PositionAnalysis[] {
-  return PORTFOLIO_POSITIONS.map((position) => {
+  return positions.map((position) => {
     const quote = prices[position.symbol];
     const livePrice = quote?.price ?? null;
     const liveIsFresh = livePrice != null && quote?.stale !== true;
@@ -123,6 +157,27 @@ export function buildPositionAnalyses(
       rationale,
       addTrigger,
       riskTrigger,
+      whatIfProfitAt10Pct: livePrice == null ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
+      whatIfProfitAt20Pct: livePrice == null ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
+      potentialUpsideSignal: groupScore == null || groupBreadth == null
+        ? 'INSUFFICIENT DATA'
+        : groupScore >= 62 && groupBreadth >= 0.5
+          ? 'SUPPORTED'
+          : groupScore >= 48 && groupBreadth >= 0.4
+            ? 'MIXED'
+            : 'WEAK',
+      averageInAlert: liveIsFresh &&
+        pnlPct < 0 &&
+        groupScore != null &&
+        groupBreadth != null &&
+        groupScore >= (isLeveraged ? 68 : 62) &&
+        groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
+        (vsPeers == null || vsPeers >= 0),
+      strategyContext: state === 'ADD REVIEW'
+        ? 'Price is below the average cost, but current group breadth/strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
+        : riskEligible
+          ? 'The position is under pressure while supporting group evidence is weak or deteriorating. Review exposure and the original thesis before adding.'
+          : 'Continue monitoring the holding against its purchase thesis, group strength, peers, catalysts and risk signals before changing exposure.',
     };
   });
 }
