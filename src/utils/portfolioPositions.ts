@@ -45,6 +45,8 @@ export type PositionAnalysis = PortfolioPosition & {
   averageInAlert: boolean;
   recoveryAlert: boolean;
   strategyContext: string;
+  portfolioWeight?: number;
+  minorPosition?: boolean;
 };
 
 export const PORTFOLIO_SNAPSHOT = null;
