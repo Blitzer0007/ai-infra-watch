@@ -194,7 +194,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const stress = calculatePortfolioStress(analyses, macroRisks);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="portfolio-intelligence">
       <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>

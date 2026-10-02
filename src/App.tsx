@@ -347,6 +347,7 @@ export default function App() {
               return (
                 <button
                   key={item.id}
+                  data-testid={"nav-" + item.id}
                   onClick={() => handleNavigate(item.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
                     isActive

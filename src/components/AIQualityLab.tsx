@@ -349,7 +349,7 @@ export default function AIQualityLab() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="ai-quality-lab">
       <div className="aiw-page-header border-b border-white/10 pb-4">
         <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Phase 06 / Advanced Evaluation</div>
         <div className="mt-2 flex items-center gap-3">

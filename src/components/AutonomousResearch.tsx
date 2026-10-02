@@ -225,7 +225,7 @@ export default function AutonomousResearch() {
   };
 
   return (
-    <div className="space-y-6" id="autonomous-research-view">
+    <div className="space-y-6" id="autonomous-research-view" data-testid="autonomous-research">
       <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-xs font-mono uppercase tracking-widest text-white/40">Agentic Research</span>
         <div className="flex items-center gap-3">
@@ -269,6 +269,7 @@ export default function AutonomousResearch() {
           className="space-y-3"
         >
           <textarea
+            data-testid="research-question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask about a ticker, catalyst, filing, earnings reaction, peer relationship, or market rotation..."
@@ -280,6 +281,7 @@ export default function AutonomousResearch() {
               {backendMessage || 'Native Vercel Python agent route; a separate backend URL is optional.'}
             </span>
             <button
+              data-testid="research-run"
               type="submit"
               disabled={busy || !question.trim()}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-mono font-black uppercase tracking-wider text-black hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
