@@ -656,6 +656,9 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
         </>
       )}
     </section>
+    <div className="mt-6">
+      <PortfolioManager holdings={holdings} onChanged={setHoldings} />
+    </div>
   );
 }
 function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
@@ -796,9 +799,6 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
         {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}
       </div>
-    </div>
-    <div className="mt-4">
-      <PortfolioManager holdings={holdings} onChanged={setHoldings} />
     </div>
     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
       <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
