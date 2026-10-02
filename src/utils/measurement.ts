@@ -302,3 +302,39 @@ export function summarizeSample(values: number[]) {
     quality: sampleQuality(n),
   };
 }
+export type CalibrationBucket = {
+  bucket: string;
+  n: number;
+  predictedPct: number;
+  observedPositiveRate: number | null;
+  meanExcessReturnPct: number | null;
+  calibrationErrorPct: number | null;
+};
+
+/** Descriptive calibration only; it never changes measured outcomes. */
+export function summarizeCalibration(
+  observations: Array<{ confidence: number; positive: boolean; excessReturnPct?: number | null }>,
+): CalibrationBucket[] {
+  const buckets = [
+    { label: '0–20%', min: 0, max: 0.2 },
+    { label: '20–40%', min: 0.2, max: 0.4 },
+    { label: '40–60%', min: 0.4, max: 0.6 },
+    { label: '60–80%', min: 0.6, max: 0.8 },
+    { label: '80–100%', min: 0.8, max: 1.000001 },
+  ];
+  return buckets.map(({ label, min, max }) => {
+    const rows = observations.filter(item => Number.isFinite(item.confidence) && item.confidence >= min && item.confidence < max);
+    const predictedPct = ((min + Math.min(max, 1)) / 2) * 100;
+    const observedPositiveRate = rows.length ? rows.filter(item => item.positive).length / rows.length : null;
+    const excess = rows.map(item => item.excessReturnPct).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const meanExcessReturnPct = excess.length ? excess.reduce((sum, value) => sum + value, 0) / excess.length : null;
+    return {
+      bucket: label,
+      n: rows.length,
+      predictedPct,
+      observedPositiveRate,
+      meanExcessReturnPct,
+      calibrationErrorPct: observedPositiveRate == null ? null : observedPositiveRate * 100 - predictedPct,
+    };
+  });
+}
