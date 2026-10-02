@@ -5,6 +5,7 @@ import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfol
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
+import { summarizeCalibration, type CalibrationBucket } from '../utils/measurement';
 
 type PricePoint = { date: string; price: number };
 
@@ -197,6 +198,7 @@ type BacktestRow = {
   p10: number;
   p90: number;
   actual: number;
+  positiveProbability: number;
 };
 
 type BacktestSummary = {
@@ -211,11 +213,12 @@ type BacktestSummary = {
   errorLift: number;
   p25CalibrationGap: number;
   p90CalibrationGap: number;
+  calibration: CalibrationBucket[];
 };
 
 function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSummary {
   if (history.length < 220 + horizon) {
-    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0, baselineDirectionalAccuracy: 0, baselineMedianAbsoluteError: 0, directionalLift: 0, errorLift: 0, p25CalibrationGap: 0, p90CalibrationGap: 0 };
+    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0, baselineDirectionalAccuracy: 0, baselineMedianAbsoluteError: 0, directionalLift: 0, errorLift: 0, p25CalibrationGap: 0, p90CalibrationGap: 0, calibration: [] };
   }
 
   const regimes = history.map((_, i) => {
@@ -273,7 +276,8 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
     }
     if (baseline.length >= 8) baselineRows.push({ median: percentile(baseline, 0.5), actual });
 
-    rows.push({ asOfDate: history[asOf].date, targetDate: history[asOf + horizon].date, median, p25, p75, p10, p90, actual });
+    const positiveProbability = base.filter(value => value > 0).length / base.length;
+    rows.push({ asOfDate: history[asOf].date, targetDate: history[asOf + horizon].date, median, p25, p75, p10, p90, actual, positiveProbability });
   }
 
   const directional = rows.filter(row => row.median !== 0 && row.actual !== 0 && Math.sign(row.median) === Math.sign(row.actual));
@@ -300,7 +304,8 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
     directionalLift: modelDirectional - baseDirectional,
     errorLift: baseError - modelError,
     p25CalibrationGap: (rows.length ? middleCovered.length / rows.length : 0) - 0.5,
-    p90CalibrationGap: (rows.length ? wideCovered.length / rows.length : 0) - 0.8
+    p90CalibrationGap: (rows.length ? wideCovered.length / rows.length : 0) - 0.8,
+    calibration: summarizeCalibration(rows.map(row => ({ confidence: row.positiveProbability, positive: row.actual > 0, excessReturnPct: row.actual - row.median })))
   };
 }
 
@@ -382,7 +387,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
-  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number} | null>(null);
+  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;calibration:CalibrationBucket[];details:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number}>} | null>(null);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
@@ -808,15 +813,20 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         const body = await response.json();
         return { ticker, points: Array.isArray(body.points) ? body.points : [] };
       }));
-      const summaries = histories.flatMap(item => HORIZONS.map(h => historicalBacktest(item.points, h.days)));
-      const valid = summaries.filter(summary => summary.rows.length);
-      const rows = valid.flatMap(summary => summary.rows);
+      const summaryRows = histories.flatMap(item => HORIZONS.map(h => ({ ticker: item.ticker, horizon: h.days, summary: historicalBacktest(item.points, h.days) })));
+      const valid = summaryRows.filter(item => item.summary.rows.length);
+      const rows = valid.flatMap(item => item.summary.rows);
+      const details = valid.map(item => ({ ticker: item.ticker, horizon: item.horizon, tests: item.summary.rows.length, direction: item.summary.directionalAccuracy, error: item.summary.medianAbsoluteError, coverage50: item.summary.p25p75Coverage, coverage80: item.summary.p10p90Coverage, baselineDirection: item.summary.baselineDirectionalAccuracy, baselineError: item.summary.baselineMedianAbsoluteError }));
       setMatrix({
         tests: rows.length,
-        direction: valid.length ? mean(valid.map(summary => summary.directionalAccuracy)) : 0,
-        error: valid.length ? mean(valid.map(summary => summary.medianAbsoluteError)) : 0,
-        coverage50: valid.length ? mean(valid.map(summary => summary.p25p75Coverage)) : 0,
-        coverage80: valid.length ? mean(valid.map(summary => summary.p10p90Coverage)) : 0
+        direction: valid.length ? mean(valid.map(item => item.summary.directionalAccuracy)) : 0,
+        error: valid.length ? mean(valid.map(item => item.summary.medianAbsoluteError)) : 0,
+        coverage50: valid.length ? mean(valid.map(item => item.summary.p25p75Coverage)) : 0,
+        coverage80: valid.length ? mean(valid.map(item => item.summary.p10p90Coverage)) : 0,
+        baselineDirection: valid.length ? mean(valid.map(item => item.summary.baselineDirectionalAccuracy)) : 0,
+        baselineError: valid.length ? mean(valid.map(item => item.summary.baselineMedianAbsoluteError)) : 0,
+        calibration: summarizeCalibration(rows.map(row => ({ confidence: row.positiveProbability, positive: row.actual > 0, excessReturnPct: row.actual - row.median }))),
+        details
       });
       setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
     } catch (err: any) {
@@ -836,6 +846,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         targetDate: row.targetDate,
         median: formatReturn(row.median),
         actual: formatReturn(row.actual),
+        positiveProbability: row.positiveProbability,
         p25: formatReturn(row.p25),
         p75: formatReturn(row.p75),
         p10: formatReturn(row.p10),
@@ -857,6 +868,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Directional hit rate: ' + (backtest.directionalAccuracy * 100).toFixed(1) + '%',
         'Median absolute error: ' + backtest.medianAbsoluteError.toFixed(1) + ' percentage points',
         'P25-P75 coverage: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
+        'Calibration buckets: ' + JSON.stringify(backtest.calibration),
         'P10-P90 coverage: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
         'Recent test rows: ' + JSON.stringify(compactRows),
         'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
@@ -1262,14 +1274,30 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
         </div>
         {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
-        {matrix && <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
+        {matrix && <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg median error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P50 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P80 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
+          </div>
+          <div className="overflow-x-auto"><table className="w-full text-[9px] font-mono"><thead><tr className="text-white/30 border-b border-white/5"><th className="text-left p-2">Ticker</th><th className="text-left p-2">Horizon</th><th className="text-right p-2">Tests</th><th className="text-right p-2">Direction</th><th className="text-right p-2">Baseline</th><th className="text-right p-2">Error</th><th className="text-right p-2">P25–P75</th></tr></thead><tbody>{matrix.details.map(row => <tr key={row.ticker + '-' + row.horizon} className="border-b border-white/5 text-white/55"><td className="p-2 text-white/75">{row.ticker}</td><td className="p-2">{row.horizon}D</td><td className="p-2 text-right">{row.tests}</td><td className="p-2 text-right">{(row.direction*100).toFixed(0)}%</td><td className="p-2 text-right">{(row.baselineDirection*100).toFixed(0)}%</td><td className="p-2 text-right">{row.error.toFixed(1)}</td><td className="p-2 text-right">{(row.coverage50*100).toFixed(0)}%</td></tr>)}</tbody></table></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[8px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
         </div>}
       </div>
+
+      {backtest && backtest.calibration.length > 0 && (
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4">
+          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/80">Forecast validation · calibration</div><div className="text-[10px] text-white/40 mt-1">Directional confidence is measured against realized positive outcomes. This describes historical calibration; it does not modify the forecast.</div></div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-3">
+            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[8px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
