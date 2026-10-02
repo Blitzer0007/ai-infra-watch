@@ -8,6 +8,7 @@ import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
+import { fetchPortfolioHoldings } from './utils/portfolioApi';
 
 // Component Views
 import Overview from './components/Overview';
@@ -38,6 +39,7 @@ export default function App() {
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
+  const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
 
   // Live Synthesis Data States
   const [liveData, setLiveData] = useState<{
@@ -57,8 +59,27 @@ export default function App() {
 
   const watchlistSymbols = [...new Set([
     ...STOCK_UNIVERSE_SYMBOLS,
-    ...PORTFOLIO_POSITIONS.map(position => position.symbol),
+    ...portfolioSymbols,
   ])];
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPortfolioSymbols = async () => {
+      try {
+        const rows = await fetchPortfolioHoldings();
+        if (!cancelled) setPortfolioSymbols(rows.map(row => row.symbol));
+      } catch {
+        if (!cancelled) setPortfolioSymbols(PORTFOLIO_POSITIONS.map(position => position.symbol));
+      }
+    };
+    void loadPortfolioSymbols();
+    const refresh = () => void loadPortfolioSymbols();
+    window.addEventListener('portfolio-holdings-changed', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('portfolio-holdings-changed', refresh);
+    };
+  }, []);
 
   // Alert engine: keep price thresholds and large-move alerts active across the dashboard.
   const quoteAlertsInitialized = useRef(false);
