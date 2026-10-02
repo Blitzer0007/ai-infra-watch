@@ -161,8 +161,8 @@ export function calculatePeerCounterfactual(input: {
     hypotheticalReturnPct,
     actualProfit,
     actualReturnPct,
-    difference: null,
-    differencePctPoints: null,
+    difference,
+    differencePctPoints,
     status: 'available',
   };
 }
