@@ -18,6 +18,17 @@ type ResearchResponse = {
   ok?: boolean;
   degraded?: boolean;
   summary?: string;
+  hallucination?: {
+    enabled?: boolean;
+    evaluator?: string;
+    claimCount?: number;
+    groundedClaims?: number;
+    ungroundedClaims?: number;
+    hallucinationRate?: number | null;
+    status?: string;
+    flaggedClaims?: Array<{ claim?: string; overlap?: number; grounded?: boolean }>;
+    note?: string;
+  };
   answer_source?: 'agent-llm' | 'deterministic-evidence' | 'deterministic-fallback' | 'none' | string;
   jev?: {
     enabled?: boolean;
@@ -318,6 +329,49 @@ export default function AutonomousResearch() {
               </p>
               {result.resolution && (
                 <p className="mt-3 text-[10px] font-mono text-white/35">Resolution: {result.resolution}</p>
+              )}
+              {result.hallucination?.enabled && (
+                <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[9px] font-mono uppercase tracking-wider text-white/35">
+                      Hallucination audit · claim grounding
+                    </div>
+                    <span className={
+                      'rounded border px-1.5 py-0.5 text-[9px] font-mono uppercase ' +
+                      (result.hallucination.status === 'CLEAR'
+                        ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
+                        : 'border-amber-400/20 bg-amber-400/5 text-amber-300')
+                    }>
+                      {result.hallucination.status || 'REVIEW'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-mono">
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 text-white/45">
+                      Claims: {result.hallucination.claimCount ?? 0}
+                    </span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 text-emerald-300/80">
+                      Grounded: {result.hallucination.groundedClaims ?? 0}
+                    </span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 text-amber-300/80">
+                      Flagged: {result.hallucination.ungroundedClaims ?? 0}
+                    </span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 text-white/45">
+                      Rate: {typeof result.hallucination.hallucinationRate === 'number' ? result.hallucination.hallucinationRate.toFixed(1) + '%' : '—'}
+                    </span>
+                  </div>
+                  {result.hallucination.flaggedClaims && result.hallucination.flaggedClaims.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {result.hallucination.flaggedClaims.slice(0, 3).map((item, index) => (
+                        <div key={String(index)} className="rounded border border-amber-400/10 bg-amber-400/5 px-2 py-1.5 text-[9px] leading-4 text-amber-100/60">
+                          {item.claim || 'Unmatched claim'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {result.hallucination.note && (
+                    <p className="mt-2 text-[9px] leading-4 text-white/25">{result.hallucination.note}</p>
+                  )}
+                </div>
               )}
               {result.jev?.evidence_gate && (
                 <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
