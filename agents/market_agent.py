@@ -133,9 +133,9 @@ def market_agent(state: AgentState) -> dict[str, Any]:
     evidence = {
         "prices": prices,
         "groups": groups,
-        "portfolio": portfolio_snapshot.get("portfolio", {}),
+        "portfolio": {},
         "positions": positions,
-        "portfolioSource": "data/portfolio_snapshot.json",
+        "portfolioSource": "private-supabase",
         "universeAverageChangePct": round(universe_avg, 4),
         "portfolioAverageChangePct": round(mean(portfolio_values), 4) if portfolio_values else None,
         "portfolioBreadth": (
