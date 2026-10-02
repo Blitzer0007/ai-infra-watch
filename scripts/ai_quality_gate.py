@@ -59,7 +59,7 @@ def main() -> int:
                 "passed": passed,
                 "total": len(results),
                 "passRate": round(rate, 4),
-            }, indent=2) + "\\n", encoding="utf-8")
+            }, indent=2) + "\n", encoding="utf-8")
         print("AI quality gate FAILED")
         return 1
     result_payload = {
@@ -75,7 +75,7 @@ def main() -> int:
         "passRate": round(rate, 4),
     }
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(result_payload, indent=2) + "\\n", encoding="utf-8")
+        Path(args.json_out).write_text(json.dumps(result_payload, indent=2) + "\n", encoding="utf-8")
     print("AI quality gate PASSED")
     return 0
 
