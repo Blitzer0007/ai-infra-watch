@@ -339,15 +339,15 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
         <Metric label="Events matched" value={String(summary.events)} suffix="SEC events" />
         <Metric
-          label="Avg Next Trading Day Reaction"
+          label="Mean Next Trading Day Reaction"
           value={formatPct(summary.avgT1)}
-          suffix=""
+          suffix={`n=${summary.n} · ${summary.quality} · median ${formatPct(summary.medianT1)}`}
           valueClass={tone(summary.avgT1)}
         />
         <Metric
-          label="Avg Next Trading Day vs Market"
+          label="Mean Next Trading Day vs Market"
           value={formatPct(summary.avgRelativeT1)}
-          suffix="pts vs SPY"
+          suffix={`pts vs SPY · n=${summary.relativeN} · median ${formatPct(summary.medianRelativeT1)}`}
           valueClass={tone(summary.avgRelativeT1)}
         />
       </div>
