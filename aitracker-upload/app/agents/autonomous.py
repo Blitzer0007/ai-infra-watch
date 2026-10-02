@@ -907,10 +907,7 @@ Requirements:
   the question, or the full retrieved-evidence payload.
 - Keep the answer concise but complete, with a clear Facts section followed by
   Interpretation/Hypotheses.
-{("
-
-Debate panel:
-" + json.dumps(debate, ensure_ascii=False, indent=2, default=str)) if debate else ""}
+{( "\n\nDebate panel:\n" + json.dumps(debate, ensure_ascii=False, indent=2, default=str)) if debate else ""}
 '''
 
 
