@@ -5,7 +5,7 @@ import { calculateStressScore, median, sampleQuality, summarizeSample } from './
 describe('stress score', () => {
   it('returns zero stress for neutral inputs', () => {
     const result = calculateStressScore({ dailyChanges: [0, 0, 0, 0], highMacroCount: 0, mediumMacroCount: 0 });
-    assert.equal(result.score, 20);
+    assert.equal(result.score, 0);
     assert.equal(result.breadth, 1);
     assert.equal(result.avgMove, 0);
   });
