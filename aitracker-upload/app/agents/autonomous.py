@@ -774,7 +774,7 @@ def _channel_tool_usable(family: str, name: str) -> bool:
     if family == "issuer_primary":
         return any(token in lower for token in (
             "investor_relations", "investor-relations", "company.", "companies.",
-            "issuer.", "press_release", "press-release", "newsroom", "official.",
+            "issuer.", "issuer_official", "press_release", "press-release", "newsroom", "official.",
             "product_docs", "product-docs", "company_docs", "company-docs",
         ))
     if family == "analyst_consensus":

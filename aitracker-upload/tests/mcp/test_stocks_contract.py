@@ -27,7 +27,19 @@ from mcp_servers.stocks.schemas import Quote, QuoteBatch
 from app.agents.schemas import RotationAgentResult
 from mcp_servers.stocks.service import FIXTURE_PATH
 
-EXPECTED_TOOLS = {"get_quote", "get_quotes", "get_snapshot", "get_earnings", "get_rotation", "get_event_study", "get_relationships", "list_watchlist", "health"}
+EXPECTED_TOOLS = {
+    "get_quote",
+    "get_quotes",
+    "get_snapshot",
+    "get_earnings",
+    "get_rotation",
+    "get_event_study",
+    "get_analyst_expectations",
+    "get_issuer_official",
+    "get_relationships",
+    "list_watchlist",
+    "health",
+}
 
 
 def _clock() -> str:

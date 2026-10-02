@@ -18,6 +18,11 @@ import httpx
 from .providers import QuoteError, _http_retryable
 
 
+def _list_records(value: Any) -> list[dict[str, Any]]:
+    """Normalize Finnhub list payloads without coupling services to provider internals."""
+    return [dict(item) for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
 @dataclass
 class AnalystSnapshot:
     symbol: str
@@ -136,7 +141,7 @@ class AnalystService:
         except QuoteError:
             revenue_raw = []
 
-        recommendation_rows = self.provider._list(recommendation_raw)
+        recommendation_rows = _list_records(recommendation_raw)
         recommendation = recommendation_rows[0] if recommendation_rows else (
             dict(recommendation_raw) if isinstance(recommendation_raw, dict) else {}
         )
@@ -150,8 +155,8 @@ class AnalystService:
             source="finnhub-analyst",
             recommendation=recommendation,
             price_target=price_target,
-            eps_estimates=self.provider._list((eps_raw or {}).get("data") if isinstance(eps_raw, dict) else eps_raw),
-            revenue_estimates=self.provider._list((revenue_raw or {}).get("data") if isinstance(revenue_raw, dict) else revenue_raw),
+            eps_estimates=_list_records((eps_raw or {}).get("data") if isinstance(eps_raw, dict) else eps_raw),
+            revenue_estimates=_list_records((revenue_raw or {}).get("data") if isinstance(revenue_raw, dict) else revenue_raw),
         )
 
 
