@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, ShieldAlert } from 'lucide-react';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterSelect } from './FilterControls';
+import { summarizeSample } from '../utils/measurement';
 
 type HistoryPoint = { date: string; price: number };
 
@@ -9,6 +10,7 @@ type SecEvent = {
   id: string;
   stockSymbol: string;
   date: string;
+  acceptedDateTime?: string | null;
   title: string;
   description?: string;
   accession?: string;
@@ -22,6 +24,7 @@ type Reaction = {
   anchorDate: string;
   anchorPrice: number;
   eventDate: string;
+  acceptedDateTime: string | null;
   eventPrice: number | null;
   t1: number | null;
   t5: number | null;
@@ -72,12 +75,14 @@ function firstOnOrAfter(history: HistoryPoint[], date: string): HistoryPoint | n
 function calculateReaction(
   history: HistoryPoint[],
   spy: HistoryPoint[],
-  eventDate: string
+  eventDate: string,
+  acceptedDateTime?: string | null
 ): Reaction | null {
   if (!history.length) return null;
 
-  const anchor = history.filter((point) => point.date < eventDate).at(-1);
-  const event = firstOnOrAfter(history, eventDate);
+  const referenceDate = acceptedDateTime ? acceptedDateTime.slice(0, 10) : eventDate;
+  const anchor = history.filter((point) => point.date < referenceDate).at(-1);
+  const event = firstOnOrAfter(history, referenceDate);
   if (!anchor || !event) return null;
 
   const eventIndex = history.findIndex((point) => point.date === event.date);
@@ -85,7 +90,7 @@ function calculateReaction(
 
   const forward = (days: number) => history[eventIndex + days] || null;
 
-  const spyEvent = firstOnOrAfter(spy, eventDate);
+  const spyEvent = firstOnOrAfter(spy, referenceDate);
   const spyIndex = spyEvent
     ? spy.findIndex((point) => point.date === spyEvent.date)
     : -1;
@@ -96,6 +101,7 @@ function calculateReaction(
     anchorDate: anchor.date,
     anchorPrice: anchor.price,
     eventDate: event.date,
+    acceptedDateTime: acceptedDateTime || null,
     eventPrice: event.price,
     t1: pct(event.price, forward(1)?.price ?? null),
     t5: pct(event.price, forward(5)?.price ?? null),
@@ -205,7 +211,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
     () =>
       events.map((event) => ({
         event,
-        reaction: calculateReaction(stockHistory, spyHistory, event.date),
+        reaction: calculateReaction(stockHistory, spyHistory, event.date, event.acceptedDateTime),
       })),
     [events, stockHistory, spyHistory]
   );
@@ -228,10 +234,18 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       .map(([category, bucket]) => ({
         category,
         count: bucket.count,
-        avgT1: bucket.t1.length ? bucket.t1.reduce((a, b) => a + b, 0) / bucket.t1.length : null,
-        avgRelativeT1: bucket.relativeT1.length
-          ? bucket.relativeT1.reduce((a, b) => a + b, 0) / bucket.relativeT1.length
-          : null,
+        ...(() => {
+          const t1 = summarizeSample(bucket.t1);
+          const relativeT1 = summarizeSample(bucket.relativeT1);
+          return {
+            n: t1.n,
+            avgT1: t1.mean,
+            medianT1: t1.median,
+            avgRelativeT1: relativeT1.mean,
+            medianRelativeT1: relativeT1.median,
+            quality: t1.quality,
+          };
+        })(),
       }))
       .sort((a, b) => b.count - a.count);
   }, [rows]);
@@ -258,12 +272,19 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
 
     return {
       events: valid.length,
-      avgT1: t1Values.length
-        ? t1Values.reduce((sum, value) => sum + value, 0) / t1Values.length
-        : null,
-      avgRelativeT1: relativeT1Values.length
-        ? relativeT1Values.reduce((sum, value) => sum + value, 0) / relativeT1Values.length
-        : null,
+      ...(() => {
+        const t1 = summarizeSample(t1Values);
+        const relativeT1 = summarizeSample(relativeT1Values);
+        return {
+          avgT1: t1.mean,
+          medianT1: t1.median,
+          n: t1.n,
+          quality: t1.quality,
+          avgRelativeT1: relativeT1.mean,
+          medianRelativeT1: relativeT1.median,
+          relativeN: relativeT1.n,
+        };
+      })(),
     };
   }, [rows]);
 
@@ -280,7 +301,12 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           events_returned: events.length,
           reactions_matched: summary.events,
           average_next_trading_day_reaction_pct: summary.avgT1,
+          median_next_trading_day_reaction_pct: summary.medianT1,
+          next_trading_day_sample_size: summary.n,
+          next_trading_day_data_quality: summary.quality,
           average_next_trading_day_vs_spy_pct_points: summary.avgRelativeT1,
+          median_next_trading_day_vs_spy_pct_points: summary.medianRelativeT1,
+          vs_spy_sample_size: summary.relativeN,
           categories: categories.slice(0, 8),
           recent_events: events.slice(0, 8).map((event) => ({
             date: event.date,
@@ -299,7 +325,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
             <div key={item.category} className="rounded-lg border border-white/5 bg-black/10 p-3">
               <div className="text-[9px] uppercase font-mono font-bold text-white/55 leading-4">{item.category}</div>
               <div className={'text-base font-black mt-2 ' + tone(item.avgT1)}>{formatPct(item.avgT1)}</div>
-              <div className="text-[9px] text-white/25 font-mono mt-1">avg next trading day · {item.count} event{item.count === 1 ? '' : 's'}</div>
+              <div className="text-[9px] text-white/25 font-mono mt-1">mean {item.count} event{item.count === 1 ? '' : 's'} · n={item.n} · {item.quality} sample</div>
+              <div className="text-[9px] text-white/35 font-mono mt-1">median {formatPct(item.medianT1)}</div>
               <div className={'text-[9px] font-mono mt-2 ' + tone(item.avgRelativeT1)}>vs market {formatPct(item.avgRelativeT1)}</div>
             </div>
           ))}
@@ -430,7 +457,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       )}
 
       <div className="mt-3 text-[9px] text-white/30 font-mono">
-        Event Day = the first trading day on or after the filing date · Next Trading Day = the first market session after Event Day · 5th/20th Trading Day = forward market sessions.
+        Event Day = the first trading day on or after the SEC accepted timestamp’s calendar date. The accepted timestamp is the event-time source; filing date is retained for disclosure chronology. Next/5th/20th Trading Day = forward market sessions.
       </div>
 
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
