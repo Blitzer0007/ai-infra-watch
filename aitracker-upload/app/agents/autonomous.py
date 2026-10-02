@@ -194,6 +194,8 @@ JEV_ROUTE_CRITERIA = {
     "congress": "Congressional/public official stock transaction disclosure",
     "news": "Recent news or media reporting about a company or ticker",
     "rotation": "Relative rotation, peer basket, hardware/application or sector rotation",
+    "analyst_consensus": "Analyst ratings, price targets, consensus estimates or estimate revisions",
+    "issuer_primary": "Company or issuer official information, investor-relations material and official-domain announcements",
     "multi_source": "Question requires combining several evidence sources before answering",
 }
 
