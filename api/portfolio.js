@@ -1,4 +1,6 @@
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qjgnryjtrdwrbmlgdquk.supabase.co';
+import { requireAccess } from './_access-auth.js';
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function headers(prefer = 'return=representation') {
@@ -57,6 +59,7 @@ function normalize(row) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (!requireAccess(req, res)) return;
   try {
     if (req.method === 'GET') {
       const holdingId = String(req.query?.holdingId || '').trim();
