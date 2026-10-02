@@ -436,6 +436,20 @@ async function handleAnalyst(req, res) {
 
   const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
 
+  const ratingCounts = {
+    strongBuy: Number(recommendation.strongBuy || 0),
+    buy: Number(recommendation.buy || 0),
+    hold: Number(recommendation.hold || 0),
+    sell: Number(recommendation.sell || 0),
+    strongSell: Number(recommendation.strongSell || 0),
+  };
+  const analystCount = Object.values(ratingCounts).reduce((sum, value) => sum + value, 0);
+  const targetMedian = normalizeAnalystValue(priceTarget.targetMedian);
+  const targetMean = normalizeAnalystValue(priceTarget.targetMean);
+  const targetLow = normalizeAnalystValue(priceTarget.targetLow);
+  const targetHigh = normalizeAnalystValue(priceTarget.targetHigh);
+  const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
+
   const data = {
     symbol,
     source: 'Finnhub analyst',
@@ -443,11 +457,7 @@ async function handleAnalyst(req, res) {
     retrievedAt: new Date().toISOString(),
     recommendation: {
       period: recommendation.period || null,
-      strongBuy: Number(recommendation.strongBuy || 0),
-      buy: Number(recommendation.buy || 0),
-      hold: Number(recommendation.hold || 0),
-      sell: Number(recommendation.sell || 0),
-      strongSell: Number(recommendation.strongSell || 0),
+      ...ratingCounts,
     },
     priceTarget: {
       lastUpdated: priceTarget.lastUpdated || priceTarget.lastUpdatedAt || null,
@@ -471,6 +481,8 @@ async function handleAnalyst(req, res) {
       analysts: Number(row?.numberAnalysts || 0) || null,
     })),
     available: Object.keys(values),
+    analystCount,
+    webEvidenceCount,
     errors,
   };
 
