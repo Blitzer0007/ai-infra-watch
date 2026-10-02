@@ -18,6 +18,18 @@ type ResearchResponse = {
   ok?: boolean;
   degraded?: boolean;
   summary?: string;
+  debate?: {
+    enabled?: boolean;
+    status?: string;
+    majority?: string;
+    agreement?: number;
+    disagreement?: boolean;
+    bull_case?: string;
+    bear_case?: string;
+    judges?: Array<{ judge?: number; verdict?: string; confidence?: number | null; rationale?: string }>;
+    note?: string;
+    error?: string;
+  };
   hallucination?: {
     enabled?: boolean;
     evaluator?: string;
@@ -222,7 +234,7 @@ export default function AutonomousResearch() {
         </div>
         <p className="text-sm text-white/55 max-w-3xl">
           Ask a research question and let the bounded MCP agent select market, company-official, analyst, filing, earnings,
-          event-study, relationship, and rotation tools from the live catalog.
+          event-study, relationship, rotation, portfolio, forecast, and quality evidence from the live catalog.
         </p>
       </div>
 
@@ -373,6 +385,39 @@ export default function AutonomousResearch() {
                   )}
                 </div>
               )}
+              {result.debate?.enabled && !result.debate.status && (
+                <div className="mt-3 rounded-lg border border-violet-400/20 bg-violet-400/5 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[9px] font-mono uppercase tracking-wider text-violet-200/80">
+                      Multi-agent research debate
+                    </div>
+                    <span className="rounded border border-violet-400/20 px-1.5 py-0.5 text-[9px] font-mono uppercase text-violet-200">
+                      {result.debate.majority || 'UNCLEAR'} · {Math.round((result.debate.agreement || 0) * 100)}% agreement
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="rounded border border-emerald-400/10 bg-emerald-400/5 p-2">
+                      <div className="text-[8px] font-mono uppercase text-emerald-300/60">Bull case</div>
+                      <p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-white/55">{result.debate.bull_case || '—'}</p>
+                    </div>
+                    <div className="rounded border border-rose-400/10 bg-rose-400/5 p-2">
+                      <div className="text-[8px] font-mono uppercase text-rose-300/60">Bear case</div>
+                      <p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-white/55">{result.debate.bear_case || '—'}</p>
+                    </div>
+                  </div>
+                  {result.debate.judges && result.debate.judges.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-mono">
+                      {result.debate.judges.map(item => (
+                        <span key={String(item.judge)} className="rounded border border-white/10 px-1.5 py-0.5 text-white/50">
+                          J{item.judge}: {item.verdict || 'unclear'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {result.debate.note && <p className="mt-2 text-[9px] leading-4 text-white/25">{result.debate.note}</p>}
+                </div>
+              )}
+
               {result.jev?.evidence_gate && (
                 <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
                   <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
