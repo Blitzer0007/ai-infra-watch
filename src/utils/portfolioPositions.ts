@@ -86,8 +86,8 @@ export function buildPositionAnalyses(
     const livePrice = quote?.price ?? null;
     const liveIsFresh = livePrice != null && quote?.stale !== true;
     const currentValue = liveIsFresh ? livePrice * position.quantity : null;
-    const pnl = currentValue - position.investedValue;
-    const pnlPct = position.investedValue ? (pnl / position.investedValue) * 100 : 0;
+    const pnl = liveIsFresh ? (currentValue ?? 0) - position.investedValue : 0;
+    const pnlPct = liveIsFresh && position.investedValue ? (pnl / position.investedValue) * 100 : 0;
     const group = intelligence.groups.find((item) => item.name === position.group) ?? null;
 
     const peerReturns = position.peers
@@ -157,8 +157,8 @@ export function buildPositionAnalyses(
       rationale,
       addTrigger,
       riskTrigger,
-      whatIfProfitAt10Pct: !liveIsFresh ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
-      whatIfProfitAt20Pct: !liveIsFresh ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
+      whatIfProfitAt10Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
+      whatIfProfitAt20Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
       potentialUpsideSignal: groupScore == null || groupBreadth == null
         ? 'INSUFFICIENT DATA'
         : groupScore >= 62 && groupBreadth >= 0.5
