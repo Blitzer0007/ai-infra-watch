@@ -965,7 +965,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {loading && <div className="flex items-center gap-2 text-xs font-mono text-white/40"><Loader2 className="w-4 h-4 animate-spin" /> Loading 5-year market history…</div>}
         {!loading && error && <div className="text-xs font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{error}</div>}
 
-        {!loading && !error && (
+        {!loading && !error &&
           <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
@@ -1030,7 +1030,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   {portfolioContext.holding?.brokerAlertPrices?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker alerts: {portfolioContext.holding.brokerAlertPrices.map(price => formatPrice(price)).join(', ')}</div> : null}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
-              )}
+        }
               </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
