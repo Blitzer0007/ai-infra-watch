@@ -81,7 +81,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const formatPortfolioMoney = (usd: number | null | undefined) => {
     if (usd == null || !Number.isFinite(usd)) return '—';
     if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-    return '
+    return '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  };
+
+  const changeTab = (nextTab: PortfolioTab) => {
+    setTab(nextTab);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
