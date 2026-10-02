@@ -438,6 +438,21 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     expected = _required_evidence_families(question)
     matrix: dict[str, Any] = {}
 
+    # The matrix describes both explicit requirements and evidence families
+    # actually observed in the trajectory. Generic research has no hard
+    # requirements, but observed market/news/filings/etc. evidence must still
+    # count toward the independent-family sufficiency policy.
+    observed_families: list[str] = []
+    for call in calls:
+        family = _evidence_family(call.tool)
+        if family in expected or _channel_tool_usable(family, call.tool):
+            if family not in observed_families:
+                observed_families.append(family)
+    families = list(expected)
+    for family in observed_families:
+        if family not in families:
+            families.append(family)
+
     def has_payload(value: Any) -> bool:
         """Return True only when a tool response contains usable evidence.
 
@@ -475,7 +490,7 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
             return any(key not in metadata_only and has_payload(child) for key, child in value.items())
         return True
 
-    for family in expected:
+    for family in families:
         family_calls = [call for call in calls if _evidence_family(call.tool) == family]
         successful = [call for call in family_calls if call.ok]
         failed = [call for call in family_calls if not call.ok]
@@ -500,9 +515,12 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
             "lastError": getattr(latest, "error", None) if latest is not None and not latest.ok else None,
         }
 
+    # "missing" is reserved for explicit user-required families. An
+    # observed-but-empty/failed optional source is degraded evidence, not a
+    # hard completeness failure.
     missing = [
-        family for family, item in matrix.items()
-        if item["status"] != "AVAILABLE"
+        family for family in expected
+        if matrix.get(family, {}).get("status") != "AVAILABLE"
     ]
     usable_families = [
         family for family, item in matrix.items()
@@ -515,6 +533,7 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
         "usable_families": usable_families,
         "usable_family_count": len(usable_families),
         "complete": not missing,
+        "observed_families": observed_families,
         "status_counts": {
             status: sum(1 for item in matrix.values() if item["status"] == status)
             for status in ("AVAILABLE", "EMPTY", "FAILED", "MISSING")
@@ -788,7 +807,7 @@ def _next_evidence_plan(
             score += max(1, 12 - priorities.index(family))
         if family == "news" and any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact")):
             score += 6
-        if family == "sec" and any(term in lower for term in ("why", "driver", "changed", "catalyst", "contract", "impact")):
+        if family == "regulatory_primary" and any(term in lower for term in ("why", "driver", "changed", "catalyst", "contract", "impact")):
             score += 6
         if family == "event_study" and any(term in lower for term in ("reaction", "event study", "earnings", "changed")):
             score += 6

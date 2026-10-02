@@ -658,15 +658,17 @@ def test_jev_strong_evidence_can_stop_before_step_bound():
     finally:
         tb.close()
 
-    assert gate.calls == 3
+    # Two independent usable families are sufficient under the new
+    # question-driven policy, so the gate stops after the complementary news
+    # source instead of forcing a SEC/filings call.
+    assert gate.calls == 2
     assert result.jev["evidence_gate"]["action"] == "stop"
     assert result.resolution == "jev_evidence_sufficient"
-    assert len(result.calls) == 4
+    assert len(result.calls) == 3
     assert [call.tool for call in result.calls] == [
         "stocks.get_quote",
         "stocks.get_snapshot",
         "news.search",
-        "filings.get_filings",
     ]
 
 def test_jev_repeated_gather_more_ends_as_insufficient():
