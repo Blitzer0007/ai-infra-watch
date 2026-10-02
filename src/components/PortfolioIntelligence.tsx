@@ -81,6 +81,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [peerComparison, setPeerComparison] = useState<PeerCounterfactual | null>(null);
   const [peerPortfolioComparisons, setPeerPortfolioComparisons] = useState<PeerCounterfactual[]>([]);
   const [peerLoading, setPeerLoading] = useState(false);
+  const [analystConsensus, setAnalystConsensus] = useState<any>(null);
+  const [analystLoading, setAnalystLoading] = useState(false);
+  const [analystError, setAnalystError] = useState('');
 
   useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
@@ -179,6 +182,26 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
   useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedAnalysis?.symbol) {
+      setAnalystConsensus(null);
+      return () => { cancelled = true; };
+    }
+    setAnalystLoading(true);
+    setAnalystError('');
+    fetch('/api/company-scale?action=analyst&symbol=' + encodeURIComponent(selectedAnalysis.symbol), { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || 'Analyst consensus unavailable');
+        return body;
+      })
+      .then(body => { if (!cancelled) setAnalystConsensus(body); })
+      .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
+      .finally(() => { if (!cancelled) setAnalystLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedAnalysis?.symbol]);
 
   useEffect(() => {
     if (!holdings.length) return;
@@ -382,6 +405,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         stressTrendAverage,
         benchmarkComparisons,
       },
+      analystConsensus: analystConsensus ? {
+        source: analystConsensus.source || null,
+        retrievedAt: analystConsensus.retrievedAt || null,
+        ratingCounts: analystConsensus.recommendation || null,
+        analystCount: ['strongBuy','buy','hold','sell','strongSell'].reduce((sum, key) => sum + Number(analystConsensus?.recommendation?.[key] || 0), 0),
+        priceTarget: analystConsensus.priceTarget || null,
+        webEvidenceCount: Array.isArray(analystConsensus.webEvidence?.results) ? analystConsensus.webEvidence.results.length : 0,
+        errors: analystConsensus.errors || [],
+      } : null,
       evidenceAvailability: {
         heldContracts: relevantContracts,
         heldCongressDisclosures: relevantCongress,
@@ -413,6 +445,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     politicalSignals,
     macroRisks.length,
     news.length,
+    analystConsensus,
   ]);
 
 
@@ -486,7 +519,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         kind="portfolio"
         title="Portfolio decision context"
         subtitle="Jev reviews the measured portfolio state and evidence coverage. It provides typed research triage and context only; it does not generate trade instructions."
-        state={decisionContext}
+        state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }}
       />
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
