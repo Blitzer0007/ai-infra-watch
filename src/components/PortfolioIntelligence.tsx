@@ -702,7 +702,10 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
       <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="Average cost" value={'$' + h.averageCost.toFixed(2)} />
+      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
+      <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
+      <Info label="Average cost" value={h.averageCost.toFixed(2)} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
       <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
     </div>
@@ -775,6 +778,11 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
       <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
       <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
     </div>
     <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
