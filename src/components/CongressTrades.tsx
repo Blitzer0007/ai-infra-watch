@@ -40,7 +40,7 @@ const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   const key = symbol.trim().toUpperCase();
   if (!historyCache[key]) {
-    historyCache[key] = fetch('/api/stock-history?symbol=' + encodeURIComponent(key) + '&range=5y')
+    historyCache[key] = fetch('/api/market-tools?action=history&symbol=' + encodeURIComponent(key) + '&range=5y')
       .then(async (res) => {
         if (!res.ok) throw new Error('History HTTP ' + res.status);
         const data = await res.json();

@@ -35,7 +35,7 @@ jobs:
 
       - name: Probe SEC gateway
         env:
-          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          SEC_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/market-tools
           SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
         run: |
@@ -66,7 +66,7 @@ jobs:
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
           SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
-          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/market-tools
         run: |
           set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
@@ -87,7 +87,7 @@ jobs:
         env:
           SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
           SEC_GATEWAY_TOKEN: ${{ secrets.SEC_GATEWAY_TOKEN }}
-          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/company-scale
+          EDGAR_GATEWAY_URL: https://ai-infra-watch-theta.vercel.app/api/market-tools
         run: |
           set -euo pipefail
           if [ -n "$SEC_CONTACT_EMAIL" ]; then
