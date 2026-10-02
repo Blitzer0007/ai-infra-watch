@@ -965,8 +965,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {loading && <div className="flex items-center gap-2 text-xs font-mono text-white/40"><Loader2 className="w-4 h-4 animate-spin" /> Loading 5-year market history…</div>}
         {!loading && error && <div className="text-xs font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{error}</div>}
 
-        {!loading && !error && (
-          <div>
+        {!loading && !error && <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
                 ['10th percentile', analysis.p10],
@@ -1107,8 +1106,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
               </div>}
             </div>
-          </div>
-        )}
+          </div>}
       </div>
 
             {/* Keep validation analytics outside the forecast content conditional so production builds remain structurally stable. */}
