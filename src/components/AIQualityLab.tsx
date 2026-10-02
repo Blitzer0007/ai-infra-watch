@@ -537,7 +537,7 @@ export default function AIQualityLab() {
                   key={item.label}
                   className={
                     'rounded border px-1.5 py-0.5 text-[8px] font-mono ' +
-                    (regressionSummary.regressions.includes(item)
+                    (regressionSummary.regressions.some(regression => regression.metric === item.metric)
                       ? 'border-rose-400/20 bg-rose-400/5 text-rose-300'
                       : 'border-white/10 text-white/40')
                   }
