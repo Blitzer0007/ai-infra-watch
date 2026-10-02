@@ -10,6 +10,8 @@ import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
+import SignalScorecardPanel from './SignalScorecardPanel';
+import { authFetch } from '../utils/apiAuth';
 import { FilterInput, FilterSelect } from './FilterControls';
 import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
 type Price = {
@@ -176,6 +178,26 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 };
     });
   }, [livePrices, intelligence, positions]);
+  useEffect(() => {
+    if (!analyses.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
+    void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        signalKey: hash(['position_state', item.symbol, item.state, today].join('|')),
+        symbol: item.symbol,
+        signalType: 'position_state',
+        signalState: item.state,
+        confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60,
+        signalPrice: item.livePrice,
+        observedAt: new Date().toISOString(),
+        evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers },
+      }),
+    })));
+  }, [analyses]);
+
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
     (group === 'All' || h.group === group) &&
@@ -439,7 +461,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             {PORTFOLIO_AS_OF} · retained only as migration context; persistent holdings above are the source of truth.
           </div>
 
-          <PortfolioSignalFusion
+          <SignalScorecardPanel />
+
+      <PortfolioSignalFusion
             prices={livePrices}
             contracts={contracts}
             congressTrades={congressTrades}
