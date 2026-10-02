@@ -25,6 +25,36 @@ ASSESSMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "criteria": ["Sparse", "Partial", "Usable", "Strong"],
         },
     },
+    "portfolio": {
+        "attention": {
+            "type": "choice",
+            "instructions": "Which aspect of the current portfolio state deserves the most immediate research attention?",
+            "criteria": {
+                "concentration": "Exposure concentration or a dominant holding is the clearest portfolio-level issue to inspect.",
+                "recovery_watch": "One or more holdings are below cost and declining while supporting group/peer evidence warrants closer review.",
+                "macro": "Macro, geopolitical, power or export exposure is the clearest active portfolio issue.",
+                "catalyst": "A filing, contract, earnings, policy or other catalyst is the clearest active issue.",
+                "market": "Current price, breadth, stress or benchmark-relative movement is the clearest active issue.",
+                "mixed": "Several evidence channels are active and should be reviewed together.",
+                "monitor": "No single portfolio issue stands out from the available evidence."
+            }
+        },
+        "context": {
+            "type": "choice",
+            "instructions": "How should the current portfolio context be characterized from the supplied measurements and evidence?",
+            "criteria": {
+                "supportive": "Observed portfolio and evidence signals are broadly supportive, with no material unresolved conflict.",
+                "mixed": "Supportive and adverse signals coexist, so the position context remains mixed.",
+                "adverse": "Observed portfolio measurements and evidence contain multiple adverse signals.",
+                "insufficient": "The available data is too incomplete or stale for a reliable context characterization."
+            }
+        },
+        "evidence_quality": {
+            "type": "score",
+            "instructions": "How complete is the evidence available for reviewing the current portfolio state?",
+            "criteria": ["Sparse", "Partial", "Usable", "Strong"]
+        }
+    },
     "platform": {
         "attention": {
             "type": "choice",
