@@ -1,4 +1,5 @@
 import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Zap } from 'lucide-react';
+import { authFetch } from '../utils/apiAuth';
 import type { Contract, CongressTrade, MacroRisk } from '../types';
 import JevDecisionPanel from './JevDecisionPanel';
 
@@ -162,6 +163,34 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
   ].sort((a, b) => String(b.when || '').localeCompare(String(a.when || ''))).slice(0, 8);
 
   const touched = symbols(signals.flatMap(x => x.affected));
+
+  useEffect(() => {
+    if (!signals.length) return;
+    const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
+    void Promise.allSettled(signals.map(signal => {
+      const symbol = signal.affected[0];
+      const signalPrice = symbol && prices[symbol] ? Number(prices[symbol].price) : null;
+      const confidence = signal.kind === 'Contract' && signal.source === 'SEC EDGAR'
+        ? 0.85
+        : signal.kind === 'Political' && (signal as any).sourceType === 'primary'
+          ? 0.80
+          : 0.55;
+      return authFetch('/api/signal-scorecard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signalKey: hash([signal.kind, signal.title, signal.when || '', signal.affected.join(',')].join('|')),
+          symbol,
+          signalType: signal.kind,
+          signalState: signal.title,
+          confidence,
+          signalPrice,
+          observedAt: signal.when ? new Date(signal.when).toISOString() : new Date().toISOString(),
+          evidence: { source: signal.source, sourceType: (signal as any).sourceType || 'secondary', url: signal.url || null, affected: signal.affected },
+        }),
+      });
+    }));
+  }, [signals, prices]);
 
   return (
     <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
