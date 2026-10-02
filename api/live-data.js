@@ -199,67 +199,68 @@ async function politicalSignals() {
     },
     {
       label: 'White House primary coverage',
-      query: 'domain:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)'
+      query: 'domainis:whitehouse.gov (Trump OR "White House") (AI OR "artificial intelligence" OR "data center" OR semiconductor OR chip OR power OR electricity OR regulation OR innovation)'
     }
   ];
 
   async function runQuery(item, timespan) {
-    try {
-      const url =
-        'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
-        encodeURIComponent(item.query) +
-        '&mode=ArtList&format=json&maxrecords=20&timespan=' + timespan + '&sort=datedesc';
-      const response = await fetch(url, {
-        headers: { 'User-Agent': 'ai-infra-watch/1.0' },
-        signal: AbortSignal.timeout(7000),
-      });
-      if (!response.ok) return [];
-      const payload = await response.json();
-      return (payload?.articles || []).map(article => {
-        const title = String(article?.title || '').trim();
-        const urlValue = String(article?.url || '').trim();
-        const source = String(article?.domain || article?.source || 'GDELT');
-        const date = article?.seendate || null;
-        const text = title + ' ' + source;
-        let sourceHost = '';
-        try {
-          sourceHost = new URL(urlValue).hostname.toLowerCase();
-        } catch {}
-        const primary =
-          sourceHost === 'whitehouse.gov' ||
-          sourceHost.endsWith('.whitehouse.gov');
+    const result = await fetchGdeltJson(item.query, timespan, item.label);
+    const signals = result.articles.map(article => {
+      const title = String(article?.title || '').trim();
+      const urlValue = String(article?.url || '').trim();
+      const source = String(article?.domain || article?.source || 'GDELT');
+      const date = article?.seendate || null;
+      const text = title + ' ' + source;
+      let sourceHost = '';
+      try { sourceHost = new URL(urlValue).hostname.toLowerCase(); } catch {}
 
-        return {
-          id: 'political-' + Buffer.from((urlValue || title).slice(0, 160)).toString('base64url').slice(0, 32),
-          actor: detectPoliticalActor(text),
-          title,
-          source,
-          sourceType: primary ? 'primary' : 'secondary',
-          topic: classifyPoliticalTopic(text),
-          eventType: /(executive order|presidential memorandum|fact sheet|signed into law|executive action|announces|announced|directive)/i.test(title)
-            ? 'Policy / official action'
-            : 'Political statement / coverage',
-          date,
-          url: urlValue || null,
-          relatedSymbols: relatedSymbols(text),
-          note: primary
-            ? 'Primary White House source signal.'
-            : 'Media coverage signal; verify the underlying statement or official action before treating the headline as a quote.'
-        };
-      }).filter(item => item.title);
-    } catch {
-      return [];
-    }
+      const primary = sourceHost === 'whitehouse.gov' || sourceHost.endsWith('.whitehouse.gov');
+
+      return {
+        id: 'political-' + Buffer.from((urlValue || title).slice(0, 160)).toString('base64url').slice(0, 32),
+        actor: detectPoliticalActor(text),
+        title,
+        source,
+        sourceType: primary ? 'primary' : 'secondary',
+        topic: classifyPoliticalTopic(text),
+        eventType: /(executive order|presidential memorandum|fact sheet|signed into law|executive action|announces|announced|directive)/i.test(title)
+          ? 'Policy / official action'
+          : 'Political statement / coverage',
+        date,
+        url: urlValue || null,
+        relatedSymbols: relatedSymbols(text),
+        note: primary
+          ? 'Primary White House source signal.'
+          : 'Media coverage signal; verify the underlying statement or official action before treating the headline as a quote.'
+      };
+    }).filter(item => item.title);
+
+    return { signals, error: result.error };
   }
 
-  // Prefer current 24-hour coverage. If that window is empty, broaden to
-  // 72 hours so a temporary quiet period does not look like a broken feed.
-  let articles = (await Promise.all(queries.map(item => runQuery(item, '24h')))).flat();
+  // Use one broad 72-hour query first. GDELT's DOC API can apply soft
+  // rate limits; sequential requests with bounded retry avoid the previous
+  // pattern of firing multiple requests simultaneously and receiving empty
+  // results during throttling.
+  let first = await runQuery(queries[0], '72h');
+  let articles = first.signals;
+  let errors = first.error ? [first.error] : [];
 
+  if (articles.length < 10) {
+    const second = await runQuery(queries[1], '72h');
+    articles = articles.concat(second.signals);
+    if (second.error) errors.push(second.error);
+  }
+
+  // Last bounded fallback with a simpler query if both specialized queries
+  // yielded nothing.
   if (!articles.length) {
-    articles = await runQuery({
-      query: '(Trump OR "White House" OR "U.S. administration" OR "JD Vance") (AI OR "artificial intelligence" OR technology OR semiconductor OR chip OR GPU OR "data center" OR power OR energy OR export OR regulation OR investment OR infrastructure)'
+    const fallback = await runQuery({
+      label: 'GDELT AI policy fallback',
+      query: '(Trump OR "White House" OR "JD Vance") (AI OR technology OR semiconductor OR chip OR GPU OR "data center" OR power OR energy OR export OR regulation OR investment OR infrastructure)'
     }, '72h');
+    articles = fallback.signals;
+    if (fallback.error) errors.push(fallback.error);
   }
 
   const unique = new Map();
@@ -271,19 +272,20 @@ async function politicalSignals() {
     }
   });
 
-  return Array.from(unique.values())
-    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-    .slice(0, 20);
+  return {
+    items: Array.from(unique.values())
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+      .slice(0, 20),
+    upstreamError: errors.length && !unique.size ? errors.join('; ') : null,
+  };
 }
 
 async function fetchGdeltNews(timespan) {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
-  const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&format=json&maxrecords=20&timespan=' + timespan + '&sort=datedesc';
-  const r = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' }, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
-  if (!r.ok) throw new Error('GDELT news HTTP ' + r.status);
-  const j = await r.json();
-  return (j && j.articles || []).slice(0,20).map(a => ({
-    title:a.title, source:a.domain || a.source || 'GDELT', url:a.url, date:a.seendate
+  const result = await fetchGdeltJson(q, timespan, 'GDELT news');
+  if (result.error && !result.articles.length) throw new Error(result.error);
+  return result.articles.slice(0, 20).map(a => ({
+    title: a.title, source: a.domain || a.source || 'GDELT', url: a.url, date: a.seendate
   }));
 }
 
@@ -352,20 +354,20 @@ export default async function handler(req, res) {
     }
   };
 
-  const [newsResult, contractsResult, congressResult, politicalSignalsResult] = await Promise.all([
+  const [newsResult, contractsResult, congressResult, politicalResult] = await Promise.all([
     news(),
-
     fetchSecContracts(),
     fetchCongressTrades(req),
-    politicalSignals().catch(() => []),
+    politicalSignals(),
   ]);
   const currentNews = newsResult?.items || [];
   const contracts = contractsResult?.items || [];
   const congressTrades = congressResult?.items || [];
+  const politicalSignalsResult = politicalResult?.items || [];
   const feedRetrievedAt = new Date().toISOString();
   evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback) };
   evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: contractsResult?.source || 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(contractsResult?.stale), upstreamError: contractsResult?.upstreamError || null };
-  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: politicalSignalsResult.length === 0 };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
   evidenceAvailability.market = { ...evidenceAvailability.market, retrievedAt: Object.values(stockPrices).reduce((latest, item) => item?.retrievedAt && item.retrievedAt > latest ? item.retrievedAt : latest, ''), refreshIntervalSeconds: 60 };
@@ -386,7 +388,8 @@ export default async function handler(req, res) {
     feedStatus: {
       newsWindow: newsResult?.window || null,
       newsFallback: Boolean(newsResult?.fallback),
-      politicalFallback: politicalSignalsResult.length === 0
+      politicalFallback: politicalSignalsResult.length === 0,
+      politicalUpstreamError: politicalResult?.upstreamError || null
     },
     sources:['Yahoo Finance chart data → Finnhub → Alpha Vantage','GDELT AI-infrastructure news (24h → 72h fallback)','GDELT political/policy coverage (24h → 72h fallback)','SEC EDGAR','Bargo Congress Trades API → fallback providers']
   };
