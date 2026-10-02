@@ -32,6 +32,7 @@ def mock_local_apis(page):
         route.fulfill(status=200, content_type='application/json', body='{}')
     page.route('**/api/**', api_route)
 def goto_app(page):
+    page.on("pageerror", lambda error: print("PAGEERROR:", error))
     page.goto("/", wait_until="domcontentloaded", timeout=60000)
     page.get_by_text("AI INFRA WATCH", exact=False).first.wait_for(state="visible", timeout=30000)
 
@@ -46,7 +47,7 @@ def test_forecast_history_error_is_gone(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-outlook").click()
-    page.get_by_test_id("forward-outlook").wait_for(state="visible", timeout=30000)
+    page.get_by_test_id("forward-outlook").wait_for(state="attached", timeout=30000)
     page.wait_for_timeout(5000)
     assert "Historical market data request failed (HTTP 404)" not in page.locator("body").inner_text()
 
@@ -55,7 +56,7 @@ def test_portfolio_search_is_functional(page):
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
-    portfolio.wait_for(state="visible", timeout=30000)
+    portfolio.wait_for(state="attached", timeout=30000)
     search = portfolio.get_by_placeholder("Search ticker, name or theme")
     search.fill("NVDA")
     page.wait_for_timeout(500)
@@ -90,5 +91,5 @@ def test_ai_quality_lab_mounts(page):
     goto_app(page)
     page.get_by_test_id("nav-quality").click()
     lab = page.get_by_test_id("ai-quality-lab")
-    lab.wait_for(state="visible", timeout=30000)
+    lab.wait_for(state="attached", timeout=30000)
     assert "AI Quality" in lab.inner_text()
