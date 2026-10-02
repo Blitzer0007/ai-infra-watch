@@ -9,7 +9,7 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent / "aitracker-upload"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -62,7 +62,7 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
 
 
 @app.post("/api/jev-assess")
-def evaluate(req: JevAssessRequest, authorization: str | None = Header(default=None), request: Any = None) -> dict[str, Any]:
+def evaluate(req: JevAssessRequest, authorization: str | None = Header(default=None), request: Request | None = None) -> dict[str, Any]:
     _require_auth(authorization)
     if request is not None and _rate_limited(request):
         raise HTTPException(status_code=429, detail="Too many Jev assessment requests")
