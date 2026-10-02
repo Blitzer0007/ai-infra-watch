@@ -257,3 +257,59 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* AIW header hierarchy: compact, readable, and consistent across dashboard pages. */
+.aiw-page-header {
+  gap: .35rem;
+  border-bottom-color: rgba(255,255,255,.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.aiw-page-header > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.35rem;
+  padding: .2rem .55rem;
+  border: 1px solid rgba(16,185,129,.18);
+  border-radius: .45rem;
+  background: rgba(16,185,129,.055);
+  color: rgba(110,231,183,.78);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .18em;
+}
+.aiw-page-header h1 {
+  margin: .15rem 0 0;
+  max-width: 100%;
+  font-size: clamp(1.8rem, 3.2vw, 2.85rem) !important;
+  line-height: .98 !important;
+  letter-spacing: -.045em !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+  text-wrap: balance;
+}
+.aiw-page-header p {
+  max-width: 52rem;
+  margin-top: .2rem;
+  font-size: .78rem;
+  line-height: 1.55;
+  color: rgba(255,255,255,.58);
+}
+.aiw-page-header::after {
+  content: "";
+  display: block;
+  width: 4rem;
+  height: 2px;
+  margin-top: .45rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(16,185,129,.9), rgba(34,211,238,.35), transparent);
+}
+@media (max-width: 640px) {
+  .aiw-page-header { padding-bottom: .8rem; }
+  .aiw-page-header h1 {
+    font-size: 1.7rem !important;
+    line-height: 1.02 !important;
+  }
+  .aiw-page-header p { font-size: .72rem; }
+}
