@@ -9,6 +9,47 @@ export type StoredPortfolioHolding = {
   updatedAt?: string;
 };
 
+export type PortfolioPurchaseLot = {
+  id: string;
+  holdingId: string;
+  symbol: string;
+  purchaseDate: string | null;
+  investedAmount: number;
+  executionPrice: number;
+  quantity: number;
+  notes: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchPortfolioPurchaseLots(holdingId: string): Promise<PortfolioPurchaseLot[]> {
+  const response = await fetch('/api/portfolio?holdingId=' + encodeURIComponent(holdingId), { cache: 'no-store' });
+  if (!response.ok) throw new Error('Purchase history service unavailable');
+  const data = await response.json();
+  if (!Array.isArray(data?.lots)) throw new Error('Purchase history service returned invalid lots');
+  return data.lots;
+}
+
+export async function addPortfolioPurchase(input: {
+  holdingId: string;
+  investedAmount: number;
+  executionPrice: number;
+  purchaseDate?: string | null;
+  notes?: string;
+}) {
+  const response = await fetch('/api/portfolio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'purchase', ...input }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || 'Unable to save purchase');
+  return {
+    lot: data.lot as PortfolioPurchaseLot,
+    holding: data.holding as StoredPortfolioHolding,
+  };
+}
+
 export async function fetchPortfolioHoldings(): Promise<StoredPortfolioHolding[]> {
   const response = await fetch('/api/portfolio', { cache: 'no-store' });
   if (!response.ok) throw new Error('Portfolio service unavailable');
