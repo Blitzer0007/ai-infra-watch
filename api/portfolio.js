@@ -69,7 +69,22 @@ export default async function handler(req, res) {
         return res.status(200).json({ lots: rows.map(normalizeLot), persistent: true, source: 'supabase' });
       }
       const rows = await supabase('portfolio_holdings?select=*&order=symbol.asc', { method: 'GET' });
-      return res.status(200).json({ holdings: rows.map(normalize), persistent: true, source: 'supabase' });
+      const holdings = rows.map(normalize);
+      if (String(req.query?.includeLots || '') === 'true') {
+        const lots = await supabase('portfolio_purchase_lots?select=*&order=purchase_date.asc,created_at.asc', { method: 'GET' });
+        const byHolding = new Map();
+        for (const lot of lots) {
+          const list = byHolding.get(lot.holding_id) || [];
+          list.push(normalizeLot(lot));
+          byHolding.set(lot.holding_id, list);
+        }
+        return res.status(200).json({
+          holdings: holdings.map(h => ({ ...h, purchaseLots: byHolding.get(h.id) || [] })),
+          persistent: true,
+          source: 'supabase',
+        });
+      }
+      return res.status(200).json({ holdings, persistent: true, source: 'supabase' });
     }
 
     if (req.method === 'POST') {
