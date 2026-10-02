@@ -54,6 +54,7 @@ def _shape(result: Any) -> dict[str, Any]:
         "answer_source": result.answer_source,
         "jev": result.jev,
         "hallucination": result.hallucination,
+        "debate": result.debate,
         "error": result.error,
         "resolution": result.resolution,
         "discovered": result.discovered,
