@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.eval.synthetic import coverage, generate_synthetic_cases
 from app.mcp_client.client import ToolInfo
+from mcp_client.inprocess import InProcessMCPToolbox
 
 
 def tool(name, description="test tool", props=None, required=None):
@@ -32,3 +33,14 @@ def test_synthetic_cases_follow_available_families():
     assert "macro" in report["families"]
     assert "congress" in report["families"]
     assert next(c for c in cases if c.expected_family == "market").required_arguments == ("symbol",)
+
+
+def test_synthetic_cases_cover_full_inprocess_research_catalog():
+    toolbox = InProcessMCPToolbox(live=False)
+    cases = generate_synthetic_cases(toolbox.tools())
+    families = {case.expected_family for case in cases}
+    assert {
+        "market", "news", "issuer_primary", "regulatory_primary",
+        "analyst_consensus", "earnings", "event_study", "congress",
+        "macro", "portfolio", "forecast", "quality", "relationship",
+    }.issubset(families)
