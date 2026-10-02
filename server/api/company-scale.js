@@ -439,6 +439,37 @@ const EXECUTIVE_UI_PROFILES = [
   { id: 'satya-nadella', name: 'Satya Nadella', organizations: ['Microsoft'], x_username: null, linkedin_profile: 'https://www.linkedin.com/in/satyanadella', official_domains: ['microsoft.com'] },
 ];
 
+async function fetchGoogleNewsSearch(query, days = 7, limit = 8) {
+  const window = Number(days) <= 1 ? '1d' : '7d';
+  const url = 'https://news.google.com/rss/search?q=' + encodeURIComponent(query + ' when:' + window) + '&hl=en-US&gl=US&ceid=US:en';
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'ai-infra-watch/1.0', Accept: 'application/rss+xml, application/xml, text/xml' },
+    signal: AbortSignal.timeout(6500),
+  });
+  if (!response.ok) throw new Error('Google News RSS HTTP ' + response.status);
+  const xml = await response.text();
+  const decode = (value) => String(value || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+  const results = [];
+  for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+    const block = match[1];
+    const title = decode(block.match(/<title>([\s\S]*?)<\/title>/i)?.[1]);
+    const url = decode(block.match(/<link>([\s\S]*?)<\/link>/i)?.[1]);
+    const published_at = decode(block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1]) || null;
+    const sourceName = decode(block.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1]) || 'Google News';
+    if (!title || !url) continue;
+    results.push({ title, snippet: '', url, published_at, source: sourceName });
+    if (results.length >= limit) break;
+  }
+  return { provider: 'google-news-rss', results };
+}
+
 async function searchWebProvider(query, days = 7, limit = 8) {
   const brave = String(process.env.BRAVE_SEARCH_API_KEY || '').trim();
   if (brave) {
@@ -454,7 +485,7 @@ async function searchWebProvider(query, days = 7, limit = 8) {
     const payload = await response.json();
     return { provider: 'tavily-web', results: (payload?.results || []).slice(0, limit).map(row => ({ title: row.title || '', snippet: row.content || row.snippet || '', url: row.url || '', published_at: row.published_date || null, source: 'tavily-web' })) };
   }
-  throw new Error('No web search provider configured');
+  return fetchGoogleNewsSearch(query, days, limit);
 }
 
 async function handleExecutiveSignals(req, res) {
