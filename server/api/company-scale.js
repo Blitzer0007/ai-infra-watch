@@ -444,10 +444,6 @@ async function handleAnalyst(req, res) {
     strongSell: Number(recommendation.strongSell || 0),
   };
   const analystCount = Object.values(ratingCounts).reduce((sum, value) => sum + value, 0);
-  const targetMedian = normalizeAnalystValue(priceTarget.targetMedian);
-  const targetMean = normalizeAnalystValue(priceTarget.targetMean);
-  const targetLow = normalizeAnalystValue(priceTarget.targetLow);
-  const targetHigh = normalizeAnalystValue(priceTarget.targetHigh);
   const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
 
   const data = {
