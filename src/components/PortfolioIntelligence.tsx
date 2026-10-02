@@ -589,26 +589,104 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
+
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
       <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="Average cost" value={'
+      <Info label="Average cost" value={'$' + h.averageCost.toFixed(2)} />
+      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
+      <Info
+        label="Current vs average"
+        value={canCalculateExitScenarios && h.livePrice != null
+          ? ((h.livePrice / h.averageCost - 1) * 100 >= 0 ? '+' : '') + ((h.livePrice / h.averageCost - 1) * 100).toFixed(2) + '%'
+          : '—'}
+      />
+    </div>
+
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+      <div className="text-[10px] text-white/35 mt-1">
+        Estimated proceeds and P&amp;L if the full position were sold at each reference price. Historical levels use the available market history.
+      </div>
+
+      {historicalPrice.loading && (
+        <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>
+      )}
+      {historicalPrice.error && (
+        <div className="text-[10px] font-mono text-amber-300/70 mt-3">
+          Historical comparison unavailable: {historicalPrice.error}
+        </div>
+      )}
+
+      {scenarios.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-[10px]">
+            <thead className="text-white/25 uppercase font-mono">
+              <tr>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Sale value</th>
+                <th className="py-2 pr-3">Profit / loss</th>
+                <th className="py-2">Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => {
+                const saleValue = scenario.price * h.quantity;
+                const profit = saleValue - h.investedValue;
+                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
+
+                return (
+                  <tr key={scenario.label} className="border-t border-white/5">
+                    <td className="py-2 pr-3 text-white/60">
+                      {scenario.label}
+                      {scenario.date ? (
+                        <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{'$' + scenario.price.toFixed(2)}</td>
+                    <td className="py-2 pr-3 font-mono">{'$' + saleValue.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                      {(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}
+                    </td>
+                    <td className={'py-2 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                      {(returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+
     <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
-      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-mono uppercase text-white/35">Model state</div>
+        <StatePill state={h.state}/>
+      </div>
       <div className="text-sm mt-2">{h.rationale}</div>
     </div>
+
     <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>
         {h.averageInAlert ? 'Average-in review alert · triggered' : 'Average-in review · not triggered'}
       </div>
-      <div className="text-sm mt-2">{h.averageInAlert
-        ? 'Price is below your average cost and the configured group/peer evidence gate is currently satisfied.'
-        : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
-      <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : h.addTrigger}</div>
+      <div className="text-sm mt-2">
+        {h.averageInAlert
+          ? 'Price is below your average cost and the configured group/peer evidence gate is currently satisfied.'
+          : 'No average-in review is triggered for this holding under the current evidence gate.'}
+      </div>
+      <div className="text-[10px] text-white/40 mt-2">
+        {h.averageInAlert ? h.strategyContext : h.addTrigger}
+      </div>
     </div>
+
     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
       <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
       <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
     </div>
+
     <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
       <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
       <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
