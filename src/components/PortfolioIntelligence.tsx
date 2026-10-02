@@ -636,6 +636,19 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             <Info label="EPS estimate" value={eps?.average == null ? "—" : Number(eps.average).toFixed(2)} />
             <Info label="Revenue estimate" value={revenue?.average == null ? "—" : "$" + (Number(revenue.average) / 1e9).toFixed(1) + "B"} />
           </div>
+          <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Web analyst evidence</div>
+            <div className="text-[9px] text-white/30 mt-1">Independent web-search results are source links only; they are not converted into consensus numbers here.</div>
+            <div className="mt-2 space-y-1.5">
+              {(data.webEvidence?.results || []).slice(0, 4).map((item: any) => (
+                <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="block text-[9px] leading-4 text-cyan-300 hover:text-cyan-200">
+                  {item.title || item.url}
+                </a>
+              ))}
+              {!data.webEvidence?.results?.length && <span className="text-[8px] font-mono text-white/20">No web analyst results returned.</span>}
+            </div>
+            {data.webEvidence?.error && <div className="mt-2 text-[8px] font-mono text-amber-200/50">{data.webEvidence.error}</div>}
+          </div>
           <div className="mt-3 text-[8px] font-mono text-white/20">
             {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() : "Retrieved time unavailable"}
             {eps?.period ? " · EPS " + eps.period : ""}
