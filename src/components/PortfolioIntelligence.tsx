@@ -687,7 +687,9 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       detail: !canCalculateExitScenarios || h.livePrice == null
         ? 'Fresh quote required'
         : belowAverage
-          ? '
+          ? '$' + h.livePrice.toFixed(2) + ' vs $' + h.averageCost.toFixed(2)
+          : 'Current $' + h.livePrice.toFixed(2) + ' is above average $' + h.averageCost.toFixed(2),
+    },
     { label: 'Group score', passed: h.groupScore != null && h.groupScore >= addGroupThreshold, detail: h.groupScore == null ? 'No group score' : Math.round(h.groupScore) + '/100 · need ≥' + addGroupThreshold },
     { label: 'Group breadth', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No breadth' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
     { label: 'Group vs universe', passed: h.relativeToUniverse != null && h.relativeToUniverse >= 0, detail: h.relativeToUniverse == null ? 'No relative-strength reading' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts' },
