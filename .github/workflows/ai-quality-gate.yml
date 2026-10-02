@@ -14,6 +14,7 @@ on:
       - "src/components/AIQualityLab.tsx"
       - "src/utils/aiQualityApi.ts"
       - "api/ai-quality.js"
+      - "api/live-data.js"
       - "aitracker-upload/app/eval/**"
       - "aitracker-upload/tests/eval/**"
       - ".github/workflows/ai-quality-gate.yml"
