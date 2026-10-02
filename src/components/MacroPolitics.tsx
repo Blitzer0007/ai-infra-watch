@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-react';
 import { MacroRisk } from '../types';
-import { PORTFOLIO_POSITIONS } from '../utils/portfolioPositions';
+import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
+import { fetchPortfolioHoldings } from '../utils/portfolioApi';
 import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
 
@@ -32,6 +33,7 @@ function PortfolioScenarioSensitivity({
   livePrices = {},
   contracts = [],
   news = [],
+  positions = [],
 }: {
   taiwanProb: number;
   gridSeverity: number;
@@ -39,11 +41,12 @@ function PortfolioScenarioSensitivity({
   livePrices?: Record<string, { price: number; changePct: number }>;
   contracts?: any[];
   news?: any[];
+  positions?: PortfolioPosition[];
 }) {
-  const derivedExposure = derivePortfolioExposure(PORTFOLIO_POSITIONS.map(position => position.symbol), contracts, news);
-  const totalInvested = PORTFOLIO_POSITIONS.reduce((sum, position) => sum + position.investedValue, 0);
+  const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
+  const totalInvested = positions.reduce((sum, position) => sum + position.investedValue, 0);
   const portfolioRows = derivedExposure.map((exposure) => {
-    const position = PORTFOLIO_POSITIONS.find((item) => item.symbol === exposure.symbol);
+    const position = positions.find((item) => item.symbol === exposure.symbol);
     const live = livePrices[exposure.symbol];
     const currentValue = live?.price != null && position
       ? live.price * position.quantity
@@ -131,8 +134,8 @@ function ExposurePill({ level, basis }: { level: ExposureLevel; basis?: string }
   );
 }
 
-function PortfolioExposureMatrix({ contracts = [], news = [] }: { contracts?: any[]; news?: any[] }) {
-  const derivedExposure = derivePortfolioExposure(PORTFOLIO_POSITIONS.map(position => position.symbol), contracts, news);
+function PortfolioExposureMatrix({ contracts = [], news = [], positions = [] }: { contracts?: any[]; news?: any[]; positions?: PortfolioPosition[] }) {
+  const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
@@ -313,8 +316,31 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
+  const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
+  const [portfolioError, setPortfolioError] = useState('');
 
   const activeRisks = liveRisks || [];
+
+  useEffect(() => {
+    let cancelled = false;
+    setPortfolioLoading(true);
+    fetchPortfolioHoldings()
+      .then(rows => {
+        if (cancelled) return;
+        setPortfolioPositions(mapStoredPortfolioHoldings(rows));
+        setPortfolioError('');
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setPortfolioPositions([]);
+        setPortfolioError(error instanceof Error ? error.message : 'Portfolio holdings unavailable');
+      })
+      .finally(() => {
+        if (!cancelled) setPortfolioLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Sync sliders dynamically if live risks are updated
   useEffect(() => {
@@ -400,7 +426,22 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         </div>
       </div>
 
-      <PortfolioExposureMatrix contracts={contracts} news={news} />
+      {portfolioLoading && (
+        <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[.02] px-4 py-3 text-[9px] font-mono text-cyan-200/50">
+          Loading current portfolio holdings for macro exposure…
+        </div>
+      )}
+      {!portfolioLoading && portfolioError && (
+        <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-4 py-3 text-[9px] font-mono text-amber-200/60">
+          Portfolio impact unavailable: {portfolioError}
+        </div>
+      )}
+      {!portfolioLoading && !portfolioError && portfolioPositions.length === 0 && (
+        <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-4 py-3 text-[9px] font-mono text-amber-200/60">
+          No saved portfolio holdings were returned, so portfolio impact is not inferred.
+        </div>
+      )}
+      <PortfolioExposureMatrix contracts={contracts} news={news} positions={portfolioPositions} />
 
       <PortfolioScenarioSensitivity
         taiwanProb={taiwanProb}
@@ -409,6 +450,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         livePrices={livePrices}
         contracts={contracts}
         news={news}
+        positions={portfolioPositions}
       />
 
       <JevDecisionPanel
