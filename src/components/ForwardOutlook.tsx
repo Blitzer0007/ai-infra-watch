@@ -966,7 +966,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {!loading && error && <div className="text-xs font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{error}</div>}
 
         {!loading && !error && (
-          <>
+          <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
                 ['10th percentile', analysis.p10],
@@ -1121,7 +1121,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 
