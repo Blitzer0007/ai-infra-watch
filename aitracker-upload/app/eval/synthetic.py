@@ -24,7 +24,7 @@ class SyntheticCase:
 
 QUESTION_BY_FAMILY = {
     "web_search": "What current web evidence is available for AI infrastructure?",
-    "executive": "What are senior executives saying about AI infrastructure?"
+    "executive": "What are senior executives saying about AI infrastructure?",
     "market": "What is the current market state for NVDA?",
     "news": "What recent news is available for NVDA?",
     "issuer_primary": "What recent official issuer information is available for NVIDIA?",
@@ -47,7 +47,7 @@ def _family(tool_name: str) -> str:
         return "executive"
     if "search_web" in name or name.startswith("web."):
         return "web_search"
-    if name.startswith("news.")
+    if name.startswith("news."):
         return "news"
     if any(x in name for x in ("analyst", "price_target", "target_price", "consensus", "recommendation", "rating")):
         return "analyst_consensus"
