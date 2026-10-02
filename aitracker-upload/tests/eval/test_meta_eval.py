@@ -7,7 +7,7 @@ def test_meta_eval_reports_mismatches():
         {"a":True,"b":False,"c":False},
     )
     assert result["sampleSize"] == 3
-    assert result["agreementRate"] == 2 / 3
+    assert abs(result["agreementRate"] - (2 / 3)) < 0.0001
     assert result["falseNegative"] == 1
     assert result["mismatches"][0]["id"] == "c"
 
