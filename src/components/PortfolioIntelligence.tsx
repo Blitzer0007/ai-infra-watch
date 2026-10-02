@@ -493,6 +493,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       <div className="text-[10px] text-white/30 flex items-center gap-2"><Globe2 className="w-3 h-3"/> Position states are model outputs for review, not automatic trade instructions.</div>
     </div>
   );
+}
+
 function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void}) {
   return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
     <div className="flex justify-between gap-3"><div className="min-w-0">
