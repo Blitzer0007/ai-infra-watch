@@ -298,6 +298,119 @@
         "ORCL"
       ],
       "geo": "Enterprise IT + cloud"
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "group": "AI Compute",
+      "theme": "Accelerators / AI systems",
+      "peers": [
+        "AMD",
+        "QCOM",
+        "TSM"
+      ],
+      "geo": "China export + Taiwan"
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms",
+      "group": "AI Platform",
+      "theme": "AI monetization / capex",
+      "peers": [
+        "GOOGL",
+        "MSFT"
+      ],
+      "geo": "AI capex + regulation"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "group": "AI Platform",
+      "theme": "Azure / Copilot / capex",
+      "peers": [
+        "GOOGL",
+        "AMZN"
+      ],
+      "geo": "Cloud capex + rates"
+    },
+    {
+      "symbol": "NOW",
+      "name": "ServiceNow",
+      "group": "Enterprise Software",
+      "theme": "AI workflow software",
+      "peers": [
+        "CRM",
+        "TEAM"
+      ],
+      "geo": "Rates + enterprise spend"
+    },
+    {
+      "symbol": "PHVS",
+      "name": "Pharvaris",
+      "group": "Healthcare",
+      "theme": "Clinical catalyst",
+      "peers": [
+        "APLS",
+        "ARWR"
+      ],
+      "geo": "Clinical / regulatory"
+    },
+    {
+      "symbol": "DRAM",
+      "name": "Roundhill Memory ETF",
+      "group": "Memory",
+      "theme": "HBM / DRAM / NAND",
+      "peers": [
+        "MU",
+        "SNDK",
+        "000660.KS"
+      ],
+      "geo": "Korea + Taiwan"
+    },
+    {
+      "symbol": "SOXL",
+      "name": "Direxion Daily Semiconductor Bull 3X",
+      "group": "Semiconductors",
+      "theme": "3x semiconductor beta",
+      "peers": [
+        "SOXX",
+        "NVDA",
+        "AMD"
+      ],
+      "geo": "Broad semiconductor beta"
+    },
+    {
+      "symbol": "VIVO",
+      "name": "VivoPower",
+      "group": "AI Infrastructure",
+      "theme": "Power + data centers",
+      "peers": [
+        "IREN",
+        "CIFR"
+      ],
+      "geo": "Power / Nordic exposure"
+    },
+    {
+      "symbol": "DGXX",
+      "name": "Digi Power X",
+      "group": "AI Infrastructure",
+      "theme": "GPU hosting / power",
+      "peers": [
+        "IREN",
+        "CIFR"
+      ],
+      "geo": "Power + grid"
+    },
+    {
+      "symbol": "NBIS",
+      "name": "Nebius",
+      "group": "AI Infrastructure",
+      "theme": "AI cloud / GPU capacity",
+      "peers": [
+        "IREN",
+        "DGXX"
+      ],
+      "geo": "U.S. + Europe capacity"
     }
   ]
 }
