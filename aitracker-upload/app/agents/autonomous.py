@@ -261,124 +261,88 @@ Rules:
 
 
 def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[ToolCallRecord]) -> dict[str, Any] | None:
-    """Build a bounded evidence sequence for 'what changed / why / drivers' questions.
+    """Build a bounded evidence sequence for price-move/catalyst questions.
 
-    Prefer one batched quote call, then historical earnings-event reaction, then
-    a filing search. This avoids spending the six-step budget on repeated
-    per-symbol quote calls and gives the synthesizer evidence about both price
-    reaction and material disclosures.
+    These questions get a deterministic cross-source packet before synthesis:
+    quote -> recent news -> SEC/company filings -> earnings -> event study.
+    Each channel is attempted at most once and the gate later decides whether
+    the resulting evidence is sufficient.
     """
     lower = question.lower()
-    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed", "recent developments", "could affect", "affect", "stock price")
+    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts",
+             "changed recently", "what changed", "recent developments", "could affect",
+             "affect", "stock price", "large move", "price move", "price movement")
     if not any(term in lower for term in terms):
         return None
     symbols = [s.upper() for s in extract_symbols(question)]
     if not symbols:
         return None
 
-    def successful_tool(predicate):
+    def successful(predicate):
         return any(c.ok and predicate(c) for c in calls)
 
-    # Step 1: one quote batch for all explicitly named symbols.
-    batch = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_quotes")
-            and "symbols" in ((t.input_schema or {}).get("properties") or {})
-        ),
+    def tool_ending(name: str, required: str | None = None):
+        return next(
+            (t for t in tools
+             if t.qualified_name.lower().endswith(name)
+             and (required is None or required in ((t.input_schema or {}).get("properties") or {}))),
+            None,
+        )
+
+    # 1. Current market state.
+    quote_batch = tool_ending(".get_quotes", "symbols")
+    if quote_batch is not None and not successful(lambda c: c.tool.lower().endswith(".get_quotes")):
+        return {"action": "tool", "tool": quote_batch.qualified_name,
+                "arguments": {"symbols": symbols},
+                "reason": "driver question: establish the observed price move first"}
+
+    # 2. Recent news is a primary driver-discovery channel.
+    news = next(
+        (t for t in tools if t.qualified_name.lower().endswith(".search")
+         and t.qualified_name.lower().startswith("news.")
+         and "query" in ((t.input_schema or {}).get("properties") or {})),
         None,
     )
-    if batch is not None and not successful_tool(
-        lambda c: c.tool.lower().endswith(".get_quotes")
-        or c.tool.lower().endswith(".get_quote")
-    ):
-        return {
-            "action": "tool",
-            "tool": batch.qualified_name,
-            "arguments": {"symbols": symbols},
-            "reason": "driver question: batch current quotes before causal research",
-        }
+    if news is not None and not successful(lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")):
+        return {"action": "tool", "tool": news.qualified_name,
+                "arguments": {"query": " ".join(symbols), "days": 7},
+                "reason": "driver question: retrieve recent news for named symbols"}
 
-    # Step 2: use event-study evidence only when the user explicitly asks
-    # about earnings/reactions. On serverless deployments, running one event
-    # study per ticker can consume the whole step budget before filings/news
-    # are retrieved, which was a major source of slow or incomplete answers.
-    event_terms = ("earnings", "earning", "event study", "price reaction", "reaction", "reacted", "historical market data", "historical price data", "price history", "historical stock price")
-    needs_event_study = any(term in lower for term in event_terms)
-    if needs_event_study:
-        event_tools = [
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_event_study")
-            and "symbol" in ((t.input_schema or {}).get("properties") or {})
-        ]
-        completed_events = {
-            str((c.arguments or {}).get("symbol", "")).upper()
-            for c in calls
-            if c.ok and c.tool.lower().endswith(".get_event_study")
-        }
+    # 3. Primary SEC/company disclosure evidence.
+    catalysts = next(
+        (t for t in tools if t.qualified_name.lower().endswith(".get_catalysts")
+         and "symbols" in ((t.input_schema or {}).get("properties") or {})),
+        None,
+    )
+    if catalysts is not None and not successful(lambda c: c.tool.lower().endswith(".get_catalysts")):
+        return {"action": "tool", "tool": catalysts.qualified_name,
+                "arguments": {"symbols": symbols},
+                "reason": "driver question: retrieve company-specific SEC catalyst evidence"}
+
+    # 4. Earnings/results context even when the user did not explicitly say "earnings".
+    earnings = tool_ending(".get_earnings", "symbol")
+    completed_earnings = {str((c.arguments or {}).get("symbol", "")).upper()
+                          for c in calls if c.ok and c.tool.lower().endswith(".get_earnings")}
+    if earnings is not None:
         for symbol in symbols[:1]:
-            if symbol not in completed_events and event_tools:
-                return {
-                    "action": "tool",
-                    "tool": event_tools[0].qualified_name,
-                    "arguments": {"symbol": symbol},
-                    "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
-                }
+            if symbol not in completed_earnings:
+                return {"action": "tool", "tool": earnings.qualified_name,
+                        "arguments": {"symbol": symbol},
+                        "reason": f"driver question: check earnings/results context for {symbol}"}
 
-    # Step 3: retrieve company-specific SEC evidence in one batched call.
-    # The generic RAG corpus may contain sector-level documents that do not
-    # mention the requested tickers. get_catalysts uses primary EDGAR 8-K data
-    # and preserves accession URLs, material-event items, and contract evidence.
-    catalyst_tool = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_catalysts")
-            and "symbols" in ((t.input_schema or {}).get("properties") or {})
-        ),
-        None,
-    )
-    if catalyst_tool is not None and not successful_tool(
-        lambda c: c.tool.lower().endswith(".get_catalysts")
-    ):
-        return {
-            "action": "tool",
-            "tool": catalyst_tool.qualified_name,
-            "arguments": {"symbols": symbols},
-            "reason": "driver question: retrieve company-specific SEC catalyst evidence",
-        }
+    # 5. Historical event evidence, useful for distinguishing a current move from
+    # a recurring earnings/event reaction pattern.
+    event = tool_ending(".get_event_study", "symbol")
+    completed_events = {str((c.arguments or {}).get("symbol", "")).upper()
+                        for c in calls if c.ok and c.tool.lower().endswith(".get_event_study")}
+    if event is not None:
+        for symbol in symbols[:1]:
+            if symbol not in completed_events:
+                return {"action": "tool", "tool": event.qualified_name,
+                        "arguments": {"symbol": symbol},
+                        "reason": f"driver question: retrieve historical event-study evidence for {symbol}"}
 
-    # Step 4: retrieve recent market/company news for the explicitly named
-    # symbols. One keyword search keeps the bounded six-tool budget while
-    # adding the missing news/macroeconomic evidence layer.
-    news_search = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".search")
-            and t.qualified_name.lower().startswith("news.")
-            and "query" in ((t.input_schema or {}).get("properties") or {})
-        ),
-        None,
-    )
-    if news_search is not None and not successful_tool(
-        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
-    ):
-        return {
-            "action": "tool",
-            "tool": news_search.qualified_name,
-            "arguments": {"query": " ".join(symbols), "days": 7},
-            "reason": "driver question: retrieve recent news for named symbols",
-        }
-
-    # Once quotes, historical event studies, SEC catalysts, and news have all
-    # been collected, stop the bounded investigation.
-    if successful_tool(lambda c: c.tool.lower().endswith(".get_catalysts")) and successful_tool(
-        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
-    ):
-        return {"action": "final", "answer": ""}
-
-    return None
-
-
+    return {"action": "final", "answer": ""}
 
 def _portfolio_research_symbols(calls: list[ToolCallRecord]) -> list[str]:
     """Extract held ticker symbols from the live portfolio-context result."""
@@ -1132,7 +1096,7 @@ class AutonomousMCPAgent:
     def __init__(self, toolbox: MCPToolbox, client: LLMClient | None = None, max_steps: int | None = None, planner: Any | None = None, jev: JevClient | None = None) -> None:
         self.toolbox = toolbox
         self.client = client or LLMClient()
-        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))
+        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "6" if os.getenv("VERCEL") else "8"))
         self.planner = planner
         self.jev = jev or JevClient()
         self.last_jev: dict[str, Any] = {}
