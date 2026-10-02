@@ -548,7 +548,11 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
         "missing": missing,
         "usable_families": usable_families,
         "usable_family_count": len(usable_families),
-        "complete": not missing,
+        "requirements_met": not missing,
+        # "complete" means availability is sufficient for the research gate:
+        # all explicit requirements are met and at least two independent
+        # evidence families are usable.
+        "complete": not missing and len(usable_families) >= 2,
         "observed_families": observed_families,
         "status_counts": {
             status: sum(1 for item in matrix.values() if item["status"] == status)
@@ -624,7 +628,7 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         # better evidence but is not mandatory for every question.
         conflict_detected = bool(conflict_report.get("detected"))
         usable_family_count = int(availability.get("usable_family_count", 0) or 0)
-        explicit_requirements_met = availability["complete"]
+        explicit_requirements_met = bool(availability.get("requirements_met", not availability.get("missing")))
         jev_stop_ready = (
             choice == "stop"
             and isinstance(score, (int, float))
