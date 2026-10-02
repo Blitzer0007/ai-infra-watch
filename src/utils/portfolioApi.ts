@@ -7,6 +7,7 @@ export type StoredPortfolioHolding = {
   notes: string;
   createdAt?: string;
   updatedAt?: string;
+  purchaseLots?: PortfolioPurchaseLot[];
 };
 
 export type PortfolioPurchaseLot = {
@@ -51,7 +52,7 @@ export async function addPortfolioPurchase(input: {
 }
 
 export async function fetchPortfolioHoldings(): Promise<StoredPortfolioHolding[]> {
-  const response = await fetch('/api/portfolio', { cache: 'no-store' });
+  const response = await fetch('/api/portfolio?includeLots=true', { cache: 'no-store' });
   if (!response.ok) throw new Error('Portfolio service unavailable');
   const data = await response.json();
   if (!Array.isArray(data?.holdings)) throw new Error('Portfolio service returned invalid holdings');
