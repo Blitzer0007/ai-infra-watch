@@ -1,4 +1,4 @@
-import { history as routedHistory, providerSymbol } from './_market-data.js';
+import { history as routedHistory, providerSymbol } from '../../api/_market-data.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
   loadedAt: 0,

@@ -1,4 +1,4 @@
-import { history as routedHistory } from './_market-data.js';
+import { history as routedHistory } from '../../api/_market-data.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();

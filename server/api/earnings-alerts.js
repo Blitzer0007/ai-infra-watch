@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { history as loadMarketHistory, providerSymbol } from './_market-data.js';
+import { history as loadMarketHistory, providerSymbol } from '../../api/_market-data.js';
 
 const DEFAULT_LEAD_DAYS = 1;
 const DEFAULT_LOOKAHEAD_DAYS = 14;

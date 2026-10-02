@@ -3,7 +3,44 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "rewrites": [
+    {
+      "source": "/api/quote",
+      "destination": "/api/market/quote"
+    },
+    {
+      "source": "/api/company-scale",
+      "destination": "/api/market/company-scale"
+    },
+    {
+      "source": "/api/contract-detail",
+      "destination": "/api/market/contract-detail"
+    },
+    {
+      "source": "/api/earnings-alerts",
+      "destination": "/api/market/earnings-alerts"
+    },
+    {
+      "source": "/api/ai-quality",
+      "destination": "/api/quality/ai-quality"
+    },
+    {
+      "source": "/api/signal-scorecard",
+      "destination": "/api/quality/signal-scorecard"
+    },
+    {
+      "source": "/api/forecast-verification",
+      "destination": "/api/cron/forecast-verification"
+    },
+    {
+      "source": "/api/portfolio-digest",
+      "destination": "/api/cron/portfolio-digest"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ],
   "git": {
     "deploymentEnabled": false
   },
@@ -31,12 +68,6 @@
     "api/*.py": {
       "maxDuration": 60,
       "excludeFiles": "{aitracker-upload/app/eval/**,aitracker-upload/app/harness/**,aitracker-upload/app/universe/**,aitracker-upload/tests/**,aitracker-upload/data/filings/**}"
-    },
-    "api/earnings-alerts.js": {
-      "maxDuration": 30
-    },
-    "api/forecast-verification.js": {
-      "maxDuration": 60
     }
   }
 }
