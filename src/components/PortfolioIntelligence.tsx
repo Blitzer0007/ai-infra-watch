@@ -108,6 +108,79 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, [tab, q, group, selected]);
 
   useEffect(() => {
+    let cancelled = false;
+    setPortfolioLoading(true);
+    fetchPortfolioHoldings()
+      .then(rows => { if (!cancelled) { setHoldings(rows); setPortfolioError(''); } })
+      .catch(error => { if (!cancelled) setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable'); })
+      .finally(() => { if (!cancelled) setPortfolioLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    if (!selected) {
+      setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
+      return () => { cancelled = true; };
+    }
+
+    setHistoricalPrice({ loading: true, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
+    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=max', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Historical price data unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        const points = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }))
+          .sort((a: {date:string;price:number}, b: {date:string;price:number}) => a.date.localeCompare(b.date));
+        if (!points.length) throw new Error('No historical price points available');
+        const cutoff = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+        const recent = points.filter((point: {date:string;price:number}) => point.date >= cutoff);
+        const high52 = (recent.length ? recent : points).reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
+        const historicalHigh = points.reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
+        setHistoricalPrice({
+          loading: false,
+          high52w: high52.price,
+          high52wDate: high52.date,
+          historicalHigh: historicalHigh.price,
+          historicalHighDate: historicalHigh.date,
+          error: '',
+        });
+      })
+      .catch(error => {
+        if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
+      });
+    return () => { cancelled = true; };
+  }, [selected]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const symbols = [...new Set([...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
+    if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
+    setPortfolioHistory({ loading: true, histories: {}, error: '' });
+    Promise.allSettled(symbols.map(async symbol => {
+      const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(symbol) + '&range=1y', { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(body?.points)) throw new Error(symbol + ': historical data unavailable');
+      return { symbol, points: body.points.filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price))).map((point: any) => ({ date: point.date, price: Number(point.price) })).sort((a: PortfolioHistoryPoint, b: PortfolioHistoryPoint) => a.date.localeCompare(b.date)) };
+    })).then(results => {
+      if (cancelled) return;
+      const histories: Record<string, PortfolioHistoryPoint[]> = {}; const failures: string[] = [];
+      results.forEach(result => { if (result.status === 'fulfilled') histories[result.value.symbol] = result.value.points; else failures.push(String(result.reason?.message || result.reason || 'history unavailable')); });
+      setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
+    });
+    return () => { cancelled = true; };
+  }, [holdings.map(item => item.symbol).join(',')]);
+  const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
+  const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
+  const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
+  useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
+  const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
+
+  useEffect(() => {
     if (!holdings.length) return;
     if (!holdings.some(item => item.symbol === selected)) setSelected(holdings[0].symbol);
   }, [holdings, selected]);
@@ -232,78 +305,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     return () => { cancelled = true; };
   }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setPortfolioLoading(true);
-    fetchPortfolioHoldings()
-      .then(rows => { if (!cancelled) { setHoldings(rows); setPortfolioError(''); } })
-      .catch(error => { if (!cancelled) setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable'); })
-      .finally(() => { if (!cancelled) setPortfolioLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    if (!selected) {
-      setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
-      return () => { cancelled = true; };
-    }
-
-    setHistoricalPrice({ loading: true, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
-    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=max', { cache: 'no-store' })
-      .then(async response => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Historical price data unavailable');
-        return body;
-      })
-      .then(body => {
-        if (cancelled) return;
-        const points = body.points
-          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
-          .map((point: any) => ({ date: point.date, price: Number(point.price) }))
-          .sort((a: {date:string;price:number}, b: {date:string;price:number}) => a.date.localeCompare(b.date));
-        if (!points.length) throw new Error('No historical price points available');
-        const cutoff = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-        const recent = points.filter((point: {date:string;price:number}) => point.date >= cutoff);
-        const high52 = (recent.length ? recent : points).reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
-        const historicalHigh = points.reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
-        setHistoricalPrice({
-          loading: false,
-          high52w: high52.price,
-          high52wDate: high52.date,
-          historicalHigh: historicalHigh.price,
-          historicalHighDate: historicalHigh.date,
-          error: '',
-        });
-      })
-      .catch(error => {
-        if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
-      });
-    return () => { cancelled = true; };
-  }, [selected]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const symbols = [...new Set([...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
-    if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
-    setPortfolioHistory({ loading: true, histories: {}, error: '' });
-    Promise.allSettled(symbols.map(async symbol => {
-      const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(symbol) + '&range=1y', { cache: 'no-store' });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(body?.points)) throw new Error(symbol + ': historical data unavailable');
-      return { symbol, points: body.points.filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price))).map((point: any) => ({ date: point.date, price: Number(point.price) })).sort((a: PortfolioHistoryPoint, b: PortfolioHistoryPoint) => a.date.localeCompare(b.date)) };
-    })).then(results => {
-      if (cancelled) return;
-      const histories: Record<string, PortfolioHistoryPoint[]> = {}; const failures: string[] = [];
-      results.forEach(result => { if (result.status === 'fulfilled') histories[result.value.symbol] = result.value.points; else failures.push(String(result.reason?.message || result.reason || 'history unavailable')); });
-      setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
-    });
-    return () => { cancelled = true; };
-  }, [holdings.map(item => item.symbol).join(',')]);
-  const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
-  const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
-  const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
-  useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
-  const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
     (group === 'All' || h.group === group) &&
     (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())
