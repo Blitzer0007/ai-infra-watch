@@ -129,6 +129,22 @@ type ResearchResponse = {
   }>;
 };
 
+function evidenceStateLabel(result: ResearchResponse | null) {
+  const availability = result?.jev?.evidence_availability;
+  const usable = Array.isArray((availability as any)?.usable_families)
+    ? (availability as any).usable_families.length
+    : Object.values(availability?.channels || {}).filter(channel => channel?.status === 'AVAILABLE').length;
+  if (usable >= 2) return 'Multi-source';
+  if (usable === 1) return 'Single-source';
+  return 'Evidence gate: insufficient';
+}
+
+function evidenceStateClass(state: string) {
+  if (state === 'Multi-source') return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
+  if (state === 'Single-source') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
+  return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
+}
+
 function answerSourceLabel(source?: string) {
   switch (source) {
     case 'agent-llm': return 'Agent LLM synthesis';
@@ -516,6 +532,11 @@ export default function AutonomousResearch() {
                 {result.jev?.enabled && result.jev.choice && (
                   <span className="rounded border border-fuchsia-400/20 bg-fuchsia-400/5 px-1.5 py-0.5 text-fuchsia-300/80">
                     Jev route: {result.jev.choice} · {typeof result.jev.confidence === 'number' ? Math.round(result.jev.confidence * 100) + '%' : 'confidence n/a'}
+                  </span>
+                )}
+                {result.jev?.evidence_gate && (
+                  <span className={'rounded border px-1.5 py-0.5 ' + evidenceStateClass(evidenceStateLabel(result))}>
+                    Evidence state: {evidenceStateLabel(result)}
                   </span>
                 )}
                 {result.jev?.evidence_gate && (
