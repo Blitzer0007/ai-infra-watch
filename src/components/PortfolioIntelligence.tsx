@@ -685,7 +685,7 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
   </Panel>;
 }
 
-function GateCheck({label,passed,detail}:{label:string;passed:boolean;detail:string}) {
+function GateCheck({label,passed,detail}:{label:string;passed:boolean;detail:string;key?: string}) {
   return <div className="border border-white/5 rounded-xl p-3 bg-black/10">
     <div className="flex items-center justify-between gap-2">
       <span className="text-[10px] font-mono uppercase text-white/55">{label}</span>
