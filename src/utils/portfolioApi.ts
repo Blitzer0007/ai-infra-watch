@@ -7,6 +7,13 @@ export type StoredPortfolioHolding = {
   averageCost: number;
   purchaseDate: string | null;
   notes: string;
+  decisionThesis?: string;
+  lossLimitPct?: number | null;
+  exitRuleType?: string | null;
+  exitRuleValue?: number | null;
+  exitRuleText?: string;
+  practicalNotes?: string;
+  brokerAlertPrices?: number[];
   createdAt?: string;
   updatedAt?: string;
   purchaseLots?: PortfolioPurchaseLot[];
