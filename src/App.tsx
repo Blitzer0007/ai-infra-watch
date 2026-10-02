@@ -17,7 +17,7 @@ const VIEW_PATHS: Record<string, string> = {
   health: '/health', guide: '/guide', settings: '/settings'
 };
 function viewFromPath(pathname: string) {
-  const view = pathname.replace(/^\\/+|\\/+$/g, '').split('/')[0] || 'overview';
+  const view = pathname.replace(/^\/+|\/+$/g, '').split('/')[0] || 'overview';
   return VIEW_IDS.has(view) ? view : 'overview';
 }
 
