@@ -1058,6 +1058,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
               }
               </div>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
                 <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
@@ -1137,6 +1138,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
           </div>
         )}
+      </div>
 
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
         <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
