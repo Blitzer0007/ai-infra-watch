@@ -184,6 +184,8 @@ JEV_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
     "news": ("news.search",),
     "rotation": (".get_rotation",),
     "analyst_consensus": ("get_analyst_expectations", ".price_target", ".recommendation"),
+    "executive": ("get_executive_signals",),
+    "web_search": ("search_web",),
     "issuer_primary": ("get_issuer_official", "investor_relations", "company_official"),
     "portfolio": ("get_portfolio_context",),
     "forecast": ("get_forecast_context",),
@@ -200,6 +202,8 @@ JEV_ROUTE_CRITERIA = {
     "news": "Recent news or media reporting about a company or ticker",
     "rotation": "Relative rotation, peer basket, hardware/application or sector rotation",
     "analyst_consensus": "Analyst ratings, price targets, consensus estimates or estimate revisions",
+    "executive": "Public executive or founder statements from official X, LinkedIn, issuer websites or corroborating coverage",
+    "web_search": "Current web evidence requiring broader discovery beyond the configured structured data feeds",
     "issuer_primary": "Company or issuer official information, investor-relations material and official-domain announcements",
     "portfolio": "Stored portfolio holdings, current portfolio context or position state",
     "forecast": "Forecast snapshots, verification history, model validation or forecast accuracy",
@@ -706,6 +710,10 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
 def _evidence_family(tool_name: str) -> str:
     """Normalize MCP tools into provenance-aware research families."""
     name = tool_name.lower()
+    if "get_executive_signals" in name or "executive" in name:
+        return "executive"
+    if "search_web" in name or name.startswith("web."):
+        return "web_search"
     if name.startswith("news."):
         return "news"
     if any(token in name for token in ("analyst.", "analyst_", "price_target", "target_price", "consensus", "estimate_revision", "recommendation", "ratings")):
@@ -737,8 +745,6 @@ def _evidence_family(tool_name: str) -> str:
     if any(token in name for token in (".get_quote", ".get_quotes", ".get_snapshot")):
         return "market"
     return name.split(".", 1)[0] if "." in name else name
-
-
 def _question_evidence_priorities(question: str) -> tuple[str, ...]:
     """Return evidence channels in a deterministic complementary order.
 
@@ -786,28 +792,14 @@ def _channel_tool_usable(family: str, name: str) -> bool:
         return "get_executive_signals" in lower
     if family == "web_search":
         return "search_web" in lower or lower.startswith("web.")
-        if family == "news":
-        return any(
-            token in lower
-            for token in ("news.search", "news.company", "news.sector", "news.global", "news.geopolitical", "news.health")
-        )
+    if family == "news":
+        return any(token in lower for token in ("news.search", "news.company", "news.sector", "news.global", "news.geopolitical", "news.health"))
     if family == "issuer_primary":
-        return any(token in lower for token in (
-            "investor_relations", "investor-relations", "company.", "companies.",
-            "issuer.", "issuer_official", "press_release", "press-release", "newsroom", "official.",
-            "product_docs", "product-docs", "company_docs", "company-docs",
-        ))
+        return any(token in lower for token in ("investor_relations", "investor-relations", "company.", "companies.", "issuer.", "issuer_official", "press_release", "press-release", "newsroom", "official.", "product_docs", "product-docs", "company_docs", "company-docs"))
     if family == "analyst_consensus":
-        return any(token in lower for token in (
-            "analyst.", "analyst_", "price_target", "target_price", "consensus",
-            "estimate_revision", "recommendation", "ratings",
-        ))
+        return any(token in lower for token in ("analyst.", "analyst_", "price_target", "target_price", "consensus", "estimate_revision", "recommendation", "ratings"))
     if family == "regulatory_primary":
-        return any(token in lower for token in (
-            "filings.get_catalysts", "filings.search_filings", "filings.get_filings",
-            "filings.get_contracts", "filings.get_milestones", "filings.get_documents",
-            "sec.", "edgar",
-        ))
+        return any(token in lower for token in ("filings.get_catalysts", "filings.search_filings", "filings.get_filings", "filings.get_contracts", "filings.get_milestones", "filings.get_documents", "sec.", "edgar"))
     if family == "event_study":
         return "get_event_study" in lower
     if family == "earnings":
@@ -826,11 +818,7 @@ def _channel_tool_usable(family: str, name: str) -> bool:
         return "quality" in lower or "red_team" in lower or "red-team" in lower
     if family == "relationship":
         return "relationship" in lower or "rotation" in lower
-    # Unknown tools are not evidence channels; only recognized evidence
-    # families may be selected as complementary research sources.
     return False
-
-
 def _next_evidence_plan(
     question: str,
     tools: list[ToolInfo],

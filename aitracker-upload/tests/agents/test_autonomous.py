@@ -777,3 +777,17 @@ def test_question_evidence_priorities_include_web_and_executive():
     priorities = _question_evidence_priorities("What is Elon Musk saying about AI infrastructure and the latest web evidence?")
     assert "executive" in priorities
     assert "web_search" in priorities
+
+
+def test_web_and_executive_tool_families():
+    from app.agents.autonomous import _evidence_family, _channel_tool_usable, _tool_for_jev_route
+    from app.mcp_client.client import ToolInfo
+
+    web = ToolInfo(server="stocks", name="search_web", description="web search", input_schema={"type":"object"})
+    executive = ToolInfo(server="stocks", name="get_executive_signals", description="executive signals", input_schema={"type":"object"})
+    assert _evidence_family("stocks.search_web") == "web_search"
+    assert _evidence_family("stocks.get_executive_signals") == "executive"
+    assert _channel_tool_usable("web_search", web.qualified_name)
+    assert _channel_tool_usable("executive", executive.qualified_name)
+    assert _tool_for_jev_route("web_search", [web]).qualified_name == "stocks.search_web"
+    assert _tool_for_jev_route("executive", [executive]).qualified_name == "stocks.get_executive_signals"
