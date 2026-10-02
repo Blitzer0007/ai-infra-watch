@@ -36,7 +36,7 @@ def _storage_state_path() -> str | None:
 
 @pytest.fixture(scope="session")
 def base_url() -> str:
-    return os.getenv("QA_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+    return (os.getenv("QA_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
 @pytest.fixture(scope="session")
 def storage_state() -> Generator[str | None, None, None]:

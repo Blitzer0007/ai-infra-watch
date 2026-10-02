@@ -19,7 +19,7 @@ def _headers() -> dict[str, str]:
 @pytest.fixture
 def client():
     with httpx.Client(
-        base_url=os.getenv("QA_BASE_URL", "https://ai-infra-watch-theta.vercel.app").rstrip("/"),
+        base_url=(os.getenv("QA_BASE_URL") or "https://ai-infra-watch-theta.vercel.app").rstrip("/"),
         headers=_headers(), follow_redirects=True, timeout=30.0
     ) as value:
         yield value
