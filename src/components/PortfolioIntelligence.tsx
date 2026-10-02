@@ -39,38 +39,7 @@ type Props = {
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function calculatePortfolioStress(
-  analyses: PositionAnalysis[],
-  macroRisks: any[],
-) {
-  const moves = analyses
-    .filter(item => item.livePrice != null && !item.liveStale)
-    .map(item => item.dailyChangePct)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  const breadth = moves.length ? moves.filter(value => value >= 0).length / moves.length : null;
-  const avgMove = moves.length ? moves.reduce((sum, value) => sum + value, 0) / moves.length : null;
-  const breadthStress = breadth == null ? 0 : (1 - breadth) * 40;
-  const moveStress = avgMove == null ? 0 : clamp((-avgMove / 5) * 30, 0, 30);
-  const high = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
-  const medium = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
-  const macroLoad = clamp(high * 12 + medium * 6, 0, 30);
-  const score = Math.round(clamp(breadthStress + moveStress + macroLoad, 0, 100));
-  const label = score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained';
-  return {
-    score,
-    label,
-    breadth,
-    avgMove,
-    macroLoad,
-    freshCount: analyses.filter(item => item.livePrice != null && !item.liveStale).length,
-    staleCount: analyses.filter(item => item.livePrice != null && item.liveStale).length,
-  };
-}
-
+import { calculateStressScore } from '../utils/measurement';
 
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => {
@@ -191,7 +160,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const liveUnrealizedPct = liveCurrentTotal != null && investedTotal
     ? (liveUnrealized as number / investedTotal) * 100
     : null;
-  const stress = calculatePortfolioStress(analyses, macroRisks);
+  const stress = calculateStressScore({
+    dailyChanges: analyses
+      .filter(item => item.livePrice != null && !item.liveStale)
+      .map(item => item.dailyChangePct)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)),
+    highMacroCount: macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length,
+    mediumMacroCount: macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length,
+  });
+  const stressFreshCount = analyses.filter(item => item.livePrice != null && !item.liveStale).length;
+  const stressStaleCount = analyses.filter(item => item.livePrice != null && item.liveStale).length;
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
@@ -224,7 +202,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
               </div>
               <div className="text-[10px] text-white/35 mt-0.5">
-                Breadth + average daily move + macro risk load · {stress.freshCount}/{analyses.length} holdings with fresh quotes{stress.staleCount ? ' · ' + stress.staleCount + ' stale' : ''}
+                Breadth + average daily move + macro risk load · {stressFreshCount}/{analyses.length} holdings with fresh quotes{stressStaleCount ? ' · ' + stressStaleCount + ' stale' : ''}
               </div>
             </div>
           </div>
