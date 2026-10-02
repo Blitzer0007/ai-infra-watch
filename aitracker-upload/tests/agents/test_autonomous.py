@@ -893,6 +893,7 @@ def test_portfolio_research_runs_held_universe_through_market_sec_news_and_macro
         [_cfg("app"), _cfg("stocks"), _cfg("filings"), _cfg("news")],
         _factory({"app": app, "stocks": stocks, "filings": filings, "news": news}),
     )
+    tb.connect()
     try:
         agent = AutonomousMCPAgent(
             tb,
