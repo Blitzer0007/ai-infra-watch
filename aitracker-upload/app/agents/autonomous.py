@@ -1459,27 +1459,6 @@ class AutonomousMCPAgent:
                     else None
                 )
                 forced_plan = forced_portfolio if forced_portfolio is not None else forced_driver
-                # Record the Jev route even when the deterministic driver
-                # sequence bypasses the normal planner path. This keeps the
-                # route trace truthful for forced multi-source investigations.
-                if forced_driver is not None and self.jev.enabled and not self.last_jev:
-                    try:
-                        decision = _jev_route(question, tools, self.jev)
-                        self.last_jev = {
-                            "enabled": True,
-                            "choice": decision.choice,
-                            "confidence": decision.confidence,
-                            "probabilities": decision.probabilities or {},
-                            "model": decision.model,
-                            "latency_ms": round(decision.latency_ms, 1),
-                            "action": "forced_driver_plan",
-                        }
-                    except Exception as exc:
-                        self.last_jev = {
-                            "enabled": True,
-                            "action": "fallback",
-                            "error": f"{type(exc).__name__}: {exc}",
-                        }
                 plan = forced_plan if forced_plan is not None else self._plan(question, tools, history)
                 steps.append(
                     Step(
