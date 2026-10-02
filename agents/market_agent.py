@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from statistics import mean
 from typing import Any
 
@@ -19,12 +18,6 @@ GROUPS = {
     "Memory": ["DRAM", "MU", "SNDK", "000660.KS"],
     "Semiconductors": ["SOXL", "SOXX", "TSM", "INTC"],
 }
-
-
-def _load_portfolio_snapshot() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[1] / "data" / "portfolio_snapshot.json"
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
 
 
 def _unwrap_mcp_payload(result: Any) -> Any:
@@ -102,14 +95,9 @@ def market_agent(state: AgentState) -> dict[str, Any]:
     if mcp_prices:
         prices = {**prices, **mcp_prices}
 
-    # The broker snapshot is shared with the React dashboard through one JSON file.
-    # It is contextual evidence, not a live broker API position feed.
-    portfolio_snapshot = _load_portfolio_snapshot()
-    positions = {
-        item["symbol"]: item
-        for item in portfolio_snapshot.get("positions", [])
-        if item.get("symbol") in symbols
-    }
+    # Portfolio holdings are private Supabase data and are intentionally not
+    # loaded from the public repository by the legacy root agent.
+    positions = {}
 
     returns = [
         item["changePct"]
