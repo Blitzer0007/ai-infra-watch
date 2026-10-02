@@ -554,8 +554,14 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
         # evidence families are usable.
         "complete": not missing and len(usable_families) >= 2,
         "observed_families": observed_families,
+        # Counts are limited to required or actually observed families;
+        # the stable matrix may contain additional globally supported families
+        # with MISSING status that should not dominate the run summary.
         "status_counts": {
-            status: sum(1 for item in matrix.values() if item["status"] == status)
+            status: sum(
+                1 for family in set((*expected, *observed_families))
+                if matrix.get(family, {}).get("status") == status
+            )
             for status in ("AVAILABLE", "EMPTY", "FAILED", "MISSING")
         },
     }
