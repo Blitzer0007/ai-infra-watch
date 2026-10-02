@@ -24,7 +24,7 @@ def mock_local_apis(page):
         if '/api/live-data' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'stockPrices':{'NVDA':{'price':200,'changePct':1}},'contracts':[],'congressTrades':[],'macroRisks':[],'marketSentiment':'QA mocked'})); return
         if '/api/portfolio' in url:
-            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'symbol':'NVDA','quantity':1,'average_cost':150,'purchase_date':'2026-01-01'}]})); return
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]})); return
         if '/api/forecast-verification' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'forecasts':[],'analytics':{'sampleSize':0,'byTickerHorizon':[],'byScenario':[],'byModel':[],'byDirection':[],'longTerm':{'verifiedCount':0}}})); return
         if '/api/ai-quality' in url:
