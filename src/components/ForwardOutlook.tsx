@@ -437,8 +437,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/stock-history?symbol=' + encodeURIComponent(selectedStock) + '&range=5y');
-        if (!res.ok) throw new Error('Historical data request failed (HTTP ' + res.status + ')');
+        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=5y');
+        if (!res.ok) throw new Error('Historical market data request failed (HTTP ' + res.status + ')');
         const data = await res.json();
         if (!cancelled) setHistory(Array.isArray(data.points) ? data.points : []);
       } catch (err: any) {
@@ -663,7 +663,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     const tickers = ['NVDA','MSFT','MU','AVGO','AMD','TSM','META','NBIS'];
     try {
       const histories = await Promise.all(tickers.map(async ticker => {
-        const response = await fetch('/api/stock-history?symbol=' + encodeURIComponent(ticker) + '&range=5y');
+        const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(ticker) + '&range=5y');
         if (!response.ok) throw new Error(ticker + ' history failed (HTTP ' + response.status + ')');
         const body = await response.json();
         return { ticker, points: Array.isArray(body.points) ? body.points : [] };

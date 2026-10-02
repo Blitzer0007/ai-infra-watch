@@ -339,6 +339,28 @@ export default function AIQualityLab() {
     score: run.qualityScore ?? 0,
   })), [runs]);
 
+  const regressionSummary = useMemo(() => {
+    const current = runs[0];
+    const previous = runs[1];
+    if (!current || !previous) return null;
+    const checks = [
+      { label: 'Quality', current: current.qualityScore, previous: previous.qualityScore, limit: 3, mode: 'down' as const },
+      { label: 'Faithfulness', current: current.faithfulness, previous: previous.faithfulness, limit: 3, mode: 'down' as const },
+      { label: 'Relevance', current: current.relevance, previous: previous.relevance, limit: 5, mode: 'down' as const },
+      { label: 'Safety', current: current.safety, previous: previous.safety, limit: 2, mode: 'down' as const },
+      { label: 'Citation', current: current.citationCoverage, previous: previous.citationCoverage, limit: 5, mode: 'down' as const },
+      { label: 'Hallucination', current: current.hallucinationRate, previous: previous.hallucinationRate, limit: 3, mode: 'up' as const },
+      { label: 'Adversarial', current: current.adversarialFailureRate, previous: previous.adversarialFailureRate, limit: 3, mode: 'up' as const },
+    ];
+    const observed = checks
+      .filter(item => typeof item.current === 'number' && typeof item.previous === 'number')
+      .map(item => ({ ...item, delta: (item.current as number) - (item.previous as number) }));
+    const regressions = observed.filter(item => item.mode === 'down'
+      ? item.delta < -item.limit
+      : item.delta > item.limit);
+    return { observed, regressions };
+  }, [runs]);
+
   return (
     <div className="space-y-6">
       <div className="aiw-page-header border-b border-white/10 pb-4">
@@ -473,6 +495,41 @@ export default function AIQualityLab() {
           </div>
         )}
 
+        {regressionSummary && (
+          <div className="mt-4 rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Latest regression comparison</div>
+                <div className="mt-1 text-[10px] text-white/45">Latest persisted run vs the immediately previous run.</div>
+              </div>
+              <span className={
+                'rounded border px-2 py-1 text-[9px] font-mono font-black uppercase ' +
+                (regressionSummary.regressions.length === 0
+                  ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
+                  : 'border-rose-400/20 bg-rose-400/5 text-rose-300')
+              }>
+                {regressionSummary.regressions.length === 0
+                  ? 'No material regression'
+                  : `${regressionSummary.regressions.length} regression${regressionSummary.regressions.length === 1 ? '' : 's'}`}
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {regressionSummary.observed.map(item => (
+                <span
+                  key={item.label}
+                  className={
+                    'rounded border px-1.5 py-0.5 text-[8px] font-mono ' +
+                    (regressionSummary.regressions.includes(item)
+                      ? 'border-rose-400/20 bg-rose-400/5 text-rose-300'
+                      : 'border-white/10 text-white/40')
+                  }
+                >
+                  {item.label} {item.delta >= 0 ? '+' : ''}{item.delta.toFixed(1)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-[9px] font-mono">
             <thead className="text-white/30 uppercase">
