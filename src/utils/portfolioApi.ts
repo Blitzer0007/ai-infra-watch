@@ -1,3 +1,5 @@
+import { authFetch, authHeaders } from './apiAuth';
+
 export type StoredPortfolioHolding = {
   id: string;
   symbol: string;
@@ -24,7 +26,7 @@ export type PortfolioPurchaseLot = {
 };
 
 export async function fetchPortfolioPurchaseLots(holdingId: string): Promise<PortfolioPurchaseLot[]> {
-  const response = await fetch('/api/portfolio?holdingId=' + encodeURIComponent(holdingId), { cache: 'no-store' });
+  const response = await authFetch('/api/portfolio?holdingId=' + encodeURIComponent(holdingId), { cache: 'no-store' });
   if (!response.ok) throw new Error('Purchase history service unavailable');
   const data = await response.json();
   if (!Array.isArray(data?.lots)) throw new Error('Purchase history service returned invalid lots');
@@ -38,9 +40,9 @@ export async function addPortfolioPurchase(input: {
   purchaseDate?: string | null;
   notes?: string;
 }) {
-  const response = await fetch('/api/portfolio', {
+  const response = await authFetch('/api/portfolio', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ action: 'purchase', ...input }),
   });
   const data = await response.json();
@@ -52,7 +54,7 @@ export async function addPortfolioPurchase(input: {
 }
 
 export async function fetchPortfolioHoldings(): Promise<StoredPortfolioHolding[]> {
-  const response = await fetch('/api/portfolio?includeLots=true', { cache: 'no-store' });
+  const response = await authFetch('/api/portfolio?includeLots=true', { cache: 'no-store' });
   if (!response.ok) throw new Error('Portfolio service unavailable');
   const data = await response.json();
   if (!Array.isArray(data?.holdings)) throw new Error('Portfolio service returned invalid holdings');
@@ -66,9 +68,9 @@ export async function createPortfolioHolding(input: {
   purchaseDate?: string | null;
   notes?: string;
 }) {
-  const response = await fetch('/api/portfolio', {
+  const response = await authFetch('/api/portfolio', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(input),
   });
   const data = await response.json();
@@ -77,9 +79,9 @@ export async function createPortfolioHolding(input: {
 }
 
 export async function updatePortfolioHolding(input: StoredPortfolioHolding) {
-  const response = await fetch('/api/portfolio', {
+  const response = await authFetch('/api/portfolio', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(input),
   });
   const data = await response.json();
@@ -88,8 +90,9 @@ export async function updatePortfolioHolding(input: StoredPortfolioHolding) {
 }
 
 export async function deletePortfolioHolding(id: string) {
-  const response = await fetch('/api/portfolio?id=' + encodeURIComponent(id), {
+  const response = await authFetch('/api/portfolio?id=' + encodeURIComponent(id), {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
