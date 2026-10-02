@@ -71,14 +71,14 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_jev_client.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py
 
       - name: Run MCP contract tests
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
         run: |
-          python -m pytest -q             aitracker-upload/tests/mcp/test_stocks_contract.py             aitracker-upload/tests/mcp/test_filings_contract.py             aitracker-upload/tests/mcp/test_contracts.py             aitracker-upload/tests/mcp/test_event_study.py             aitracker-upload/tests/mcp/test_relationships.py
+          python -m pytest -q             aitracker-upload/tests/mcp/test_stocks_contract.py             aitracker-upload/tests/mcp/test_filings_contract.py             aitracker-upload/tests/mcp/test_contracts.py             aitracker-upload/tests/mcp/test_event_study.py             aitracker-upload/tests/mcp/test_relationships.py             aitracker-upload/tests/mcp/test_research_sources.py
 
       - name: Run API contract tests
         env:
