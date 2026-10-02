@@ -1090,24 +1090,23 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <Sparkles className="w-4 h-4 text-violet-300" />
                     <span className="text-[9px] font-mono uppercase tracking-widest text-violet-200/70">JEV evidence & context</span>
                   </div>
-                  <p className="text-[10px] text-white/45 max-w-3xl">
-                    JEV does not generate the numerical forecast. It evaluates current evidence around the historical result and flags support, conflict, or insufficient evidence.
-                  </p>
+                  <p className="text-[10px] text-white/45 max-w-3xl">JEV does not generate the numerical forecast. It evaluates current evidence around the historical result and flags support, conflict, or insufficient evidence.</p>
                 </div>
-                <button
-                  onClick={runJevEvidenceCheck}
-                  disabled={jevLoading}
-                  className="shrink-0 px-4 py-2.5 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase tracking-wider disabled:opacity-50"
-                >
-                  {jevLoading ? 'JEV CHECKING…' : 'Run JEV Evidence Check'}
-                </button>
+                <button onClick={runJevEvidenceCheck} disabled={jevLoading} className="shrink-0 px-4 py-2.5 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase tracking-wider disabled:opacity-50">{jevLoading ? 'JEV CHECKING…' : 'Run JEV Evidence Check'}</button>
               </div>
-
               {jevError && <div className="mt-3 text-[10px] font-mono text-amber-300 border border-amber-300/20 rounded-xl p-3">{jevError}</div>}
-
-              {!jevLoading && !jevError && !jevResult && (
-                <div className="mt-3 text-[10px] text-white/35">Run the check to have JEV assess the current evidence for {selectedStock} without changing the historical numbers above.</div>
-              )}
+              {jevResult && <div className="mt-4 space-y-3">
+                <div className="text-sm text-white/75 leading-relaxed">{jevResult.summary}</div>
+                <div className="flex flex-wrap gap-2">
+                  {jevResult.choice && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV route: {jevResult.choice}</span>}
+                  {jevResult.evidenceGate && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence gate: {jevResult.evidenceGate}</span>}
+                  {jevResult.rawScore != null && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV evidence quality: {jevResult.rawScore.toFixed(2)} / 3</span>}
+                  {jevResult.evidenceQuality != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence quality: {jevResult.evidenceQuality.toFixed(0)} / 100</span>}
+                  {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence.toFixed(2)} / 1</span>}
+                  {jevResult.answer_source && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Source: {jevResult.answer_source}</span>}
+                </div>
+              </div>}
+            </div>
 
               {jevResult && (
                 <div className="mt-4 space-y-3">
