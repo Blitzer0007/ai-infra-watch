@@ -229,6 +229,55 @@ function relatedSymbols(text) {
   return Array.from(symbols);
 }
 
+async function fetchWhiteHousePrimaryPolicy(days = 7) {
+  const cutoff = Date.now() - days * 86400000;
+  const queryUrls = [
+    'https://www.whitehouse.gov/news/?s=artificial+intelligence',
+    'https://www.whitehouse.gov/presidential-actions/?s=artificial+intelligence',
+    'https://www.whitehouse.gov/briefings-statements/?s=artificial+intelligence',
+    'https://www.whitehouse.gov/news/?s=semiconductor',
+  ];
+  const rows = [];
+  for (const url of queryUrls) {
+    try {
+      const response = await fetch(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' }, signal: AbortSignal.timeout(4500) });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const matches = [...html.matchAll(/<a[^>]+href=[\"'](https:\/\/www\.whitehouse\.gov\/[^\"']+)[\"'][^>]*>([\s\S]*?)<\/a>/gi)];
+      for (const match of matches) {
+        const href = String(match[1] || '');
+        const title = String(match[2] || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#8217;/g, "'").replace(/&#8220;/g, '“').replace(/&#8221;/g, '”').replace(/\s+/g, ' ').trim();
+        if (!title || title.length < 18 || title.length > 240) continue;
+        if (!/(artificial intelligence|\bAI\b|semiconductor|chip|GPU|data center|power|electricity|export|technology|infrastructure)/i.test(title)) continue;
+        rows.push({ title, url: href, source: 'whitehouse.gov', date: null, sourceType: 'primary' });
+      }
+    } catch {}
+  }
+  const unique = new Map();
+  rows.forEach(row => unique.set(row.url, row));
+  return Array.from(unique.values()).slice(0, 20);
+}
+
+async function fetchFederalRegisterPrimary(days = 7) {
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const url = 'https://www.federalregister.gov/api/v1/documents.json?per_page=20&order=newest&conditions%5Bterm%5D=artificial%20intelligence%20semiconductor%20data%20center%20export&conditions%5Bpublication_date%5D%5Bgte%5D=' + since;
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'ai-infra-watch/1.0' }, signal: AbortSignal.timeout(4500) });
+    if (!response.ok) throw new Error('Federal Register HTTP ' + response.status);
+    const payload = await response.json();
+    return (payload?.results || []).slice(0, 20).map(row => ({
+      title: row?.title || '',
+      url: row?.html_url || '',
+      source: 'federalregister.gov',
+      date: row?.publication_date || null,
+      sourceType: 'primary',
+      topic: 'Regulatory / government policy',
+      note: 'Federal Register primary-source result; inspect the document for the operative text.'
+    })).filter(row => row.title && row.url);
+  } catch {
+    return [];
+  }
+}
 async function fetchPolicyWebSearch(query, days = 3) {
   const brave = String(process.env.BRAVE_SEARCH_API_KEY || '').trim();
   if (brave) {
@@ -251,26 +300,46 @@ async function politicalSignals() {
   const rows = [];
   let provider = 'none';
   let upstreamError = null;
-  try {
-    const result = await fetchPolicyWebSearch(query, 3);
-    provider = result.provider;
-    for (const article of result.articles || []) {
-      const title = String(article?.title || '').trim();
-      const url = String(article?.url || '').trim();
-      if (!title || !url) continue;
-      let host = ''; try { host = new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch {}
-      const official = host === 'whitehouse.gov' || host.endsWith('.whitehouse.gov') || host.endsWith('.gov');
-      const body = title + ' ' + String(article?.description || article?.content || '');
-      rows.push({
-        id: 'political-web-' + Buffer.from(url).toString('base64url').slice(0, 32),
-        actor: detectPoliticalActor(body), title, source: host || provider, sourceType: official ? 'primary' : 'secondary',
-        topic: classifyPoliticalTopic(body),
-        eventType: /(executive order|presidential memorandum|fact sheet|directive|executive action|signed into law)/i.test(title) ? 'Policy / official action' : 'Political statement / coverage',
-        date: article?.published || article?.published_at || null, url, relatedSymbols: relatedSymbols(body),
-        note: official ? 'Government-domain search result; verify the underlying official document.' : 'Web search result; verify the underlying statement or official action before relying on wording.'
-      });
-    }
-  } catch (error) { upstreamError = String(error?.message || error); }
+
+  // Prefer primary government sources that do not require a third-party API key.
+  const [whiteHouseRows, federalRows] = await Promise.all([
+    fetchWhiteHousePrimaryPolicy(7),
+    fetchFederalRegisterPrimary(7),
+  ]);
+  rows.push(...whiteHouseRows.map(item => ({
+    ...item,
+    id: 'political-whitehouse-' + Buffer.from(item.url).toString('base64url').slice(0, 32),
+    actor: detectPoliticalActor(item.title),
+    topic: classifyPoliticalTopic(item.title),
+    eventType: /(executive order|presidential memorandum|fact sheet|directive|executive action|signed into law)/i.test(item.title) ? 'Policy / official action' : 'Political statement / coverage',
+    relatedSymbols: relatedSymbols(item.title),
+    note: 'Primary White House source; verify the underlying document before interpreting market impact.',
+  })));
+  rows.push(...federalRows.map(item => ({
+    ...item,
+    id: 'political-federal-register-' + Buffer.from(item.url).toString('base64url').slice(0, 32),
+    actor: 'U.S. government',
+    relatedSymbols: relatedSymbols(item.title),
+  })));
+  if (rows.length) provider = 'government-primary';
+
+  // Then use a general web-search provider when configured.
+  if (rows.length < 8) {
+    try {
+      const result = await fetchPolicyWebSearch(query, 3);
+      provider = provider === 'government-primary' ? provider + ' + ' + result.provider : result.provider;
+      for (const article of result.articles || []) {
+        const title = String(article?.title || '').trim();
+        const url = String(article?.url || '').trim();
+        if (!title || !url) continue;
+        let host = ''; try { host = new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch {}
+        const official = host === 'whitehouse.gov' || host.endsWith('.whitehouse.gov') || host.endsWith('.gov');
+        const body = title + ' ' + String(article?.description || article?.content || '');
+        rows.push({ id:'political-web-' + Buffer.from(url).toString('base64url').slice(0,32), actor:detectPoliticalActor(body), title, source:host || provider, sourceType:official?'primary':'secondary', topic:classifyPoliticalTopic(body), eventType:/(executive order|presidential memorandum|fact sheet|directive|executive action|signed into law)/i.test(title)?'Policy / official action':'Political statement / coverage', date:article?.published || article?.published_at || null, url, relatedSymbols:relatedSymbols(body), note:official?'Government-domain search result; verify the underlying official document.':'Web search result; verify the underlying statement or official action before relying on wording.' });
+      }
+    } catch (error) { upstreamError = String(error?.message || error); }
+  }
+
   if (!rows.length) {
     try {
       const fallback = await fetchGdeltJson(query, '72h', 'GDELT policy fallback');
@@ -281,13 +350,13 @@ async function politicalSignals() {
         if (!title || !url) continue;
         let host = ''; try { host = new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch {}
         const official = host === 'whitehouse.gov' || host.endsWith('.whitehouse.gov') || host.endsWith('.gov');
-        rows.push({ id: 'political-gdelt-' + Buffer.from(url).toString('base64url').slice(0,32), actor: detectPoliticalActor(title), title, source: host || 'GDELT', sourceType: official ? 'primary' : 'secondary', topic: classifyPoliticalTopic(title), eventType: 'Political statement / coverage', date: article?.seendate || null, url, relatedSymbols: relatedSymbols(title), note: official ? 'Government-domain discovery result.' : 'GDELT discovery result; verify the source.' });
+        rows.push({ id:'political-gdelt-' + Buffer.from(url).toString('base64url').slice(0,32), actor:detectPoliticalActor(title), title, source:host || 'GDELT', sourceType:official?'primary':'secondary', topic:classifyPoliticalTopic(title), eventType:'Political statement / coverage', date:article?.seendate || null, url, relatedSymbols:relatedSymbols(title), note:official?'Government-domain discovery result.':'GDELT discovery result; verify the source.' });
       }
     } catch (error) { upstreamError = upstreamError || String(error?.message || error); }
   }
   const unique = new Map();
-  rows.forEach(row => { const key = row.url || row.title.toLowerCase(); if (!unique.has(key)) unique.set(key, row); });
-  return { items: Array.from(unique.values()).sort((a,b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0,20), provider, upstreamError: upstreamError && unique.size ? 'Provider degraded: ' + upstreamError : upstreamError };
+  rows.forEach(row => { const key=row.url || row.title.toLowerCase(); if(!unique.has(key)) unique.set(key,row); });
+  return { items:Array.from(unique.values()).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,20), provider, upstreamError: upstreamError && unique.size ? 'Provider degraded: '+upstreamError : upstreamError };
 }
 async function fetchGdeltNews(timespan) {
   const q = '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR "Digi Power X" OR Meta OR TSMC) (AI OR GPU OR semiconductor OR "data center" OR contract OR export)';
