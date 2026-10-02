@@ -11,7 +11,9 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks, calculateStressScore } from '../utils/measurement';
+import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import SignalScorecardPanel from './SignalScorecardPanel';
+import { authFetch } from '../utils/apiAuth';
 type Price = {
   price: number;
   changePct: number;
@@ -55,6 +57,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
+  const [currency, setCurrency] = useState<'USD' | 'INR'>(() => localStorage.getItem('aiw_portfolio_currency') === 'INR' ? 'INR' : 'USD');
+  const [usdInr, setUsdInr] = useState<number | null>(null);
   const [historicalPrice, setHistoricalPrice] = useState<HistoricalPriceState>({
     loading: false,
     high52w: null,
@@ -63,6 +67,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     historicalHighDate: null,
     error: '',
   });
+
+  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
+  const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
 
   const changeTab = (nextTab: PortfolioTab) => {
     setTab(nextTab);
@@ -155,7 +162,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, [holdings.map(item => item.symbol).join(',')]);
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
-  const analyses = useMemo(() => buildPositionAnalyses(livePrices, intelligence, positions), [livePrices, intelligence, positions]);
+  const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
+  useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
     (group === 'All' || h.group === group) &&
@@ -181,19 +189,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const liveUnrealizedPct = liveCurrentTotal != null && investedTotal
     ? (liveUnrealized as number / investedTotal) * 100
     : null;
-  const stress = calculateStressScore({
-    dailyChanges: analyses
-      .filter(item => item.livePrice != null && !item.liveStale)
-      .map(item => item.dailyChangePct)
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)),
-    highMacroCount: macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length,
-    mediumMacroCount: macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length,
-  });
   const stressFreshCount = analyses.filter(item => item.livePrice != null && !item.liveStale).length;
   const stressStaleCount = analyses.filter(item => item.livePrice != null && item.liveStale).length;
   const portfolioMetricInputs = useMemo(() => analyses.map(item => ({ symbol: item.symbol, investedValue: item.investedValue, currentValue: item.currentValue, pnl: item.pnl, pnlPct: item.pnlPct, dailyChangePct: item.dailyChangePct, group: item.group })), [analyses]);
   const concentration = useMemo(() => calculatePortfolioConcentration(portfolioMetricInputs), [portfolioMetricInputs]);
   const weightedStress = useMemo(() => calculatePortfolioStressScore(portfolioMetricInputs, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length), [portfolioMetricInputs, macroRisks]);
+  const stress = weightedStress;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
   const portfolioWeights = useMemo(() => Object.fromEntries(concentration.weights.map(item => [item.symbol, item.weight])), [concentration.weights]);
   const stressTrend = useMemo(() => buildPortfolioDailySeries(Object.fromEntries(Object.entries(portfolioHistory.histories).filter(([symbol]) => !['SPY', 'QQQ', 'SOXX'].includes(symbol))) as Record<string, PortfolioHistoryPoint[]>, portfolioWeights, 30), [portfolioHistory.histories, portfolioWeights]);
@@ -320,7 +321,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+        <div className="flex items-center justify-end gap-2 mb-2"><span className="text-[10px] font-mono uppercase text-white/55">Display currency</span>{(['USD', 'INR'] as const).map(code => <button key={code} type="button" aria-pressed={currency === code} onClick={() => setCurrency(code)} className={"px-2 py-1 rounded border text-[10px] font-mono " + (currency === code ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-200" : "border-white/10 text-white/55")}>{code}</button>)}</div>
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Breadth</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.breadth == null ? '—' : Math.round(stress.breadth * 100) + '% positive'}</div>
@@ -371,9 +373,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <div className="mt-3 text-[8px] font-mono text-white/20">Weighted stress measures observed moves and exposure concentration, not a forecast. P&L attribution is descriptive. Benchmark comparisons are descriptive matched-window measurements.</div>
       </section>
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
-        <Metric label="Invest amount" value={'$' + investedTotal.toFixed(2)} suffix="position cost" tone="neutral" icon={<WalletCards/>}/>
-        <Metric label="Current value" value={liveCurrentTotal != null ? '$' + liveCurrentTotal.toFixed(2) : '—'} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' snapshot fallback'} tone="up" icon={<TrendingUp/>}/>
-        <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '') + '$' + liveUnrealized.toFixed(2) : '—'} suffix={(liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : '') + (stalePositions.length ? ' · snapshot fallback' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
+        <Metric label="Invest amount" value={formatPortfolioMoney(investedTotal)} suffix={currency === 'INR' ? 'home currency · USD basis' : 'position cost'} tone="neutral" icon={<WalletCards/>}/>
+        <Metric label="Current value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' fallback'} tone="up" icon={<TrendingUp/>}/>
+        <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(liveUnrealized)) : '—'} suffix={(liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : '') + (stalePositions.length ? ' · snapshot fallback' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
         <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
       </div>
@@ -421,7 +423,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             {PORTFOLIO_AS_OF} · retained only as migration context; persistent holdings above are the source of truth.
           </div>
 
-          <PortfolioSignalFusion
+          <SignalScorecardPanel />
+
+      <PortfolioSignalFusion
             prices={livePrices}
             contracts={contracts}
             congressTrades={congressTrades}
@@ -667,9 +671,9 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
   return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
     <div className="flex justify-between gap-3">
       <div className="min-w-0">
-        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/></div>
+        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/>{h.minorPosition && <span className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] font-mono text-white/55">MINOR · {((h.portfolioWeight || 0) * 100).toFixed(1)}%</span>}</div>
         <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
-        <div className="text-[10px] text-white/25 mt-1">Qty {h.quantity.toFixed(6)} · Avg {h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
+        <div className="text-[10px] text-white/45 mt-1">Qty {h.quantity.toFixed(6)} · Avg ${h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '−') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
       </div>
       <div className="text-right shrink-0">
         <div className="font-bold text-sm">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>

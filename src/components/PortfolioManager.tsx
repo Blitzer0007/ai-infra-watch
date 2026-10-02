@@ -130,10 +130,10 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
             <div className="text-[9px] text-white/25 mt-1">{h.purchaseDate?'First purchase '+h.purchaseDate:'Purchase date not set'}</div>
           </div>
           <div className="flex gap-1">
-            <button type="button" title="Add purchase" onClick={()=>startPurchase(h)} className="p-1.5 rounded border border-emerald-400/15 text-emerald-300/70 hover:text-emerald-300"><Plus className="w-3 h-3"/></button>
-            <button type="button" title="Purchase history" onClick={()=>showHistory(h)} className="p-1.5 rounded border border-white/10 text-white/45 hover:text-white"><ChevronDown className={'w-3 h-3 transition-transform '+(expandedId===h.id?'rotate-180':'')}/></button>
-            <button type="button" onClick={()=>edit(h)} className="p-1.5 rounded border border-white/10 text-white/45 hover:text-white"><Pencil className="w-3 h-3"/></button>
-            <button type="button" onClick={()=>remove(h)} disabled={busy} className="p-1.5 rounded border border-white/10 text-rose-300/60 hover:text-rose-300"><Trash2 className="w-3 h-3"/></button>
+            <button type="button" aria-label={"Add purchase to " + h.symbol} title="Add purchase" onClick={()=>startPurchase(h)} className="p-1.5 rounded border border-emerald-400/15 text-emerald-300/70 hover:text-emerald-300"><Plus className="w-3 h-3"/></button>
+            <button type="button" aria-label={"Purchase history for " + h.symbol} title="Purchase history" onClick={()=>showHistory(h)} className="p-1.5 rounded border border-white/10 text-white/45 hover:text-white"><ChevronDown className={'w-3 h-3 transition-transform '+(expandedId===h.id?'rotate-180':'')}/></button>
+            <button type="button" aria-label={"Edit " + h.symbol} onClick={()=>edit(h)} className="p-1.5 rounded border border-white/10 text-white/45 hover:text-white"><Pencil className="w-3 h-3"/></button>
+            <button type="button" aria-label={"Delete " + h.symbol} onClick={()=>remove(h)} disabled={busy} className="p-1.5 rounded border border-white/10 text-rose-300/60 hover:text-rose-300"><Trash2 className="w-3 h-3"/></button>
           </div>
         </div>
 
@@ -173,7 +173,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
     </div>
 
     {open && <div className="mt-4 rounded-xl border border-white/10 bg-[#0F1115] p-4">
-      <div className="flex items-center justify-between"><div className="text-xs font-bold">{editing?'Edit holding':'Add holding'}</div><button type="button" onClick={()=>setOpen(false)} className="text-white/35 hover:text-white"><X className="w-4 h-4"/></button></div>
+      <div className="flex items-center justify-between"><div className="text-xs font-bold">{editing?'Edit holding':'Add holding'}</div><button type="button" aria-label="Close holding editor" onClick={()=>setOpen(false)} className="text-white/45 hover:text-white"><X className="w-4 h-4"/></button></div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3">
         <Field testId="portfolio-field-ticker" label="Ticker" value={form.symbol} onChange={v=>setForm({...form,symbol:v})} placeholder="NVDA"/>
         <Field testId="portfolio-field-quantity" label="Quantity" value={form.quantity} onChange={v=>setForm({...form,quantity:v})} placeholder="10" type="number"/>

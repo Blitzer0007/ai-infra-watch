@@ -243,3 +243,17 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   }
 }
 
+
+
+/* Accessibility baseline: preserve the compact visual language without making
+   essential metadata depend on tiny type or low-contrast grey. */
+.text-\[8px\] { font-size: 10px !important; }
+.text-\[9px\] { font-size: 11px !important; }
+.text-white\/20 { color: rgba(255,255,255,.42) !important; }
+.text-white\/25 { color: rgba(255,255,255,.48) !important; }
+.text-white\/30 { color: rgba(255,255,255,.56) !important; }
+.text-white\/35 { color: rgba(255,255,255,.62) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

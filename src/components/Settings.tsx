@@ -59,6 +59,22 @@ export default function Settings() {
         </p>
       </div>
 
+      <section className="bg-slate-900/30 border border-cyan-400/15 p-5 rounded-2xl" aria-labelledby="digest-settings-heading">
+        <div className="flex items-center space-x-2 border-b border-slate-900 pb-3">
+          <Info className="w-5 h-5 text-cyan-300" aria-hidden="true" />
+          <h2 id="digest-settings-heading" className="text-sm font-black text-white">Daily portfolio digest</h2>
+        </div>
+        <p className="text-sm text-slate-400 leading-relaxed mt-3">
+          The daily digest is generated server-side from your private portfolio and can deliver through Telegram, email, or a generic webhook.
+        </p>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono text-slate-300">
+          <div className="rounded-lg border border-white/10 p-3"><strong>Telegram</strong><div className="text-slate-500 mt-1">TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID</div></div>
+          <div className="rounded-lg border border-white/10 p-3"><strong>Email</strong><div className="text-slate-500 mt-1">RESEND_API_KEY + PORTFOLIO_DIGEST_EMAIL</div></div>
+          <div className="rounded-lg border border-white/10 p-3"><strong>Webhook</strong><div className="text-slate-500 mt-1">PORTFOLIO_DIGEST_WEBHOOK_URL</div></div>
+        </div>
+        <div className="mt-3 text-[11px] text-slate-500">Configure these as Vercel environment secrets; never put delivery tokens in browser storage or source code.</div>
+      </section>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* API Credentials Card */}
         <div className="lg:col-span-2 bg-slate-900/30 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-6">
@@ -127,7 +143,10 @@ export default function Settings() {
               const name = STOCK_METADATA[sym].name;
               return (
                 <button
+                  type="button"
                   key={sym}
+                  aria-pressed={active}
+                  aria-label={(active ? "Remove " : "Add ") + sym + " from overview watchlist"}
                   onClick={() => handleToggleWatchlist(sym)}
                   className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition text-xs font-mono cursor-pointer ${
                     active

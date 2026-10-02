@@ -6,13 +6,7 @@ function loadConfiguredSymbols() {
     const watchlist = JSON.parse(
       readFileSync(join(process.cwd(), 'data', 'stock_watchlist.json'), 'utf8')
     ).watchlist || [];
-    const portfolio = JSON.parse(
-      readFileSync(join(process.cwd(), 'data', 'portfolio_snapshot.json'), 'utf8')
-    ).positions || [];
-    return [...new Set([
-      ...portfolio.map((item) => item.symbol),
-      ...watchlist.map((item) => item.symbol),
-    ].filter(Boolean))];
+    return [...new Set(watchlist.map((item) => item.symbol).filter(Boolean))];
   } catch {
     return [
       'DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS',
