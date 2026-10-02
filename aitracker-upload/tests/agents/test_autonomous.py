@@ -791,3 +791,24 @@ def test_web_and_executive_tool_families():
     assert _channel_tool_usable("executive", executive.qualified_name)
     assert _tool_for_jev_route("web_search", [web]).qualified_name == "stocks.search_web"
     assert _tool_for_jev_route("executive", [executive]).qualified_name == "stocks.get_executive_signals"
+
+
+def test_executive_route_extracts_named_executive():
+    from app.agents.autonomous import _next_evidence_plan
+    from app.mcp_client.client import ToolInfo
+    tool = ToolInfo(
+        server="stocks",
+        name="get_executive_signals",
+        description="executive signals",
+        input_schema={"type":"object","properties":{"executive":{"type":"string"},"days":{"type":"integer"}}},
+    )
+    plan = _next_evidence_plan("What is Elon Musk saying about AI infrastructure?", [tool], [])
+    assert plan is not None
+    assert plan["arguments"]["executive"] == "Elon Musk"
+
+
+def test_final_prompt_separates_executive_statement_from_impact():
+    from app.agents.autonomous import _final_prompt
+    prompt = _final_prompt("What is Arkady Volozh saying and how does it impact NBIS?", [])
+    assert "third-party reporting" in prompt
+    assert "inference/hypothesis" in prompt

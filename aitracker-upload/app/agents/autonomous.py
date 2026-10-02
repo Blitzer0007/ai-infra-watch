@@ -875,6 +875,22 @@ def _next_evidence_plan(
             args["symbol"] = symbols[0]
         if "query" in props:
             args["query"] = question
+        if family == "executive":
+            executive_names = {
+                "musk": "Elon Musk",
+                "elon musk": "Elon Musk",
+                "volozh": "Arkady Volozh",
+                "arkady volozh": "Arkady Volozh",
+                "lisa su": "Lisa Su",
+                "satya nadella": "Satya Nadella",
+                "zuckerberg": "Mark Zuckerberg",
+                "jensen huang": "Jensen Huang",
+            }
+            for token, executive_name in executive_names.items():
+                if token in lower:
+                    if "executive" in props:
+                        args["executive"] = executive_name
+                    break
         if "days" in props:
             args["days"] = 7
         if "limit" in props and "limit" in required:
@@ -956,6 +972,14 @@ Requirements:
   when explaining possible catalysts.
 - For each named ticker, identify what is directly observed and label any driver
   not directly supported by retrieved evidence as a hypothesis.
+- For executive/social evidence, distinguish the executive's own statement from
+  third-party reporting. Treat the statement as evidence about what was said,
+  not proof that the implied market impact occurred.
+- When explaining "how it impacts us", separate (1) the observed statement,
+  (2) corroborating company/SEC/market evidence, and (3) the application's
+  inferred exposure or mechanism. Label item (3) as inference/hypothesis.
+- Do not turn an executive statement, analyst target, or web headline into a
+  guaranteed price or return prediction.
 - Return only the final user-facing answer. Do not restate these instructions,
   the question, or the full retrieved-evidence payload.
 - Keep the answer concise but complete, with a clear Facts section followed by
@@ -1000,6 +1024,22 @@ class AutonomousMCPAgent:
                         arguments["symbols"] = symbols
                     elif "symbol" in properties and symbols:
                         arguments["symbol"] = symbols[0]
+                    elif "executive" in properties:
+                        lower_question = question.lower()
+                        executive_names = {
+                            "musk": "Elon Musk",
+                            "elon musk": "Elon Musk",
+                            "volozh": "Arkady Volozh",
+                            "arkady volozh": "Arkady Volozh",
+                            "lisa su": "Lisa Su",
+                            "satya nadella": "Satya Nadella",
+                            "zuckerberg": "Mark Zuckerberg",
+                            "jensen huang": "Jensen Huang",
+                        }
+                        for token, executive_name in executive_names.items():
+                            if token in lower_question:
+                                arguments["executive"] = executive_name
+                                break
                     self.last_jev["action"] = "direct_tool"
                     self.last_jev["tool"] = route_tool.qualified_name
                     return {
