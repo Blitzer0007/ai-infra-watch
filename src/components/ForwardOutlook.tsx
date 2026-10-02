@@ -1004,7 +1004,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision context</span></div>
                 {portfolioContext.hasHolding && <button onClick={() => setDecisionEditing(value => !value)} className="text-[8px] font-mono uppercase tracking-widest text-amber-200/70 hover:text-amber-100">{decisionEditing ? 'Close' : 'Edit rules'}</button>}
               </div>
-              {portfolioContext.hasHolding && decisionEditing ? (
+              {portfolioContext.hasHolding && decisionEditing &&
                 <div className="space-y-2">
                   <label className="block text-[8px] text-white/30 uppercase font-mono">Reason to own / thesis<textarea value={decisionDraft.thesis} onChange={e => setDecisionDraft(d => ({ ...d, thesis: e.target.value }))} rows={2} placeholder="Write the reason you own this holding." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1019,7 +1019,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <label className="block text-[8px] text-white/30 uppercase font-mono">Practical notes<textarea value={decisionDraft.practicalNotes} onChange={e => setDecisionDraft(d => ({ ...d, practicalNotes: e.target.value }))} rows={3} placeholder="Broker alerts, fractional-share limitations, review date, etc." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   <div className="flex items-center justify-between gap-2"><button disabled={decisionSaving} onClick={saveDecisionContext} className="rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[8px] font-mono uppercase tracking-widest text-amber-100 disabled:opacity-40">{decisionSaving ? 'Saving…' : 'Save rules'}</button>{decisionMessage && <span className="text-[8px] font-mono text-white/45">{decisionMessage}</span>}</div>
                 </div>
-              ) : (
+              }
+              {(!portfolioContext.hasHolding || !decisionEditing) &&
                 <div>
                   <div className="text-[8px] text-white/25 uppercase font-mono">Recorded thesis</div>
                   <div className="text-[10px] text-white/65 mt-1 leading-relaxed">{portfolioContext.holding?.decisionThesis || portfolioContext.thesis || 'No thesis recorded. Forecast does not invent a reason to own the stock.'}</div>
@@ -1030,7 +1031,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   {portfolioContext.holding?.brokerAlertPrices?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker alerts: {portfolioContext.holding.brokerAlertPrices.map(price => formatPrice(price)).join(', ')}</div> : null}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
-              )}
+              }
               </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
