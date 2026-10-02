@@ -210,10 +210,8 @@ export function buildPositionAnalyses(
       strategyContext: recoveryAlert
         ? 'The holding is declining today and remains below cost, while group breadth, relative strength and peer-relative evidence remain supportive. This is a recovery-watch alert for review, not an automatic buy instruction.'
         : averageInAlert
-        ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
-
-        ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
-        : state === 'RISK REVIEW'
+          ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
+          : state === 'RISK REVIEW'
           ? 'The position is under pressure while supporting group evidence is weak or deteriorating. Review exposure and the original thesis before adding.'
           : state === 'ADD REVIEW'
             ? 'Current group breadth/relative strength and peer-relative evidence meet the configured review thresholds. This is a review signal, not an automatic buy instruction.'
