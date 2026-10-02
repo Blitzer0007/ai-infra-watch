@@ -10,7 +10,7 @@ export type AIQualityRun = {
   safety: number | null;
   hallucinationRate: number | null;
   citationCoverage: number | null;
-  adversarialSuccessRate: number | null;
+  adversarialFailureRate: number | null;
   caseCount: number;
   failures: number;
   summary: string;
