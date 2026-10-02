@@ -555,6 +555,7 @@ async function handleMilestones(req, res) {
         id: 'sec-milestone-' + accession,
         stockSymbol: symbol,
         date: filedDate,
+        acceptedDateTime: recent.acceptanceDateTime?.[i] || null,
         title: eventTitle,
         category: categoryFor(selectedItems, eventTitle),
         items: selectedItems,
