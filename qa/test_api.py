@@ -58,6 +58,8 @@ def test_history_api_rejects_unsupported_range(client):
     response = client.get("/api/company-scale", params={"action":"history","symbol":"NVDA","range":"7y"})
     assert response.status_code == 400
 
+@pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("QA_HEADERS_JSON"), reason="protected Vercel API requires QA_HEADERS_JSON")
 def test_portfolio_api_rejects_invalid_post(client):
     response = client.post("/api/portfolio", json={"symbol":"QA_TEST_INVALID","quantity":0,"averageCost":100})
     assert response.status_code == 400
@@ -82,6 +84,8 @@ def test_milestones_api_contract(client):
     assert body.get("symbol") == "NVDA"
     assert isinstance(body.get("events"), list)
 
+@pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("QA_HEADERS_JSON"), reason="protected Vercel API requires QA_HEADERS_JSON")
 def test_portfolio_api_contract(client):
     response = client.get("/api/portfolio")
     assert response.status_code == 200, response.text[:500]
