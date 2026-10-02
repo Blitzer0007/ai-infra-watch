@@ -10,6 +10,7 @@ import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import { FilterInput, FilterSelect } from './FilterControls';
+import { calculateStressScore } from '../utils/measurement';
 type Price = {
   price: number;
   changePct: number;
@@ -38,7 +39,6 @@ type Props = {
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
-import { calculateStressScore } from '../utils/measurement';
 
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => {
