@@ -1,0 +1,9 @@
+{
+  "qualityScore": 100,
+  "faithfulness": 100,
+  "relevance": 100,
+  "safety": 100,
+  "citationCoverage": 100,
+  "hallucinationRate": 0,
+  "adversarialFailureRate": 0
+}

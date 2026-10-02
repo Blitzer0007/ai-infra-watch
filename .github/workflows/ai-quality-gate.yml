@@ -8,6 +8,10 @@ on:
       - "src/components/AIQualityLab.tsx"
       - "src/utils/aiQualityApi.ts"
       - "api/ai-quality.js"
+      - "aitracker-upload/app/eval/**"
+      - "scripts/run_red_team.py"
+      - "scripts/ai_red_team_fixture.json"
+      - "scripts/ai_quality_baseline.json"
       - ".github/workflows/ai-quality-gate.yml"
   push:
     branches: [main]
