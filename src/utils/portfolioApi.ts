@@ -73,7 +73,7 @@ export async function createPortfolioHolding(input: {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data?.error || 'Unable to save holding');
-  return data.holding as StoredPortfolioHolding;
+  return { ...data.holding, purchaseLots: data.lot ? [data.lot as PortfolioPurchaseLot] : [] } as StoredPortfolioHolding;
 }
 
 export async function updatePortfolioHolding(input: StoredPortfolioHolding) {
