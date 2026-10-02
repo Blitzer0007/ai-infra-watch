@@ -29,9 +29,11 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
       if (editing) {
         const saved=await updatePortfolioHolding({...editing,symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim()});
         onChanged(holdings.map(x=>x.id===saved.id?saved:x));
+        window.dispatchEvent(new Event('portfolio-holdings-changed'));
       } else {
         const saved=await createPortfolioHolding({symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim()});
         onChanged([...holdings,saved].sort((a,b)=>a.symbol.localeCompare(b.symbol)));
+        window.dispatchEvent(new Event('portfolio-holdings-changed'));
       }
       setOpen(false);
     } catch(e) { setError(e instanceof Error?e.message:'Unable to save holding.'); }
@@ -41,7 +43,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
   const remove = async (h: StoredPortfolioHolding) => {
     if (!window.confirm('Remove '+h.symbol+' from your persistent portfolio?')) return;
     setBusy(true);
-    try { await deletePortfolioHolding(h.id); onChanged(holdings.filter(x=>x.id!==h.id)); }
+    try { await deletePortfolioHolding(h.id); onChanged(holdings.filter(x=>x.id!==h.id)); window.dispatchEvent(new Event('portfolio-holdings-changed')); }
     catch(e) { setError(e instanceof Error?e.message:'Unable to remove holding.'); }
     finally { setBusy(false); }
   };
