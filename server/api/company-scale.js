@@ -328,14 +328,58 @@ function normalizeAnalystValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+const ANALYST_SEARCH_NAMES = {
+  NVDA: 'NVIDIA',
+  MSFT: 'Microsoft',
+  NBIS: 'Nebius',
+  NOW: 'ServiceNow',
+  META: 'Meta Platforms',
+  AMD: 'AMD',
+  TSM: 'TSMC',
+  AVGO: 'Broadcom',
+  MU: 'Micron',
+  SOXL: 'SOXL',
+  RKLB: 'Rocket Lab',
+  VIVO: 'VivoPower',
+  PHVS: 'Pharvaris',
+  DGXX: 'Digi Power X',
+};
+
 async function fetchAnalystWebEvidence(symbol, days = 14, limit = 6) {
-  const query = '"' + symbol + '" (analyst OR "price target" OR consensus OR estimates OR rating) (AI OR semiconductor OR cloud OR technology)';
-  try {
-    const result = await searchWebProvider(query, days, limit);
-    return { provider: result.provider, results: result.results || [], error: null };
-  } catch (error) {
-    return { provider: 'unavailable', results: [], error: String(error?.message || error) };
+  const name = ANALYST_SEARCH_NAMES[symbol] || symbol;
+  const queries = [
+    '"' + name + '" "price target" analyst',
+    '"' + name + '" analyst estimates rating',
+    '"' + symbol + '" stock analyst consensus',
+  ];
+  const providers = [];
+  const results = [];
+  const errors = [];
+
+  for (const query of queries) {
+    try {
+      const result = await searchWebProvider(query, days, limit);
+      providers.push(result.provider);
+      results.push(...(result.results || []));
+      if (results.length >= limit) break;
+    } catch (error) {
+      errors.push(String(error?.message || error));
+    }
   }
+
+  const seen = new Set();
+  const deduped = results.filter(row => {
+    const key = String(row?.url || row?.title || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
+
+  return {
+    provider: [...new Set(providers)].join(' + ') || 'unavailable',
+    results: deduped,
+    error: deduped.length ? null : (errors[0] || null),
+  };
 }
 
 async function handleAnalyst(req, res) {
@@ -390,9 +434,12 @@ async function handleAnalyst(req, res) {
     });
   }
 
+  const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
+
   const data = {
     symbol,
     source: 'Finnhub analyst',
+    webEvidence,
     retrievedAt: new Date().toISOString(),
     recommendation: {
       period: recommendation.period || null,
@@ -440,7 +487,8 @@ const EXECUTIVE_UI_PROFILES = [
 ];
 
 async function fetchGoogleNewsSearch(query, days = 7, limit = 8) {
-  const window = Number(days) <= 1 ? '1d' : '7d';
+  const requestedDays = Math.min(Math.max(Number(days) || 7, 1), 30);
+  const window = requestedDays <= 1 ? '1d' : requestedDays <= 7 ? '7d' : '30d';
   const url = 'https://news.google.com/rss/search?q=' + encodeURIComponent(query + ' when:' + window) + '&hl=en-US&gl=US&ceid=US:en';
   const response = await fetch(url, {
     headers: { 'User-Agent': 'ai-infra-watch/1.0', Accept: 'application/rss+xml, application/xml, text/xml' },

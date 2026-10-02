@@ -63,14 +63,44 @@ function channelClass(status?: string) {
   return 'border-white/10 bg-white/[.02] text-white/40';
 }
 
+function inferEvidenceFamily(tool?: string) {
+  const name = String(tool || '').toLowerCase();
+  if (name.includes('portfolio') || name.includes('holdings')) return 'portfolio';
+  if (name.startsWith('stocks.') || name.includes('quote') || name.includes('market')) return 'market';
+  if (name.startsWith('filings.') || name.includes('sec') || name.includes('edgar')) return 'regulatory_primary';
+  if (name.startsWith('news.')) return 'news';
+  if (name.includes('macro') || name.includes('political') || name.includes('geopolitical') || name.includes('risk')) return 'macro';
+  return null;
+}
+
 export default function PortfolioResearchPanel() {
   const [question, setQuestion] = useState(PROMPTS[0]);
   const [result, setResult] = useState<ResearchResult | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const channels = result?.jev?.evidence_availability?.channels || {};
-  const required = result?.jev?.evidence_availability?.required || [];
-  const missing = result?.jev?.evidence_availability?.missing || [];
+  const observedChannels = useMemo(() => {
+    const inferred: Record<string, EvidenceChannel> = {};
+    for (const call of result?.calls || []) {
+      if (!call.ok) continue;
+      const family = inferEvidenceFamily(call.tool);
+      if (!family) continue;
+      const existing = inferred[family] || {};
+      inferred[family] = {
+        ...existing,
+        status: 'AVAILABLE',
+        observedCalls: Number(existing.observedCalls || 0) + 1,
+        successfulCalls: Number(existing.successfulCalls || 0) + 1,
+      };
+    }
+    return inferred;
+  }, [result]);
+
+  const channels = { ...observedChannels, ...(result?.jev?.evidence_availability?.channels || {}) };
+  const portfolioQuestion = /portfolio|my holdings|my positions|held stocks|holdings/i.test(result?.summary || '') || /portfolio|my holdings|my positions|held stocks|holdings/i.test(question);
+  const required = result?.jev?.evidence_availability?.required?.length
+    ? result.jev.evidence_availability.required
+    : portfolioQuestion ? FAMILIES.map(([key]) => key) : [];
+  const missing = result?.jev?.evidence_availability?.missing || required.filter(key => channels[key]?.status !== 'AVAILABLE');
   const gate = result?.jev?.evidence_gate;
 
   const toolFamilies = useMemo(() => {

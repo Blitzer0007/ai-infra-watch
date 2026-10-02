@@ -14,7 +14,7 @@ const historyPromises: Record<string, Promise<HistoryPoint[]>> = {};
 function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   const key = symbol.trim().toUpperCase();
   if (historyPromises[key]) return historyPromises[key];
-  historyPromises[key] = fetch('/api/stock-history?symbol=' + encodeURIComponent(key) + '&range=2y')
+  historyPromises[key] = fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(key) + '&range=2y')
     .then(res => {
       if (!res.ok) throw new Error('history unavailable');
       return res.json();
