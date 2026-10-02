@@ -58,6 +58,8 @@ export type BenchmarkComparison = {
   sampleDays: number;
 };
 
+export function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
+
 export function calculateStressScore(input: StressInput): StressResult {
   const moves = input.dailyChanges.filter((value) => Number.isFinite(value));
   const breadth = moves.length
