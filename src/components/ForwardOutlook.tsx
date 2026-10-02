@@ -382,7 +382,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
-  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;rows:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;coverage50:number;coverage80:number}>} | null>(null);
+  const [matrix, setMatrix] = useState<{tests:number;groups:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;rows:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;coverage50:number;coverage80:number}>} | null>(null);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
@@ -820,6 +820,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       };
       setMatrix({
         tests: rows.length,
+        groups: valid.length,
         direction: weighted('directionalAccuracy'),
         error: weighted('medianAbsoluteError'),
         coverage50: weighted('p25p75Coverage'),
@@ -1276,8 +1277,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         </div>
         {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
         {matrix && <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-2">
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Historical tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Ticker × horizon</div><div className="text-sm font-mono font-bold mt-1">{matrix.groups}/40</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Model direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction lift</div><div className="text-sm font-mono font-bold mt-1">{matrix.directionLift >= 0 ? '+' : ''}{(matrix.directionLift*100).toFixed(1)} pp</div></div>
@@ -1285,6 +1287,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{matrix.errorLift >= 0 ? '+' : ''}{matrix.errorLift.toFixed(1)} pp</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P25–P75</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P10–P90</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
           </div>
           <div className="overflow-x-auto max-h-72 rounded-xl border border-white/5">
             <table className="min-w-full text-left text-[9px] font-mono">
@@ -1306,7 +1309,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </tbody>
             </table>
           </div>
-          <div className="text-[8px] font-mono text-white/25">Aggregate metrics are weighted by the number of historical tests in each valid ticker/horizon group. No ticker or horizon is ranked.</div>
+          <div className="text-[8px] font-mono text-white/25">Aggregate metrics are weighted by the number of historical tests in each valid ticker/horizon group. No ticker or horizon is ranked. Coverage targets are 50% for P25–P75 and 80% for P10–P90.</div>
+          {matrix.groups < 40 && <div className="text-[8px] font-mono text-amber-200/70">Only {matrix.groups} of 40 ticker/horizon groups produced enough history for a backtest. Missing groups are not treated as zero-performance results.</div>}
         </div>}
       </div>
 
