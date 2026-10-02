@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateStressScore, median, sampleQuality, summarizeSample } from './measurement';
+import { calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration } from './measurement';
 
 describe('stress score', () => {
   it('returns zero stress for neutral inputs', () => {
@@ -43,5 +43,23 @@ describe('sample statistics', () => {
       median: 2.5,
       quality: 'limited',
     });
+  });
+});
+
+
+describe('calibration summary', () => {
+  it('keeps confidence bands separate from measured outcomes', () => {
+    const result = summarizeCalibration([
+      { confidence: 0.1, positive: false, excessReturnPct: -2 },
+      { confidence: 0.1, positive: true, excessReturnPct: 4 },
+      { confidence: 0.7, positive: true, excessReturnPct: 3 },
+      { confidence: 0.7, positive: true, excessReturnPct: 5 },
+    ]);
+    assert.equal(result[0].n, 2);
+    assert.equal(result[0].observedPositiveRate, 0.5);
+    assert.equal(result[0].meanExcessReturnPct, 1);
+    assert.equal(result[3].n, 2);
+    assert.equal(result[3].observedPositiveRate, 1);
+    assert.equal(result[3].meanExcessReturnPct, 4);
   });
 });
