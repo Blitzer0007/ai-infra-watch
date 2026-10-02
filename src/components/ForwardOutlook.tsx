@@ -766,7 +766,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const formatReturn = (value: number) => (value >= 0 ? '+' : '') + value.toFixed(1) + '%';
 
   return (
-    <div className="space-y-6" id="forward-outlook-view">
+    <div className="space-y-6" id="forward-outlook-view" data-testid="forward-outlook">
       <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 09 / Forward-looking analysis</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Forward Outlook</h1>

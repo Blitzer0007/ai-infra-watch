@@ -92,4 +92,4 @@ def test_ai_quality_lab_mounts(page):
     page.get_by_test_id("nav-quality").click()
     lab = page.get_by_test_id("ai-quality-lab")
     lab.wait_for(state="attached", timeout=30000)
-    assert "AI Quality" in lab.inner_text()
+    assert "AI QUALITY LAB" in lab.inner_text()
