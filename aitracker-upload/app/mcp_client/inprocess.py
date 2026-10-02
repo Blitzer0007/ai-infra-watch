@@ -37,6 +37,9 @@ class InProcessMCPToolbox:
         from mcp_servers.filings.contracts import ContractService
         from mcp_servers.news.service import NewsService
         from mcp_servers.news.providers import from_env as news_provider_from_env
+        from mcp_servers.stocks.research_sources import AnalystService, IssuerOfficialService
+        self._analysts = AnalystService()
+        self._issuer_official = IssuerOfficialService()
 
         self._stocks = StockService.from_env(mode)
         self._earnings = EarningsService.from_env(mode)
@@ -59,6 +62,8 @@ class InProcessMCPToolbox:
                 ("get_event_study", "Compute earnings-event T+1, T+5 and T+20 session returns.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("get_rotation", "Detect AI hardware versus application capital rotation over 1d, 5d and 20d windows.", {"type": "object", "properties": {}}),
                 ("get_relationships", "Resolve configured AI Infra Watch peer relationships.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_analyst_expectations", "Get analyst recommendation trends, price targets, EPS estimates and revenue estimates.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
+                ("get_issuer_official", "Get issuer profile and recent official-domain company evidence.", {"type": "object", "properties": {"symbol": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}}, "required": ["symbol"]}),
                 ("list_watchlist", "List tracked watchlist symbols.", {"type": "object", "properties": {}}),
                 ("health", "Stocks service health snapshot.", {"type": "object", "properties": {}}),
             ],
@@ -115,6 +120,13 @@ class InProcessMCPToolbox:
             return RotationAgent(service=self._candles).run().model_dump()
         if key == "stocks.get_event_study":
             return self._event_study.get_study(str(args.get("symbol", "")))
+        if key == "stocks.get_analyst_expectations":
+            return self._analysts.get(str(args.get("symbol", ""))).model_dump()
+        if key == "stocks.get_issuer_official":
+            return self._issuer_official.get(
+                str(args.get("symbol", "")),
+                days=int(args.get("days", 14)),
+            ).model_dump()
         if key == "stocks.get_relationships":
             from mcp_servers.stocks.relationships import from_env as relationships_from_env
             return relationships_from_env().get(str(args.get("symbol", "")).strip().upper())
