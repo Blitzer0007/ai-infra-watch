@@ -221,7 +221,7 @@ export default function AutonomousResearch() {
           <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">Autonomous AI Research</h1>
         </div>
         <p className="text-sm text-white/55 max-w-3xl">
-          Ask a research question and let the bounded MCP agent select market, filing, earnings,
+          Ask a research question and let the bounded MCP agent select market, company-official, analyst, filing, earnings,
           event-study, relationship, and rotation tools from the live catalog.
         </p>
       </div>
