@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Zap } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 import type { Contract, CongressTrade, MacroRisk } from '../types';
