@@ -66,7 +66,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
   if (!apiKey) {
     const res = await fetch(
       '/api/quote?symbol=' + encodeURIComponent(symbol) + (forceRefresh ? '&refresh=true' : ''),
-      { cache: 'no-store' }
+      { cache: forceRefresh ? 'no-store' : 'default' }
     );
     if (!res.ok) throw new Error('Server quote request failed: HTTP ' + res.status);
     const data = await res.json();
