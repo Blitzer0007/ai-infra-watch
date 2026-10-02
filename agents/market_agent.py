@@ -163,12 +163,6 @@ def market_agent(state: AgentState) -> dict[str, Any]:
                 "source": payload["source"],
                 "asOf": payload["timestamp"],
             },
-            {
-                "agent": "Market Agent",
-                "type": "portfolio_snapshot",
-                "source": "data/portfolio_snapshot.json",
-                "asOf": portfolio_snapshot.get("asOf"),
-            },
             *([mcp_source] if mcp_source else []),
         ],
         "errors": state.get("errors", []) + ([mcp_error] if mcp_error else []),
