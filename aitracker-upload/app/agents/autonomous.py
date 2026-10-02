@@ -25,6 +25,7 @@ from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
 from app.agents.evidence_quality import citation_coverage, deduplicate_evidence, detect_conflicts, enrich_calls
 from app.assertions.semantic import claim_grounding_score
+from app.agents.debate import run_debate
 
 
 @dataclass
@@ -36,6 +37,7 @@ class AutonomousResult:
     trajectory: AgentTrajectory
     jev: dict[str, Any] = field(default_factory=dict)
     hallucination: dict[str, Any] = field(default_factory=dict)
+    debate: dict[str, Any] = field(default_factory=dict)
     answer_source: str = "agent-llm"
     error: str = ""
     resolution: str = "completed"
@@ -857,7 +859,21 @@ def _deterministic_summary(question: str, calls: list[ToolCallRecord], evidence_
     return "\n".join(lines)
 
 
-def _final_prompt(question: str, calls: list[ToolCallRecord], evidence_status: str = "") -> str:
+def _needs_debate(question: str) -> bool:
+    lower = question.lower()
+    return any(term in lower for term in (
+        "bull case", "bear case", "bull vs bear", "bull and bear",
+        "bullish case", "bearish case", "debate the stock",
+        "debate this stock", "upside and downside case", "both sides",
+    ))
+
+
+def _final_prompt(
+    question: str,
+    calls: list[ToolCallRecord],
+    evidence_status: str = "",
+    debate: dict[str, Any] | None = None,
+) -> str:
     evidence = [{
         "tool": c.tool,
         "ok": c.ok,
@@ -891,6 +907,10 @@ Requirements:
   the question, or the full retrieved-evidence payload.
 - Keep the answer concise but complete, with a clear Facts section followed by
   Interpretation/Hypotheses.
+{("
+
+Debate panel:
+" + json.dumps(debate, ensure_ascii=False, indent=2, default=str)) if debate else ""}
 '''
 
 
@@ -976,6 +996,49 @@ class AutonomousMCPAgent:
 
     def _finalize(self, question: str, calls: list[ToolCallRecord], steps: list[Step], resolution: str = "completed") -> AutonomousResult:
         successful = [c for c in calls if c.ok]
+        debate_result: dict[str, Any] = {}
+        if (
+            _needs_debate(question)
+            and len(successful) >= 2
+            and resolution not in {"jev_evidence_insufficient", "error", "no_tool"}
+            and not self.client.stub
+        ):
+            try:
+                evidence = [
+                    {
+                        "tool": call.tool,
+                        "arguments": call.arguments,
+                        "output": _result_preview(call.output, 2200),
+                    }
+                    for call in successful
+                ]
+                debate = run_debate(question, evidence, self.client, judge_count=3)
+                debate_result = {
+                    "enabled": debate.enabled,
+                    "bull_case": debate.bull_case,
+                    "bear_case": debate.bear_case,
+                    "judges": [
+                        {
+                            "judge": item.judge,
+                            "verdict": item.verdict,
+                            "confidence": item.confidence,
+                            "rationale": item.rationale,
+                        }
+                        for item in debate.judges
+                    ],
+                    "majority": debate.majority,
+                    "agreement": debate.agreement,
+                    "disagreement": debate.disagreement,
+                    "note": debate.note,
+                }
+                steps.append(Step(node="debate", kind="node", note=f"panel={len(debate.judges)} majority={debate.majority}"))
+            except Exception as exc:
+                debate_result = {
+                    "enabled": True,
+                    "status": "unavailable",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+                steps.append(Step(node="debate", kind="node", note="debate unavailable; final synthesis continued"))
         if not successful:
             steps.append(Step(node="finalize", kind="node", note="no successful calls"))
             return AutonomousResult(
@@ -1004,6 +1067,7 @@ class AutonomousMCPAgent:
                 AgentTrajectory(steps=steps),
                 jev=self.last_jev,
                 hallucination=hallucination,
+                debate=debate_result,
                 answer_source="deterministic-evidence",
                 resolution=resolution,
             )
@@ -1018,7 +1082,12 @@ class AutonomousMCPAgent:
             ):
                 final_client = LLMClient(provider=final_provider, model=final_model)
             final_text = final_client.generate(
-                _final_prompt(question, successful, evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else "")),
+                _final_prompt(
+                    question,
+                    successful,
+                    evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else ""),
+                    debate=debate_result or None,
+                ),
                 max_tokens=settings.LLM_FINAL_MAX_TOKENS,
                 temperature=0.0,
                 timeout_sec=settings.LLM_FINAL_TIMEOUT_SEC,
@@ -1043,6 +1112,7 @@ class AutonomousMCPAgent:
                 AgentTrajectory(steps=steps),
                 jev=self.last_jev,
                 hallucination=hallucination,
+                debate=debate_result,
                 answer_source="deterministic-fallback",
                 error=error,
                 resolution=resolution,
@@ -1070,6 +1140,7 @@ class AutonomousMCPAgent:
             AgentTrajectory(steps=steps),
             jev=self.last_jev,
             hallucination=hallucination,
+            debate=debate_result,
             resolution=resolution,
         )
 
