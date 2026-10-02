@@ -116,11 +116,17 @@ class AnalystService:
         if not symbol:
             raise QuoteError("NO_DATA", "symbol is required")
 
-        recommendation_raw = self.provider._get("/stock/recommendation", {"symbol": symbol})
-        target_raw = self.provider._get("/stock/price-target", {"symbol": symbol})
-
-        eps_raw: Any
-        revenue_raw: Any
+        # Each analyst endpoint is best-effort because access can vary by plan
+        # and a single unavailable endpoint should not discard useful consensus
+        # or target evidence returned by another endpoint.
+        try:
+            recommendation_raw = self.provider._get("/stock/recommendation", {"symbol": symbol})
+        except QuoteError:
+            recommendation_raw = []
+        try:
+            target_raw = self.provider._get("/stock/price-target", {"symbol": symbol})
+        except QuoteError:
+            target_raw = {}
         try:
             eps_raw = self.provider._get("/stock/eps-estimate", {"symbol": symbol})
         except QuoteError:
@@ -187,10 +193,13 @@ class IssuerOfficialService:
 
         end = time.strftime("%Y-%m-%d", time.gmtime())
         start = time.strftime("%Y-%m-%d", time.gmtime(time.time() - max(1, min(days, 30)) * 86400))
-        raw_articles = self.provider._get(
-            "/company-news",
-            {"symbol": symbol, "from": start, "to": end},
-        )
+        try:
+            raw_articles = self.provider._get(
+                "/company-news",
+                {"symbol": symbol, "from": start, "to": end},
+            )
+        except QuoteError:
+            raw_articles = []
         official: list[dict[str, Any]] = []
         for row in raw_articles if isinstance(raw_articles, list) else []:
             if not isinstance(row, dict):
