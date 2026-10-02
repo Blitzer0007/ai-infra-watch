@@ -1,4 +1,3 @@
-import portfolio from '../../data/portfolio_snapshot.json';
 import { STOCK_UNIVERSE, type StockUniverseEntry } from './stockUniverse';
 
 export type PricePoint = {
@@ -38,7 +37,6 @@ export type IntelligenceSnapshot = {
 const GROUP_MEMBERS = (() => {
   const entries: Array<{ symbol: string; group: string }> = [
     ...STOCK_UNIVERSE.map((item: StockUniverseEntry) => ({ symbol: item.symbol, group: item.group })),
-    ...portfolio.positions.map((item) => ({ symbol: item.symbol, group: item.group })),
   ];
   const groups = new Map<string, string[]>();
   for (const entry of entries) {
@@ -89,12 +87,9 @@ export function buildIntelligence(prices: Record<string, PricePoint>): Intellige
     return { name, members, avgChange, breadth, relativeToUniverse, score };
   });
 
-  const portfolioSymbols = portfolio.positions.map((item) => item.symbol);
-  const portfolioReturns = portfolioSymbols
-    .map(t => prices[t])
-    .filter((x) => x?.stale !== true)
-    .map(x => x?.changePct)
-    .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+  // Portfolio positions are now sourced from authenticated Supabase holdings.
+  // This utility intentionally has no committed portfolio snapshot fallback.
+  const portfolioReturns: number[] = [];
 
   const pairSignals = PAIRS.map(([left,right,label]) => ({
     left,
