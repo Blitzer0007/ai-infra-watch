@@ -17,9 +17,9 @@ export type PortfolioPosition = {
   notes?: string;
   id?: string;
   purchaseDate?: string | null;
-  purchaseLotCount: number;
-  firstPurchaseDate: string | null;
-  holdingPeriodDays: number | null;
+  purchaseLotCount?: number;
+  firstPurchaseDate?: string | null;
+  holdingPeriodDays?: number | null;
 };
 
 export type PositionAnalysis = PortfolioPosition & {
