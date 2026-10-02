@@ -448,10 +448,26 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
         if family in expected or _channel_tool_usable(family, call.tool):
             if family not in observed_families:
                 observed_families.append(family)
-    families = list(expected)
-    for family in observed_families:
-        if family not in families:
-            families.append(family)
+
+    # Keep a stable matrix across all supported research families so the UI
+    # can distinguish AVAILABLE / EMPTY / FAILED / MISSING. Only explicitly
+    # required families participate in the hard "complete" check.
+    known_families = (
+        "market",
+        "news",
+        "issuer_primary",
+        "regulatory_primary",
+        "analyst_consensus",
+        "earnings",
+        "event_study",
+        "congress",
+        "macro",
+        "portfolio",
+        "forecast",
+        "quality",
+        "relationship",
+    )
+    families = list(dict.fromkeys((*known_families, *expected, *observed_families)))
 
     def has_payload(value: Any) -> bool:
         """Return True only when a tool response contains usable evidence.
