@@ -361,18 +361,70 @@ async function fetchGdeltNews(timespan) {
   }));
 }
 
+function decodeXml(value) {
+  return String(value || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+}
+
+async function fetchGoogleNewsRss(query, window = '1d') {
+  const url = 'https://news.google.com/rss/search?q=' + encodeURIComponent(query + ' when:' + window) + '&hl=en-US&gl=US&ceid=US:en';
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'ai-infra-watch/1.0', Accept: 'application/rss+xml, application/xml, text/xml' },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error('Google News RSS HTTP ' + response.status);
+
+  const xml = await response.text();
+  const items = [];
+  for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+    const block = match[1];
+    const title = decodeXml(block.match(/<title>([\s\S]*?)<\/title>/i)?.[1]);
+    const link = decodeXml(block.match(/<link>([\s\S]*?)<\/link>/i)?.[1]);
+    const date = decodeXml(block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1]);
+    const source = decodeXml(block.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1]) || 'Google News';
+    if (!title || !link) continue;
+    items.push({ title, source, url: link, date });
+    if (items.length >= 20) break;
+  }
+  return items;
+}
+
 async function news() {
   try {
     const recent = await fetchGdeltNews('24h');
-    if (recent.length) return { items: recent, window: '24h', fallback: false };
+    if (recent.length) return { items: recent, window: '24h', fallback: false, provider: 'GDELT' };
   } catch {}
 
   try {
     const fallback = await fetchGdeltNews('72h');
-    return { items: fallback, window: '72h', fallback: true };
+    if (fallback.length) return { items: fallback, window: '72h', fallback: true, provider: 'GDELT' };
+  } catch {}
+
+  try {
+    const recent = await fetchGoogleNewsRss(
+      '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR TSMC) (AI OR GPU OR semiconductor OR "data center")',
+      '1d'
+    );
+    if (recent.length) return { items: recent, window: '24h', fallback: true, provider: 'Google News RSS' };
+  } catch {}
+
+  try {
+    const fallback = await fetchGoogleNewsRss(
+      '(NVIDIA OR AMD OR Micron OR "SK Hynix" OR Nebius OR ServiceNow OR Salesforce OR TSMC) (AI OR GPU OR semiconductor OR "data center")',
+      '3d'
+    );
+    if (fallback.length) return { items: fallback, window: '72h', fallback: true, provider: 'Google News RSS' };
   } catch {
-    return { items: [], window: null, fallback: true };
+    // Keep the feed explicitly empty when every provider is unavailable.
   }
+
+  return { items: [], window: null, fallback: true, provider: 'unavailable' };
 }
 
 export default async function handler(req, res) {
@@ -437,7 +489,7 @@ export default async function handler(req, res) {
   const congressTrades = congressResult?.items || [];
   const politicalSignalsResult = politicalResult?.items || [];
   const feedRetrievedAt = new Date().toISOString();
-  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback) };
+  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: newsResult?.provider || 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback) };
   evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: contractsResult?.source || 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(contractsResult?.stale), upstreamError: contractsResult?.upstreamError || null };
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null };
@@ -463,7 +515,7 @@ export default async function handler(req, res) {
       politicalFallback: politicalSignalsResult.length === 0,
       politicalUpstreamError: politicalResult?.upstreamError || null
     },
-    sources:['Yahoo Finance chart data → Finnhub → Alpha Vantage','GDELT AI-infrastructure news (24h → 72h fallback)','GDELT political/policy coverage (24h → 72h fallback)','SEC EDGAR','Bargo Congress Trades API → fallback providers']
+    sources:['Yahoo Finance chart data → Finnhub → Alpha Vantage','GDELT → Google News RSS AI-infrastructure news (24h → 72h fallback)','GDELT political/policy coverage (24h → 72h fallback)','SEC EDGAR','Bargo Congress Trades API → fallback providers']
   };
   cached = data;
   cachedAt = Date.now();
