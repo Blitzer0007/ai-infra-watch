@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
-import { fetchPortfolioHoldings, updatePortfolioHolding, type StoredPortfolioHolding } from '../utils/portfolioApi';
+import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfolioApi';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
@@ -21,6 +21,7 @@ type Horizon = 5 | 20 | 60 | 120 | 252;
 type ForecastSnapshot = {
   id: string; ticker: string; createdAt: string; targetDate: string; horizon: Horizon; scenarioId: string;
   entryPrice: number; median: number; p25: number; p75: number; p10: number; p90: number;
+  decisionThesis?: string; lossLimitPct?: number | null; exitRuleType?: string | null; exitRuleValue?: number | null; exitRuleText?: string; practicalNotes?: string; brokerAlertPrices?: number[];
   modelVersion?: string;
   status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
 };
@@ -710,7 +711,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     const snapshot: ForecastSnapshot = {
       id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
       targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
-      median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending'
+      median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending',
+      decisionThesis: portfolioContext.holding?.decisionThesis || portfolioContext.thesis || '',
+      lossLimitPct: portfolioContext.holding?.lossLimitPct ?? null,
+      exitRuleType: portfolioContext.holding?.exitRuleType ?? null,
+      exitRuleValue: portfolioContext.holding?.exitRuleValue ?? null,
+      exitRuleText: portfolioContext.holding?.exitRuleText || '',
+      practicalNotes: portfolioContext.holding?.practicalNotes || '',
+      brokerAlertPrices: portfolioContext.holding?.brokerAlertPrices || []
     };
     try {
       const response = await fetch('/api/forecast-verification', {
@@ -718,7 +726,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       });
       if (!response.ok) throw new Error('Persistent forecast storage failed (HTTP ' + response.status + ')');
       const body = await response.json();
-      const saved = body?.forecast || snapshot;
+      const saved = { ...snapshot, ...(body?.forecast || {}) };
       const next = [...forecasts.filter(f => f.id !== saved.id), saved];
       setForecasts(next);
       saveForecasts(next);
@@ -1123,6 +1131,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[9px] font-mono">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
             <div className="mt-1 text-white/40">Forecast median {formatReturn(f.median)} · middle 50% {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
+            {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
       </div>
