@@ -62,6 +62,17 @@ def test_portfolio_api_rejects_invalid_post(client):
     response = client.post("/api/portfolio", json={"symbol":"QA_TEST_INVALID","quantity":0,"averageCost":100})
     assert response.status_code == 400
 
+def test_analyst_api_contract(client):
+    response = client.get("/api/company-scale", params={"action":"analyst","symbol":"NVDA"})
+    assert response.status_code in {200, 503}, response.text[:500]
+    body = _json(response)
+    if response.status_code == 200:
+        assert body.get("symbol") == "NVDA"
+        assert isinstance(body.get("recommendation"), dict)
+        assert isinstance(body.get("priceTarget"), dict)
+        assert isinstance(body.get("epsEstimates"), list)
+        assert isinstance(body.get("revenueEstimates"), list)
+
 def test_milestones_api_contract(client):
     response = client.get("/api/company-scale", params={"action":"milestones","symbol":"NVDA","limit":12})
     assert response.status_code == 200, response.text[:500]

@@ -6,6 +6,8 @@ const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache 
 });
 
 const factsCache = globalThis.__aiwFactsCache || (globalThis.__aiwFactsCache = new Map());
+const analystCache = globalThis.__aiwAnalystCache || (globalThis.__aiwAnalystCache = new Map());
+
 
 function cleanSymbol(value) {
   return String(value || '').trim().toUpperCase();
@@ -308,6 +310,117 @@ function categoryFor(items, title = '') {
   return 'Other';
 }
 
+
+async function finnhubResearch(symbol, endpoint) {
+  const token = String(process.env.FINNHUB_API_KEY || '').trim();
+  if (!token) throw new Error('FINNHUB_API_KEY is not configured');
+  const response = await fetch(
+    'https://finnhub.io/api/v1/' + endpoint +
+      '?symbol=' + encodeURIComponent(symbol) +
+      '&token=' + encodeURIComponent(token),
+    { signal: AbortSignal.timeout(7000) }
+  );
+  if (!response.ok) throw new Error('Finnhub research HTTP ' + response.status);
+  return response.json();
+}
+
+function normalizeAnalystValue(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+async function handleAnalyst(req, res) {
+  const symbol = cleanSymbol(req.query?.symbol);
+  if (!validateMarketSymbol(symbol)) {
+    return res.status(400).json({ error: 'Valid stock symbol is required.' });
+  }
+
+  const cached = analystCache.get(symbol);
+  if (cached && Date.now() - cached.loadedAt < 15 * 60 * 1000) {
+    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
+    return res.status(200).json({ ...cached.data, cached: true });
+  }
+
+  const endpoints = [
+    ['recommendation', 'stock/recommendation'],
+    ['priceTarget', 'stock/price-target'],
+    ['epsEstimates', 'stock/eps-estimate'],
+    ['revenueEstimates', 'stock/revenue-estimate'],
+  ];
+
+  const settled = await Promise.allSettled(
+    endpoints.map(([, endpoint]) => finnhubResearch(symbol, endpoint))
+  );
+
+  const values = {};
+  const errors = [];
+  settled.forEach((item, index) => {
+    const [key] = endpoints[index];
+    if (item.status === 'fulfilled') values[key] = item.value;
+    else errors.push({ source: key, error: String(item.reason?.message || item.reason || 'Unavailable') });
+  });
+
+  const recommendationRows = Array.isArray(values.recommendation) ? values.recommendation : [];
+  const recommendation = recommendationRows[0] || {};
+  const priceTarget = values.priceTarget && typeof values.priceTarget === 'object'
+    ? values.priceTarget
+    : {};
+  const epsRaw = values.epsEstimates;
+  const revenueRaw = values.revenueEstimates;
+  const epsEstimates = Array.isArray(epsRaw) ? epsRaw : Array.isArray(epsRaw?.data) ? epsRaw.data : [];
+  const revenueEstimates = Array.isArray(revenueRaw) ? revenueRaw : Array.isArray(revenueRaw?.data) ? revenueRaw.data : [];
+
+  if (!Object.keys(values).length) {
+    return res.status(503).json({
+      symbol,
+      source: 'Finnhub analyst',
+      available: [],
+      errors,
+      error: 'Analyst expectations provider unavailable.',
+    });
+  }
+
+  const data = {
+    symbol,
+    source: 'Finnhub analyst',
+    retrievedAt: new Date().toISOString(),
+    recommendation: {
+      period: recommendation.period || null,
+      strongBuy: Number(recommendation.strongBuy || 0),
+      buy: Number(recommendation.buy || 0),
+      hold: Number(recommendation.hold || 0),
+      sell: Number(recommendation.sell || 0),
+      strongSell: Number(recommendation.strongSell || 0),
+    },
+    priceTarget: {
+      lastUpdated: priceTarget.lastUpdated || priceTarget.lastUpdatedAt || null,
+      high: normalizeAnalystValue(priceTarget.targetHigh),
+      low: normalizeAnalystValue(priceTarget.targetLow),
+      mean: normalizeAnalystValue(priceTarget.targetMean),
+      median: normalizeAnalystValue(priceTarget.targetMedian),
+    },
+    epsEstimates: epsEstimates.slice(0, 8).map(row => ({
+      period: row?.period || null,
+      average: normalizeAnalystValue(row?.epsAvg ?? row?.epsAverage),
+      high: normalizeAnalystValue(row?.epsHigh),
+      low: normalizeAnalystValue(row?.epsLow),
+      analysts: Number(row?.numberAnalysts || 0) || null,
+    })),
+    revenueEstimates: revenueEstimates.slice(0, 8).map(row => ({
+      period: row?.period || null,
+      average: normalizeAnalystValue(row?.revenueAvg ?? row?.revenueAverage),
+      high: normalizeAnalystValue(row?.revenueHigh),
+      low: normalizeAnalystValue(row?.revenueLow),
+      analysts: Number(row?.numberAnalysts || 0) || null,
+    })),
+    available: Object.keys(values),
+    errors,
+  };
+
+  analystCache.set(symbol, { loadedAt: Date.now(), data });
+  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
+  return res.status(200).json({ ...data, cached: false });
+}
+
 function validMilestoneSymbol(symbol) {
   return /^[A-Z0-9.^=-]{1,20}$/.test(symbol);
 }
@@ -406,6 +519,7 @@ export default async function handler(req, res) {
   const action = String(req.query?.action || '').trim().toLowerCase();
   if (action === 'history') return handleHistory(req, res);
   if (action === 'milestones') return handleMilestones(req, res);
+  if (action === 'analyst') return handleAnalyst(req, res);
   if (req.query?.sec) {
     return handleSecGateway(req, res);
   }

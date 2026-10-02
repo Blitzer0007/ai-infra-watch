@@ -376,7 +376,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             const universeVs = groupInfo?.relativeToUniverse ?? null;
 
             return (
-              <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+              <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
                 <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
                   <div>
                     <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Watchlist analysis</div>

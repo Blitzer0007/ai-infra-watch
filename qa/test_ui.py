@@ -114,5 +114,11 @@ def test_portfolio_manager_create_flow(page):
     page.get_by_test_id("portfolio-field-average-cost").fill("100")
     page.get_by_test_id("portfolio-field-purchase-date").fill("2026-01-02")
     page.get_by_test_id("portfolio-field-notes").fill("QA holding")
-    page.get_by_test_id("portfolio-save-holding").click()
-    assert portfolio.get_by_text("AMD", exact=True).count() >= 1
+    with page.expect_request(lambda request: "/api/portfolio" in request.url and request.method == "POST", timeout=30000) as request_info:
+        page.get_by_test_id("portfolio-save-holding").click()
+    request = request_info.value
+    payload = request.post_data_json
+    assert payload["symbol"] == "AMD"
+    assert float(payload["quantity"]) == 2
+    assert float(payload["averageCost"]) == 100
+    page.get_by_test_id("portfolio-save-holding").wait_for(state="detached", timeout=30000)
