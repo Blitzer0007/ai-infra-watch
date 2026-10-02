@@ -107,17 +107,20 @@ export default async function handler(req, res) {
       if (!symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(averageCost) || averageCost < 0) {
         return res.status(400).json({ error: 'symbol, positive quantity and non-negative averageCost are required' });
       }
-      const rows = await supabase('portfolio_holdings', {
+      const rpc = await supabase('rpc/create_portfolio_holding', {
         method: 'POST',
         body: JSON.stringify({
-          symbol,
-          quantity,
-          average_cost: averageCost,
-          purchase_date: body.purchaseDate || null,
-          notes: body.notes || null,
+          p_symbol: symbol,
+          p_quantity: quantity,
+          p_average_cost: averageCost,
+          p_purchase_date: body.purchaseDate || null,
+          p_notes: body.notes || null,
         }),
       });
-      return res.status(201).json({ holding: normalize(rows[0]) });
+      return res.status(201).json({
+        lot: normalizeLot(rpc?.lot),
+        holding: normalize(rpc?.holding),
+      });
     }
 
     if (req.method === 'PUT') {
