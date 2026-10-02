@@ -147,3 +147,14 @@ def test_event_study_uses_consolidated_api(page):
     assert any("/api/company-scale?action=history" in url for url in requests)
     assert not any("/api/stock-milestones" in url for url in requests)
     assert not any("/api/stock-history" in url for url in requests)
+
+
+def test_unified_event_timeline_uses_consolidated_api(page):
+    requests = []
+    mock_local_apis(page)
+    page.on("request", lambda request: requests.append(request.url))
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.wait_for_timeout(1500)
+    assert not any("/api/stock-milestones" in url for url in requests)
+    assert not any("/api/stock-history" in url for url in requests)

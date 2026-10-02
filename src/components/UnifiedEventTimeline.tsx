@@ -37,7 +37,7 @@ const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   const key = symbol.trim().toUpperCase();
   if (!historyCache[key]) {
-    historyCache[key] = fetch('/api/stock-history?symbol=' + encodeURIComponent(key) + '&range=5y', { cache: 'no-store' })
+    historyCache[key] = fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(key) + '&range=5y', { cache: 'no-store' })
       .then(async response => {
         if (!response.ok) throw new Error('History request failed');
         const payload = await response.json();
@@ -81,7 +81,7 @@ async function loadEarningsEvents(symbol: string): Promise<TimelineEvent[]> {
 
 async function loadSecEvents(symbol: string): Promise<TimelineEvent[]> {
   try {
-    const response = await fetch('/api/stock-milestones?symbol=' + encodeURIComponent(symbol) + '&limit=20', { cache: 'no-store' });
+    const response = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(symbol) + '&limit=20', { cache: 'no-store' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) return [];
     return (payload?.events || []).map((event: any) => ({
