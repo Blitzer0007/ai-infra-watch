@@ -8,6 +8,7 @@ on:
       - "tests/test_agents.py"
       - "tests/test_mcp_integration.py"
       - "aitracker-upload/mcp_servers/**"
+      - "api/live-data.js"
       - "aitracker-upload/app/rag/**"
       - "aitracker-upload/app/agents/**"
       - "aitracker-upload/app/mcp_client/**"
