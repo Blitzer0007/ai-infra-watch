@@ -982,8 +982,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-rose-300/15 bg-rose-300/[.03] p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-rose-300/15 bg-rose-300/[.03] p-4 min-w-0">
                 <div className="flex items-center gap-2 mb-3"><TrendingDown className="w-4 h-4 text-rose-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-rose-200/70">Downside context</span></div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Worst analogue</div><div className="text-sm font-mono font-bold mt-1 text-rose-300">{forecastRisk.worst == null ? '—' : formatReturn(forecastRisk.worst)}</div></div>
@@ -991,7 +991,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
                 <p className="text-[9px] text-white/35 mt-3">Review the lower tail before interpreting the median. Historical outcomes are not a loss limit.</p>
               </div>
-              <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.03] p-4">
+              <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.03] p-4 min-w-0">
                 <div className="flex items-center gap-2 mb-3"><BarChart3 className="w-4 h-4 text-cyan-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Portfolio context</span></div>
                 {portfolioLoadError ? <div className="text-[9px] font-mono text-amber-200/60">Portfolio context unavailable: {portfolioLoadError}</div> : portfolioContext.hasHolding ? <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Position weight</div><div className="text-sm font-mono font-bold mt-1">{(portfolioContext.weight * 100).toFixed(1)}%</div></div>
@@ -999,7 +999,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2 col-span-2"><div className="text-[8px] text-white/25 uppercase font-mono">Related exposure</div><div className="text-sm font-mono font-bold mt-1">{(portfolioContext.concentrationWeight * 100).toFixed(1)}% · {portfolioContext.concentrationPeers.join(', ') || 'none identified'}</div></div>
                 </div> : <div className="text-[9px] text-white/35">No saved holding for {selectedStock}. Forecast is being shown without position context.</div>}
               </div>
-              <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[.03] p-4">
+              <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[.03] p-4 min-w-0 lg:col-span-2">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision context</span></div>
                 {portfolioContext.hasHolding && <button onClick={() => setDecisionEditing(value => !value)} className="text-[8px] font-mono uppercase tracking-widest text-amber-200/70 hover:text-amber-100">{decisionEditing ? 'Close' : 'Edit rules'}</button>}
@@ -1050,8 +1050,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-[#0F1115] p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4 min-w-0">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[9px] font-mono uppercase tracking-widest text-white/35">Outcome range from historical analogues</span>
                   <span className="text-[9px] font-mono text-white/35">{analysis.analogueCount || analysis.allCount} observations</span>
@@ -1066,7 +1066,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 </div>
                 <div className="flex justify-between text-[8px] font-mono text-white/25 mt-1"><span>Downside tail</span><span>Historical median</span><span>Upside tail</span></div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4 space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4 space-y-3 min-w-0">
                 <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Model diagnostics</span></div>
                 <div className="text-sm font-bold">{analysis.confidence} confidence</div>
                 <div className="text-[10px] text-white/45">Positive historical outcomes: {(analysis.positive * 100).toFixed(0)}%</div>
