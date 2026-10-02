@@ -123,13 +123,32 @@ def _latest_date(value: Any) -> datetime | None:
     return max(dates) if dates else None
 
 def _family_from_tool(tool_name: str) -> str:
+    """Normalize a tool into a research evidence family.
+
+    Primary company/issuer sources and analyst expectations are intentionally
+    separate from generic news and regulatory filings so the research gate can
+    reason about provenance instead of treating every source as equivalent.
+    """
     name = tool_name.lower()
-    if name.startswith("news."): return "news"
+    if name.startswith("news."):
+        return "news"
+    if any(token in name for token in ("analyst.", "analyst_", "price_target", "target_price", "consensus", "estimate_revision", "recommendation", "ratings")):
+        return "analyst_consensus"
+    if any(token in name for token in (
+        "investor_relations", "investor-relations", "company.", "companies.",
+        "issuer.", "press_release", "press-release", "newsroom", "official.",
+        "product_docs", "product-docs", "company_docs", "company-docs",
+    )):
+        return "issuer_primary"
     if "get_event_study" in name: return "event_study"
     if "get_earnings" in name: return "earnings"
-    if name.startswith("filings.") or "sec" in name: return "sec"
+    if name.startswith("filings.") or "sec" in name: return "regulatory_primary"
     if "congress" in name: return "congress"
     if "macro" in name or "risk" in name: return "macro"
+    if "forecast" in name or "verification" in name: return "forecast"
+    if "portfolio" in name or "holdings" in name: return "portfolio"
+    if "quality" in name or "red_team" in name or "red-team" in name: return "quality"
+    if "rotation" in name or "relationship" in name: return "relationship"
     if any(token in name for token in (".get_quote", ".get_quotes", ".get_snapshot")): return "market"
     return name.split(".", 1)[0] if "." in name else "default"
 
