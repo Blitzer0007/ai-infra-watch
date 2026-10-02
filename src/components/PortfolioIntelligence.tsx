@@ -9,6 +9,7 @@ import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
+import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
 import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks, calculateStressScore } from '../utils/measurement';
 type Price = {
@@ -203,6 +204,76 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const groupConcentration = concentration.groupWeights.slice(0, 3);
   const stressTrendAverage = stressTrend.length ? stressTrend.reduce((sum, row) => sum + row.stressScore, 0) / stressTrend.length : null;
   const stressTrendLatest = stressTrend.at(-1)?.stressScore ?? null;
+  const decisionContext = useMemo(() => {
+    const heldSymbols = new Set(analyses.map(item => item.symbol));
+    const relevantContracts = contracts.filter(item => heldSymbols.has(String(item?.company || '').toUpperCase())).length;
+    const relevantCongress = congressTrades.filter(item => heldSymbols.has(String(item?.stockSymbol || '').toUpperCase())).length;
+    const relevantPolitical = politicalSignals.filter(item =>
+      Array.isArray(item?.relatedSymbols) &&
+      item.relatedSymbols.some(symbol => heldSymbols.has(String(symbol).toUpperCase()))
+    ).length;
+    const recoveryHoldings = analyses.filter(item => item.recoveryAlert).map(item => item.symbol);
+    const riskHoldings = analyses.filter(item => item.state === 'RISK REVIEW').map(item => item.symbol);
+    const staleCount = analyses.filter(item => item.liveStale || item.livePrice == null).length;
+    return {
+      portfolio: {
+        holdingCount: analyses.length,
+        freshQuoteCount: livePositions.length,
+        staleOrMissingQuoteCount: staleCount,
+        selectedHolding: selectedAnalysis?.symbol || null,
+        selectedHoldingState: selectedAnalysis?.state || null,
+        selectedHoldingPnlPct: selectedAnalysis?.pnlPct ?? null,
+        selectedHoldingDailyChangePct: selectedAnalysis?.dailyChangePct ?? null,
+        selectedHoldingStrategyContext: selectedAnalysis?.strategyContext || null,
+        recoveryWatch: recoveryHoldings,
+        riskReview: riskHoldings,
+      },
+      measurements: {
+        weightedStress: weightedStress.score,
+        weightedStressLabel: weightedStress.label,
+        weightedBreadth: weightedStress.weightedBreadth,
+        weightedAverageMove: weightedStress.weightedAvgMove,
+        concentrationHhi: concentration.hhi,
+        topHolding: concentration.topHolding,
+        top3Weight: concentration.top3Weight,
+        effectiveHoldings: concentration.effectiveHoldings,
+        stressTrendLatest,
+        stressTrendAverage,
+        benchmarkComparisons,
+      },
+      evidenceAvailability: {
+        heldContracts: relevantContracts,
+        heldCongressDisclosures: relevantCongress,
+        heldPoliticalSignals: relevantPolitical,
+        macroRiskItems: macroRisks.length,
+        newsItems: news.length,
+        contractSource: relevantContracts > 0 ? 'available' : 'none observed',
+        congressSource: relevantCongress > 0 ? 'available' : 'none observed',
+        politicalSource: relevantPolitical > 0 ? 'available' : 'none observed',
+      },
+      guardrails: [
+        'Measurements describe observed portfolio state; they are not trade instructions.',
+        'Recovery watch requires negative P&L and negative daily move with supportive group/peer evidence.',
+        'Historical stress uses current weights across the historical window and does not reconstruct historical position sizes.',
+        'Benchmark comparisons use overlapping available market dates only.',
+      ],
+    };
+  }, [
+    analyses,
+    livePositions.length,
+    selectedAnalysis,
+    weightedStress,
+    concentration,
+    stressTrendLatest,
+    stressTrendAverage,
+    benchmarkComparisons,
+    contracts,
+    congressTrades,
+    politicalSignals,
+    macroRisks.length,
+    news.length,
+  ]);
+
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
@@ -268,6 +339,13 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           </div>
         </div>
       </section>
+
+      <JevDecisionPanel
+        kind="portfolio"
+        title="Portfolio decision context"
+        subtitle="Jev reviews the measured portfolio state and evidence coverage. It provides typed research triage and context only; it does not generate trade instructions."
+        state={decisionContext}
+      />
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
