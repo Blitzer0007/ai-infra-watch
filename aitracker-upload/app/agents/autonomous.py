@@ -1360,6 +1360,39 @@ class AutonomousMCPAgent:
         step_limit = self.max_steps + (2 if evidence_enabled else 0)
 
         for iteration in range(1, step_limit + 1):
+            # Record the JEV route before any deterministic driver planning.
+            # This must happen even when the available test/tool catalog cannot
+            # satisfy the full driver evidence sequence (including max_steps=1).
+            if (
+                iteration == 1
+                and self.jev.enabled
+                and not self.last_jev
+                and any(
+                    term in question.lower()
+                    for term in (
+                        "driver", "drivers", "why", "cause", "causes",
+                        "catalyst", "catalysts", "changed recently", "what changed",
+                    )
+                )
+            ):
+                try:
+                    decision = _jev_route(question, tools, self.jev)
+                    self.last_jev = {
+                        "enabled": True,
+                        "choice": decision.choice,
+                        "confidence": decision.confidence,
+                        "probabilities": decision.probabilities or {},
+                        "model": decision.model,
+                        "latency_ms": round(decision.latency_ms, 1),
+                        "action": "forced_driver_plan",
+                    }
+                except Exception as exc:
+                    self.last_jev = {
+                        "enabled": True,
+                        "action": "fallback",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+
             gate = self.last_jev.get("evidence_gate") or {}
             successful_count = sum(1 for call in calls if call.ok)
             gate_checked = int(gate.get("checked_after_successful_calls", 0) or 0)
@@ -1412,43 +1445,6 @@ class AutonomousMCPAgent:
                 # Driver investigations record Jev routing once, while the
                 # bounded evidence sequence controls retrieval for known driver
                 # questions.
-                if (
-                    iteration == 1
-                    and self.jev.enabled
-                    and not self.last_jev
-                    and any(
-                        term in question.lower()
-                        for term in (
-                            "driver",
-                            "drivers",
-                            "why",
-                            "cause",
-                            "causes",
-                            "catalyst",
-                            "catalysts",
-                            "changed recently",
-                            "what changed",
-                        )
-                    )
-                ):
-                    try:
-                        decision = _jev_route(question, tools, self.jev)
-                        self.last_jev = {
-                            "enabled": True,
-                            "choice": decision.choice,
-                            "confidence": decision.confidence,
-                            "probabilities": decision.probabilities or {},
-                            "model": decision.model,
-                            "latency_ms": round(decision.latency_ms, 1),
-                            "action": "forced_driver_plan",
-                        }
-                    except Exception as exc:
-                        self.last_jev = {
-                            "enabled": True,
-                            "action": "fallback",
-                            "error": f"{type(exc).__name__}: {exc}",
-                        }
-
                 # Custom planners are used by tests and integrations to control
                 # the exact next action; keep the production-only forced driver
                 # sequence out of that injected planner path.
