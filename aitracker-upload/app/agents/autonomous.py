@@ -181,6 +181,8 @@ JEV_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
     "congress": ("congress.", ".get_congress", ".get_trades"),
     "news": ("news.search",),
     "rotation": (".get_rotation",),
+    "analyst_consensus": ("get_analyst_expectations", ".price_target", ".recommendation"),
+    "issuer_primary": ("get_issuer_official", "investor_relations", "company_official"),
 }
 
 JEV_ROUTE_CRITERIA = {
