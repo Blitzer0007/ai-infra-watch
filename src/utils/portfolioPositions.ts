@@ -1,6 +1,6 @@
 import snapshot from '../../data/portfolio_snapshot.json';
 import type { IntelligenceSnapshot, PricePoint } from './intelligence';
-import type { StoredPortfolioHolding } from './portfolioApi';
+import type { PortfolioPurchaseLot, StoredPortfolioHolding } from './portfolioApi';
 import { STOCK_UNIVERSE } from './stockUniverse';
 
 export type PortfolioPosition = {
@@ -17,6 +17,9 @@ export type PortfolioPosition = {
   notes?: string;
   id?: string;
   purchaseDate?: string | null;
+  purchaseLotCount: number;
+  firstPurchaseDate: string | null;
+  holdingPeriodDays: number | null;
 };
 
 export type PositionAnalysis = PortfolioPosition & {
@@ -41,6 +44,7 @@ export type PositionAnalysis = PortfolioPosition & {
   whatIfProfitAt20Pct: number | null;
   potentialUpsideSignal: 'SUPPORTED' | 'MIXED' | 'WEAK' | 'INSUFFICIENT DATA';
   averageInAlert: boolean;
+  recoveryAlert: boolean;
   strategyContext: string;
 };
 
@@ -50,6 +54,14 @@ export const PORTFOLIO_POSITIONS: PortfolioPosition[] = snapshot.positions;
 
 function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
   const meta = STOCK_UNIVERSE.find(item => item.symbol === holding.symbol);
+  const lots: PortfolioPurchaseLot[] = Array.isArray(holding.purchaseLots) ? holding.purchaseLots : [];
+  const firstPurchaseDate = lots
+    .map(lot => lot.purchaseDate)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] ?? holding.purchaseDate ?? null;
+  const holdingPeriodDays = firstPurchaseDate
+    ? Math.max(0, Math.floor((Date.now() - new Date(firstPurchaseDate + 'T00:00:00Z').getTime()) / 86400000))
+    : null;
   const investedValue = holding.quantity * holding.averageCost;
   return {
     id: holding.id,
@@ -64,7 +76,10 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     investedValue,
     snapshotCurrentValue: investedValue,
     notes: holding.notes,
-    purchaseDate: holding.purchaseDate,
+    purchaseDate: firstPurchaseDate,
+    purchaseLotCount: lots.length,
+    firstPurchaseDate,
+    holdingPeriodDays,
   };
 }
 
@@ -149,6 +164,19 @@ export function buildPositionAnalyses(
       relativeToUniverse >= 0 &&
       vsPeers >= 0;
 
+    const recoveryAlert = liveIsFresh &&
+      pnlPct < 0 &&
+      dailyChangePct != null &&
+      dailyChangePct < 0 &&
+      groupScore != null &&
+      groupBreadth != null &&
+      relativeToUniverse != null &&
+      vsPeers != null &&
+      groupScore >= (isLeveraged ? 68 : 62) &&
+      groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
+      relativeToUniverse >= 0 &&
+      vsPeers >= 0;
+
     return {
       ...position,
       livePrice,
@@ -178,7 +206,12 @@ export function buildPositionAnalyses(
             ? 'MIXED'
             : 'WEAK',
       averageInAlert,
-      strategyContext: averageInAlert
+      recoveryAlert,
+      strategyContext: recoveryAlert
+        ? 'The holding is declining today and remains below cost, while group breadth, relative strength and peer-relative evidence remain supportive. This is a recovery-watch alert for review, not an automatic buy instruction.'
+        : averageInAlert
+        ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
+
         ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
         : state === 'RISK REVIEW'
           ? 'The position is under pressure while supporting group evidence is weak or deteriorating. Review exposure and the original thesis before adding.'
