@@ -29,7 +29,7 @@ app = FastAPI(
 
 
 def _require_auth(authorization: str | None) -> None:
-    expected = settings.AGENT_API_TOKEN
+    expected = settings.AGENT_API_TOKEN or os.getenv("AIW_ACCESS_TOKEN", "").strip()
     if not expected:
         return
     prefix = "Bearer "
