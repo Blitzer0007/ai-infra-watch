@@ -150,7 +150,7 @@ export default function App() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [activeView, config]);
+  }, [activeView, config, portfolioSymbols]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
     setIsLiveLoading(true);
