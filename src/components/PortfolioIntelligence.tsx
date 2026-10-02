@@ -498,22 +498,32 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
 function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
   return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
-    <div className="flex justify-between gap-3"><div className="min-w-0">
-      <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/></div>
-      <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
-      <div className="text-[10px] text-white/25 mt-1">Qty {h.quantity.toFixed(6)} · Avg {h.averageCost.toFixed(2)} · P&L {h.pnlPct >= 0 ? '+' : ''}{h.pnlPct.toFixed(2)}%{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
-    </div><div className="text-right shrink-0">
-      <div className="font-bold text-sm">{h.livePrice != null ? '</div>
-      <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
-      <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
-    </div></div>
+    <div className="flex justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/></div>
+        <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
+        <div className="text-[10px] text-white/25 mt-1">Qty {h.quantity.toFixed(6)} · Avg {h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="font-bold text-sm">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
+        <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
+        <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
+      </div>
+    </div>
   </button>;
 }
+
 function PositionDetail({h}:{h:PositionAnalysis}) {
   return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
     <div className="grid grid-cols-2 gap-2">
-      <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/><Info label="Current value" value={h.currentValue == null ? '—' : '/><Info label="P&L" value={(h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/><Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
-      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/><Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/><Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
+      <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/>
+      <Info label="Current value" value={h.currentValue == null ? '—' : '$' + h.currentValue.toFixed(2)}/>
+      <Info label="P&L" value={h.livePrice == null ? '—' : (h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/>
+      <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
+      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
+      <Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/>
+      <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
+      <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
       <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
@@ -521,99 +531,70 @@ function PositionDetail({h}:{h:PositionAnalysis}) {
       <Info label="At +20% from current" value={h.whatIfProfitAt20Pct == null ? '—' : (h.whatIfProfitAt20Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt20Pct.toFixed(2)} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
     </div>
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div><div className="text-sm mt-2">{h.rationale}</div></div>
-    {h.averageInAlert && <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4"><div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">Average-in review alert</div><div className="text-sm mt-2 text-white/80">The position is below your average cost while the current group/peer evidence remains supportive.</div><div className="text-[10px] text-white/40 mt-2">{h.strategyContext}</div></div>}
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/><RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/></div>
-    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4"><div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div><div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div><div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div></div>
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    {h.averageInAlert && <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">Average-in review alert</div>
+      <div className="text-sm mt-2 text-white/80">The position is below your average cost while the current group/peer evidence remains supportive.</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.strategyContext}</div>
+    </div>}
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
+      <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
+    </div>
+    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
+      <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
+      <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
+      <div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div>
+    </div>
   </Panel>;
 }
-function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) { return <div className="border border-white/5 rounded-xl p-3"><div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div><div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div></div>; }
+
+function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div>
+    <div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div>
+  </div>;
+}
+
 function StatePill({state}:{state:PositionAnalysis['state']}) {
-  const cls = state === 'ADD REVIEW' ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' : state === 'RISK REVIEW' ? 'bg-rose-400/10 text-rose-300 border-rose-400/20' : state === 'INSUFFICIENT DATA' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' : 'bg-white/5 text-white/55 border-white/10';
+  const cls = state === 'ADD REVIEW'
+    ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
+    : state === 'RISK REVIEW'
+      ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
   return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
 }
-function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) { return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5"><div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>{children}</section>; }
-function Info({label,value}:{label:string;value:string}) { return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="text-[9px] uppercase font-mono text-white/25">{label}</div><div className="text-xs mt-1">{value}</div></div>; }
-function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) { const c=tone==='up'?'text-emerald-400':tone==='down'?'text-rose-400':tone==='warn'?'text-amber-300':'text-white'; return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon&&<span className={c}>{icon}</span>}</div><div className={'text-lg font-black mt-2 '+c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div></div>; }
-function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) { return <div className="border border-white/5 rounded-xl p-3"><div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div><div className="text-[10px] text-white/35 mt-2">{body}</div></div>; }
- + h.currentValue.toFixed(2)}/><Info label="P&L" value={(h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/><Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
-      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/><Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/><Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
-    </div>
-    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="At +10% from current" value={h.whatIfProfitAt10Pct == null ? '—' : (h.whatIfProfitAt10Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt10Pct.toFixed(2)} />
-      <Info label="At +20% from current" value={h.whatIfProfitAt20Pct == null ? '—' : (h.whatIfProfitAt20Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt20Pct.toFixed(2)} />
-      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
-    </div>
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div><div className="text-sm mt-2">{h.rationale}</div></div>
-    {h.averageInAlert && <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4"><div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">Average-in review alert</div><div className="text-sm mt-2 text-white/80">The position is below your average cost while the current group/peer evidence remains supportive.</div><div className="text-[10px] text-white/40 mt-2">{h.strategyContext}</div></div>}
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/><RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/></div>
-    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4"><div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div><div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div><div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div></div>
-  </Panel>;
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
 }
-function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) { return <div className="border border-white/5 rounded-xl p-3"><div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div><div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div></div>; }
-function StatePill({state}:{state:PositionAnalysis['state']}) {
-  const cls = state === 'ADD REVIEW' ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' : state === 'RISK REVIEW' ? 'bg-rose-400/10 text-rose-300 border-rose-400/20' : state === 'INSUFFICIENT DATA' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' : 'bg-white/5 text-white/55 border-white/10';
-  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
 }
-function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) { return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5"><div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>{children}</section>; }
-function Info({label,value}:{label:string;value:string}) { return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="text-[9px] uppercase font-mono text-white/25">{label}</div><div className="text-xs mt-1">{value}</div></div>; }
-function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) { const c=tone==='up'?'text-emerald-400':tone==='down'?'text-rose-400':tone==='warn'?'text-amber-300':'text-white'; return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon&&<span className={c}>{icon}</span>}</div><div className={'text-lg font-black mt-2 '+c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div></div>; }
-function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) { return <div className="border border-white/5 rounded-xl p-3"><div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div><div className="text-[10px] text-white/35 mt-2">{body}</div></div>; }
- + h.livePrice.toFixed(2) : '—'}</div>
-      <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
-      <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
-    </div></div>
-  </button>;
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
 }
-function PositionDetail({h}:{h:PositionAnalysis}) {
-  return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
-    <div className="grid grid-cols-2 gap-2">
-      <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/><Info label="Current value" value={h.currentValue == null ? '—' : '/><Info label="P&L" value={(h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/><Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
-      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/><Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/><Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
-    </div>
-    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="At +10% from current" value={h.whatIfProfitAt10Pct == null ? '—' : (h.whatIfProfitAt10Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt10Pct.toFixed(2)} />
-      <Info label="At +20% from current" value={h.whatIfProfitAt20Pct == null ? '—' : (h.whatIfProfitAt20Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt20Pct.toFixed(2)} />
-      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
-    </div>
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div><div className="text-sm mt-2">{h.rationale}</div></div>
-    {h.averageInAlert && <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4"><div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">Average-in review alert</div><div className="text-sm mt-2 text-white/80">The position is below your average cost while the current group/peer evidence remains supportive.</div><div className="text-[10px] text-white/40 mt-2">{h.strategyContext}</div></div>}
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/><RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/></div>
-    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4"><div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div><div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div><div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div></div>
-  </Panel>;
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
 }
-function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) { return <div className="border border-white/5 rounded-xl p-3"><div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div><div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div></div>; }
-function StatePill({state}:{state:PositionAnalysis['state']}) {
-  const cls = state === 'ADD REVIEW' ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' : state === 'RISK REVIEW' ? 'bg-rose-400/10 text-rose-300 border-rose-400/20' : state === 'INSUFFICIENT DATA' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' : 'bg-white/5 text-white/55 border-white/10';
-  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
-}
-function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) { return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5"><div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>{children}</section>; }
-function Info({label,value}:{label:string;value:string}) { return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="text-[9px] uppercase font-mono text-white/25">{label}</div><div className="text-xs mt-1">{value}</div></div>; }
-function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) { const c=tone==='up'?'text-emerald-400':tone==='down'?'text-rose-400':tone==='warn'?'text-amber-300':'text-white'; return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon&&<span className={c}>{icon}</span>}</div><div className={'text-lg font-black mt-2 '+c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div></div>; }
-function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) { return <div className="border border-white/5 rounded-xl p-3"><div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div><div className="text-[10px] text-white/35 mt-2">{body}</div></div>; }
- + h.currentValue.toFixed(2)}/><Info label="P&L" value={(h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/><Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
-      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/><Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/><Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/><Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
-    </div>
-    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="At +10% from current" value={h.whatIfProfitAt10Pct == null ? '—' : (h.whatIfProfitAt10Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt10Pct.toFixed(2)} />
-      <Info label="At +20% from current" value={h.whatIfProfitAt20Pct == null ? '—' : (h.whatIfProfitAt20Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt20Pct.toFixed(2)} />
-      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
-    </div>
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div><div className="text-sm mt-2">{h.rationale}</div></div>
-    {h.averageInAlert && <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4"><div className="text-[9px] font-mono uppercase tracking-widest text-amber-300">Average-in review alert</div><div className="text-sm mt-2 text-white/80">The position is below your average cost while the current group/peer evidence remains supportive.</div><div className="text-[10px] text-white/40 mt-2">{h.strategyContext}</div></div>}
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2"><RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/><RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/></div>
-    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4"><div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div><div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div><div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div></div>
-  </Panel>;
-}
-function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) { return <div className="border border-white/5 rounded-xl p-3"><div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div><div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div></div>; }
-function StatePill({state}:{state:PositionAnalysis['state']}) {
-  const cls = state === 'ADD REVIEW' ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' : state === 'RISK REVIEW' ? 'bg-rose-400/10 text-rose-300 border-rose-400/20' : state === 'INSUFFICIENT DATA' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' : 'bg-white/5 text-white/55 border-white/10';
-  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
-}
-function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) { return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5"><div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>{children}</section>; }
-function Info({label,value}:{label:string;value:string}) { return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="text-[9px] uppercase font-mono text-white/25">{label}</div><div className="text-xs mt-1">{value}</div></div>; }
-function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) { const c=tone==='up'?'text-emerald-400':tone==='down'?'text-rose-400':tone==='warn'?'text-amber-300':'text-white'; return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3"><div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon&&<span className={c}>{icon}</span>}</div><div className={'text-lg font-black mt-2 '+c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div></div>; }
-function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) { return <div className="border border-white/5 rounded-xl p-3"><div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div><div className="text-[10px] text-white/35 mt-2">{body}</div></div>; }
