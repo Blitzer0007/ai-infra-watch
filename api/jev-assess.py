@@ -62,9 +62,9 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
 
 
 @app.post("/api/jev-assess")
-def evaluate(req: JevAssessRequest, authorization: str | None = Header(default=None), request: Request | None = None) -> dict[str, Any]:
+def evaluate(req: JevAssessRequest, request: Request, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     _require_auth(authorization)
-    if request is not None and _rate_limited(request):
+    if _rate_limited(request):
         raise HTTPException(status_code=429, detail="Too many Jev assessment requests")
     kind = req.kind.strip().lower()
     if kind not in ASSESSMENTS:
