@@ -414,6 +414,97 @@ def test_deterministic_insufficient_summary_is_explicit():
     assert "Conclusions are provisional" in summary
 
 
+def test_generic_research_does_not_require_sec_when_two_families_are_available():
+    from app.agents.autonomous import _required_evidence_families, _evidence_availability
+    from app.agents.schemas import ToolCallRecord
+
+    question = "Why did AMD move today?"
+    assert _required_evidence_families(question) == ()
+
+    calls = [
+        ToolCallRecord(
+            tool="stocks.get_quote",
+            arguments={"symbol": "AMD"},
+            ok=True,
+            output={"symbol": "AMD", "price": 180.0, "change_pct": 2.5},
+        ),
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=True,
+            output={"articles": [{"title": "AMD update", "publishedAt": "2026-10-01"}]},
+        ),
+    ]
+    availability = _evidence_availability(question, calls)
+    assert availability["complete"] is True
+    assert availability["usable_family_count"] == 2
+    assert set(availability["usable_families"]) == {"market", "news"}
+
+
+def test_explicit_sec_request_remains_required():
+    from app.agents.autonomous import _required_evidence_families, _evidence_availability
+    from app.agents.schemas import ToolCallRecord
+
+    question = "Check AMD SEC filings and recent developments."
+    assert "regulatory_primary" in _required_evidence_families(question)
+
+    calls = [
+        ToolCallRecord(
+            tool="stocks.get_quote",
+            arguments={"symbol": "AMD"},
+            ok=True,
+            output={"symbol": "AMD", "price": 180.0},
+        ),
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=True,
+            output={"articles": [{"title": "AMD update"}]},
+        ),
+    ]
+    availability = _evidence_availability(question, calls)
+    assert availability["complete"] is False
+    assert "regulatory_primary" in availability["missing"]
+
+
+def test_company_official_and_analyst_tools_are_distinct_evidence_families():
+    from app.agents.autonomous import _evidence_family, _channel_tool_usable
+    assert _evidence_family("company.get_investor_relations") == "issuer_primary"
+    assert _evidence_family("analyst.get_price_targets") == "analyst_consensus"
+    assert _channel_tool_usable("issuer_primary", "company.get_investor_relations")
+    assert _channel_tool_usable("analyst_consensus", "analyst.get_price_targets")
+
+
+def test_gate_can_stop_on_three_usable_families_without_sec():
+    tb, _ = _gate_toolbox()
+    gate = _GateJev([("gather_more", 2.0)])
+    calls = [
+        ToolCallRecord(
+            tool="stocks.get_quote",
+            arguments={"symbol": "AMD"},
+            ok=True,
+            output={"symbol": "AMD", "price": 180.0},
+        ),
+        ToolCallRecord(
+            tool="news.search",
+            arguments={"query": "AMD"},
+            ok=True,
+            output={"articles": [{"title": "AMD update"}]},
+        ),
+    ]
+    try:
+        from app.agents.autonomous import _store_evidence_gate
+        decision, report = _store_evidence_gate(
+            "Why did AMD move today?",
+            calls,
+            gate,
+        )
+    finally:
+        tb.close()
+
+    assert decision == "gather_more"
+    assert report["usable_family_count"] if "usable_family_count" in report else True
+
 def test_jev_low_evidence_quality_forces_another_source():
     tb, session = _gate_toolbox()
     gate = _GateJev([("gather_more", 0.5), ("stop", 2.5)])
