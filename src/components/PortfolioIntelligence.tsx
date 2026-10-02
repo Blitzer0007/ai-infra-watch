@@ -20,6 +20,14 @@ type Price = {
   cached?: boolean;
 };
 type PortfolioTab = 'overview' | 'watchlist' | 'events' | 'rotation' | 'network';
+type HistoricalPriceState = {
+  loading: boolean;
+  high52w: number | null;
+  high52wDate: string | null;
+  historicalHigh: number | null;
+  historicalHighDate: string | null;
+  error: string;
+};
 
 type Props = {
   livePrices?: Record<string, Price>;
@@ -75,6 +83,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
+  const [historicalPrice, setHistoricalPrice] = useState<HistoricalPriceState>({
+    loading: false,
+    high52w: null,
+    high52wDate: null,
+    historicalHigh: null,
+    historicalHighDate: null,
+    error: '',
+  });
 
   const changeTab = (nextTab: PortfolioTab) => {
     setTab(nextTab);
@@ -107,6 +123,45 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       .finally(() => { if (!cancelled) setPortfolioLoading(false); });
     return () => { cancelled = true; };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    if (!selected) {
+      setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
+      return () => { cancelled = true; };
+    }
+
+    setHistoricalPrice({ loading: true, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
+    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=max', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Historical price data unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        const points = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }))
+          .sort((a: {date:string;price:number}, b: {date:string;price:number}) => a.date.localeCompare(b.date));
+        if (!points.length) throw new Error('No historical price points available');
+        const cutoff = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+        const recent = points.filter((point: {date:string;price:number}) => point.date >= cutoff);
+        const high52 = (recent.length ? recent : points).reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
+        const historicalHigh = points.reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
+        setHistoricalPrice({
+          loading: false,
+          high52w: high52.price,
+          high52wDate: high52.date,
+          historicalHigh: historicalHigh.price,
+          historicalHighDate: historicalHigh.date,
+          error: '',
+        });
+      })
+      .catch(error => {
+        if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
+      });
+    return () => { cancelled = true; };
+  }, [selected]);
 
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
@@ -224,7 +279,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <>
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.25fr] gap-4 items-start">
             <div>
-              {selectedAnalysis && <PositionDetail h={selectedAnalysis}/>}
+              {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>} 
             </div>
             <Panel title="Held portfolio universe" subtitle="Live portfolio positions · quote freshness · model state · select a holding to update decision context">
               <div className="flex flex-wrap gap-2 mb-3">
@@ -513,7 +568,16 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
   </button>;
 }
 
-function PositionDetail({h}:{h:PositionAnalysis}) {
+function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
+  const canCalculateExitScenarios = h.livePrice != null && !h.liveStale;
+  const scenarios = [
+    canCalculateExitScenarios && h.livePrice != null ? { label: 'Current', price: h.livePrice } : null,
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+10% from current', price: h.livePrice * 1.10 } : null,
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+20% from current', price: h.livePrice * 1.20 } : null,
+    historicalPrice.high52w != null ? { label: '52-week high', price: historicalPrice.high52w, date: historicalPrice.high52wDate } : null,
+    historicalPrice.historicalHigh != null ? { label: 'Historical high (available)', price: historicalPrice.historicalHigh, date: historicalPrice.historicalHighDate } : null,
+  ].filter(Boolean) as Array<{label:string;price:number;date?:string}>;
+
   return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
     <div className="grid grid-cols-2 gap-2">
       <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/>
@@ -527,9 +591,121 @@ function PositionDetail({h}:{h:PositionAnalysis}) {
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
       <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="At +10% from current" value={h.whatIfProfitAt10Pct == null ? '—' : (h.whatIfProfitAt10Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt10Pct.toFixed(2)} />
-      <Info label="At +20% from current" value={h.whatIfProfitAt20Pct == null ? '—' : (h.whatIfProfitAt20Pct >= 0 ? '+' : '') + '$' + h.whatIfProfitAt20Pct.toFixed(2)} />
+      <Info label="Average cost" value={'
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>
+        {h.averageInAlert ? 'Average-in review alert · triggered' : 'Average-in review · not triggered'}
+      </div>
+      <div className="text-sm mt-2">{h.averageInAlert
+        ? 'Price is below your average cost and the configured group/peer evidence gate is currently satisfied.'
+        : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : h.addTrigger}</div>
+    </div>
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
+      <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
+    </div>
+    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
+      <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
+      <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
+      <div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div>
+    </div>
+  </Panel>;
+}
+
+function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div>
+    <div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div>
+  </div>;
+}
+
+function StatePill({state}:{state:PositionAnalysis['state']}) {
+  const cls = state === 'ADD REVIEW'
+    ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
+    : state === 'RISK REVIEW'
+      ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
+  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
+}
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
+}
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
+}
+ + h.averageCost.toFixed(2)} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
+      <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? ((h.livePrice / h.averageCost - 1) * 100 >= 0 ? '+' : '') + ((h.livePrice / h.averageCost - 1) * 100).toFixed(2) + '%' : '—'} />
+    </div>
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+      <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L if the full position were sold at each reference price. Historical levels use the available history returned by the market-data provider.</div>
+      {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
+      {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
+      {scenarios.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-[10px]">
+            <thead className="text-white/25 uppercase font-mono">
+              <tr>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Sale value</th>
+                <th className="py-2 pr-3">Profit / loss</th>
+                <th className="py-2">Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => {
+                const saleValue = scenario.price * h.quantity;
+                const profit = saleValue - h.investedValue;
+                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
+                return (
+                  <tr key={scenario.label} className="border-t border-white/5">
+                    <td className="py-2 pr-3 text-white/60">
+                      {scenario.label}
+                      {scenario.date ? <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span> : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">${scenario.price.toFixed(2)}</td>
+                    <td className="py-2 pr-3 font-mono">${saleValue.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{profit >= 0 ? '+' : ''}${profit.toFixed(2)}</td>
+                    <td className={'py-2 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
     <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
       <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
