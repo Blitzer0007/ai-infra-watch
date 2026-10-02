@@ -1,4 +1,5 @@
-import { FormEvent, ReactNode, useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { LockKeyhole, Loader2 } from 'lucide-react';
 import { authenticateAccessToken, clearAccessToken, getAccessToken } from '../utils/apiAuth';
 
