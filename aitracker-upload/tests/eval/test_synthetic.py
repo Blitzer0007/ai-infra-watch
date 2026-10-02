@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.eval.synthetic import coverage, generate_synthetic_cases
 from app.mcp_client.client import ToolInfo
-from mcp_client.inprocess import InProcessMCPToolbox
+from app.mcp_client.inprocess import InProcessMCPToolbox
 
 
 def tool(name, description="test tool", props=None, required=None):
