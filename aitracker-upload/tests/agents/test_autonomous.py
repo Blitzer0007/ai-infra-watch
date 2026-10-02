@@ -668,7 +668,7 @@ def test_evidence_availability_distinguishes_empty_failed_and_missing():
     result = _evidence_availability("Analyze AMD today and explain the drivers", calls)
     assert result["channels"]["market"]["status"] == "EMPTY"
     assert result["channels"]["news"]["status"] == "FAILED"
-    assert result["channels"]["sec"]["status"] == "MISSING"
+    assert result["channels"]["regulatory_primary"]["status"] == "MISSING"
     assert result["complete"] is False
     assert result["status_counts"]["EMPTY"] == 1
     assert result["status_counts"]["FAILED"] == 1
