@@ -389,23 +389,35 @@ def _needs_evidence_gate(question: str) -> bool:
 
 
 def _required_evidence_families(question: str) -> tuple[str, ...]:
-    """Return evidence channels expected for a bounded research answer.
+    """Return only *explicitly required* evidence families.
 
-    The list is question-sensitive: earnings/congress/macro are not mandatory
-    for every stock question, while market + recent news + primary SEC evidence
-    are the default core channels for causal/impact research.
+    Generic stock/ETF research no longer requires market + news + SEC as a
+    fixed checklist. The sufficiency policy instead requires multiple usable
+    families, while explicit requests such as "check SEC" remain hard
+    requirements. This makes the gate question-driven rather than SEC-driven.
     """
     lower = question.lower()
-    families = ["market", "news", "sec"]
-    if any(term in lower for term in ("earnings", "eps", "revenue", "results", "surprise")):
+    families: list[str] = []
+    if any(term in lower for term in ("sec", "edgar", "10-k", "10-q", "8-k", "filing", "filings", "regulatory disclosure")):
+        families.append("regulatory_primary")
+    if any(term in lower for term in ("company announcement", "company press", "investor relations", "ir release", "official documentation", "official docs", "company docs", "product documentation")):
+        families.append("issuer_primary")
+    if any(term in lower for term in ("analyst", "price target", "target price", "consensus", "wall street", "estimate revision", "rating")):
+        families.append("analyst_consensus")
+    if any(term in lower for term in ("earnings", "eps", "revenue surprise", "results", "guidance")):
         families.append("earnings")
+    if any(term in lower for term in ("reaction", "reacted", "event study", "price history", "historical market data", "historical price data", "historical stock price")):
         families.append("event_study")
-    if any(term in lower for term in ("reaction", "reacted", "event study", "price history", "historical price")):
-        families.append("event_study")
-    if any(term in lower for term in ("congress", "senator", "representative", "official trade")):
+    if any(term in lower for term in ("congress", "senator", "representative", "official trade", "congressional trade")):
         families.append("congress")
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
         families.append("macro")
+    if any(term in lower for term in ("portfolio", "my holdings", "my positions", "held stocks", "holdings")):
+        families.append("portfolio")
+    if any(term in lower for term in ("forecast", "forecast track", "prediction accuracy", "forecast accuracy", "verification history")):
+        families.append("forecast")
+    if any(term in lower for term in ("ai quality", "hallucination", "red team", "red-team", "research quality", "agent reliability")):
+        families.append("quality")
     return tuple(dict.fromkeys(families))
 
 
@@ -486,10 +498,16 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
         family for family, item in matrix.items()
         if item["status"] != "AVAILABLE"
     ]
+    usable_families = [
+        family for family, item in matrix.items()
+        if item["status"] == "AVAILABLE"
+    ]
     return {
         "required": list(expected),
         "channels": matrix,
         "missing": missing,
+        "usable_families": usable_families,
+        "usable_family_count": len(usable_families),
         "complete": not missing,
         "status_counts": {
             status: sum(1 for item in matrix.values() if item["status"] == status)
@@ -553,22 +571,45 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
         score = quality.score if quality else None
         confidence = sufficiency.confidence if sufficiency else None
 
-        # Only allow an early stop when Jev explicitly selects stop and the
-        # evidence-quality score reaches the Usable/Strong boundary.
+        # JEV is the sufficiency advisor; deterministic policy supplies the
+        # safety rails. Generic research does NOT require Market+News+SEC.
+        # We require at least two usable families, while explicit user-requested
+        # families remain hard requirements. "Usable" is enough; "Strong" is
+        # better evidence but is not mandatory for every question.
         conflict_detected = bool(conflict_report.get("detected"))
-        if conflict_detected:
-            decision = "gather_more"
-        elif (
+        usable_family_count = int(availability.get("usable_family_count", 0) or 0)
+        explicit_requirements_met = availability["complete"]
+        jev_stop_ready = (
             choice == "stop"
             and isinstance(score, (int, float))
-            and score >= 2.25
+            and score >= 2.0
             and (confidence is None or confidence >= 0.50)
-            and availability["complete"]
-        ):
-            decision = "stop"
-        elif choice in {"gather_more", "resolve_conflict"} or not availability["complete"]:
+        )
+        policy_stop_ready = (
+            not conflict_detected
+            and explicit_requirements_met
+            and usable_family_count >= 2
+        )
+
+        if conflict_detected:
             decision = "gather_more"
-        elif isinstance(score, (int, float)) and score < 1.50:
+        elif not explicit_requirements_met:
+            decision = "gather_more"
+        elif jev_stop_ready and policy_stop_ready:
+            decision = "stop"
+        elif (
+            policy_stop_ready
+            and usable_family_count >= 3
+            and isinstance(score, (int, float))
+            and score >= 2.0
+        ):
+            # JEV can be conservative on broad questions. Three distinct,
+            # usable families with no conflict are enough to finalize under the
+            # platform policy, even when JEV returns a non-stop advisory.
+            decision = "stop"
+        elif choice in {"gather_more", "resolve_conflict"} or usable_family_count < 2:
+            decision = "gather_more"
+        elif isinstance(score, (int, float)) and score < 2.0:
             decision = "gather_more"
         else:
             decision = "continue"
@@ -595,20 +636,34 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
 
 
 def _evidence_family(tool_name: str) -> str:
-    """Normalize MCP tools into broad evidence channels to avoid redundant sources."""
+    """Normalize MCP tools into provenance-aware research families."""
     name = tool_name.lower()
     if name.startswith("news."):
         return "news"
+    if any(token in name for token in ("analyst.", "analyst_", "price_target", "target_price", "consensus", "estimate_revision", "recommendation", "ratings")):
+        return "analyst_consensus"
+    if any(token in name for token in (
+        "investor_relations", "investor-relations", "company.", "companies.",
+        "issuer.", "press_release", "press-release", "newsroom", "official.",
+        "product_docs", "product-docs", "company_docs", "company-docs",
+    )):
+        return "issuer_primary"
     if "get_event_study" in name:
         return "event_study"
     if "get_earnings" in name:
         return "earnings"
-    if name.startswith("filings."):
-        return "sec"
+    if name.startswith("filings.") or "sec" in name or "edgar" in name:
+        return "regulatory_primary"
     if "congress" in name:
         return "congress"
     if "macro" in name or "risk" in name:
         return "macro"
+    if "forecast" in name or "verification" in name:
+        return "forecast"
+    if "portfolio" in name or "holdings" in name:
+        return "portfolio"
+    if "quality" in name or "red_team" in name or "red-team" in name:
+        return "quality"
     if "rotation" in name or "relationship" in name:
         return "relationship"
     if any(token in name for token in (".get_quote", ".get_quotes", ".get_snapshot")):
@@ -617,22 +672,38 @@ def _evidence_family(tool_name: str) -> str:
 
 
 def _question_evidence_priorities(question: str) -> tuple[str, ...]:
-    """Return evidence channels in a deterministic complementary order."""
+    """Return evidence channels in a deterministic complementary order.
+
+    These are preferences, not mandatory requirements. The agent can answer
+    with any sufficient combination of usable, relevant families.
+    """
     lower = question.lower()
     priorities: list[str] = []
+    if any(term in lower for term in ("forecast", "prediction accuracy", "forecast track", "verification history")):
+        priorities.extend(["forecast", "market", "event_study"])
+    if any(term in lower for term in ("portfolio", "my holdings", "my positions", "held stocks", "holdings")):
+        priorities.extend(["portfolio", "market", "news", "issuer_primary"])
+    if any(term in lower for term in ("analyst", "price target", "target price", "consensus", "wall street", "estimate revision", "rating")):
+        priorities.append("analyst_consensus")
+    if any(term in lower for term in ("official documentation", "official docs", "company docs", "product documentation", "investor relations", "company announcement")):
+        priorities.append("issuer_primary")
     if any(term in lower for term in ("earnings", "earning", "eps", "revenue surprise")):
         priorities.extend(["earnings", "event_study"])
     if any(term in lower for term in ("reaction", "event study", "reacted", "price moved", "price movement", "historical market data", "historical price data", "price history", "historical stock price")):
         priorities.append("event_study")
-    if any(term in lower for term in ("sec", "filing", "contract", "disclosure", "material agreement")):
-        priorities.append("sec")
+    if any(term in lower for term in ("sec", "edgar", "filing", "contract", "disclosure", "material agreement")):
+        priorities.append("regulatory_primary")
     if any(term in lower for term in ("congress", "senator", "representative", "official trade")):
         priorities.append("congress")
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid", "risk")):
         priorities.append("macro")
-    if any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact", "affected")):
-        priorities.extend(["news", "sec", "event_study"])
-    priorities.extend(["news", "sec", "event_study", "earnings", "macro", "congress"])
+    if any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact", "affected", "recent developments")):
+        priorities.extend(["market", "news", "issuer_primary", "analyst_consensus", "regulatory_primary", "event_study"])
+    priorities.extend([
+        "market", "news", "issuer_primary", "regulatory_primary",
+        "analyst_consensus", "earnings", "event_study", "macro", "congress",
+        "portfolio", "forecast", "quality",
+    ])
     return tuple(dict.fromkeys(priorities))
 
 
@@ -644,24 +715,41 @@ def _channel_tool_usable(family: str, name: str) -> bool:
             token in lower
             for token in ("news.search", "news.company", "news.sector", "news.global", "news.geopolitical", "news.health")
         )
-    if family == "sec":
-        return any(
-            token in lower
-            for token in (
-                "filings.get_catalysts",
-                "filings.search_filings",
-                "filings.get_filings",
-                "filings.get_contracts",
-                "filings.get_milestones",
-                "filings.get_documents",
-            )
-        )
+    if family == "issuer_primary":
+        return any(token in lower for token in (
+            "investor_relations", "investor-relations", "company.", "companies.",
+            "issuer.", "press_release", "press-release", "newsroom", "official.",
+            "product_docs", "product-docs", "company_docs", "company-docs",
+        ))
+    if family == "analyst_consensus":
+        return any(token in lower for token in (
+            "analyst.", "analyst_", "price_target", "target_price", "consensus",
+            "estimate_revision", "recommendation", "ratings",
+        ))
+    if family == "regulatory_primary":
+        return any(token in lower for token in (
+            "filings.get_catalysts", "filings.search_filings", "filings.get_filings",
+            "filings.get_contracts", "filings.get_milestones", "filings.get_documents",
+            "sec.", "edgar",
+        ))
     if family == "event_study":
         return "get_event_study" in lower
     if family == "earnings":
         return "get_earnings" in lower
     if family == "market":
         return any(token in lower for token in (".get_quote", ".get_quotes", ".get_snapshot"))
+    if family == "congress":
+        return "congress" in lower and any(token in lower for token in ("trade", "transaction", "get_"))
+    if family == "macro":
+        return "macro" in lower or "risk" in lower
+    if family == "portfolio":
+        return "portfolio" in lower or "holdings" in lower
+    if family == "forecast":
+        return "forecast" in lower or "verification" in lower
+    if family == "quality":
+        return "quality" in lower or "red_team" in lower or "red-team" in lower
+    if family == "relationship":
+        return "relationship" in lower or "rotation" in lower
     # Unknown tools are not evidence channels; only recognized evidence
     # families may be selected as complementary research sources.
     return False
