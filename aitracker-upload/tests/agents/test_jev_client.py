@@ -11,6 +11,14 @@ def test_platform_assessment_defines_multiple_typed_questions():
     assert questions["evidence_quality"]["type"] == "score"
 
 
+def test_portfolio_assessment_defines_typed_decision_questions():
+    questions = ASSESSMENTS["portfolio"]
+    assert set(questions) == {"attention", "context", "evidence_quality"}
+    assert questions["attention"]["type"] == "choice"
+    assert questions["context"]["type"] == "choice"
+    assert questions["evidence_quality"]["type"] == "score"
+
+
 def test_jev_client_evaluate_parses_choice_and_score(tmp_path, monkeypatch):
     captured = {}
 
