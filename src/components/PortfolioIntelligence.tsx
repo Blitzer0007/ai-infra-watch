@@ -569,6 +569,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
 }
 
 function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
+  const [customTarget, setCustomTarget] = useState('');
   const canCalculateExitScenarios = h.livePrice != null && !h.liveStale;
   const isLeveraged = h.symbol === 'SOXL';
   const addGroupThreshold = isLeveraged ? 68 : 62;
@@ -580,6 +581,7 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     canCalculateExitScenarios && h.livePrice != null ? { label: '+20% from current', price: h.livePrice * 1.20 } : null,
     historicalPrice.high52w != null ? { label: '52-week high', price: historicalPrice.high52w, date: historicalPrice.high52wDate } : null,
     historicalPrice.historicalHigh != null ? { label: 'Historical high (available)', price: historicalPrice.historicalHigh, date: historicalPrice.historicalHighDate } : null,
+    Number(customTarget) > 0 ? { label: 'Custom target', price: Number(customTarget) } : null,
   ].filter(Boolean) as Array<{label:string;price:number;date?:string}>;
   const distanceTo52wHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.high52w != null && h.livePrice > 0
     ? ((historicalPrice.high52w / h.livePrice) - 1) * 100
@@ -659,6 +661,22 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Info label="52-week high distance" value={distanceTo52wHigh == null ? '—' : '+' + distanceTo52wHigh.toFixed(2) + '% from current'} />
         <Info label="Historical high distance" value={distanceToHistoricalHigh == null ? '—' : '+' + distanceToHistoricalHigh.toFixed(2) + '% from current'} />
+      </div>
+      <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+        <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Custom target price</div>
+        <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={customTarget}
+            onChange={e => setCustomTarget(e.target.value)}
+            placeholder="Enter price"
+            aria-label="Custom target price"
+            className="w-full sm:w-44 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-mono text-white outline-none focus:border-cyan-400/30"
+          />
+          <div className="text-[9px] text-white/30">Adds a hypothetical full-position sale row; it is not a forecast or trading instruction.</div>
+        </div>
       </div>
     </div>
     <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
