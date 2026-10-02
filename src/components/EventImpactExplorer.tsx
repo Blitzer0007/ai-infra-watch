@@ -37,7 +37,7 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   const key = symbol.trim().toUpperCase();
   if (!historyCache[key]) {
     historyCache[key] = fetch(
-      '/api/stock-history?symbol=' + encodeURIComponent(key) + '&range=5y'
+      '/api/company-scale?action=history&symbol=' + encodeURIComponent(key) + '&range=5y'
     )
       .then(async (res) => {
         if (!res.ok) throw new Error('History request failed: HTTP ' + res.status);
@@ -51,7 +51,7 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
 
 async function loadSecEvents(symbol: string): Promise<SecEvent[]> {
   const res = await fetch(
-    '/api/stock-milestones?symbol=' + encodeURIComponent(symbol) + '&limit=20'
+    '/api/company-scale?action=milestones&symbol=' + encodeURIComponent(symbol) + '&limit=20'
   );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || 'SEC event lookup failed');

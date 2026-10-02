@@ -133,3 +133,17 @@ def test_analyst_expectations_panel(page):
     page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
     page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
     assert "EXTERNAL ANALYST EXPECTATIONS" in page.get_by_test_id("analyst-expectations").inner_text().upper()
+
+
+def test_event_study_uses_consolidated_api(page):
+    requests = []
+    mock_local_apis(page)
+    page.on("request", lambda request: requests.append(request.url))
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Event Study", exact=True).click()
+    page.wait_for_timeout(1500)
+    assert any("/api/company-scale?action=milestones" in url for url in requests)
+    assert any("/api/company-scale?action=history" in url for url in requests)
+    assert not any("/api/stock-milestones" in url for url in requests)
+    assert not any("/api/stock-history" in url for url in requests)

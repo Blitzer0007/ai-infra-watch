@@ -146,6 +146,44 @@ async function fetchCongressTrades(req) {
 
 import { quote as routedQuote } from './_market-data.js';
 
+async function fetchGdeltJson(query, timespan, label = 'GDELT') {
+  const url =
+    'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
+    encodeURIComponent(query) +
+    '&mode=ArtList&format=json&maxrecords=20&timespan=' +
+    encodeURIComponent(timespan || '24h') +
+    '&sort=datedesc';
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'ai-infra-watch/1.0' },
+        signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        return {
+          articles: Array.isArray(payload?.articles) ? payload.articles : [],
+          error: null,
+        };
+      }
+
+      lastError = new Error(label + ' HTTP ' + response.status);
+      if (![408, 425, 429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 450 * (2 ** attempt)));
+  }
+
+  return {
+    articles: [],
+    error: label + ' unavailable: ' + String(lastError?.message || lastError || 'unknown error'),
+  };
+}
+
 function classifyPoliticalTopic(text) {
   const value = text.toLowerCase();
   if (value.includes('export') || value.includes('chip') || value.includes('semiconductor') || value.includes('gpu')) {
