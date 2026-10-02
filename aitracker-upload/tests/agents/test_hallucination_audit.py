@@ -34,3 +34,20 @@ def test_hallucination_audit_clear_when_claim_matches_sources():
     assert report["claimCount"] == 1
     assert report["ungroundedClaims"] == 0
     assert report["status"] == "CLEAR"
+
+
+
+def test_finalization_uses_private_hallucination_audit_helper():
+    """Regression guard for the production NameError seen on finalization."""
+    import ast
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[2] / "app" / "agents" / "autonomous.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    bare_calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "hallucination_audit"
+    ]
+    assert bare_calls == []
