@@ -302,6 +302,73 @@ export function summarizeSample(values: number[]) {
     quality: sampleQuality(n),
   };
 }
+export type ValidationMatrixDetail = {
+  ticker: string;
+  horizon: number;
+  tests: number;
+  direction: number;
+  error: number;
+  coverage50: number;
+  coverage80: number;
+  baselineDirection: number;
+  baselineError: number;
+};
+
+export type ValidationMatrixSummary = {
+  tests: number;
+  direction: number;
+  error: number;
+  coverage50: number;
+  coverage80: number;
+  baselineDirection: number;
+  baselineError: number;
+  calibration: CalibrationBucket[];
+  details: ValidationMatrixDetail[];
+};
+
+/** Aggregates independent ticker/horizon backtests without ranking or reweighting them. */
+export function summarizeValidationMatrix(
+  runs: Array<{ ticker: string; horizon: number; summary: {
+    rows: Array<{ positiveProbability: number; actual: number; median: number }>;
+    directionalAccuracy: number;
+    medianAbsoluteError: number;
+    p25p75Coverage: number;
+    p10p90Coverage: number;
+    baselineDirectionalAccuracy: number;
+    baselineMedianAbsoluteError: number;
+  } }>,
+): ValidationMatrixSummary {
+  const valid = runs.filter(item => item.summary.rows.length > 0);
+  const rows = valid.flatMap(item => item.summary.rows);
+  const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  const details = valid.map(item => ({
+    ticker: item.ticker,
+    horizon: item.horizon,
+    tests: item.summary.rows.length,
+    direction: item.summary.directionalAccuracy,
+    error: item.summary.medianAbsoluteError,
+    coverage50: item.summary.p25p75Coverage,
+    coverage80: item.summary.p10p90Coverage,
+    baselineDirection: item.summary.baselineDirectionalAccuracy,
+    baselineError: item.summary.baselineMedianAbsoluteError,
+  }));
+  return {
+    tests: rows.length,
+    direction: avg(valid.map(item => item.summary.directionalAccuracy)),
+    error: avg(valid.map(item => item.summary.medianAbsoluteError)),
+    coverage50: avg(valid.map(item => item.summary.p25p75Coverage)),
+    coverage80: avg(valid.map(item => item.summary.p10p90Coverage)),
+    baselineDirection: avg(valid.map(item => item.summary.baselineDirectionalAccuracy)),
+    baselineError: avg(valid.map(item => item.summary.baselineMedianAbsoluteError)),
+    calibration: summarizeCalibration(rows.map(row => ({
+      confidence: row.positiveProbability,
+      positive: row.actual > 0,
+      excessReturnPct: row.actual - row.median,
+    }))),
+    details,
+  };
+}
+
 export type CalibrationBucket = {
   bucket: string;
   n: number;
