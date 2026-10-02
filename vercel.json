@@ -6,35 +6,35 @@
   "rewrites": [
     {
       "source": "/api/quote",
-      "destination": "/api/market/quote"
+      "destination": "/api/market?route=quote"
     },
     {
       "source": "/api/company-scale",
-      "destination": "/api/market/company-scale"
+      "destination": "/api/market?route=company-scale"
     },
     {
       "source": "/api/contract-detail",
-      "destination": "/api/market/contract-detail"
+      "destination": "/api/market?route=contract-detail"
     },
     {
       "source": "/api/earnings-alerts",
-      "destination": "/api/market/earnings-alerts"
+      "destination": "/api/market?route=earnings-alerts"
     },
     {
       "source": "/api/ai-quality",
-      "destination": "/api/quality/ai-quality"
+      "destination": "/api/quality?route=ai-quality"
     },
     {
       "source": "/api/signal-scorecard",
-      "destination": "/api/quality/signal-scorecard"
+      "destination": "/api/quality?route=signal-scorecard"
     },
     {
       "source": "/api/forecast-verification",
-      "destination": "/api/cron/forecast-verification"
+      "destination": "/api/cron?route=forecast-verification"
     },
     {
       "source": "/api/portfolio-digest",
-      "destination": "/api/cron/portfolio-digest"
+      "destination": "/api/cron?route=portfolio-digest"
     },
     {
       "source": "/(.*)",
