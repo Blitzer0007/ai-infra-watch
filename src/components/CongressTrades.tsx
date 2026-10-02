@@ -321,7 +321,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, trade.transactionDate || trade.date),
+        reaction: reactionFor(history, trade.filingDate || trade.date || trade.transactionDate),
       }))
       .filter((row) => row.reaction);
   }, [filtered, history, symbolFilter]);
@@ -382,7 +382,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       <div className="flex items-start space-x-3 bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 text-white/80">
         <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
         <div className="text-xs leading-relaxed">
-          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the transaction date, while the filing date remains the disclosure timestamp.
+          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the disclosure/filing date when available. The transaction date remains a separate field and is not substituted for the disclosure timestamp.
         </div>
       </div>
 
