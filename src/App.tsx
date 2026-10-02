@@ -23,6 +23,7 @@ import HelpGuide from './components/HelpGuide';
 import ForwardOutlook from './components/ForwardOutlook';
 import AutonomousResearch from './components/AutonomousResearch';
 import DataHealth from './components/DataHealth';
+import AIQualityLab from './components/AIQualityLab';
 
 type LivePrice = {
   price: number;
@@ -278,8 +279,9 @@ export default function App() {
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'outlook', label: 'Forward Outlook', index: '09', icon: TrendingUp },
-    { id: 'health', label: 'Data Health', index: '10', icon: ShieldAlert },
+    { id: 'quality', label: 'AI Quality Lab', index: '09', icon: Bot },
+    { id: 'outlook', label: 'Forward Outlook', index: '10', icon: TrendingUp },
+    { id: 'health', label: 'Data Health', index: '11', icon: ShieldAlert },
     { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
@@ -498,6 +500,7 @@ export default function App() {
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
+              {activeView === 'quality' && <AIQualityLab />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
               {activeView === 'health' && <DataHealth evidenceAvailability={liveData?.evidenceAvailability || {}} timestamp={liveData?.timestamp} isLoading={isLiveLoading} onRefresh={() => handleFetchLiveData(true)} error={liveError} />}
