@@ -535,7 +535,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <>
           <div className="space-y-4">
             {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
+            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} />
             {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+            {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
             <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
             <Panel title="Held portfolio" subtitle="Persistent positions · live quote state · select a holding to update the selected holding view">
@@ -919,6 +921,52 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
     </section>
   );
 }
+function PortfolioEvidenceCoverage({analyses,contracts,congressTrades,macroRisks,news}:{analyses:PositionAnalysis[];contracts:any[];congressTrades:any[];macroRisks:any[];news:any[]}) {
+  const held = new Set(analyses.map(item => item.symbol));
+  const secCount = contracts.filter(item => held.has(String(item?.company || item?.stockSymbol || '').toUpperCase())).length;
+  const congressCount = congressTrades.filter(item => held.has(String(item?.stockSymbol || item?.symbol || '').toUpperCase())).length;
+  const channels = [
+    { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
+    { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
+    { label: 'Peers', value: analyses.filter(item => item.vsPeers != null).length, total: analyses.length },
+    { label: 'SEC / events', value: secCount, total: null },
+    { label: 'Congress', value: congressCount, total: null },
+    { label: 'News', value: news.length, total: null },
+    { label: 'Macro', value: macroRisks.length, total: null },
+  ];
+  const available = channels.filter(item => item.value > 0).length;
+  const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div><h2 className="text-base font-black mt-1">{status}</h2><div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence or quality score.</div></div><div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mt-3">
+      {channels.map(channel => <div key={channel.label} className={'rounded-lg border p-2 ' + (channel.value > 0 ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}>
+        <div className="text-[8px] font-mono uppercase tracking-wider text-white/45">{channel.label}</div>
+        <div className="text-[10px] font-mono font-bold mt-1">{channel.value > 0 ? 'AVAILABLE' : 'MISSING'}</div>
+        {channel.total != null && <div className="text-[8px] font-mono text-white/25 mt-1">{channel.value}/{channel.total}</div>}
+      </div>)}
+    </div>
+  </section>;
+}
+
+function DecisionGateSummary({h}:{h:PositionAnalysis}) {
+  const leveraged = h.symbol === 'SOXL';
+  const groupThreshold = leveraged ? 68 : 62;
+  const breadthThreshold = leveraged ? 0.67 : 0.50;
+  const gates = [
+    ['Below average cost', h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
+    ['Group score', h.groupScore != null && h.groupScore >= groupThreshold],
+    ['Group breadth', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
+    ['Group vs universe', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
+    ['Peer relative', h.vsPeers != null && h.vsPeers >= 0],
+  ] as const;
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/55 p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision gates</div><h2 className="text-base font-black mt-1">Current evidence gate for {h.symbol}</h2></div><StatePill state={h.state}/></div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+      {gates.map(([label,passed]) => <div key={label} className={'rounded-lg border p-2 ' + (passed ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase text-white/45">{label}</span><span className={'text-[8px] font-mono font-bold ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span></div></div>)}
+    </div>
+  </section>;
+}
+
 function PortfolioPeerImpactSummary({comparisons}:{comparisons:PeerCounterfactual[]}) {
   const available = comparisons.filter(item => item.status === 'available' && item.hypotheticalProfit != null && item.actualProfit != null);
   const actualProfit = available.reduce((sum, item) => sum + (item.actualProfit ?? 0), 0);
