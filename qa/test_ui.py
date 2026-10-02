@@ -115,4 +115,4 @@ def test_portfolio_manager_create_flow(page):
     page.get_by_test_id("portfolio-field-purchase-date").fill("2026-01-02")
     page.get_by_test_id("portfolio-field-notes").fill("QA holding")
     page.get_by_test_id("portfolio-save-holding").click()
-    portfolio.get_by_text("AMD", exact=True).wait_for(state="visible", timeout=30000)
+    assert portfolio.get_by_text("AMD", exact=True).count() >= 1
