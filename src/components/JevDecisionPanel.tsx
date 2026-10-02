@@ -11,7 +11,7 @@ type JevAnswer = {
 };
 
 type Props = {
-  kind: 'platform' | 'contracts' | 'events' | 'macro' | 'congress' | 'earnings';
+  kind: 'platform' | 'portfolio' | 'contracts' | 'events' | 'macro' | 'congress' | 'earnings';
   state: unknown;
   title?: string;
   subtitle?: string;
