@@ -382,7 +382,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
-  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number} | null>(null);
+  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;rows:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;baselineDirection:number;baselineError:number;directionLift:number;errorLift:number;coverage50:number;coverage80:number}>} | null>(null);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
@@ -808,15 +808,39 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         const body = await response.json();
         return { ticker, points: Array.isArray(body.points) ? body.points : [] };
       }));
-      const summaries = histories.flatMap(item => HORIZONS.map(h => historicalBacktest(item.points, h.days)));
-      const valid = summaries.filter(summary => summary.rows.length);
-      const rows = valid.flatMap(summary => summary.rows);
+      const results = histories.flatMap(item => HORIZONS.map(h => {
+        const summary = historicalBacktest(item.points, h.days);
+        return { ticker: item.ticker, horizon: h.days, summary };
+      }));
+      const valid = results.filter(item => item.summary.rows.length);
+      const rows = valid.flatMap(item => item.summary.rows);
+      const weighted = (field: 'directionalAccuracy' | 'medianAbsoluteError' | 'p25p75Coverage' | 'p10p90Coverage' | 'baselineDirectionalAccuracy' | 'baselineMedianAbsoluteError' | 'directionalLift' | 'errorLift') => {
+        const total = valid.reduce((sum, item) => sum + item.summary.rows.length, 0);
+        return total ? valid.reduce((sum, item) => sum + Number(item.summary[field]) * item.summary.rows.length, 0) / total : 0;
+      };
       setMatrix({
         tests: rows.length,
-        direction: valid.length ? mean(valid.map(summary => summary.directionalAccuracy)) : 0,
-        error: valid.length ? mean(valid.map(summary => summary.medianAbsoluteError)) : 0,
-        coverage50: valid.length ? mean(valid.map(summary => summary.p25p75Coverage)) : 0,
-        coverage80: valid.length ? mean(valid.map(summary => summary.p10p90Coverage)) : 0
+        direction: weighted('directionalAccuracy'),
+        error: weighted('medianAbsoluteError'),
+        coverage50: weighted('p25p75Coverage'),
+        coverage80: weighted('p10p90Coverage'),
+        baselineDirection: weighted('baselineDirectionalAccuracy'),
+        baselineError: weighted('baselineMedianAbsoluteError'),
+        directionLift: weighted('directionalLift'),
+        errorLift: weighted('errorLift'),
+        rows: valid.map(item => ({
+          ticker: item.ticker,
+          horizon: item.horizon,
+          tests: item.summary.rows.length,
+          direction: item.summary.directionalAccuracy,
+          error: item.summary.medianAbsoluteError,
+          baselineDirection: item.summary.baselineDirectionalAccuracy,
+          baselineError: item.summary.baselineMedianAbsoluteError,
+          directionLift: item.summary.directionalLift,
+          errorLift: item.summary.errorLift,
+          coverage50: item.summary.p25p75Coverage,
+          coverage80: item.summary.p10p90Coverage
+        }))
       });
       setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
     } catch (err: any) {
@@ -1251,12 +1275,38 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
         </div>
         {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
-        {matrix && <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg median error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P50 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P80 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
+        {matrix && <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Model direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction lift</div><div className="text-sm font-mono font-bold mt-1">{matrix.directionLift >= 0 ? '+' : ''}{(matrix.directionLift*100).toFixed(1)} pp</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Model error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{matrix.errorLift >= 0 ? '+' : ''}{matrix.errorLift.toFixed(1)} pp</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P25–P75</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
+          </div>
+          <div className="overflow-x-auto max-h-72 rounded-xl border border-white/5">
+            <table className="min-w-full text-left text-[9px] font-mono">
+              <thead className="sticky top-0 bg-[#15181E] text-white/25 uppercase">
+                <tr><th className="px-2 py-2">Ticker</th><th className="px-2 py-2">Horizon</th><th className="px-2 py-2">N</th><th className="px-2 py-2">Model dir.</th><th className="px-2 py-2">Baseline</th><th className="px-2 py-2">Lift</th><th className="px-2 py-2">Model error</th><th className="px-2 py-2">Baseline error</th><th className="px-2 py-2">P25–P75</th></tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {matrix.rows.map(row => <tr key={row.ticker + '-' + row.horizon}>
+                  <td className="px-2 py-2 text-white/65">{row.ticker}</td>
+                  <td className="px-2 py-2 text-white/45">{row.horizon}D</td>
+                  <td className="px-2 py-2 text-white/45">{row.tests}</td>
+                  <td className="px-2 py-2 text-white/55">{(row.direction*100).toFixed(1)}%</td>
+                  <td className="px-2 py-2 text-white/45">{(row.baselineDirection*100).toFixed(1)}%</td>
+                  <td className="px-2 py-2 text-white/55">{row.directionLift >= 0 ? '+' : ''}{(row.directionLift*100).toFixed(1)} pp</td>
+                  <td className="px-2 py-2 text-white/55">{row.error.toFixed(1)} pp</td>
+                  <td className="px-2 py-2 text-white/45">{row.baselineError.toFixed(1)} pp</td>
+                  <td className="px-2 py-2 text-white/55">{(row.coverage50*100).toFixed(1)}%</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[8px] font-mono text-white/25">Aggregate metrics are weighted by the number of historical tests in each valid ticker/horizon group. No ticker or horizon is ranked.</div>
         </div>}
       </div>
 
