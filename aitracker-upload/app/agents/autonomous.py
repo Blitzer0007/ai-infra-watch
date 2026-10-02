@@ -1192,7 +1192,7 @@ class AutonomousMCPAgent:
         except Exception as exc:
             final_text = _deterministic_summary(question, calls, evidence_status=("insufficient" if resolution == "jev_evidence_insufficient" else ""))
             error = f"finalization_failed: {type(exc).__name__}: {exc}"
-            hallucination = hallucination_audit(final_text, successful)
+            hallucination = _hallucination_audit(final_text, successful)
             steps.append(Step(node="finalize", kind="node", note=error))
             return AutonomousResult(
                 question,
@@ -1207,7 +1207,7 @@ class AutonomousMCPAgent:
                 error=error,
                 resolution=resolution,
             )
-        hallucination = hallucination_audit(final_text, successful)
+        hallucination = _hallucination_audit(final_text, successful)
         steps.append(
             Step(
                 node="hallucination_audit",
