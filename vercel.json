@@ -29,6 +29,14 @@
       "destination": "/api/quality/signal-scorecard"
     },
     {
+      "source": "/api/forecast-verification",
+      "destination": "/api/cron/forecast-verification"
+    },
+    {
+      "source": "/api/portfolio-digest",
+      "destination": "/api/cron/portfolio-digest"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
@@ -60,9 +68,6 @@
     "api/*.py": {
       "maxDuration": 60,
       "excludeFiles": "{aitracker-upload/app/eval/**,aitracker-upload/app/harness/**,aitracker-upload/app/universe/**,aitracker-upload/tests/**,aitracker-upload/data/filings/**}"
-    },
-    "api/forecast-verification.js": {
-      "maxDuration": 60
     }
   }
 }
