@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
+import { fetchPortfolioHoldings } from '../utils/portfolioApi';
+import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
+import { authHeaders } from '../utils/apiAuth';
 
 type PricePoint = { date: string; price: number };
 
@@ -383,11 +386,29 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
   const [jevValidationError, setJevValidationError] = useState<string | null>(null);
+  const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
+  const [portfolioLoadError, setPortfolioLoadError] = useState<string | null>(null);
 
   const verificationDrift = useMemo(
     () => calculateVerificationDrift(forecasts, selectedStock, horizon),
     [forecasts, selectedStock, horizon],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPortfolioHoldings()
+      .then(rows => {
+        if (cancelled) return;
+        setPortfolioPositions(mapStoredPortfolioHoldings(rows));
+        setPortfolioLoadError(null);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setPortfolioPositions([]);
+        setPortfolioLoadError(error instanceof Error ? error.message : 'Portfolio context unavailable');
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -513,6 +534,45 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const selectedScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
   const meta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', logoColor: '#22c55e' };
 
+  const portfolioContext = useMemo(() => {
+    const totalInvested = portfolioPositions.reduce((sum, position) => sum + position.investedValue, 0);
+    const holding = portfolioPositions.find(position => position.symbol === selectedStock);
+    const positionValue = holding && currentPrice != null ? holding.quantity * currentPrice : holding?.investedValue ?? 0;
+    const weight = totalInvested > 0 ? positionValue / totalInvested : 0;
+    const concentrationPeers = portfolioPositions
+      .filter(position => position.symbol !== selectedStock && (position.group === holding?.group || position.theme === holding?.theme || position.peers.includes(selectedStock)))
+      .map(position => position.symbol);
+    const concentrationWeight = portfolioPositions
+      .filter(position => concentrationPeers.includes(position.symbol))
+      .reduce((sum, position) => sum + position.investedValue, 0) / Math.max(totalInvested, 1);
+    const thesis = String(holding?.notes || '').trim();
+    const eventDate = (item: any) => String(item?.date || item?.publishedAt || item?.published_at || item?.filingDate || '').slice(0, 10);
+    const eventTitle = (item: any) => String(item?.title || item?.name || item?.summary || 'Relevant event');
+    const now = new Date();
+    const horizonEnd = new Date(now.getTime() + 20 * 86400000);
+    const upcoming = [...contracts, ...news, ...politicalSignals]
+      .filter(item => {
+        const date = eventDate(item);
+        if (!date) return false;
+        const parsed = new Date(date + 'T23:59:59Z');
+        return parsed >= now && parsed <= horizonEnd;
+      })
+      .map(item => ({ date: eventDate(item), title: eventTitle(item) }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 6);
+    return { holding, totalInvested, positionValue, weight, concentrationPeers, concentrationWeight, thesis, upcoming, hasHolding: Boolean(holding) };
+  }, [portfolioPositions, selectedStock, currentPrice, contracts, news, politicalSignals]);
+
+  const forecastRisk = useMemo(() => {
+    const sample = analysis.sample;
+    const negative = sample.filter(value => value < 0);
+    return {
+      worst: sample.length ? Math.min(...sample) : null,
+      negativeCount: negative.length,
+      negativePct: sample.length ? negative.length / sample.length : 0,
+    };
+  }, [analysis.sample]);
+
   const runJevEvidenceCheck = async () => {
     if (!history.length || loading) return;
     setJevLoading(true);
@@ -551,7 +611,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
       const response = await fetch('/api/agent-ask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ question: prompt })
       });
       if (!response.ok) throw new Error('JEV evidence check failed (HTTP ' + response.status + ')');
@@ -851,6 +911,51 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <div className={`text-lg font-black font-mono mt-1 ${Number(value) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatReturn(Number(value))}</div>
                 </div>
               ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-rose-300/15 bg-rose-300/[.03] p-4">
+                <div className="flex items-center gap-2 mb-3"><TrendingDown className="w-4 h-4 text-rose-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-rose-200/70">Downside context</span></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Worst analogue</div><div className="text-sm font-mono font-bold mt-1 text-rose-300">{forecastRisk.worst == null ? '—' : formatReturn(forecastRisk.worst)}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Negative outcomes</div><div className="text-sm font-mono font-bold mt-1">{forecastRisk.negativeCount}/{analysis.sample.length || 0}</div></div>
+                </div>
+                <p className="text-[9px] text-white/35 mt-3">Review the lower tail before interpreting the median. Historical outcomes are not a loss limit.</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.03] p-4">
+                <div className="flex items-center gap-2 mb-3"><BarChart3 className="w-4 h-4 text-cyan-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Portfolio context</span></div>
+                {portfolioLoadError ? <div className="text-[9px] font-mono text-amber-200/60">Portfolio context unavailable: {portfolioLoadError}</div> : portfolioContext.hasHolding ? <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Position weight</div><div className="text-sm font-mono font-bold mt-1">{(portfolioContext.weight * 100).toFixed(1)}%</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Related holdings</div><div className="text-sm font-mono font-bold mt-1">{portfolioContext.concentrationPeers.length}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2 col-span-2"><div className="text-[8px] text-white/25 uppercase font-mono">Related exposure</div><div className="text-sm font-mono font-bold mt-1">{(portfolioContext.concentrationWeight * 100).toFixed(1)}% · {portfolioContext.concentrationPeers.join(', ') || 'none identified'}</div></div>
+                </div> : <div className="text-[9px] text-white/35">No saved holding for {selectedStock}. Forecast is being shown without position context.</div>}
+              </div>
+              <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[.03] p-4">
+                <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision context</span></div>
+                <div className="text-[8px] text-white/25 uppercase font-mono">Recorded thesis</div>
+                <div className="text-[10px] text-white/65 mt-1 leading-relaxed">{portfolioContext.thesis || 'No thesis recorded. Forecast does not invent a reason to own the stock.'}</div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div><div className="text-[9px] font-mono text-white/45 mt-1">Not recorded</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">Not recorded</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
+                <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
+                {portfolioContext.upcoming.length ? <div className="space-y-2">{portfolioContext.upcoming.map((event, index) => <div key={event.date + event.title + index} className="flex gap-3 rounded-lg border border-white/5 bg-black/10 p-2 text-[9px] font-mono"><span className="text-white/30 shrink-0">{event.date}</span><span className="text-white/60">{event.title}</span></div>)}</div> : <div className="text-[9px] text-white/35">No dated contract, news, or policy events in the next 20 calendar days were found in the supplied evidence feeds.</div>}
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
+                <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Forecast reliability & invalidation</span></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Confidence</div><div className="text-sm font-mono font-bold mt-1">{analysis.confidence}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Current evidence</div><div className="text-sm font-mono font-bold mt-1">{evidenceCounts}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Macro load</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
+                </div>
+                <p className="text-[9px] text-white/35 mt-3 leading-relaxed">Treat the historical distribution as less applicable if the current thesis changes, evidence conflicts materially, or near-term catalysts dominate the historical analogue. No exit rule is inferred by the system.</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
