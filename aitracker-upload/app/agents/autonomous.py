@@ -649,7 +649,7 @@ def _evidence_family(tool_name: str) -> str:
         return "analyst_consensus"
     if any(token in name for token in (
         "investor_relations", "investor-relations", "company.", "companies.",
-        "issuer.", "press_release", "press-release", "newsroom", "official.",
+        "issuer.", "issuer_official", "company_official", "press_release", "press-release", "newsroom", "official.",
         "product_docs", "product-docs", "company_docs", "company-docs",
     )):
         return "issuer_primary"
