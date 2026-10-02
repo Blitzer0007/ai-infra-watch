@@ -333,6 +333,7 @@ function respond(res, {
     symbol,
     trades,
     source: provider === 'bargo' ? 'bargo-congress-trades' : provider,
+    sourceTier: provider === 'bargo' ? 'primary-feed' : provider === 'datadawn' ? 'fallback-public' : provider === 'cache' ? 'cache-fallback' : 'unavailable',
     sourceLabel,
     sourceUrl:
       provider === 'bargo'
