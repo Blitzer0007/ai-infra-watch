@@ -15,13 +15,6 @@ def _load_api(name: str, filename: str):
     return module
 
 
-def test_portfolio_requires_private_access(monkeypatch):
-    module = _load_api("portfolio_security", "portfolio.js") if False else None
-    # The JavaScript route is covered by the frontend/API smoke suite; this test
-    # records the production contract for the shared token name.
-    assert "AIW_ACCESS_TOKEN" in "AIW_ACCESS_TOKEN"
-
-
 def test_jev_requires_private_access(monkeypatch):
     module = _load_api("jev_assess_security", "jev-assess.py")
     monkeypatch.setenv("AIW_ACCESS_TOKEN", "test-token")
