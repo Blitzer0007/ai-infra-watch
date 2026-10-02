@@ -75,6 +75,10 @@ def test_forecast_verification_api_contract(client):
     assert response.status_code == 200, response.text[:500]
     body = _json(response)
     assert isinstance(body.get("forecasts"), list)
+    assert isinstance(body.get("analytics"), dict)
+    assert "byTickerHorizon" in body["analytics"]
+    assert "byScenario" in body["analytics"]
+    assert "byModel" in body["analytics"]
 
 @pytest.mark.integration
 @pytest.mark.skipif(not os.getenv("QA_HEADERS_JSON"), reason="protected Vercel API requires QA_HEADERS_JSON")

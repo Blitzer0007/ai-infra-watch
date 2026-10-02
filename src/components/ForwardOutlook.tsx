@@ -90,6 +90,15 @@ function forwardReturns(history: PricePoint[], horizon: number): number[] {
   return result;
 }
 
+type ForecastAnalytics = {
+  sampleSize: number;
+  byTickerHorizon: Array<{ticker?: string; horizon?: number; count:number; directionalAccuracyPct:number|null; medianAbsoluteError:number|null; p25p75CoveragePct:number|null;}>;
+  byScenario: Array<{scenarioId?: string; count:number;}>;
+  byModel: Array<{modelVersion?: string; count:number;}>;
+  byDirection: Array<{bucket:string; count:number;}>;
+  longTerm: {verifiedCount:number; oldestVerifiedAt:string|null; newestVerifiedAt:string|null;};
+};
+
 type VerificationDrift = {
   sampleSize: number;
   recentCount: number;
@@ -362,6 +371,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevResult, setJevResult] = useState<{ summary?: string; answer_source?: string; choice?: string; evidenceGate?: string; confidence?: number; rawScore?: number; evidenceQuality?: number } | null>(null);
   const [jevError, setJevError] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
+  const [forecastAnalytics, setForecastAnalytics] = useState<ForecastAnalytics | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const [backtestBusy, setBacktestBusy] = useState(false);
@@ -389,6 +399,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         const remote: ForecastSnapshot[] = Array.isArray(body.forecasts) ? body.forecasts : [];
         if (!cancelled) {
           setForecasts(remote);
+          setForecastAnalytics(body?.analytics || null);
           if (!remote.length) {
             const legacy = loadForecasts();
             for (const item of legacy) {
@@ -919,7 +930,19 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         )}
       </div>
 
-      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
+            {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
+        <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Verified forecasts aggregated by ticker, horizon, scenario and model.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}</span></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Groups</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byTickerHorizon.length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Models</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byModel.length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Scenarios</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byScenario.length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Long-term verified</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.longTerm.verifiedCount}</div></div>
+          </div>
+          <div className="overflow-x-auto"><table className="min-w-full text-left text-[9px] font-mono"><thead className="text-white/25 uppercase"><tr><th className="px-2 py-1.5">Ticker</th><th className="px-2 py-1.5">Horizon</th><th className="px-2 py-1.5">N</th><th className="px-2 py-1.5">Direction</th><th className="px-2 py-1.5">Median error</th><th className="px-2 py-1.5">P25-P75</th></tr></thead><tbody className="divide-y divide-white/5">{forecastAnalytics.byTickerHorizon.slice(0,12).map((row,index)=><tr key={String(row.ticker)+String(row.horizon)+index}><td className="px-2 py-1.5 text-white/65">{row.ticker || '—'}</td><td className="px-2 py-1.5 text-white/45">{row.horizon ? row.horizon+'D' : '—'}</td><td className="px-2 py-1.5 text-white/45">{row.count}</td><td className="px-2 py-1.5 text-white/55">{row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1)+'%'}</td></tr>)}</tbody></table></div>
+        </div>
+      )}
+<div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast verification</div>
           <p className="text-[10px] text-white/45 mt-1">Save the current forecast, then compare it with the real market return after the selected trading horizon. Automatic verification runs on the scheduled backend job after deployment.</p></div>

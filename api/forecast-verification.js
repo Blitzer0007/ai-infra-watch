@@ -187,6 +187,65 @@ async function upsertModelConfig(row){
   if(!r.ok) throw new Error(d?.message||'Model config save failed');
   return d[0];
 }
+
+function forecastAnalytics(rows) {
+  const verified = rows.filter(row =>
+    String(row.status) === 'verified' &&
+    Number.isFinite(Number(row.actual_return)) &&
+    Number.isFinite(Number(row.median))
+  );
+  const aggregate = (subset) => {
+    if (!subset.length) return { count:0, directionalAccuracyPct:null, medianAbsoluteError:null, p25p75CoveragePct:null, p10p90CoveragePct:null };
+    const eligible = subset.filter(row => Number(row.actual_return)!==0 && Number(row.median)!==0);
+    const direction = eligible.length
+      ? eligible.filter(row => Math.sign(Number(row.actual_return))===Math.sign(Number(row.median))).length/eligible.length*100
+      : null;
+    const errors = subset.map(row=>Math.abs(Number(row.actual_return)-Number(row.median))).sort((a,b)=>a-b);
+    const middle = subset.filter(row=>Number(row.p25)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p75)).length/subset.length*100;
+    const wide = subset.filter(row=>Number(row.p10)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p90)).length/subset.length*100;
+    return {
+      count:subset.length,
+      directionalAccuracyPct:direction==null?null:Number(direction.toFixed(2)),
+      medianAbsoluteError:Number(errors[Math.floor((errors.length-1)*0.5)].toFixed(4)),
+      p25p75CoveragePct:Number(middle.toFixed(2)),
+      p10p90CoveragePct:Number(wide.toFixed(2)),
+    };
+  };
+  const grouped=(keyFn, decorate)=>{
+    const map=new Map();
+    for(const row of verified){
+      const key=keyFn(row);
+      const bucket=map.get(key)||[];
+      bucket.push(row);
+      map.set(key,bucket);
+    }
+    return [...map.values()].map(subset=>({...decorate(subset[0]),...aggregate(subset)}))
+      .sort((a,b)=>String(a.ticker||a.modelVersion||a.scenarioId||'').localeCompare(String(b.ticker||b.modelVersion||b.scenarioId||''))||Number(a.horizon||0)-Number(b.horizon||0));
+  };
+  const byDirection=['up','down','flat'].map(bucket=>{
+    const subset=verified.filter(row=>{
+      const value=Number(row.actual_return);
+      return bucket==='up'?value>0:bucket==='down'?value<0:value===0;
+    });
+    return {bucket,...aggregate(subset)};
+  });
+  return {
+    sampleSize:verified.length,
+    byTickerHorizon:grouped(
+      row=>String(row.ticker||'').toUpperCase()+'|'+String(Number(row.horizon)),
+      row=>({ticker:String(row.ticker||'').toUpperCase(),horizon:Number(row.horizon)})
+    ),
+    byScenario:grouped(row=>String(row.scenario_id||'unknown'),row=>({scenarioId:String(row.scenario_id||'unknown')})),
+    byModel:grouped(row=>String(row.model_version||'analogue-v1'),row=>({modelVersion:String(row.model_version||'analogue-v1')})),
+    byDirection,
+    longTerm:{
+      verifiedCount:verified.length,
+      oldestVerifiedAt:verified.map(row=>row.verified_at).filter(Boolean).sort()[0]||null,
+      newestVerifiedAt:verified.map(row=>row.verified_at).filter(Boolean).sort().at(-1)||null,
+    },
+  };
+}
+
 function normalize(row) {
   return {
     id: row.id,
@@ -262,7 +321,7 @@ export default async function handler(req, res) {
       const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=100', { headers: headers() });
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to load forecasts.' });
-      return send(res, 200, { forecasts: data.map(normalize) });
+      return send(res, 200, { forecasts: data.map(normalize), analytics: forecastAnalytics(data) });
     }
 
     if (req.method === 'POST') {
