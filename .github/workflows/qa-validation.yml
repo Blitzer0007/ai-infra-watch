@@ -1,6 +1,13 @@
 name: UI API DB Validation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "api/**"
+      - "qa/**"
+      - ".github/workflows/qa-validation.yml"
   workflow_dispatch:
   pull_request:
     paths:
@@ -12,6 +19,38 @@ on:
     - cron: "30 2 * * *"
 
 jobs:
+  ui-local:
+    name: Playwright UI functional validation (local mocked APIs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Node dependencies
+        run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install QA dependencies
+        run: python -m pip install -r qa/requirements.txt
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Start local app
+        env:
+          GEMINI_API_KEY: qa-local-placeholder
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 > /tmp/aiw-local.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/ >/dev/null && exit 0; sleep 2; done
+          cat /tmp/aiw-local.log
+          exit 1
+      - name: Run local Playwright tests
+        env:
+          QA_BASE_URL: http://127.0.0.1:3000
+          QA_UI_MOCKS: "true"
+        run: python -m pytest -q qa/test_ui.py
+
   api:
     name: API contract validation
     runs-on: ubuntu-latest
