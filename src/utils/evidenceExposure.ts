@@ -1,4 +1,4 @@
-import { PORTFOLIO_POSITIONS } from './portfolioPositions';
+import { PORTFOLIO_POSITIONS, type PortfolioPosition } from './portfolioPositions';
 
 export type ExposureLevel = 'Direct' | 'Secondary' | 'Limited';
 export type MacroScenario = 'taiwan' | 'power' | 'export';
