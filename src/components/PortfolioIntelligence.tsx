@@ -79,6 +79,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [chartRange, setChartRange] = useState<SelectedChartState['range']>('1Y');
   const [selectedChart, setSelectedChart] = useState<SelectedChartState>({ loading: false, points: [], range: '1Y', error: '', retrievedAt: null });
   const [peerComparison, setPeerComparison] = useState<PeerCounterfactual | null>(null);
+  const [peerPortfolioComparisons, setPeerPortfolioComparisons] = useState<PeerCounterfactual[]>([]);
   const [peerLoading, setPeerLoading] = useState(false);
 
   useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
@@ -140,6 +141,47 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       });
     return () => { cancelled = true; };
   }, [selected, chartRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!analyses.length) {
+      setPeerPortfolioComparisons([]);
+      return () => { cancelled = true; };
+    }
+    const jobs = analyses.map(async analysis => {
+      const meta = STOCK_UNIVERSE.find(item => item.symbol === analysis.symbol);
+      if (!meta) return null;
+      const peer = selectMostRelevantPeer(meta, livePrices);
+      if (!peer) return null;
+      try {
+        const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(peer.symbol) + '&range=max', { cache: 'no-store' });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error('history unavailable');
+        const history = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }));
+        return calculatePeerCounterfactual({
+          holding: analysis,
+          peer,
+          peerHistory: history,
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: analysis.livePrice,
+        });
+      } catch {
+        return calculatePeerCounterfactual({
+          holding: analysis,
+          peer,
+          peerHistory: [],
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: analysis.livePrice,
+        });
+      }
+    });
+    Promise.all(jobs).then(results => {
+      if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)));
+    });
+    return () => { cancelled = true; };
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices]);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,6 +536,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
             {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
             {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
+            <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
             <Panel title="Held portfolio" subtitle="Persistent positions · live quote state · select a holding to update the selected holding view">
               <div className="flex flex-wrap gap-2 mb-3">
                 <div className="relative flex-1 min-w-48">
@@ -875,6 +918,18 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
     </section>
   );
 }
+function PortfolioPeerImpactSummary({comparisons}:{comparisons:PeerCounterfactual[]}) {
+  const available = comparisons.filter(item => item.status === 'available' && item.hypotheticalProfit != null && item.actualProfit != null);
+  const actualProfit = available.reduce((sum, item) => sum + (item.actualProfit ?? 0), 0);
+  const peerProfit = available.reduce((sum, item) => sum + (item.hypotheticalProfit ?? 0), 0);
+  const difference = peerProfit - actualProfit;
+  const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer counterfactual</h2><div className="text-[9px] text-white/35 mt-1">Same investment amounts and purchase dates where historical peer data is available. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><Info label="Actual profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer hypothetical" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
+  </section>;
+}
+
 function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:PositionAnalysis;chart:SelectedChartState;chartRange:SelectedChartState['range'];onChartRangeChange:(range:SelectedChartState['range'])=>void}) {
   const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
