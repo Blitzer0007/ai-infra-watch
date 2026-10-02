@@ -1,4 +1,3 @@
-import snapshot from '../../data/portfolio_snapshot.json';
 import type { IntelligenceSnapshot, PricePoint } from './intelligence';
 import type { PortfolioPurchaseLot, StoredPortfolioHolding } from './portfolioApi';
 import { STOCK_UNIVERSE } from './stockUniverse';
@@ -48,9 +47,9 @@ export type PositionAnalysis = PortfolioPosition & {
   strategyContext: string;
 };
 
-export const PORTFOLIO_SNAPSHOT = snapshot.portfolio;
-export const PORTFOLIO_AS_OF = snapshot.asOf;
-export const PORTFOLIO_POSITIONS: PortfolioPosition[] = snapshot.positions;
+export const PORTFOLIO_SNAPSHOT = null;
+export const PORTFOLIO_AS_OF = null;
+export const PORTFOLIO_POSITIONS: PortfolioPosition[] = [];
 
 function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
   const meta = STOCK_UNIVERSE.find(item => item.symbol === holding.symbol);
