@@ -24,7 +24,7 @@ export type PositionAnalysis = PortfolioPosition & {
   liveRetrievedAt: string | null;
   liveProvider: string | null;
   liveStale: boolean;
-  currentValue: number;
+  currentValue: number | null;
   pnl: number;
   pnlPct: number;
   dailyChangePct: number | null;
@@ -85,7 +85,7 @@ export function buildPositionAnalyses(
     const quote = prices[position.symbol];
     const livePrice = quote?.price ?? null;
     const liveIsFresh = livePrice != null && quote?.stale !== true;
-    const currentValue = liveIsFresh ? livePrice * position.quantity : position.snapshotCurrentValue;
+    const currentValue = liveIsFresh ? livePrice * position.quantity : null;
     const pnl = currentValue - position.investedValue;
     const pnlPct = position.investedValue ? (pnl / position.investedValue) * 100 : 0;
     const group = intelligence.groups.find((item) => item.name === position.group) ?? null;
@@ -119,10 +119,10 @@ export function buildPositionAnalyses(
       (vsPeers != null && vsPeers <= (isLeveraged ? -1.5 : -1.0) && groupBreadth != null && groupBreadth < 0.50)
     );
 
-    let state: PositionAnalysis['state'] = 'HOLD / WATCH';
-    if (!quote && position.snapshotCurrentValue == null) state = 'INSUFFICIENT DATA';
-    else if (riskEligible) state = 'RISK REVIEW';
-    else if (addEligible) state = 'ADD REVIEW';
+    let state: PositionAnalysis['state'] = 'INSUFFICIENT DATA';
+    if (liveIsFresh && riskEligible) state = 'RISK REVIEW';
+    else if (liveIsFresh && addEligible) state = 'ADD REVIEW';
+    else if (liveIsFresh) state = 'HOLD / WATCH';
 
     const rationale = state === 'ADD REVIEW'
       ? 'Group momentum, breadth and relative strength currently align with the configured review thresholds.'
@@ -157,8 +157,8 @@ export function buildPositionAnalyses(
       rationale,
       addTrigger,
       riskTrigger,
-      whatIfProfitAt10Pct: livePrice == null ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
-      whatIfProfitAt20Pct: livePrice == null ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
+      whatIfProfitAt10Pct: !liveIsFresh ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
+      whatIfProfitAt20Pct: !liveIsFresh ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
       potentialUpsideSignal: groupScore == null || groupBreadth == null
         ? 'INSUFFICIENT DATA'
         : groupScore >= 62 && groupBreadth >= 0.5
@@ -170,14 +170,21 @@ export function buildPositionAnalyses(
         pnlPct < 0 &&
         groupScore != null &&
         groupBreadth != null &&
+        relativeToUniverse != null &&
+        vsPeers != null &&
         groupScore >= (isLeveraged ? 68 : 62) &&
         groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
-        (vsPeers == null || vsPeers >= 0),
-      strategyContext: state === 'ADD REVIEW'
-        ? 'Price is below the average cost, but current group breadth/strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
-        : riskEligible
+        relativeToUniverse >= 0 &&
+        vsPeers >= 0,
+      strategyContext: averageInAlert
+        ? 'Price is below the average cost, while current group breadth/relative strength and peer-relative evidence remain supportive. This is an evidence-gated average-in review, not an automatic buy instruction.'
+        : state === 'RISK REVIEW'
           ? 'The position is under pressure while supporting group evidence is weak or deteriorating. Review exposure and the original thesis before adding.'
-          : 'Continue monitoring the holding against its purchase thesis, group strength, peers, catalysts and risk signals before changing exposure.',
+          : state === 'ADD REVIEW'
+            ? 'Current group breadth/relative strength and peer-relative evidence meet the configured review thresholds. This is a review signal, not an automatic buy instruction.'
+            : state === 'INSUFFICIENT DATA'
+              ? 'A fresh market quote is required before calculating current P&L and review signals.'
+              : 'Continue monitoring the holding against its purchase thesis, group strength, peers, catalysts and risk signals before changing exposure.',
     };
   });
 }
