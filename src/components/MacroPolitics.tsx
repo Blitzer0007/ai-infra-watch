@@ -177,6 +177,35 @@ function PortfolioExposureMatrix({ contracts = [], news = [] }: { contracts?: an
 
 
 
+function ExecutiveSignalsPanel() {
+  const [signals, setSignals] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const load = async () => {
+    setLoading(true); setMessage('');
+    try {
+      const response = await fetch('/api/company-scale?action=executive&days=7&limit=12', { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error || 'Executive signals unavailable');
+      setSignals(Array.isArray(body?.signals) ? body.signals : []);
+      setProfiles(Array.isArray(body?.profiles) ? body.profiles : []);
+      if (body?.configuredProvider === 'none') setMessage('Web search provider not configured. Official profile links remain available. Add BRAVE_SEARCH_API_KEY or TAVILY_API_KEY for live X/LinkedIn discovery.');
+      else if (body?.providerNotes?.length) setMessage(body.providerNotes.join(' · '));
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Executive signals unavailable'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+  return (
+    <section data-testid='executive-signals' className='bg-[#15181E]/30 border border-violet-400/15 rounded-2xl p-5'>
+      <div className='flex flex-wrap items-start justify-between gap-3'><div><div className='text-[10px] font-mono uppercase tracking-[0.2em] text-violet-300'>Executive / social signals</div><h3 className='text-lg font-black uppercase tracking-tight text-white mt-1'>Leadership statements</h3><p className='text-[10px] text-white/35 mt-1 font-mono max-w-4xl'>Public executive signals from official X, LinkedIn and company web sources when indexed. Official matches are separated from secondary coverage.</p></div><button onClick={() => void load()} disabled={loading} className='rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-cyan-300'>{loading ? 'Loading' : 'Refresh'}</button></div>
+      {message && <div className='mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/65'>{message}</div>}
+      <div className='mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2'>{profiles.map(profile => <div key={profile.id} className='rounded-lg border border-white/5 bg-black/10 p-3'><div className='text-[9px] font-mono font-black text-white'>{profile.name}</div><div className='text-[8px] text-white/30 mt-1'>{profile.organizations.join(' · ')}</div>{profile.x_username && <a className='text-[8px] text-cyan-300 mt-2 inline-block' href={'https://x.com/' + profile.x_username} target='_blank' rel='noreferrer'>X / @{profile.x_username}</a>}{profile.linkedin_profile && <a className='text-[8px] text-cyan-300 mt-2 ml-3 inline-block' href={profile.linkedin_profile} target='_blank' rel='noreferrer'>LinkedIn</a>}</div>)}</div>
+      <div className='mt-4 space-y-2 max-h-[420px] overflow-y-auto pr-1 aiw-scroll-region'>{signals.length ? signals.map((signal,index) => <article key={signal.url || index} className='rounded-lg border border-white/5 bg-white/[.02] p-3'><div className='flex flex-wrap items-center gap-2'><span className='text-[8px] font-mono uppercase text-violet-300'>{signal.executive}</span><span className={'text-[8px] font-mono uppercase rounded border px-1.5 py-0.5 ' + (signal.official ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300')}>{signal.sourceType}</span></div><div className='text-[11px] font-bold text-white mt-1'>{signal.title}</div>{signal.snippet && <p className='text-[9px] leading-4 text-white/35 mt-1'>{signal.snippet}</p>}<div className='flex flex-wrap items-center gap-3 mt-2'><span className='text-[8px] font-mono text-white/20'>{signal.source}</span>{signal.published_at && <span className='text-[8px] font-mono text-white/20'>{new Date(signal.published_at).toLocaleString()}</span>}<a className='text-[8px] font-mono text-cyan-300' href={signal.url} target='_blank' rel='noreferrer'>Open source</a></div></article>) : !loading && <div className='rounded-lg border border-white/5 bg-white/[.02] p-4 text-[9px] font-mono text-white/30'>No executive signals returned by the configured search sources.</div>}</div>
+      <div className='mt-3 pt-3 border-t border-white/5 text-[8px] font-mono text-white/20'>Executive statements are evidence. Autonomous Research routes these results through JEV for provenance, freshness and conflict checks before synthesis; inferred market impact stays separate from the executive's words.</div>
+    </section>
+  );
+}
 function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
   const actorTone = (actor: string) => {
     if (actor === 'Donald Trump') return 'text-amber-300';
@@ -402,6 +431,8 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
       />
 
       <PoliticalSignalsFeed signals={politicalSignals} />
+
+      <ExecutiveSignalsPanel />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}

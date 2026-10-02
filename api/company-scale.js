@@ -421,6 +421,59 @@ async function handleAnalyst(req, res) {
   return res.status(200).json({ ...data, cached: false });
 }
 
+const EXECUTIVE_UI_PROFILES = [
+  { id: 'elon-musk', name: 'Elon Musk', organizations: ['Tesla','xAI','X'], x_username: 'elonmusk', linkedin_profile: null, official_domains: ['x.com'] },
+  { id: 'arkady-volozh', name: 'Arkady Volozh', organizations: ['Nebius'], x_username: null, linkedin_profile: 'https://www.linkedin.com/in/arkady-volozh', official_domains: ['nebius.com'] },
+  { id: 'lisa-su', name: 'Lisa Su', organizations: ['AMD'], x_username: null, linkedin_profile: 'https://www.linkedin.com/in/lisasu-amd', official_domains: ['amd.com'] },
+  { id: 'satya-nadella', name: 'Satya Nadella', organizations: ['Microsoft'], x_username: null, linkedin_profile: 'https://www.linkedin.com/in/satyanadella', official_domains: ['microsoft.com'] },
+];
+
+async function searchWebProvider(query, days = 7, limit = 8) {
+  const brave = String(process.env.BRAVE_SEARCH_API_KEY || '').trim();
+  if (brave) {
+    const response = await fetch('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + limit + '&search_lang=en&country=us&freshness=' + (days <= 1 ? 'pd' : 'pm'), { headers: { Accept: 'application/json', 'X-Subscription-Token': brave }, signal: AbortSignal.timeout(6500) });
+    if (!response.ok) throw new Error('Brave Search HTTP ' + response.status);
+    const payload = await response.json();
+    return { provider: 'brave-web', results: (payload?.web?.results || []).slice(0, limit).map(row => ({ title: row.title || '', snippet: row.description || row.snippet || '', url: row.url || '', published_at: row.published || null, source: 'brave-web' })) };
+  }
+  const tavily = String(process.env.TAVILY_API_KEY || '').trim();
+  if (tavily) {
+    const response = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: tavily, query, search_depth: 'advanced', max_results: limit, include_answer: false, days: Math.min(Math.max(Number(days) || 7, 1), 30) }), signal: AbortSignal.timeout(6500) });
+    if (!response.ok) throw new Error('Tavily Search HTTP ' + response.status);
+    const payload = await response.json();
+    return { provider: 'tavily-web', results: (payload?.results || []).slice(0, limit).map(row => ({ title: row.title || '', snippet: row.content || row.snippet || '', url: row.url || '', published_at: row.published_date || null, source: 'tavily-web' })) };
+  }
+  throw new Error('No web search provider configured');
+}
+
+async function handleExecutiveSignals(req, res) {
+  const days = Math.min(Math.max(Number(req.query?.days) || 7, 1), 14);
+  const limit = Math.min(Math.max(Number(req.query?.limit) || 12, 1), 20);
+  const wantedExecutive = String(req.query?.executive || '').trim().toLowerCase();
+  const wantedOrganization = String(req.query?.organization || '').trim().toLowerCase();
+  const profiles = EXECUTIVE_UI_PROFILES.filter(profile => (!wantedExecutive || profile.name.toLowerCase().includes(wantedExecutive)) && (!wantedOrganization || profile.organizations.some(org => org.toLowerCase().includes(wantedOrganization))));
+  const signals = [];
+  const providerNotes = [];
+  for (const profile of profiles) {
+    const orgQuery = profile.organizations.map(org => '"' + org + '"').join(' OR ');
+    const queries = ['"' + profile.name + '" (' + orgQuery + ') (AI OR chips OR GPU OR "data center" OR infrastructure OR cloud OR power)'];
+    if (profile.x_username) queries.push('site:x.com/' + profile.x_username + ' "' + profile.name + '" AI');
+    if (profile.linkedin_profile) queries.push('site:linkedin.com "' + profile.name + '" ' + orgQuery);
+    for (const query of queries) {
+      try {
+        const result = await searchWebProvider(query, days, limit);
+        for (const row of result.results) {
+          const lower = String(row.url || '').toLowerCase();
+          const official = (profile.x_username && lower.startsWith('https://x.com/' + profile.x_username.toLowerCase())) || (profile.linkedin_profile && lower.startsWith(profile.linkedin_profile.toLowerCase())) || profile.official_domains.some(domain => { try { const host = new URL(row.url).hostname.toLowerCase().replace(/^www\\./, ''); return host === domain || host.endsWith('.' + domain); } catch { return false; } });
+          signals.push({ ...row, executive: profile.name, organizations: profile.organizations, official, sourceType: official && /x\\.com|linkedin\\.com/.test(lower) ? 'official-social' : official ? 'official-web' : 'secondary', signalType: official && /x\\.com|linkedin\\.com/.test(lower) ? 'executive_statement' : 'executive_coverage' });
+        }
+      } catch (error) { providerNotes.push(String(error?.message || error)); }
+    }
+  }
+  const seen = new Set();
+  const deduped = signals.filter(row => { const key = String(row.url || row.title || '').toLowerCase(); if (!key || seen.has(key)) return false; seen.add(key); return true; }).sort((a,b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
+  return res.status(200).json({ source: 'executive-signal-discovery', profiles, signals: deduped.slice(0, limit), configuredProvider: process.env.BRAVE_SEARCH_API_KEY ? 'brave-web' : process.env.TAVILY_API_KEY ? 'tavily-web' : 'none', degraded: providerNotes.length > 0, providerNotes: [...new Set(providerNotes)].slice(0, 5) });
+}
 function validMilestoneSymbol(symbol) {
   return /^[A-Z0-9.^=-]{1,20}$/.test(symbol);
 }
@@ -519,6 +572,7 @@ export default async function handler(req, res) {
   const action = String(req.query?.action || '').trim().toLowerCase();
   if (action === 'history') return handleHistory(req, res);
   if (action === 'milestones') return handleMilestones(req, res);
+  if (action === 'executive') return handleExecutiveSignals(req, res);
   if (action === 'analyst') return handleAnalyst(req, res);
   if (req.query?.sec) {
     return handleSecGateway(req, res);

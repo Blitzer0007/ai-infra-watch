@@ -770,3 +770,10 @@ def test_autonomous_ui_exposes_all_jev_evidence_states():
     assert "Gathering more evidence" in content
     assert "Evidence insufficient" in content
     assert "r.jev.evidence_gate" in content
+
+
+def test_question_evidence_priorities_include_web_and_executive():
+    from app.agents.autonomous import _question_evidence_priorities
+    priorities = _question_evidence_priorities("What is Elon Musk saying about AI infrastructure and the latest web evidence?")
+    assert "executive" in priorities
+    assert "web_search" in priorities

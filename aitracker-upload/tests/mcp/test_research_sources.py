@@ -91,3 +91,18 @@ def test_analyst_service_keeps_partial_results_when_endpoint_is_unavailable():
     assert snapshot.recommendation["buy"] == 7
     assert snapshot.eps_estimates == []
     assert snapshot.revenue_estimates[0]["avg"] == 100000000
+
+
+def test_web_search_service_is_optional(monkeypatch):
+    from mcp_servers.stocks.social_research import WebSearchService
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    service = WebSearchService()
+    assert hasattr(service, "search")
+
+
+def test_executive_catalog_contains_nebius_and_musk():
+    from mcp_servers.stocks.social_research import EXECUTIVE_PROFILES
+    names = {row["name"] for row in EXECUTIVE_PROFILES}
+    assert "Arkady Volozh" in names
+    assert "Elon Musk" in names

@@ -420,6 +420,10 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
         families.append("earnings")
     if any(term in lower for term in ("reaction", "reacted", "event study", "price history", "historical market data", "historical price data", "historical stock price")):
         families.append("event_study")
+    if any(term in lower for term in ("web search", "search the web", "search online", "internet")):
+        families.append("web_search")
+    if any(term in lower for term in ("ceo", "founder", "management", "executive", "musk", "volozh", "jensen huang", "lisa su", "satya nadella", "zuckerberg")):
+        families.append("executive")
     if any(term in lower for term in ("congress", "senator", "representative", "official trade", "congressional trade")):
         families.append("congress")
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
@@ -460,6 +464,8 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     # required families participate in the hard "complete" check.
     known_families = (
         "market",
+        "executive",
+        "web_search",
         "news",
         "issuer_primary",
         "regulatory_primary",
