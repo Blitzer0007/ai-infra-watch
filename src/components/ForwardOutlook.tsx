@@ -1040,7 +1040,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
                 <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Forecast reliability & invalidation</span></div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length}</div></div>
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Confidence</div><div className="text-sm font-mono font-bold mt-1">{analysis.confidence}</div></div>
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Current evidence</div><div className="text-sm font-mono font-bold mt-1">{evidenceCounts}</div></div>
@@ -1108,17 +1108,6 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </div>}
             </div>
 
-              {jevResult && (
-                <div className="mt-4 space-y-3">
-                  <div className="text-sm text-white/75 leading-relaxed">{jevResult.summary}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {jevResult.choice && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV route: {jevResult.choice}</span>}
-                    {jevResult.evidenceGate && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence gate: {jevResult.evidenceGate}</span>}
-                    {jevResult.rawScore != null && <span className="px-2 py-1 rounded border border-violet-300/20 bg-violet-300/5 text-[9px] font-mono text-violet-100">JEV evidence quality: {jevResult.rawScore.toFixed(2)} / 3</span>}
-                    {jevResult.evidenceQuality != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Evidence quality: {jevResult.evidenceQuality.toFixed(0)} / 100</span>}
-                    {jevResult.confidence != null && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">JEV confidence: {jevResult.confidence.toFixed(2)} / 1</span>}
-                    {jevResult.answer_source && <span className="px-2 py-1 rounded border border-white/10 bg-white/5 text-[9px] font-mono text-white/60">Source: {jevResult.answer_source}</span>}
-                  </div>
                 </div>
               )}
             </div>
