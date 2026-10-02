@@ -5,7 +5,7 @@ import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfol
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
-import { summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
+import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 
 type PricePoint = { date: string; price: number };
 
