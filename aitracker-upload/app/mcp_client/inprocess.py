@@ -13,6 +13,7 @@ import os
 from typing import Any
 
 from app.mcp_client.client import MCPClientError, ToolInfo
+from app.mcp_client.application_sources import ApplicationResearchService
 
 def _live_default() -> bool:
     raw = os.getenv("AI_INFRA_AGENT_LIVE_DATA")
@@ -42,6 +43,7 @@ class InProcessMCPToolbox:
         self._issuer_official = IssuerOfficialService()
 
         self._stocks = StockService.from_env(mode)
+        self._application = ApplicationResearchService(live=self.live, stocks=self._stocks)
         self._earnings = EarningsService.from_env(mode)
         self._candles = CandleService.from_env(mode)
         self._event_study = EventStudyService(earnings=self._earnings, candles=self._candles)
@@ -73,6 +75,15 @@ class InProcessMCPToolbox:
                 ("get_contracts", "Get contract-related primary SEC disclosures.", {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]}),
                 ("health", "SEC evidence service health snapshot.", {"type": "object", "properties": {}}),
             ],
+            "app": [
+                ("get_portfolio_context", "Read persistent portfolio holdings and current portfolio context.", {"type": "object", "properties": {"symbol": {"type": "string"}}}),
+                ("get_forecast_context", "Read forecast snapshots, model validation configuration and verification analytics.", {"type": "object", "properties": {"ticker": {"type": "string"}, "horizon": {"type": "integer"}, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}}),
+                ("get_quality_runs", "Read persisted AI Quality Lab evaluation runs and recent quality analytics.", {"type": "object", "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 100}}}),
+                ("search_congress_trades", "Search public congressional stock-trade disclosures by ticker or filer query.", {"type": "object", "properties": {"symbol": {"type": "string"}, "query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}}),
+                ("get_macro_signals", "Read the application's current macro risk map and related AI-infrastructure exposures.", {"type": "object", "properties": {}}),
+                ("get_political_signals", "Read recent political and AI-policy signals, including White House primary-domain results when available.", {"type": "object", "properties": {"topic": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 7}}}),
+                ("health", "Application research-source health and capability snapshot.", {"type": "object", "properties": {}}),
+            ],
             "news": [
                 ("search", "Search recent market news by keywords.", {"type": "object", "properties": {"query": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}} , "required": ["query"]}),
                 ("company", "Get recent company news for one symbol.", {"type": "object", "properties": {"symbol": {"type": "string"}, "days": {"type": "integer", "minimum": 1, "maximum": 30}}, "required": ["symbol"]}),
@@ -97,7 +108,7 @@ class InProcessMCPToolbox:
         return list(self._tool_map)
 
     def servers(self) -> list[str]:
-        return ["stocks", "filings", "news"]
+        return ["stocks", "filings", "news", "app"]
 
     def close(self) -> None:
         return None
@@ -160,6 +171,32 @@ class InProcessMCPToolbox:
                 "ok": True,
                 "detail": "SEC 8-K milestone and contract tools ready",
             }
+
+        if key == "app.get_portfolio_context":
+            return self._application.portfolio_context(args.get("symbol"))
+        if key == "app.get_forecast_context":
+            return self._application.forecast_context(
+                ticker=args.get("ticker"),
+                horizon=args.get("horizon"),
+                limit=int(args.get("limit", 50)),
+            )
+        if key == "app.get_quality_runs":
+            return self._application.quality_runs(limit=int(args.get("limit", 20)))
+        if key == "app.search_congress_trades":
+            return self._application.congress_trades(
+                symbol=args.get("symbol"),
+                query=args.get("query"),
+                limit=int(args.get("limit", 100)),
+            )
+        if key == "app.get_macro_signals":
+            return self._application.macro_signals()
+        if key == "app.get_political_signals":
+            return self._application.political_signals(
+                topic=args.get("topic"),
+                days=int(args.get("days", 3)),
+            )
+        if key == "app.health":
+            return self._application.health()
 
         if key == "news.search":
             return self._news.search(str(args.get("query", "")), days=int(args.get("days", 7))).model_dump()

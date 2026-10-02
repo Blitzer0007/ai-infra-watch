@@ -185,6 +185,9 @@ JEV_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
     "rotation": (".get_rotation",),
     "analyst_consensus": ("get_analyst_expectations", ".price_target", ".recommendation"),
     "issuer_primary": ("get_issuer_official", "investor_relations", "company_official"),
+    "portfolio": ("get_portfolio_context",),
+    "forecast": ("get_forecast_context",),
+    "quality": ("get_quality_runs",),
 }
 
 JEV_ROUTE_CRITERIA = {
@@ -198,6 +201,9 @@ JEV_ROUTE_CRITERIA = {
     "rotation": "Relative rotation, peer basket, hardware/application or sector rotation",
     "analyst_consensus": "Analyst ratings, price targets, consensus estimates or estimate revisions",
     "issuer_primary": "Company or issuer official information, investor-relations material and official-domain announcements",
+    "portfolio": "Stored portfolio holdings, current portfolio context or position state",
+    "forecast": "Forecast snapshots, verification history, model validation or forecast accuracy",
+    "quality": "AI Quality Lab runs, hallucination, citation, adversarial or regression quality metrics",
     "multi_source": "Question requires combining several evidence sources before answering",
 }
 
@@ -712,7 +718,7 @@ def _evidence_family(tool_name: str) -> str:
         return "regulatory_primary"
     if "congress" in name:
         return "congress"
-    if "macro" in name or "risk" in name:
+    if "macro" in name or "risk" in name or "political" in name:
         return "macro"
     if "forecast" in name or "verification" in name:
         return "forecast"
@@ -751,7 +757,7 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
         priorities.append("regulatory_primary")
     if any(term in lower for term in ("congress", "senator", "representative", "official trade")):
         priorities.append("congress")
-    if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid", "risk")):
+    if any(term in lower for term in ("macro", "geopolit", "political", "policy", "taiwan", "export", "power", "grid", "risk")):
         priorities.append("macro")
     if any(term in lower for term in ("why", "driver", "changed", "catalyst", "impact", "affected", "recent developments")):
         priorities.extend(["market", "news", "issuer_primary", "analyst_consensus", "regulatory_primary", "event_study"])
@@ -797,7 +803,7 @@ def _channel_tool_usable(family: str, name: str) -> bool:
     if family == "congress":
         return "congress" in lower and any(token in lower for token in ("trade", "transaction", "get_"))
     if family == "macro":
-        return "macro" in lower or "risk" in lower
+        return any(token in lower for token in ("macro", "risk", "political", "policy", "geopolitical"))
     if family == "portfolio":
         return "portfolio" in lower or "holdings" in lower
     if family == "forecast":

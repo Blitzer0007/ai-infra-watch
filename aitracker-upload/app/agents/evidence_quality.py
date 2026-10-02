@@ -144,7 +144,7 @@ def _family_from_tool(tool_name: str) -> str:
     if "get_earnings" in name: return "earnings"
     if name.startswith("filings.") or "sec" in name: return "regulatory_primary"
     if "congress" in name: return "congress"
-    if "macro" in name or "risk" in name: return "macro"
+    if "macro" in name or "risk" in name or "political" in name: return "macro"
     if "forecast" in name or "verification" in name: return "forecast"
     if "portfolio" in name or "holdings" in name: return "portfolio"
     if "quality" in name or "red_team" in name or "red-team" in name: return "quality"
