@@ -117,11 +117,13 @@ export default async function handler(req, res) {
   try {
     if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
     const digest = await buildDigest();
+    if (req.method === 'GET' && !isCron(req)) {
+      return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
+    }
     const requested = req.method === 'POST'
       ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
       : [];
     const delivery = await deliver(digest, requested);
-    if (req.method === 'GET' && !isCron(req)) return res.status(200).json({ ...digest, delivery: { configured: delivery.delivered, errors: delivery.errors } });
     return res.status(delivery.errors.length && !delivery.delivered.length ? 502 : 200).json({ ok: true, ...digest, delivery });
   } catch (error) {
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Portfolio digest failed' });
