@@ -24,7 +24,7 @@ from app.config import settings
 from app.jev.client import JevClient, JevDecision
 from app.jev.assess import assess
 from app.agents.evidence_quality import citation_coverage, deduplicate_evidence, detect_conflicts, enrich_calls
-from app.agents.hallucination import audit as hallucination_audit
+from app.assertions.semantic import claim_grounding_score
 
 
 @dataclass
@@ -75,6 +75,43 @@ def _result_preview(value: Any, limit: int = 5000) -> str:
     except (TypeError, ValueError):
         text = str(value)
     return text[:limit] + ("..." if len(text) > limit else "")
+
+
+def _hallucination_audit(summary: str, calls: list[ToolCallRecord]) -> dict[str, Any]:
+    """Audit final claims against successful MCP outputs using shared grounding heuristics."""
+    claims = [
+        claim.strip()
+        for claim in re.split(r"(?<=[.!?])\\s+|\\n+", str(summary or ""))
+        if len(claim.strip()) >= 18
+    ]
+    sources = []
+    for call in calls:
+        if not call.ok or call.output is None:
+            continue
+        sources.append(_result_preview(call.output, 5000))
+    flagged = []
+    for index, claim in enumerate(claims):
+        score = claim_grounding_score(claim, sources)
+        if score < 0.25 and not re.search(r"https?://", claim):
+            flagged.append({
+                "index": index + 1,
+                "claim": claim,
+                "overlap": round(score, 3),
+                "grounded": False,
+            })
+    grounded = max(0, len(claims) - len(flagged))
+    return {
+        "enabled": True,
+        "evaluator": "shared-claim-grounding-v1",
+        "claimCount": len(claims),
+        "groundedClaims": grounded,
+        "ungroundedClaims": len(flagged),
+        "hallucinationRate": round((len(flagged) / len(claims)) * 100, 1) if claims else None,
+        "status": "REVIEW" if flagged else "CLEAR",
+        "threshold": 0.25,
+        "flaggedClaims": flagged[:8],
+        "note": "Heuristic claim-to-MCP-evidence grounding; review flagged claims against primary sources before treating them as established facts.",
+    }
 
 
 def _extract_json_object(text: str) -> dict[str, Any] | None:
@@ -860,7 +897,7 @@ class AutonomousMCPAgent:
         # instead of marking a successful investigation as degraded.
         if self.client.stub:
             final_text = _result_preview(successful[-1].output, 4000)
-            hallucination = hallucination_audit(final_text, successful)
+            hallucination = _hallucination_audit(final_text, successful)
             steps.append(Step(node="finalize", kind="node", note="deterministic evidence synthesis"))
             return AutonomousResult(
                 question,
