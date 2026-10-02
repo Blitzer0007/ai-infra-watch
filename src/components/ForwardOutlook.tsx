@@ -1123,7 +1123,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               )}
             </div>
           </div>
-        )}
+        }
       </div>
 
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
