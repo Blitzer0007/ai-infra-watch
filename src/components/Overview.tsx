@@ -300,7 +300,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
           <button type="button" onClick={() => onNavigate('portfolio')} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-mono uppercase text-white/70 hover:text-white hover:bg-white/5">Open portfolio</button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-          {Object.entries(quotes).filter(([, item]) => item?.ok && Number.isFinite(item?.data?.changePct)).sort((a,b) => Math.abs(b[1].data.changePct) - Math.abs(a[1].data.changePct)).slice(0,3).map(([symbol,item]) => {
+          {(Object.entries(quotes) as Array<[string, any]>).filter(([, item]) => item?.ok && Number.isFinite(item?.data?.changePct)).sort((a,b) => Math.abs(b[1].data.changePct) - Math.abs(a[1].data.changePct)).slice(0,3).map(([symbol,item]) => {
             const move = Number(item.data.changePct);
             return <div key={symbol} className="rounded-xl border border-white/10 bg-black/10 p-3">
               <div className="flex items-center justify-between"><span className="text-sm font-black">{symbol}</span><span className="text-[11px] font-mono">{move >= 0 ? '▲ +' : '▼ −'}{Math.abs(move).toFixed(2)}%</span></div>
@@ -308,7 +308,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
             </div>;
           })}
         </div>
-        {!Object.values(quotes).some(item => item?.ok) && <div className="mt-3 text-[11px] text-white/50">Waiting for the first live quote refresh.</div>}
+        {!Object.values(quotes).some((item: any) => item?.ok) && <div className="mt-3 text-[11px] text-white/50">Waiting for the first live quote refresh.</div>}
       </section>
 
       {/* Layman Connections & Benefits Master Guide */}
