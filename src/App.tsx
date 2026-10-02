@@ -10,6 +10,17 @@ import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
 
+const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
+const VIEW_PATHS: Record<string, string> = {
+  overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
+  portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', quality: '/quality', outlook: '/outlook',
+  health: '/health', guide: '/guide', settings: '/settings'
+};
+function viewFromPath(pathname: string) {
+  const view = pathname.replace(/^\\/+|\\/+$/g, '').split('/')[0] || 'overview';
+  return VIEW_IDS.has(view) ? view : 'overview';
+}
+
 // Component Views
 import Overview from './components/Overview';
 import ContractsLedger from './components/ContractsLedger';
@@ -35,7 +46,7 @@ type LivePrice = {
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<string>('tracker'); // Default to Progress Tracker as requested
+  const [activeView, setActiveView] = useState<string>(() => viewFromPath(window.location.pathname));
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -253,9 +264,18 @@ export default function App() {
   }, []);
 
   const handleNavigate = (view: string) => {
-    setActiveView(view);
+    const nextView = VIEW_IDS.has(view) ? view : 'overview';
+    setActiveView(nextView);
     setIsMobileMenuOpen(false);
+    const nextPath = VIEW_PATHS[nextView] || '/overview';
+    if (window.location.pathname !== nextPath) window.history.pushState({ view: nextView }, '', nextPath);
   };
+
+  useEffect(() => {
+    const onPopState = () => setActiveView(viewFromPath(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const reloadSettings = () => {
     setConfig(loadConfig());
@@ -270,6 +290,7 @@ export default function App() {
   }
 
   // Sidebar link details
+  // The summary is the default landing surface: overview is intentionally the first route.
   const navigationItems = [
     { id: 'overview', label: 'Overview', index: '01', icon: Grid },
     { id: 'contracts', label: 'Contracts', index: '02', icon: FileText },
@@ -384,6 +405,8 @@ export default function App() {
           </div>
 
           <button
+            type="button"
+            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="p-1.5 bg-white/5 border border-white/10 text-white rounded-lg cursor-pointer"
           >
@@ -409,6 +432,8 @@ export default function App() {
                   return (
                     <button
                       key={item.id}
+                      type="button"
+                      aria-current={isActive ? "page" : undefined}
                       onClick={() => handleNavigate(item.id)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
                         isActive
