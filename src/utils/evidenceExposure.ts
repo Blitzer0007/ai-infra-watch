@@ -74,8 +74,9 @@ export function deriveExposure(
   scenario: MacroScenario,
   contracts: ContractLike[] = [],
   news: NewsLike[] = [],
+  positions: PortfolioPosition[] = PORTFOLIO_POSITIONS,
 ): ExposureEvidenceItem {
-  const position = PORTFOLIO_POSITIONS.find(item => item.symbol === symbol);
+  const position = positions.find(item => item.symbol === symbol);
   const keywords = KEYWORDS[scenario];
 
   const profileText = [
@@ -150,12 +151,13 @@ export function derivePortfolioExposure(
   symbols: string[],
   contracts: ContractLike[] = [],
   news: NewsLike[] = [],
+  positions: PortfolioPosition[] = PORTFOLIO_POSITIONS,
 ) {
   return symbols.map(symbol => ({
     symbol,
-    taiwan: deriveExposure(symbol, 'taiwan', contracts, news),
-    power: deriveExposure(symbol, 'power', contracts, news),
-    export: deriveExposure(symbol, 'export', contracts, news),
+    taiwan: deriveExposure(symbol, 'taiwan', contracts, news, positions),
+    power: deriveExposure(symbol, 'power', contracts, news, positions),
+    export: deriveExposure(symbol, 'export', contracts, news, positions),
   }));
 }
 
