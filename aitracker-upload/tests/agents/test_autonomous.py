@@ -206,6 +206,55 @@ class _FakeJev:
         )
 
 
+def test_autonomous_jev_high_confidence_routes_to_analyst_tool():
+    class AnalystJev:
+        enabled = True
+
+        def choose(self, **kwargs):
+            from app.jev.client import JevDecision
+            return JevDecision(
+                choice="analyst_consensus",
+                confidence=0.95,
+                model="jev-test",
+                latency_ms=2.0,
+            )
+
+    session = FakeSession(
+        specs=[
+            dict(
+                name="get_analyst_expectations",
+                description="Get analyst expectations, ratings and price targets.",
+                input_schema={
+                    "properties": {"symbol": {"type": "string"}},
+                    "required": ["symbol"],
+                },
+            ),
+        ],
+        call_returns={
+            "get_analyst_expectations": {
+                "symbol": "NVDA",
+                "price_target": {"targetMean": 220},
+            },
+        },
+    )
+    tb = MCPToolbox([_cfg("stocks")], _factory({"stocks": session}))
+    tb.connect()
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            client=LLMClient(provider="stub", model="stub"),
+            jev=AnalystJev(),
+            max_steps=1,
+        )
+        result = agent.run("What are analysts expecting for NVDA?")
+    finally:
+        tb.close()
+
+    assert result.calls[0].tool == "stocks.get_analyst_expectations"
+    assert result.calls[0].arguments == {"symbol": "NVDA"}
+    assert result.jev["choice"] == "analyst_consensus"
+
+
 def test_autonomous_jev_high_confidence_routes_to_earnings_tool():
     session = FakeSession(
         specs=[
