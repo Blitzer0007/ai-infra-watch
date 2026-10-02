@@ -80,7 +80,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const res = await fetch('/api/market-tools?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y');
+        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y');
         if (!res.ok) throw new Error('History request failed: HTTP ' + res.status);
         const data = await res.json();
         if (!cancelled) setHistoryData(Array.isArray(data.points) ? data.points : []);
@@ -105,7 +105,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       setSecMilestoneLoading(true);
       setSecMilestoneError(null);
       try {
-        const res = await fetch('/api/market-tools?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12');
+        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12');
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'SEC milestone lookup failed');
         if (!cancelled) {
@@ -165,7 +165,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     setTickerResolving(true);
     setTickerResolveError(null);
     try {
-      const response = await fetch('/api/market-tools?action=company-search&search=' + encodeURIComponent(rawInput), { cache: 'no-store' });
+      const response = await fetch('/api/company-scale?action=company-search&search=' + encodeURIComponent(rawInput), { cache: 'no-store' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(body?.matches) || !body.matches.length) {
         throw new Error(body?.error || 'No public ticker match found');
