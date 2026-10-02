@@ -328,6 +328,16 @@ function normalizeAnalystValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+async function fetchAnalystWebEvidence(symbol, days = 14, limit = 6) {
+  const query = '"' + symbol + '" (analyst OR "price target" OR consensus OR estimates OR rating) (AI OR semiconductor OR cloud OR technology)';
+  try {
+    const result = await searchWebProvider(query, days, limit);
+    return { provider: result.provider, results: result.results || [], error: null };
+  } catch (error) {
+    return { provider: 'unavailable', results: [], error: String(error?.message || error) };
+  }
+}
+
 async function handleAnalyst(req, res) {
   const symbol = cleanSymbol(req.query?.symbol);
   if (!validateMarketSymbol(symbol)) {
@@ -375,6 +385,7 @@ async function handleAnalyst(req, res) {
       source: 'Finnhub analyst',
       available: [],
       errors,
+    webEvidence: await fetchAnalystWebEvidence(symbol, 14, 6),
       error: 'Analyst expectations provider unavailable.',
     });
   }
