@@ -10,6 +10,7 @@ from .state import AgentState
 from .tools import DEFAULT_SYMBOLS, fetch_live_data, utc_now
 
 
+# Relationship metadata is public universe data; private holdings stay in Supabase.
 GROUPS = {
     "AI Infrastructure": ["DGXX", "NBIS", "VIVO", "IREN", "CIFR"],
     "AI Compute": ["NVDA", "AMD", "CBRS", "QCOM"],
