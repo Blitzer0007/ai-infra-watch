@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BrainCircuit, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
+import { authHeaders } from '../utils/apiAuth';
 
 type JevAnswer = {
   type?: 'choice' | 'score' | 'noul' | string;
@@ -76,7 +77,7 @@ export default function JevDecisionPanel({
     try {
       const response = await fetch('/api/jev-assess', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ kind, state }),
       });
       const body = await response.json().catch(() => ({}));
