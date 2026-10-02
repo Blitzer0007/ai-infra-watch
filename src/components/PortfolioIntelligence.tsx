@@ -119,7 +119,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return () => { cancelled = true; };
     }
     setSelectedChart(prev => ({ ...prev, loading: true, range: chartRange, error: '' }));
-    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=1y', { cache: 'no-store' })
+    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=' + (chartRange === 'MAX' ? 'max' : '1y'), { cache: 'no-store' })
       .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Live price history unavailable');
