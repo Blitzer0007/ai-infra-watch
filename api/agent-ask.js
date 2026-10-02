@@ -1,3 +1,5 @@
+import { requireAccess } from './_access-auth.js';
+
 const DEFAULT_TIMEOUT_MS = 55000;
 
 function backendUrl(req) {
@@ -25,6 +27,7 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 }
 
 export default async function handler(req, res) {
+  if (!requireAccess(req, res)) return;
   const base = backendUrl(req);
 
   if (!base) {
