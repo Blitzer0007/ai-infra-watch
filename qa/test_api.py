@@ -62,6 +62,8 @@ def test_portfolio_api_rejects_invalid_post(client):
     response = client.post("/api/portfolio", json={"symbol":"QA_TEST_INVALID","quantity":0,"averageCost":100})
     assert response.status_code == 400
 
+@pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("QA_BASE_URL"), reason="analyst action is validated against the configured QA deployment")
 def test_analyst_api_contract(client):
     response = client.get("/api/company-scale", params={"action":"analyst","symbol":"NVDA"})
     assert response.status_code in {200, 503}, response.text[:500]

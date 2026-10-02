@@ -17,6 +17,8 @@ def mock_local_apis(page):
         if '/api/quote' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','price':200.0,'changePct':1.0,'provider':'qa'})); return
         if '/api/company-scale' in url:
+            if 'action=analyst' in url:
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','source':'Finnhub analyst','retrievedAt':'2026-10-02T07:00:00Z','recommendation':{'period':'2026-09-30','strongBuy':5,'buy':20,'hold':8,'sell':2,'strongSell':1},'priceTarget':{'median':250,'mean':245,'low':180,'high':300},'epsEstimates':[{'period':'2026','average':2.5,'analysts':20}], 'revenueEstimates':[{'period':'2026','average':200000000000,'analysts':18}], 'available':['recommendation','priceTarget','epsEstimates','revenueEstimates'],'errors':[]})); return
             if 'action=history' in url:
                 points=[{'date':'2025-01-01','price':100.0},{'date':'2025-01-02','price':101.0}]*180
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','points':points})); return
@@ -122,3 +124,12 @@ def test_portfolio_manager_create_flow(page):
     assert float(payload["quantity"]) == 2
     assert float(payload["averageCost"]) == 100
     page.get_by_test_id("portfolio-save-holding").wait_for(state="detached", timeout=30000)
+
+
+def test_analyst_expectations_panel(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
+    page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
+    assert "External analyst expectations" in page.get_by_test_id("analyst-expectations").inner_text()

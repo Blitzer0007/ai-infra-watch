@@ -84,7 +84,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/api/test_contracts_endpoint.py aitracker-upload/tests/api/test_autonomous_auth.py
+        run: python -m pytest -q aitracker-upload/tests/api/test_contracts_endpoint.py aitracker-upload/tests/api/test_autonomous_auth.py aitracker-upload/tests/api/test_agent_python_runtime.py
 
       - name: Run evaluation harness tests
         env:
