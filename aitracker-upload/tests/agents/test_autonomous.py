@@ -812,3 +812,121 @@ def test_final_prompt_separates_executive_statement_from_impact():
     prompt = _final_prompt("What is Arkady Volozh saying and how does it impact NBIS?", [])
     assert "third-party reporting" in prompt
     assert "inference/hypothesis" in prompt
+
+
+def test_portfolio_research_runs_held_universe_through_market_sec_news_and_macro():
+    class PortfolioGate(_GateJev):
+        def evaluate(self, **kwargs):
+            from app.jev.client import JevAnswer, JevEvaluation
+            self.calls += 1
+            return JevEvaluation(
+                answers={
+                    "sufficiency": JevAnswer(type="choice", choice="stop", confidence=0.95),
+                    "evidence_quality": JevAnswer(type="score", score=3.0, confidence=0.95),
+                },
+                model="jev-test",
+                latency_ms=1.0,
+                input_tokens=50,
+            )
+
+    app = FakeSession(
+        specs=[
+            dict(
+                name="get_portfolio_context",
+                description="Read persistent portfolio holdings and current portfolio context.",
+                input_schema={"properties": {"symbol": {"type": "string"}}},
+            ),
+            dict(
+                name="get_macro_signals",
+                description="Read current macro risk map.",
+                input_schema={"properties": {}},
+            ),
+        ],
+        call_returns={
+            "get_portfolio_context": {
+                "source": "supabase",
+                "holdings": [
+                    {"symbol": "NVDA", "quantity": 2, "currentValue": 300},
+                    {"symbol": "AMD", "quantity": 3, "currentValue": 200},
+                ],
+            },
+            "get_macro_signals": {"risks": [{"name": "export controls"}]},
+        },
+    )
+    stocks = FakeSession(
+        specs=[dict(
+            name="get_quotes",
+            description="Get real-time quotes for several stock symbols.",
+            input_schema={
+                "properties": {"symbols": {"type": "array", "items": {"type": "string"}}},
+                "required": ["symbols"],
+            },
+        )],
+        call_returns={"get_quotes": {"quotes": [
+            {"symbol": "NVDA", "price": 150, "change_pct": -2.0},
+            {"symbol": "AMD", "price": 100, "change_pct": 1.0},
+        ]}},
+    )
+    filings = FakeSession(
+        specs=[dict(
+            name="get_catalysts",
+            description="Get current SEC 8-K material-event and contract evidence.",
+            input_schema={
+                "properties": {"symbols": {"type": "array", "items": {"type": "string"}}},
+                "required": ["symbols"],
+            },
+        )],
+        call_returns={"get_catalysts": {"symbols": {"NVDA": {"milestones": []}, "AMD": {"milestones": []}}}},
+    )
+    news = FakeSession(
+        specs=[dict(
+            name="search",
+            description="Search recent market news by keywords.",
+            input_schema={
+                "properties": {"query": {"type": "string"}, "days": {"type": "integer"}},
+                "required": ["query"],
+            },
+        )],
+        call_returns={"search": {"articles": [{"title": "portfolio update"}]}},
+    )
+    tb = MCPToolbox(
+        [_cfg("app"), _cfg("stocks"), _cfg("filings"), _cfg("news")],
+        _factory({"app": app, "stocks": stocks, "filings": filings, "news": news}),
+    )
+    tb.connect()
+    try:
+        agent = AutonomousMCPAgent(
+            tb,
+            client=LLMClient(provider="stub", model="stub"),
+            jev=PortfolioGate([], 0.95),
+            max_steps=7,
+        )
+        result = agent.run("What changed across my holdings?")
+    finally:
+        tb.close()
+
+    assert result.ok()
+    assert [call.tool for call in result.calls] == [
+        "app.get_portfolio_context",
+        "stocks.get_quotes",
+        "filings.get_catalysts",
+        "news.search",
+        "app.get_macro_signals",
+    ]
+    assert stocks.calls[0][1]["symbols"] == ["NVDA", "AMD"]
+    assert filings.calls[0][1]["symbols"] == ["NVDA", "AMD"]
+    assert "NVDA" in news.calls[0][1]["query"]
+    assert "AMD" in news.calls[0][1]["query"]
+    assert result.jev["evidence_gate"]["action"] == "stop"
+    assert result.resolution == "jev_evidence_sufficient"
+
+
+def test_portfolio_research_requires_core_evidence_families():
+    from app.agents.autonomous import _required_evidence_families
+    assert _required_evidence_families("What changed across my holdings?") == (
+        "portfolio",
+        "market",
+        "news",
+        "regulatory_primary",
+        "macro",
+    )

@@ -379,6 +379,133 @@ def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[Tool
     return None
 
 
+
+def _portfolio_research_symbols(calls: list[ToolCallRecord]) -> list[str]:
+    """Extract held ticker symbols from the live portfolio-context result."""
+    symbols: list[str] = []
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if "symbol" in value:
+                candidate = str(value.get("symbol") or "").strip().upper()
+                if re.fullmatch(r"[A-Z][A-Z0-9.]{0,5}", candidate) and candidate not in symbols:
+                    symbols.append(candidate)
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+    for call in calls:
+        if call.ok and _evidence_family(call.tool) == "portfolio":
+            walk(call.output)
+    return symbols[:30]
+
+
+def _portfolio_research_plan(
+    question: str,
+    tools: list[ToolInfo],
+    calls: list[ToolCallRecord],
+) -> dict[str, Any] | None:
+    """Run a bounded portfolio-wide evidence sequence.
+
+    Portfolio research is different from a single-ticker question: first read
+    the user's persistent holdings, then use those discovered symbols to gather
+    market, primary SEC, recent news and macro evidence. This guarantees the
+    portfolio itself remains the research subject rather than relying on
+    symbols explicitly typed by the user.
+    """
+    lower = question.lower()
+    portfolio_terms = ("portfolio", "my holdings", "my positions", "held stocks", "holdings")
+    if not any(term in lower for term in portfolio_terms):
+        return None
+
+    def successful(predicate):
+        return any(c.ok and predicate(c) for c in calls)
+
+    app_portfolio = next(
+        (t for t in tools if t.qualified_name.lower() == "app.get_portfolio_context"),
+        None,
+    )
+    symbols = _portfolio_research_symbols(calls)
+
+    if app_portfolio is not None and not successful(lambda c: c.tool.lower() == "app.get_portfolio_context"):
+        return {
+            "action": "tool",
+            "tool": app_portfolio.qualified_name,
+            "arguments": {},
+            "reason": "portfolio research: establish persistent held universe first",
+        }
+
+    if not symbols:
+        return {
+            "action": "final",
+            "answer": "",
+        } if successful(lambda c: c.tool.lower() == "app.get_portfolio_context") else None
+
+    quotes = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower() == "stocks.get_quotes"
+            and "symbols" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if quotes is not None and not successful(lambda c: c.tool.lower() == "stocks.get_quotes"):
+        return {
+            "action": "tool",
+            "tool": quotes.qualified_name,
+            "arguments": {"symbols": symbols},
+            "reason": "portfolio research: measure current movement across held symbols",
+        }
+
+    catalysts = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower() == "filings.get_catalysts"
+            and "symbols" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if catalysts is not None and not successful(lambda c: c.tool.lower() == "filings.get_catalysts"):
+        return {
+            "action": "tool",
+            "tool": catalysts.qualified_name,
+            "arguments": {"symbols": symbols},
+            "reason": "portfolio research: collect company-specific primary SEC evidence",
+        }
+
+    news = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower() == "news.search"
+            and "query" in ((t.input_schema or {}).get("properties") or {})
+        ),
+        None,
+    )
+    if news is not None and not successful(lambda c: c.tool.lower() == "news.search"):
+        return {
+            "action": "tool",
+            "tool": news.qualified_name,
+            "arguments": {"query": " ".join(symbols) + " portfolio holdings recent developments", "days": 7},
+            "reason": "portfolio research: collect recent news across the held universe",
+        }
+
+    macro = next(
+        (
+            t for t in tools
+            if t.qualified_name.lower() == "app.get_macro_signals"
+        ),
+        None,
+    )
+    if macro is not None and not successful(lambda c: c.tool.lower() == "app.get_macro_signals"):
+        return {
+            "action": "tool",
+            "tool": macro.qualified_name,
+            "arguments": {},
+            "reason": "portfolio research: collect current macro and geopolitical transmission evidence",
+        }
+
+    return {"action": "final", "answer": ""}
+
 def _needs_evidence_gate(question: str) -> bool:
     """Return whether a question benefits from an explicit evidence sufficiency check."""
     lower = question.lower()
@@ -433,7 +560,7 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
         families.append("macro")
     if any(term in lower for term in ("portfolio", "my holdings", "my positions", "held stocks", "holdings")):
-        families.append("portfolio")
+        families.extend(["portfolio", "market", "news", "regulatory_primary", "macro"])
     if any(term in lower for term in ("forecast", "forecast track", "prediction accuracy", "forecast accuracy", "verification history")):
         families.append("forecast")
     if any(term in lower for term in ("ai quality", "hallucination", "red team", "red-team", "research quality", "agent reliability")):
@@ -550,9 +677,22 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     # "missing" is reserved for explicit user-required families. An
     # observed-but-empty/failed optional source is degraded evidence, not a
     # hard completeness failure.
+    portfolio_research = (
+        any(term in question.lower() for term in ("portfolio", "my holdings", "my positions", "held stocks", "holdings"))
+        and "sec" not in question.lower()
+        and "edgar" not in question.lower()
+        and "filing" not in question.lower()
+        and "10-k" not in question.lower()
+        and "10-q" not in question.lower()
+        and "8-k" not in question.lower()
+    )
+    # For the automatic portfolio packet, EMPTY means the source was checked
+    # and returned no matching records. That is different from MISSING/FAILED
+    # and should be disclosed in the packet without blocking synthesis.
+    required_ok_statuses = {"AVAILABLE", "EMPTY"} if portfolio_research else {"AVAILABLE"}
     missing = [
         family for family in expected
-        if matrix.get(family, {}).get("status") != "AVAILABLE"
+        if matrix.get(family, {}).get("status") not in required_ok_statuses
     ]
     usable_families = [
         family for family, item in matrix.items()
@@ -1269,7 +1409,13 @@ class AutonomousMCPAgent:
                 and successful_count == gate_checked
             )
             if gate_forces_more:
-                additional = _next_evidence_plan(question, tools, calls)
+                additional = (
+                    _portfolio_research_plan(question, tools, calls)
+                    if self.planner is None
+                    else None
+                )
+                if additional is None:
+                    additional = _next_evidence_plan(question, tools, calls)
                 if additional is None:
                     gate = dict(gate)
                     gate["action"] = "insufficient"
@@ -1342,17 +1488,27 @@ class AutonomousMCPAgent:
                 # Custom planners are used by tests and integrations to control
                 # the exact next action; keep the production-only forced driver
                 # sequence out of that injected planner path.
-                forced_driver = (
-                    _driver_research_plan(question, tools, calls)
+                forced_portfolio = (
+                    _portfolio_research_plan(question, tools, calls)
                     if self.planner is None
                     else None
                 )
-                plan = forced_driver if forced_driver is not None else self._plan(question, tools, history)
+                forced_driver = (
+                    None if forced_portfolio is not None else _driver_research_plan(question, tools, calls)
+                    if self.planner is None
+                    else None
+                )
+                forced_plan = forced_portfolio if forced_portfolio is not None else forced_driver
+                plan = forced_plan if forced_plan is not None else self._plan(question, tools, history)
                 steps.append(
                     Step(
                         node="plan",
                         kind="node",
-                        note=f"iteration={iteration}" + ("; forced driver evidence" if forced_driver else ""),
+                        note=f"iteration={iteration}" + (
+                            "; forced portfolio evidence" if forced_portfolio
+                            else "; forced driver evidence" if forced_driver
+                            else ""
+                        ),
                     )
                 )
 
@@ -1382,7 +1538,13 @@ class AutonomousMCPAgent:
 
             action = str(plan.get("action", "")).strip().lower()
             if action == "final":
-                forced = _driver_research_plan(question, tools, calls)
+                forced = (
+                    _portfolio_research_plan(question, tools, calls)
+                    if self.planner is None
+                    else None
+                )
+                if forced is None and self.planner is None:
+                    forced = _driver_research_plan(question, tools, calls)
                 if forced is not None:
                     forced_action = str(forced.get("action", "")).strip().lower()
                     if forced_action == "final":
@@ -1449,7 +1611,13 @@ class AutonomousMCPAgent:
                 # do not finalize just because the planner repeated itself;
                 # first try an unused complementary evidence family.
                 if evidence_enabled:
-                    additional = _next_evidence_plan(question, tools, calls)
+                    additional = (
+                        _portfolio_research_plan(question, tools, calls)
+                        if self.planner is None
+                        else None
+                    )
+                    if additional is None:
+                        additional = _next_evidence_plan(question, tools, calls)
                     if additional is not None:
                         plan = additional
                         tool_name = str(plan.get("tool", "")).strip()
