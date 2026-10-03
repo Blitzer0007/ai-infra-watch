@@ -125,7 +125,7 @@ const ROTATION_HORIZONS: Array<{ key: RotationHorizon; days: number }> = [
   { key: '60D', days: 60 }, { key: '3M', days: 63 }, { key: '6M', days: 126 },
 ];
 
-function historicalReturn(points: PricePoint[], days: number): number | null {
+function historicalReturn(points: Array<{ price: number }>, days: number): number | null {
   if (points.length <= days) return null;
   const end = points.at(-1)?.price ?? 0;
   const start = points.at(-(days + 1))?.price ?? 0;
