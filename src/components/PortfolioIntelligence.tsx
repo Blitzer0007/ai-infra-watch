@@ -563,13 +563,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       </section>
 
-      <JevDecisionPanel
-        kind="portfolio"
-        title="Portfolio decision context"
-        subtitle="Jev reviews the measured portfolio state and evidence coverage. It provides typed research triage and context only; it does not generate trade instructions."
-        state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }}
-      />
-
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
           <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Exposure, attribution & benchmark context</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
@@ -614,14 +607,18 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'overview' && (
         <>
-          <div className="space-y-4">
-            {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
-            {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
-            {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
-            {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-            <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
-            <Panel title="Held portfolio" subtitle="Persistent positions · live quote state · select a holding to update the selected holding view">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
+            <section className="min-w-0 space-y-3" aria-label="Portfolio decision context">
+              <JevDecisionPanel
+                kind="portfolio"
+                title="Portfolio decision context"
+                subtitle="Typed research triage and context from measured portfolio evidence; not a trade instruction."
+                state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }}
+              />
+              {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
+            </section>
+            <section className="min-w-0">
+              <Panel title="Held portfolio universe" subtitle="Persistent positions · live quote state · select a holding to update the intelligence rendered below">
               <div className="flex flex-wrap gap-2 mb-3">
                 <div className="relative flex-1 min-w-48">
                   <FilterInput
@@ -641,7 +638,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </FilterSelect>
               </div>
               <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
-            </Panel>
+              </Panel>
+            </section>
+          </div>
+
+          <div className="space-y-4">
+            {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
+            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
+            {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+            {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
+            <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
           </div>
 
           <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
