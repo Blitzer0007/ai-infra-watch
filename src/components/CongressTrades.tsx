@@ -571,37 +571,14 @@ export default function CongressTrades(_props: CongressTradesProps) {
             empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'}
             initialSort={{ key: 'tradeDate', direction: 'desc' }}
             columns={[
-              { key: 'filer', header: 'Filer / Chamber', accessor: row => row.politician, render: row => <><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></> },
-              { key: 'symbol', header: 'Symbol', accessor: row => row.stockSymbol, render: row => <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">{row.stockSymbol}</span> },
-              { key: 'type', header: 'Type', accessor: row => row.transactionType, render: row => <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' + (row.transactionType === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}>{row.transactionType}</span> },
+              { key: 'filer', header: 'Filer / Chamber', accessor: row => row.politician, render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></div> },
+              { key: 'symbol', header: 'Symbol', accessor: row => row.stockSymbol },
+              { key: 'type', header: 'Type', accessor: row => row.transactionType },
               { key: 'amount', header: 'Amount Range', accessor: row => row.amountRange },
               { key: 'tradeDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
               { key: 'filed', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
-              { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return <span className="font-bold text-white">{reaction ? '
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: string;
-}) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-black/10 p-3">
-      <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div>
-      <div className={'text-base font-black mt-1 ' + tone}>{value}</div>
-    </div>
-  );
-}
- + formatPrice(reaction.eventPrice) : '—'}</span>; } },
-              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
+              { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '$' + formatPrice(reaction.eventPrice) : '—'; } },
+              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className="text-[9px] mt-1">5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className="text-[9px] mt-1">20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
             ]}
           />
         </div>
