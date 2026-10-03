@@ -79,7 +79,7 @@ export function selectDynamicPeers(
         } satisfies DynamicPeerCandidate['dimensions'],
       };
     })
-    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
+    .sort((a, b) => b.score - a.score || a.configuredRank - b.configuredRank || a.symbol.localeCompare(b.symbol));
 
   return {
     primary: candidates[0] ? { ...candidates[0], tier: 'primary' } : null,
