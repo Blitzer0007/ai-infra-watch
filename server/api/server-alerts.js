@@ -202,11 +202,6 @@ async function evaluate() {
 
   const states = await getStates();
   let forecastValidationContexts = new Map();
-  try {
-    forecastValidationContexts = await getForecastValidationContexts(watchedSymbols);
-  } catch {
-    forecastValidationContexts = new Map();
-  }
   const now = new Date();
   const timestamp = now.toISOString();
   const events = [];
@@ -252,7 +247,6 @@ async function evaluate() {
         title: alert.symbol + ' price target reached',
         message: alert.symbol + ' is ' + alert.type + ' $' + alert.targetPrice.toFixed(2) + ' at $' + q.price.toFixed(2) + '.',
         source: 'Yahoo Finance quote',
-        validationContext: forecastValidationContexts.get(alert.symbol) || null,
       });
     }
   }
@@ -300,7 +294,6 @@ async function evaluate() {
             ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
             : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
         source: 'Yahoo Finance quote',
-        validationContext: forecastValidationContexts.get(symbol) || null,
       });
 
       if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
@@ -333,7 +326,6 @@ async function evaluate() {
         title: symbol + ' SEC agreement detected',
         message: (contract?.client || 'Material definitive agreement') + ' · ' + (contract?.value || 'Value not quantified') + (contract?.dateSigned ? ' · ' + contract.dateSigned : ''),
         source: 'SEC EDGAR',
-        validationContext: forecastValidationContexts.get(symbol) || null,
       });
     }
 
@@ -351,8 +343,18 @@ async function evaluate() {
         title: symbol + ' congressional trade disclosed',
         message: (trade?.politician || 'Unknown filer') + ' reported a ' + (trade?.transactionType || 'transaction') + ' in the range ' + (trade?.amountRange || 'not disclosed') + (trade?.date ? ' · ' + trade.date : ''),
         source: 'Congressional disclosure feed',
-        validationContext: forecastValidationContexts.get(symbol) || null,
       });
+    }
+  }
+
+  if (events.length) {
+    try {
+      forecastValidationContexts = await getForecastValidationContexts([...new Set(events.map(event => event.symbol))]);
+      events.forEach(event => {
+        event.validationContext = forecastValidationContexts.get(event.symbol) || null;
+      });
+    } catch {
+      forecastValidationContexts = new Map();
     }
   }
 
