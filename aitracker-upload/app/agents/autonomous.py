@@ -1325,6 +1325,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                jev=self.last_jev,
                 answer_source="none",
                 error="no successful tool calls",
                 resolution="error",
