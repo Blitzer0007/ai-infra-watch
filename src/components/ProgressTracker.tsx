@@ -107,7 +107,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       const next = prev.filter(item => item !== symbol);
       saveTrackerSymbols(next);
       if (selectedStock === symbol) {
-        setSelectedStock(next[0]);
+        setSelectedStock(next[0] || Object.keys(STOCK_METADATA)[0] || '');
         setActiveMilestoneId(null);
       }
       return next;
