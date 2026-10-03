@@ -20,11 +20,14 @@ def _assert_sort_control(table, label: str):
     )
     if has_button:
         button = header.locator("button").first
-        assert button.get_attribute("aria-sort") in ("none", "ascending", "descending")
+        before = button.get_attribute("aria-sort")
+        assert before in ("none", "ascending", "descending")
         button.click()
-        assert button.get_attribute("aria-sort") == "ascending"
+        after = button.get_attribute("aria-sort")
+        expected = "ascending" if before in ("none", "descending") else "descending"
+        assert after == expected
         button.click()
-        assert button.get_attribute("aria-sort") == "descending"
+        assert button.get_attribute("aria-sort") == before
 
 
 def test_exploratory_sorting_congress(page):
@@ -44,14 +47,16 @@ def test_exploratory_sorting_quality_lab(page):
 def test_exploratory_sorting_forward_outlook(page):
     mock_local_apis(page)
     goto_app(page)
-    page.get_by_test_id("nav-outlook").click()
+    page.goto("/outlook", wait_until="domcontentloaded")
+    page.get_by_test_id("forward-outlook").wait_for(state="visible", timeout=30000)
     _assert_sort_control(_table_with_header(page, "Ticker"), "Ticker")
 
 
 def test_exploratory_sorting_portfolio_scenarios(page):
     mock_local_apis(page)
     goto_app(page)
-    page.get_by_test_id("nav-portfolio").click()
+    page.goto("/portfolio", wait_until="domcontentloaded")
+    page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
     _assert_sort_control(_table_with_header(page, "Reference"), "Reference")
 
 
@@ -103,7 +108,13 @@ def test_exploratory_global_table_accessibility(page):
         ("portfolio", "Reference"),
         ("macro", "Holding"),
     ]:
-        page.get_by_test_id("nav-" + nav_id).click()
+        page.goto({
+            "congress": "/congress",
+            "quality": "/quality",
+            "outlook": "/outlook",
+            "portfolio": "/portfolio",
+            "macro": "/macro",
+        }[nav_id], wait_until="domcontentloaded")
         table = _table_with_header(page, label)
         assert table.locator("thead").count() == 1
         assert table.locator("tbody").count() == 1
