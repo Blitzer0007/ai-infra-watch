@@ -1,4 +1,5 @@
 import { AppConfig } from '../utils';
+import { authFetch, getAccessToken } from './apiAuth';
 
 export type AlertSeverity = 'info' | 'medium' | 'high' | 'critical';
 export type AlertEventType = 'price' | 'large-move' | 'catalyst';
@@ -127,6 +128,27 @@ export function evaluateQuoteAlerts(
 export function requestBrowserNotifications(): Promise<NotificationPermission> {
   if (!('Notification' in window)) return Promise.resolve('denied');
   return Notification.requestPermission();
+}
+
+export async function notifyTelegram(events: AlertEvent[]): Promise<void> {
+  if (!events.length || !getAccessToken()) return;
+
+  try {
+    const response = await authFetch('/api/alert-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      // Telegram delivery is optional; local alert state/browser notifications
+      // must keep working even when the server relay is not configured.
+      return;
+    }
+  } catch {
+    // Keep the dashboard signal engine resilient to notification transport failures.
+  }
 }
 
 export function notifyBrowser(event: AlertEvent): void {
