@@ -293,6 +293,7 @@ function normalize(row) {
     p10: Number(row.p10),
     p90: Number(row.p90),
     modelVersion: row.model_version || 'analogue-v1',
+    evidenceSnapshot: row.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : undefined,
     status: row.status,
     verifiedAt: row.verified_at || undefined,
     actualDate: row.actual_date || undefined,
@@ -361,13 +362,25 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const required = ['id','ticker','createdAt','targetDate','horizon','scenarioId','entryPrice','median','p25','p75','p10','p90'];
       if (required.some(key => body[key] === undefined || body[key] === null || body[key] === '')) return send(res, 400, { error: 'Missing forecast fields.' });
+      const existingResponse = await fetch(
+        SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&id=eq.' + encodeURIComponent(body.id) + '&limit=1',
+        { headers: headers() }
+      );
+      const existingData = await existingResponse.json();
+      if (!existingResponse.ok) return send(res, existingResponse.status, { error: existingData?.message || 'Failed to check existing forecast.' });
+      if (Array.isArray(existingData) && existingData[0]) {
+        return send(res, 200, { forecast: normalize(existingData[0]), unchanged: true });
+      }
+
       const row = {
         id: body.id, ticker: String(body.ticker).toUpperCase(), created_at: body.createdAt, target_date: body.targetDate,
         horizon: String(body.horizon), scenario_id: body.scenarioId, entry_price: Number(body.entryPrice), median: Number(body.median),
         p25: Number(body.p25), p75: Number(body.p75), p10: Number(body.p10), p90: Number(body.p90),
-        model_version: String(body.modelVersion || 'analogue-v1'), status: 'pending'
+        model_version: String(body.modelVersion || 'analogue-v1'),
+        evidence_snapshot: body.evidenceSnapshot && typeof body.evidenceSnapshot === 'object' ? body.evidenceSnapshot : {},
+        status: 'pending'
       };
-      const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?on_conflict=id', { method: 'POST', headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(row) });
+      const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots', { method: 'POST', headers: { ...headers(), Prefer: 'return=representation' }, body: JSON.stringify(row) });
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to save forecast.' });
       return send(res, 201, { forecast: normalize(data[0]) });
