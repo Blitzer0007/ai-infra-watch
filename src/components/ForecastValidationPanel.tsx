@@ -34,7 +34,7 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
       .then(body => {
         if (cancelled) return;
         setSummary(body?.overall?.count ? body.overall : null);
-        setGlobalGate(body?.validationGate || null);
+        setGlobalGate(body?.globalValidationGate || body?.validationGate || null);
       })
       .catch(err => {
         if (!cancelled) {
