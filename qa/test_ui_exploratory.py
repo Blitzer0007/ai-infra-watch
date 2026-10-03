@@ -65,6 +65,7 @@ def test_exploratory_sorting_portfolio_scenarios(page):
 def test_exploratory_sorting_macro_politics(page):
     mock_local_apis(page)
     goto_app(page)
+    page.goto("/macro", wait_until="domcontentloaded")
     _assert_sort_control(_table_with_header(page, "Holding"), "Holding")
 
 
