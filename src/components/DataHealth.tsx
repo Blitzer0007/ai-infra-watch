@@ -196,6 +196,6 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   );
 }
 
-function Metric({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+function Metric({ label, value, icon }: { label: string; value: number | string; icon: ReactNode }) {
   return <div className="rounded-xl border border-white/10 bg-[#15181E] p-4"><div className="flex items-center gap-2 text-[9px] font-mono uppercase text-white/35">{icon}{label}</div><div className="text-2xl font-black mt-2">{value}</div></div>;
 }
