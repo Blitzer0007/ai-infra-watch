@@ -261,11 +261,33 @@ def _record_jev_route(question: str, tools: list[ToolInfo], client: Any, *, acti
             "action": action,
         }
     except Exception as exc:
-        return {
-            "enabled": True,
-            "action": "fallback",
-            "error": f"{type(exc).__name__}: {exc}",
-        }
+        # Keep route recording resilient to optional tool metadata. A JEV
+        # client can still make the routing decision without the discovered
+        # tool catalog, so retry the typed decision with a minimal state before
+        # declaring routing unavailable.
+        try:
+            decision = client.choose(
+                state=f"AI Infra Watch research question: {question}",
+                instructions="Which research route should run first? Choose multi_source when the question asks why/what changed or clearly needs multiple evidence sources.",
+                criteria={**JEV_ROUTE_CRITERIA},
+            )
+            return {
+                "enabled": True,
+                "choice": str(getattr(decision, "choice", "") or ""),
+                "confidence": float(getattr(decision, "confidence", 0.0) or 0.0),
+                "probabilities": dict(getattr(decision, "probabilities", None) or {}),
+                "model": str(getattr(decision, "model", "") or ""),
+                "latency_ms": round(float(getattr(decision, "latency_ms", 0.0) or 0.0), 1),
+                "action": action,
+                "route_retry": True,
+                "route_error": f"{type(exc).__name__}: {exc}",
+            }
+        except Exception as retry_exc:
+            return {
+                "enabled": True,
+                "action": "fallback",
+                "error": f"{type(exc).__name__}: {exc}; retry={type(retry_exc).__name__}: {retry_exc}",
+            }
 
 def _tool_for_jev_route(route: str, tools: list[ToolInfo]) -> ToolInfo | None:
     patterns = JEV_ROUTE_PATTERNS.get(route, ())
