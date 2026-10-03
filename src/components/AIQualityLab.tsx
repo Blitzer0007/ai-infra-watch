@@ -1,3 +1,4 @@
+import DataTable, { type DataTableColumn } from './DataTable';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -191,6 +192,15 @@ function evaluateDefense(item: RedTeamCase) {
 function formatPct(value: number | null | undefined) {
   return typeof value === 'number' ? value.toFixed(0) + '%' : '—';
 }
+
+const qualityColumns: DataTableColumn<any>[] = [
+  { key: 'createdAt', header: 'Time', accessor: row => row.createdAt, type: 'datetime', render: row => new Date(row.createdAt).toLocaleString() },
+  { key: 'qualityScore', header: 'Quality', accessor: row => row.qualityScore, type: 'percent', render: row => formatPct(row.qualityScore) },
+  { key: 'faithfulness', header: 'Faithfulness', accessor: row => row.faithfulness, type: 'percent', render: row => formatPct(row.faithfulness) },
+  { key: 'hallucinationRate', header: 'Hallucination', accessor: row => row.hallucinationRate, type: 'percent', render: row => formatPct(row.hallucinationRate) },
+  { key: 'adversarialFailureRate', header: 'Adversarial', accessor: row => row.adversarialFailureRate, type: 'percent', render: row => formatPct(row.adversarialFailureRate) },
+  { key: 'failures', header: 'Failures', accessor: row => row.failures, type: 'number', align: 'right' },
+];
 
 export default function AIQualityLab() {
   const [question, setQuestion] = useState('What changed recently across NVDA and NBIS?');
@@ -528,38 +538,13 @@ export default function AIQualityLab() {
               }>
                 {regressionSummary.regressions.length === 0
                   ? 'No material regression'
-                  : `${regressionSummary.regressions.length} regression${regressionSummary.regressions.length === 1 ? '' : 's'}`}
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {regressionSummary.observed.map(item => (
-                <span
-                  key={item.label}
-                  className={
-                    'rounded border px-1.5 py-0.5 text-[8px] font-mono ' +
-                    (regressionSummary.regressions.some(regression => regression.metric === item.metric)
-                      ? 'border-rose-400/20 bg-rose-400/5 text-rose-300'
-                      : 'border-white/10 text-white/40')
-                  }
-                >
-                  {item.label} {item.delta >= 0 ? '+' : ''}{item.delta.toFixed(1)}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-[9px] font-mono">
-            <thead className="text-white/30 uppercase">
-              <tr>
-                <th className="px-2 py-2">Time</th>
-                <th className="px-2 py-2">Quality</th>
-                <th className="px-2 py-2">Faithfulness</th>
-                <th className="px-2 py-2">Hallucination</th>
-                <th className="px-2 py-2">Adversarial</th>
-                <th className="px-2 py-2">Failures</th>
-              </tr>
-            </thead>
+               <DataTable
+          rows={runs}
+          columns={qualityColumns}
+          rowKey={(row, index) => String(row.id || row.createdAt || index)}
+          empty="No persisted quality runs yet."
+          initialSort={{ key: 'createdAt', direction: 'desc' }}
+        />     </thead>
             <tbody className="divide-y divide-white/5">
               {runs.map(run => (
                 <tr key={run.id || run.createdAt}>
