@@ -26,6 +26,7 @@ type ForecastSnapshot = {
   entryPrice: number; median: number; p25: number; p75: number; p10: number; p90: number;
   decisionThesis?: string; lossLimitPct?: number | null; exitRuleType?: string | null; exitRuleValue?: number | null; exitRuleText?: string; practicalNotes?: string; brokerAlertPrices?: number[];
   modelVersion?: string;
+  evidenceSnapshot?: ForecastEvidenceSnapshot;
   status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
 };
 
