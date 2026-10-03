@@ -38,6 +38,11 @@ export function loadConfig(): AppConfig {
 
 export function saveConfig(cfg: AppConfig): void {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+  try {
+    window.dispatchEvent(new CustomEvent('aiw-config-changed', { detail: cfg }));
+  } catch {
+    // Server synchronization is handled by the authenticated app shell.
+  }
 }
 
 export function formatPrice(p: number | undefined): string {

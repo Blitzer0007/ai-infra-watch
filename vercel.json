@@ -21,6 +21,14 @@
       "destination": "/api/market?route=earnings-alerts"
     },
     {
+      "source": "/api/alert-config",
+      "destination": "/api/market?route=alert-config"
+    },
+    {
+      "source": "/api/server-alerts",
+      "destination": "/api/market?route=server-alerts"
+    },
+    {
       "source": "/api/alert-notify",
       "destination": "/api/market?route=alert-notify"
     },
