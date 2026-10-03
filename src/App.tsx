@@ -9,6 +9,7 @@ import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser, notifyTelegram } from './utils/alertEngine';
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
+import { authFetch, getAccessToken } from './utils/apiAuth';
 
 const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
@@ -73,6 +74,30 @@ export default function App() {
     ...STOCK_UNIVERSE_SYMBOLS,
     ...portfolioSymbols,
   ])];
+
+  useEffect(() => {
+    const syncServerAlertConfig = async (cfg: AppConfig) => {
+      if (!getAccessToken()) return;
+      try {
+        await authFetch('/api/alert-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg),
+          cache: 'no-store',
+        });
+      } catch {
+        // Server-side smart monitoring retries on the next config change or app load.
+      }
+    };
+
+    void syncServerAlertConfig(loadConfig());
+    const onConfigChanged = (event: Event) => {
+      const detail = (event as CustomEvent<AppConfig>).detail;
+      if (detail) void syncServerAlertConfig(detail);
+    };
+    window.addEventListener('aiw-config-changed', onConfigChanged);
+    return () => window.removeEventListener('aiw-config-changed', onConfigChanged);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
