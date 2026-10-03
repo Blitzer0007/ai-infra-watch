@@ -131,8 +131,10 @@ export async function quote(symbol) {
 }
 
 async function yahooHistory(symbol, range) {
-  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
-    encodeURIComponent(providerSymbol(symbol)) + '?range=' + encodeURIComponent(range) + '&interval=1d&events=div%2Csplits';
+  const chartBase = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(providerSymbol(symbol));
+  const url = range === 'max'
+    ? chartBase + '?period1=0&period2=' + Math.floor(Date.now() / 1000) + '&interval=1d&events=div%2Csplits'
+    : chartBase + '?range=' + encodeURIComponent(range) + '&interval=1d&events=div%2Csplits';
   const result = (await fetchJson(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' } }))?.chart?.result?.[0];
   if (!result) throw new Error('No Yahoo history');
   const ts = result.timestamp || [];
