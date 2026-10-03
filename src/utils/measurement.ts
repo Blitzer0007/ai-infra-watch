@@ -343,7 +343,8 @@ export function calculatePortfolioCorrelation(
   });
   return { symbols: selected, values, sampleDays };
 }
-\nexport type StressInput = {
+
+export type StressInput = {
   dailyChanges: number[];
   highMacroCount: number;
   mediumMacroCount: number;
