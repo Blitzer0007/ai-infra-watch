@@ -82,7 +82,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
   const removeTrackerSymbol = (symbol: string) => {
     setTrackerSymbols(prev => {
-      if (prev.length <= 1) return prev;
       const next = prev.filter(item => item !== symbol);
       saveTrackerSymbols(next);
       if (selectedStock === symbol) {
