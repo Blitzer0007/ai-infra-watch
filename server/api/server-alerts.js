@@ -1,5 +1,9 @@
 import { requireAccess } from '../../api/_access-auth.js';
 
+const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
+const MAX_SMART_ALERTS_PER_SCAN = 10;
+
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
@@ -153,10 +157,6 @@ async function sendTelegram(events) {
   return { sent, sentEventKeys, errors };
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 async function evaluate() {
   const config = await getConfig();
   const portfolioSymbols = await getPortfolioSymbols();
@@ -220,23 +220,50 @@ async function evaluate() {
 
   if (config.large_move_enabled) {
     const threshold = Math.max(0.1, Number(config.large_move_pct) || 5);
-    const date = todayKey();
     for (const symbol of watchedSymbols) {
       const q = quotes.get(symbol);
-      if (!q || Math.abs(q.changePct) < threshold) continue;
+      const magnitude = Math.abs(q?.changePct ?? 0);
+
+      if (!q || magnitude < threshold) {
+        for (const direction of ['up', 'down']) {
+          const key = 'large-move:' + symbol + ':' + direction;
+          const previous = states.get(key);
+          if (previous?.active) {
+            stateUpdates.push({
+              event_key: key,
+              active: false,
+              last_seen_at: timestamp,
+              last_triggered_at: previous.last_triggered_at || null,
+              metadata: { symbol, type: 'large-move', direction, threshold },
+            });
+          }
+        }
+        continue;
+      }
+
       const direction = q.changePct >= 0 ? 'up' : 'down';
-      const key = 'large-move:' + symbol + ':' + date + ':' + direction;
+      const key = 'large-move:' + symbol + ':' + direction;
       const previous = states.get(key);
-      if (previous?.active) continue;
+      const lastTriggered = previous?.last_triggered_at ? Date.parse(previous.last_triggered_at) : 0;
+      const elapsedMs = lastTriggered > 0 ? Date.parse(timestamp) - lastTriggered : Number.POSITIVE_INFINITY;
+      const inCooldown = elapsedMs < LARGE_MOVE_COOLDOWN_MS;
+      if (previous?.active && inCooldown) continue;
+
+      const severity = magnitude >= threshold * LARGE_MOVE_CRITICAL_MULTIPLIER ? 'critical' : 'high';
       events.push({
         stateKey: key,
         type: 'large-move',
-        severity: Math.abs(q.changePct) >= threshold * 2 ? 'critical' : 'high',
+        severity,
         symbol,
         title: symbol + ' large move detected',
-        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + Math.abs(q.changePct).toFixed(2) + '% today at $' + q.price.toFixed(2) + '.',
+        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at $' + q.price.toFixed(2) + '. ' +
+          (severity === 'critical'
+            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
+            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
         source: 'Yahoo Finance quote',
       });
+
+      if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
     }
   }
 
