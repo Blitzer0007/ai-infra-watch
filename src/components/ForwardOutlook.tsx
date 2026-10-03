@@ -58,7 +58,33 @@ function addBusinessDays(start: Date, days: number): string {
   while (remaining > 0) { date.setDate(date.getDate() + 1); const day = date.getDay(); if (day !== 0 && day !== 6) remaining -= 1; }
   return date.toISOString().slice(0, 10);
 }
-function loadForecasts(): ForecastSnapshot[] { try { const raw = localStorage.getItem(FORECAST_STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }
+function loadForecasts(): ForecastSnapshot[] {
+  try {
+    const raw = localStorage.getItem(FORECAST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Older builds could store either the array directly or a wrapper object.
+    // Never allow malformed browser state to crash the whole Forward Outlook route.
+    const candidates = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.forecasts)
+        ? parsed.forecasts
+        : [];
+    return candidates.filter((item): item is ForecastSnapshot =>
+      Boolean(
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.ticker === 'string' &&
+        Number.isFinite(Number(item.horizon)) &&
+        Number.isFinite(Number(item.entryPrice)) &&
+        Number.isFinite(Number(item.median))
+      )
+    );
+  } catch {
+    return [];
+  }
+}
 function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
 
 function percentile(values: number[], p: number): number {
