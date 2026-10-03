@@ -52,6 +52,11 @@ const GROUP_MEMBERS = (() => {
   return Object.fromEntries(groups.entries());
 })();
 
+export const MONEY_ROTATION_SYMBOLS = Array.from(new Set([
+  ...Object.values(GROUP_MEMBERS).flat(),
+  'NVDA', 'AMD', 'NOW', 'CRM', 'MU', '000660.KS', 'NBIS', 'IREN', 'DGXX', 'CIFR', 'META', 'GOOGL',
+]));
+ 
 const PAIRS: Array<[string,string,string]> = [
   ['NVDA','AMD','Accelerator relative strength'],
   ['NOW','CRM','Enterprise software relative strength'],

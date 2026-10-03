@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
-import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
+import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
@@ -67,6 +67,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
+  const [rotationHistory, setRotationHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => localStorage.getItem('aiw_portfolio_currency') === 'INR' ? 'INR' : 'USD');
   const [usdInr, setUsdInr] = useState<number | null>(null);
   const [historicalPrice, setHistoricalPrice] = useState<HistoricalPriceState>({
@@ -182,7 +183,36 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
   const [rotationGroup, setRotationGroup] = useState<string>('All');
-  const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices), [portfolioHistory.histories, livePrices]);
+  useEffect(() => {
+    let cancelled = false;
+    if (tab !== 'rotation') return () => { cancelled = true; };
+    setRotationHistory({ loading: true, histories: {}, error: '' });
+    Promise.allSettled(MONEY_ROTATION_SYMBOLS.map(async symbol => {
+      const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(symbol) + '&range=1y', { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(body?.points)) throw new Error(symbol + ': historical data unavailable');
+      const points = body.points
+        .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+        .map((point: any) => ({ date: point.date, price: Number(point.price) }))
+        .sort((a: PortfolioHistoryPoint, b: PortfolioHistoryPoint) => a.date.localeCompare(b.date));
+      return { symbol, points };
+    })).then(results => {
+      if (cancelled) return;
+      const histories: Record<string, PortfolioHistoryPoint[]> = {};
+      const failures: string[] = [];
+      results.forEach(result => {
+        if (result.status === 'fulfilled') histories[result.value.symbol] = result.value.points;
+        else failures.push(String(result.reason?.message || result.reason || 'history unavailable'));
+      });
+      setRotationHistory({
+        loading: false,
+        histories,
+        error: failures.length ? failures.slice(0, 5).join(' · ') : '',
+      });
+    });
+    return () => { cancelled = true; };
+  }, [tab]);
+  const rotation = useMemo(() => buildMoneyRotation(rotationHistory.histories, livePrices), [rotationHistory.histories, livePrices]);
   const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
   useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
@@ -859,7 +889,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Rotation signal'] : [typeof v === 'number' ? v.toFixed(1) + '%' : '—','Period return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
             </BarChart></ResponsiveContainer></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => <div key={g.name} className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex justify-between gap-2"><span className="text-xs font-bold">{g.name}</span><span className="text-[9px] font-mono uppercase text-white/40">{g.direction}</span></div><div className="text-[9px] text-white/35 mt-1">{g.members.join(' · ')}</div><div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">{(['1D','20D','60D'] as RotationHorizon[]).map(h => <div key={h}><span className="text-white/20">{h}</span><div className="text-white/60">{g.horizons[h] == null ? '—' : g.horizons[h]!.toFixed(1) + '%'}</div></div>)}</div></div>)}</div>
-            <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
+            <div className="mt-3 text-[9px] text-white/30">
+              {rotation.methodology}
+              {' · History coverage: ' + Object.keys(rotationHistory.histories).length + '/' + MONEY_ROTATION_SYMBOLS.length + ' symbols'}
+              {rotationHistory.loading ? ' · loading…' : rotationHistory.error ? ' · History warning: ' + rotationHistory.error : ' · coverage complete'}
+            </div>
           </Panel>
           <Panel title="Pair monitor" subtitle="Relative-strength spread history and current transition state">
             <div className="space-y-2">{rotation.pairs.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
