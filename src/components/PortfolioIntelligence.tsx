@@ -16,6 +16,7 @@ import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, type PeerCounterfactual } from '../utils/peerIntelligence';
+import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 type Price = {
   price: number;
   changePct: number;
@@ -890,8 +891,10 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
   const mean = Number.isFinite(Number(target.mean)) ? Number(target.mean) : null;
   const low = Number.isFinite(Number(target.low)) ? Number(target.low) : null;
   const high = Number.isFinite(Number(target.high)) ? Number(target.high) : null;
-  const targetMove = currentPrice != null && currentPrice > 0 && median != null ? (median / currentPrice - 1) * 100 : null;
-  const ratingCount = ["strongBuy", "buy", "hold", "sell", "strongSell"].reduce((sum, key) => sum + Number(recommendation[key] || 0), 0);
+  const consensus = normalizeAnalystConsensus({ recommendation, priceTarget: target, currentPrice, retrievedAt: data?.retrievedAt ?? null, source: data?.source ?? null, analystCount: data?.analystCount ?? null });
+  const targetMove = consensus.target.medianUpsidePct;
+  const ratingCount = consensus.analystCount;
+  const freshness = analystFreshness(consensus.retrievedAt);
   const eps = Array.isArray(data?.epsEstimates) ? data.epsEstimates[0] : null;
   const revenue = Array.isArray(data?.revenueEstimates) ? data.revenueEstimates[0] : null;
 
@@ -912,11 +915,11 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
       {!error && !loading && data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0)} />
-            <Info label="Buy" value={String(recommendation.buy ?? 0)} />
-            <Info label="Hold" value={String(recommendation.hold ?? 0)} />
-            <Info label="Sell" value={String(recommendation.sell ?? 0)} />
-            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0)} />
+            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0) + (ratingCount ? ' · ' + consensus.percentages.strongBuy.toFixed(0) + '%' : '')} />
+            <Info label="Buy" value={String(recommendation.buy ?? 0) + (ratingCount ? ' · ' + consensus.percentages.buy.toFixed(0) + '%' : '')} />
+            <Info label="Hold" value={String(recommendation.hold ?? 0) + (ratingCount ? ' · ' + consensus.percentages.hold.toFixed(0) + '%' : '')} />
+            <Info label="Sell" value={String(recommendation.sell ?? 0) + (ratingCount ? ' · ' + consensus.percentages.sell.toFixed(0) + '%' : '')} />
+            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0) + (ratingCount ? ' · ' + consensus.percentages.strongSell.toFixed(0) + '%' : '')} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
             <Info label="Median target" value={median == null ? "—" : "$" + median.toFixed(2)} />
@@ -926,7 +929,7 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             <Info label="Vs current" value={targetMove == null ? "—" : (targetMove >= 0 ? "+" : "") + targetMove.toFixed(1) + "%"} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-            <Info label="Rating count" value={String(ratingCount)} />
+            <Info label="Analyst count" value={String(ratingCount)} />
             <Info label="EPS estimate" value={eps?.average == null ? "—" : Number(eps.average).toFixed(2)} />
             <Info label="Revenue estimate" value={revenue?.average == null ? "—" : "$" + (Number(revenue.average) / 1e9).toFixed(1) + "B"} />
           </div>
@@ -944,7 +947,8 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             {data.webEvidence?.error && <div className="mt-2 text-[8px] font-mono text-amber-200/50">{data.webEvidence.error}</div>}
           </div>
           <div className="mt-3 text-[8px] font-mono text-white/20">
-            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() : "Retrieved time unavailable"}
+            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() + " · " + freshness : "Retrieved time unavailable"}
+            {target.lastUpdated ? " · Targets " + target.lastUpdated : ""}
             {eps?.period ? " · EPS " + eps.period : ""}
             {revenue?.period ? " · Revenue " + revenue.period : ""}
             {data.errors?.length ? " · Some analyst endpoints unavailable" : ""}
@@ -1198,37 +1202,3 @@ function StatePill({state}:{state:PositionAnalysis['state']}) {
     ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
     : state === 'RISK REVIEW'
       ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
-      : state === 'INSUFFICIENT DATA'
-        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
-        : 'bg-white/5 text-white/55 border-white/10';
-  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
-}
-
-function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
-  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
-    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
-    {children}
-  </section>;
-}
-
-function Info({label,value}:{label:string;value:string}) {
-  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
-    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
-    <div className="text-xs mt-1">{value}</div>
-  </div>;
-}
-
-function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
-  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
-  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
-    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
-    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
-  </div>;
-}
-
-function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
-  return <div className="border border-white/5 rounded-xl p-3">
-    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
-    <div className="text-[10px] text-white/35 mt-2">{body}</div>
-  </div>;
-}
