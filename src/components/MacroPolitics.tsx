@@ -5,7 +5,7 @@ import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/por
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
 import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
-import DataTable, { type DataTableColumn } from './DataTable';
+import DataTable from './DataTable';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
@@ -99,8 +99,8 @@ function PortfolioScenarioSensitivity({
           { key: 'export', header: 'Export', accessor: row => row.export.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
           { key: 'sensitivity', header: 'Sensitivity', accessor: row => row.sensitivity, type: 'number', align: 'right', render: row => row.sensitivity + '/100' },
           { key: 'weightedContribution', header: 'Weighted contribution', accessor: row => row.weightedContribution, type: 'number', align: 'right', render: row => row.weightedContribution.toFixed(1) },
-        ] as DataTableColumn<typeof portfolioRows[number]>[]}
-        rowKey={(row) => row.symbol}
+        ]}
+        rowKey={row => row.symbol}
         initialSort={{ key: 'sensitivity', direction: 'desc' }}
         empty="No portfolio exposure data available."
       />
@@ -150,8 +150,8 @@ function PortfolioExposureMatrix({ contracts = [], news = [], positions = [] }: 
           { key: 'taiwan', header: 'TSMC disruption', accessor: row => row.taiwan.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /> },
           { key: 'power', header: 'Power shortfall', accessor: row => row.power.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.power.level} basis={row.power.basis} /> },
           { key: 'export', header: 'AI-chip export controls', accessor: row => row.export.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
-        ] as DataTableColumn<typeof derivedExposure[number]>[]}
-        rowKey={(row) => row.symbol}
+        ]}
+        rowKey={row => row.symbol}
         initialSort={{ key: 'symbol', direction: 'asc' }}
         empty="No portfolio exposure data available."
       />
