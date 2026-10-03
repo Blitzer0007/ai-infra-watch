@@ -1202,3 +1202,37 @@ function StatePill({state}:{state:PositionAnalysis['state']}) {
     ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
     : state === 'RISK REVIEW'
       ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
+  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
+}
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
+}
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
+}
