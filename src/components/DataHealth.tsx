@@ -1,5 +1,7 @@
-import { Activity, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { authFetch } from '../utils/apiAuth';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -64,6 +66,33 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
   const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT').length;
   const fallback = entries.filter(([, item]) => Boolean(item?.fallback)).length;
+  const [forecastValidation, setForecastValidation] = useState<any>(null);
+  const [forecastValidationError, setForecastValidationError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch('/api/forecast-validation', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || 'Forecast validation unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        setForecastValidation(body);
+        setForecastValidationError('');
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setForecastValidation(null);
+          setForecastValidationError(error instanceof Error ? error.message : 'Forecast validation unavailable');
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const validationOverall = forecastValidation?.overall || null;
+  const validationGate = forecastValidation?.validationGate || null;
 
   return (
     <div className="space-y-6">
@@ -89,6 +118,33 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <Metric label="Fallbacks" value={fallback} icon={<RefreshCw className="w-4 h-4"/>}/>
         <Metric label="Total channels" value={entries.length} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
+
+
+      <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4" data-testid="forecast-validation-health">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-cyan-300">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Forecast validation health
+            </div>
+            <div className="text-sm font-black mt-1">Verified forecast sample</div>
+            <div className="text-[9px] text-white/30 mt-1">Tracks completed forecasts separately from current evidence availability.</div>
+          </div>
+          <span className="text-[8px] font-mono uppercase text-white/30">{validationGate?.ready ? '50+ gate established' : 'validation sample building'}</span>
+        </div>
+        {forecastValidationError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{forecastValidationError}</div>}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+          <Metric label="Verified" value={validationOverall?.count ?? 0} icon={<CheckCircle2 className="w-4 h-4"/>}/>
+          <Metric label="Direction" value={validationOverall?.directionalAccuracyPct == null ? '—' : Math.round(validationOverall.directionalAccuracyPct) + '%'} icon={<Activity className="w-4 h-4"/>}/>
+          <Metric label="Typical error" value={validationOverall?.medianAbsoluteError == null ? '—' : validationOverall.medianAbsoluteError.toFixed(1) + ' pp'} icon={<Activity className="w-4 h-4"/>}/>
+          <Metric label="Likely range" value={validationOverall?.p25p75CoveragePct == null ? '—' : Math.round(validationOverall.p25p75CoveragePct) + '%'} icon={<ShieldCheck className="w-4 h-4"/>}/>
+          <Metric label="Gate" value={validationGate ? validationGate.verifiedCount + '/' + validationGate.minimumRequired : '—'} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        </div>
+        <div className="mt-2 text-[8px] font-mono text-white/25">
+          {validationOverall?.sampleStatus ? 'Sample status: ' + validationOverall.sampleStatus.replace('-', ' ') : 'No verified forecast history yet.'}
+          {validationOverall?.newestVerifiedAt ? ' · last verified ' + new Date(validationOverall.newestVerifiedAt).toLocaleString() : ''}
+          {forecastValidation?.scope?.truncated ? ' · latest ' + forecastValidation.scope.rowLimit + ' rows shown' : ''}
+        </div>
+      </section>
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden" aria-label="Evidence channel health">
         <div className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 border-b border-white/10 text-[9px] font-mono uppercase tracking-widest text-white/35">
@@ -140,6 +196,6 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   );
 }
 
-function Metric({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+function Metric({ label, value, icon }: { label: string; value: number | string; icon: ReactNode }) {
   return <div className="rounded-xl border border-white/10 bg-[#15181E] p-4"><div className="flex items-center gap-2 text-[9px] font-mono uppercase text-white/35">{icon}{label}</div><div className="text-2xl font-black mt-2">{value}</div></div>;
 }

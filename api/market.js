@@ -5,6 +5,7 @@ import earningsAlertsHandler from '../server/api/earnings-alerts.js';
 import alertNotifyHandler from '../server/api/alert-notify.js';
 import alertConfigHandler from '../server/api/alert-config.js';
 import serverAlertsHandler from '../server/api/server-alerts.js';
+import forecastValidationHandler from '../server/api/forecast-validation.js';
 
 const routes = {
   quote: quoteHandler,
@@ -14,6 +15,7 @@ const routes = {
   'alert-notify': alertNotifyHandler,
   'alert-config': alertConfigHandler,
   'server-alerts': serverAlertsHandler,
+  'forecast-validation': forecastValidationHandler,
 };
 
 export default async function handler(req, res) {

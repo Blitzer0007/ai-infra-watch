@@ -1,4 +1,5 @@
 import { requireAccess } from '../../api/_access-auth.js';
+import { getTickerValidationContext } from '../utils/forecastValidation.js';
 
 const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
@@ -70,6 +71,23 @@ async function getStates() {
   return new Map((rows || []).map(row => [String(row.event_key), row]));
 }
 
+async function getForecastValidationContexts(symbols) {
+  const unique = [...new Set(symbols.map(symbol => String(symbol || '').trim().toUpperCase()).filter(Boolean))];
+  if (!unique.length) return new Map();
+  const tickerFilter = unique.map(symbol => encodeURIComponent(symbol)).join(',');
+  const path =
+    'forecast_snapshots?select=ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at' +
+    '&status=eq.verified&horizon=eq.20&ticker=in.(' + tickerFilter + ')' +
+    '&order=verified_at.desc&limit=2000';
+  const rows = await readJson(path);
+  const contexts = new Map();
+  for (const symbol of unique) {
+    const context = getTickerValidationContext(rows || [], symbol, 20);
+    if (context) contexts.set(symbol, context);
+  }
+  return contexts;
+}
+
 async function quote(symbol) {
   const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
     encodeURIComponent(symbol) + '?range=1d&interval=1d';
@@ -113,16 +131,30 @@ async function fetchCatalystFeed() {
 }
 
 function formatSignal(event) {
-  return [
+  const lines = [
     '🚨 AI Infra Watch · Server Smart Alert',
     '',
     event.symbol + ' · ' + event.title,
     event.message,
+  ];
+  if (event.validationContext) {
+    const v = event.validationContext;
+    lines.push(
+      '',
+      'Forecast validation (' + v.horizon + 'D): ' +
+        v.count + ' verified · ' +
+        v.sampleStatus.replace('-', ' ') +
+        (v.directionalAccuracyPct == null ? '' : ' · direction ' + v.directionalAccuracyPct.toFixed(1) + '%') +
+        (v.medianAbsoluteError == null ? '' : ' · typical error ' + v.medianAbsoluteError.toFixed(2) + ' pp')
+    );
+  }
+  lines.push(
     '',
     'Type: ' + event.type + ' · Severity: ' + event.severity,
     'Source: ' + event.source,
     'Server-side monitor · information alert only; no trade instruction is inferred.',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 async function sendTelegram(events) {
@@ -169,6 +201,7 @@ async function evaluate() {
   ].map(value => String(value).trim().toUpperCase()).filter(Boolean))].slice(0, 60);
 
   const states = await getStates();
+  let forecastValidationContexts = new Map();
   const now = new Date();
   const timestamp = now.toISOString();
   const events = [];
@@ -314,6 +347,17 @@ async function evaluate() {
     }
   }
 
+  if (events.length) {
+    try {
+      forecastValidationContexts = await getForecastValidationContexts([...new Set(events.map(event => event.symbol))]);
+      events.forEach(event => {
+        event.validationContext = forecastValidationContexts.get(event.symbol) || null;
+      });
+    } catch {
+      forecastValidationContexts = new Map();
+    }
+  }
+
   const delivery = await sendTelegram(events);
   const deliveredKeys = new Set(delivery.sentEventKeys || []);
 
@@ -349,6 +393,7 @@ async function evaluate() {
     sent: delivery.sent,
     errors: delivery.errors,
     catalyst_scan: Boolean(catalystFeed),
+    forecast_validation_contexts: forecastValidationContexts.size,
     checked_at: timestamp,
   };
 }
