@@ -16,6 +16,8 @@ on:
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     paths:
+      - "server/**"
+      - "supabase/**"
       - "src/**"
       - "api/**"
       - "package.json"
