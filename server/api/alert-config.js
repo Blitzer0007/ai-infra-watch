@@ -47,7 +47,7 @@ function normalizeConfig(input = {}) {
 async function readConfig() {
   const response = await fetch(
     SUPABASE_URL + '/rest/v1/server_alert_config?select=id,watchlist,alerts,large_move_enabled,large_move_pct,catalyst_alerts,updated_at&id=eq.default&limit=1',
-    { headers: { ...headers(), Prefer: undefined } },
+    { headers: headers() },
   );
   if (!response.ok) throw new Error('Supabase alert config read failed: HTTP ' + response.status);
   const rows = await response.json();
