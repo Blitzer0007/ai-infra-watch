@@ -15,7 +15,7 @@ import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePort
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
-import { calculatePeerCounterfactual, selectMostRelevantPeer, type PeerCounterfactual } from '../utils/peerIntelligence';
+import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 type Price = {
   price: number;
@@ -186,6 +186,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
   useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
+  const selectedPeerSet = useMemo(() => selectedAnalysis ? selectDynamicPeers(STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol) ?? selectedAnalysis as any, livePrices) : { primary: null, core: [], extended: [] }, [selectedAnalysis?.symbol, livePrices]);
 
   useEffect(() => {
     let cancelled = false;
@@ -850,49 +851,37 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
-                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Connected peers</div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer universe</div>
+                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from the full configured universe using transparent comparability signals.</div>
                 <div className="mt-3 space-y-2">
-                  {selectedAnalysis.peers.length === 0 && (
-                    <div className="text-[10px] font-mono text-white/30">No configured peer relationships for this holding.</div>
-                  )}
-                  {selectedAnalysis.peers.map(peerSymbol => {
+                  {selectedPeerSet.primary && (() => {
+                    const peerSymbol = selectedPeerSet.primary.symbol;
                     const peer = analyses.find(item => item.symbol === peerSymbol);
                     const peerQuote = livePrices[peerSymbol];
                     const selectedMove = selectedAnalysis.dailyChangePct;
                     const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
                     const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
-                    return (
-                      <button
-                        key={peerSymbol}
-                        type="button"
-                        onClick={() => setSelected(peerSymbol)}
-                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-black text-white">{peerSymbol}</div>
-                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
-                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
-                            </div>
-                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
-                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
+                    return <button type="button" onClick={() => setSelected(peerSymbol)} className="w-full rounded-lg border border-violet-400/20 bg-violet-400/[.04] p-3 text-left hover:bg-white/[.04] transition">
+                      <div className="flex items-center justify-between gap-3"><div><div className="text-[8px] font-mono uppercase text-violet-300">Primary peer</div><div className="text-xs font-black text-white mt-1">{peerSymbol}</div><div className="text-[8px] text-white/25 mt-1">{selectedPeerSet.primary.reasons.join(' · ')}</div></div><div className="text-right"><div className="text-[10px] font-mono font-bold">{peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}</div><div className="text-[8px] font-mono mt-1">{spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}</div></div></div>
+                    </button>;
+                  })()}
+                  {selectedPeerSet.core.map(peerCandidate => {
+                    const peerSymbol = peerCandidate.symbol;
+                    const peer = analyses.find(item => item.symbol === peerSymbol);
+                    const peerQuote = livePrices[peerSymbol];
+                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
+                    return <button key={peerSymbol} type="button" onClick={() => setSelected(peerSymbol)} className="w-full rounded-lg border border-white/5 bg-black/10 p-2.5 text-left hover:bg-white/[.04] transition">
+                      <div className="flex items-center justify-between gap-2"><div><div className="text-[10px] font-black text-white">{peerSymbol}</div><div className="text-[8px] text-white/25">{peerCandidate.reasons.join(' · ')}</div></div><div className="text-[8px] font-mono text-white/40">{peerMove == null ? '—' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}</div></div>
+                    </button>;
                   })}
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/20 pt-1">Extended peers · {selectedPeerSet.extended.length}</div>
+                  <div className="flex flex-wrap gap-1.5">{selectedPeerSet.extended.map(peer => <button key={peer.symbol} type="button" onClick={() => setSelected(peer.symbol)} className="rounded-md border border-white/5 px-2 py-1 text-[8px] font-mono text-white/45 hover:text-white">{peer.symbol}</button>)}</div>
                 </div>
               </div>
             </div>
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-              <Insight title="Direct relationship" body={selectedAnalysis.peers.length + ' configured peer connection' + (selectedAnalysis.peers.length === 1 ? '' : 's') + ' for ' + selectedAnalysis.symbol + '.'} icon={<Network/>}/>
+              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from the universe.'} icon={<Network/>}/>
               <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
               <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
             </div>
