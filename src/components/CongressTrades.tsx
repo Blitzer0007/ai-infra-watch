@@ -4,6 +4,7 @@ import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
+import DataTable from './DataTable';
 
 interface CongressTradesProps {
   liveTrades?: CongressTrade[];
@@ -563,79 +564,23 @@ export default function CongressTrades(_props: CongressTradesProps) {
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">
-          <table className="w-full border-collapse text-left text-xs font-mono">
-            <thead>
-              <tr className="border-b border-white/10 bg-[#0F1115]/60 text-white/40 uppercase tracking-widest text-[9px] font-black">
-                <th className="p-4">Filer / Chamber</th>
-                <th className="p-4">Symbol</th>
-                <th className="p-4">Type</th>
-                <th className="p-4">Amount Range</th>
-                <th className="p-4">Trade Date</th>
-                <th className="p-4">Filed</th>
-                <th className="p-4">Trade-Day Close</th>
-                <th className="p-4 text-right">Afterward</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-white/40">
-                    {loading
-                      ? 'Loading disclosure records…'
-                      : sourceStatus.kind === 'unavailable'
-                        ? 'No records available from the configured Congress sources.'
-                        : search.trim()
-                          ? 'No Congress records match the current search.'
-                          : 'No transactions found for the selected filters.'}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((t) => {
-                  const reaction = reactionById.get(t.id);
-
-                  return (
-                    <tr key={t.id} className="hover:bg-white/5 transition">
-                      <td className="p-4 font-sans font-bold text-white">
-                        <div>{t.politician}</div>
-                        <div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{t.chamber}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">
-                          {t.stockSymbol}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' +
-                          (t.transactionType === 'buy'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}
-                        >
-                          {t.transactionType}
-                        </span>
-                      </td>
-                      <td className="p-4 text-white/80 font-bold">{t.amountRange}</td>
-                      <td className="p-4 text-white/60 font-bold">{t.transactionDate || t.date || '—'}</td>
-                      <td className="p-4 text-white/40 font-bold">{t.filingDate || '—'}</td>
-                      <td className="p-4 text-white font-bold">
-                        {reaction ? '$' + formatPrice(reaction.eventPrice) : '—'}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>
-                          Next day {formatPct(reaction?.nextPct ?? null)}
-                        </div>
-                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>
-                          5 days {formatPct(reaction?.day5Pct ?? null)}
-                        </div>
-                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>
-                          20 days {formatPct(reaction?.day20Pct ?? null)}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          <DataTable<CongressTrade>
+            rows={filtered}
+            rowKey={(row) => row.id}
+            loading={loading || globalLoading}
+            empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'}
+            initialSort={{ key: 'tradeDate', direction: 'desc' }}
+            columns={[
+              { key: 'filer', header: 'Filer / Chamber', accessor: row => row.politician, render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></div> },
+              { key: 'symbol', header: 'Symbol', accessor: row => row.stockSymbol },
+              { key: 'type', header: 'Type', accessor: row => row.transactionType },
+              { key: 'amount', header: 'Amount Range', accessor: row => row.amountRange },
+              { key: 'tradeDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
+              { key: 'filed', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
+              { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '$' + formatPrice(reaction.eventPrice) : '—'; } },
+              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className="text-[9px] mt-1">5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className="text-[9px] mt-1">20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
+            ]}
+          />
         </div>
       </div>
     </div>
