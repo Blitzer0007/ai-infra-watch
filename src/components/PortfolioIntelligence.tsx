@@ -876,37 +876,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   })}
                   <div className="text-[8px] font-mono uppercase tracking-widest text-white/20 pt-1">Extended peers · {selectedPeerSet.extended.length}</div>
                   <div className="flex flex-wrap gap-1.5">{selectedPeerSet.extended.map(peer => <button key={peer.symbol} type="button" onClick={() => setSelected(peer.symbol)} className="rounded-md border border-white/5 px-2 py-1 text-[8px] font-mono text-white/45 hover:text-white">{peer.symbol}</button>)}</div>
-                    const peer = analyses.find(item => item.symbol === peerSymbol);
-                    const peerQuote = livePrices[peerSymbol];
-                    const selectedMove = selectedAnalysis.dailyChangePct;
-                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
-                    const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
-                    return (
-                      <button
-                        key={peerSymbol}
-                        type="button"
-                        onClick={() => setSelected(peerSymbol)}
-                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-black text-white">{peerSymbol}</div>
-                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
-                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
-                            </div>
-                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
-                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
             </div>
