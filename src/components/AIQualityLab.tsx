@@ -1,3 +1,4 @@
+import DataTable from './DataTable';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -549,33 +550,20 @@ export default function AIQualityLab() {
           </div>
         )}
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-[9px] font-mono">
-            <thead className="text-white/30 uppercase">
-              <tr>
-                <th className="px-2 py-2">Time</th>
-                <th className="px-2 py-2">Quality</th>
-                <th className="px-2 py-2">Faithfulness</th>
-                <th className="px-2 py-2">Hallucination</th>
-                <th className="px-2 py-2">Adversarial</th>
-                <th className="px-2 py-2">Failures</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {runs.map(run => (
-                <tr key={run.id || run.createdAt}>
-                  <td className="px-2 py-2 text-white/40">{new Date(run.createdAt).toLocaleString()}</td>
-                  <td className="px-2 py-2 text-white">{formatPct(run.qualityScore)}</td>
-                  <td className="px-2 py-2">{formatPct(run.faithfulness)}</td>
-                  <td className="px-2 py-2">{formatPct(run.hallucinationRate)}</td>
-                  <td className="px-2 py-2">{formatPct(run.adversarialFailureRate)}</td>
-                  <td className="px-2 py-2 text-white/50">{run.failures}</td>
-                </tr>
-              ))}
-              {!runs.length && (
-                <tr><td colSpan={6} className="px-2 py-8 text-center text-white/25">No persisted quality runs yet.</td></tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable<AIQualityRun>
+            rows={runs}
+            rowKey={(row, index) => row.id || row.createdAt || String(index)}
+            empty="No persisted quality runs yet."
+            initialSort={{ key: 'time', direction: 'desc' }}
+            columns={[
+              { key: 'time', header: 'Time', accessor: row => row.createdAt, type: 'datetime', render: row => new Date(row.createdAt).toLocaleString() },
+              { key: 'quality', header: 'Quality', accessor: row => row.qualityScore, type: 'percent', render: row => formatPct(row.qualityScore) },
+              { key: 'faithfulness', header: 'Faithfulness', accessor: row => row.faithfulness, type: 'percent', render: row => formatPct(row.faithfulness) },
+              { key: 'hallucination', header: 'Hallucination', accessor: row => row.hallucinationRate, type: 'percent', render: row => formatPct(row.hallucinationRate) },
+              { key: 'adversarial', header: 'Adversarial', accessor: row => row.adversarialFailureRate, type: 'percent', render: row => formatPct(row.adversarialFailureRate) },
+              { key: 'failures', header: 'Failures', accessor: row => row.failures, type: 'number' },
+            ]}
+          />
         </div>
       </section>
 
