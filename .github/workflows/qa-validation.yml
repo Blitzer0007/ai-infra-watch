@@ -6,6 +6,8 @@ on:
     paths:
       - "src/**"
       - "api/**"
+      - "server/**"
+      - "supabase/**"
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
   workflow_dispatch:
