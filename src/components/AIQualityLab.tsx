@@ -550,7 +550,7 @@ export default function AIQualityLab() {
           </div>
         )}
         <div className="mt-4 overflow-x-auto">
-          <DataTable
+          <DataTable<AIQualityRun>
             rows={runs}
             rowKey={(row, index) => row.id || row.createdAt || String(index)}
             empty="No persisted quality runs yet."
