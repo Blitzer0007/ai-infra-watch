@@ -55,10 +55,47 @@ async function sendTelegram(events) {
       );
       if (!response.ok) {
         let detail = '';
+        let description = '';
         try {
           const payload = await response.json();
-          detail = payload?.description ? ' ' + payload.description : '';
+          description = String(payload?.description || '');
+          detail = description ? ' ' + description : '';
         } catch {}
+
+        // When Telegram reports an invalid target chat, inspect recent bot updates
+        // so the authenticated Watchlist can identify chats that actually contacted the bot.
+        if (response.status === 400 && /chat not found/i.test(description)) {
+          try {
+            const updatesResponse = await fetch('https://api.telegram.org/bot' + botToken + '/getUpdates?limit=20', {
+              method: 'GET',
+              signal: AbortSignal.timeout(10000),
+            });
+            const updatesPayload = await updatesResponse.json().catch(() => ({}));
+            const chats = new Map();
+            for (const update of Array.isArray(updatesPayload?.result) ? updatesPayload.result : []) {
+              const chat = update?.message?.chat || update?.channel_post?.chat || update?.edited_message?.chat || update?.edited_channel_post?.chat;
+              if (!chat?.id) continue;
+              const id = String(chat.id);
+              chats.set(id, {
+                id,
+                type: String(chat.type || 'unknown'),
+                title: String(chat.title || chat.username || chat.first_name || 'Telegram chat').slice(0, 120),
+                username: chat.username ? String(chat.username).slice(0, 80) : null,
+              });
+            }
+            const availableChats = Array.from(chats.values()).slice(-10);
+            const discoverySuffix = availableChats.length
+              ? ' Found recent bot chats: ' + availableChats.map(chat => chat.title + ' (' + chat.type + ', ID ' + chat.id + ')').join(' · ') + '.'
+              : ' No recent bot chat updates were found. Send /start to the bot in the target chat, then retry.';
+            throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail + discoverySuffix);
+          } catch (discoveryError) {
+            if (discoveryError instanceof Error && /Found recent bot chats|No recent bot chat updates/i.test(discoveryError.message)) {
+              throw discoveryError;
+            }
+            throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail);
+          }
+        }
+
         throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail);
       }
       sent += 1;
