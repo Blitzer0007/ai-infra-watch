@@ -147,8 +147,12 @@ def traced_node(name: str, kind: Literal["node", "llm"] = "node") -> Callable:
                     s.node = name
             partial["steps"] = [visit] + list(steps)
             if settings.TRACE_ENABLED:
-                from app.eval.trace import record_call
+                from app.eval.trace import record_event, record_call
 
+                record_event(
+                    "agent_node",
+                    {"agent": name, "ok": visit.ok, "duration_ms": round(duration_ms, 2)},
+                )
                 record_call(
                     kind=f"agent:{name}",
                     prompt=prompt,
