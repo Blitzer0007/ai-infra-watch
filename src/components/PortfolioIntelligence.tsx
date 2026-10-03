@@ -427,6 +427,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         analystCount: Number(analystConsensus?.analystCount || 0),
         priceTarget: analystConsensus?.priceTarget || null,
         webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+        epsEstimates: Array.isArray(analystConsensus?.epsEstimates) ? analystConsensus.epsEstimates : [],
+        revenueEstimates: Array.isArray(analystConsensus?.revenueEstimates) ? analystConsensus.revenueEstimates : [],
+        evidence: Array.isArray(analystConsensus?.webEvidence?.results)
+          ? analystConsensus.webEvidence.results.slice(0, 6).map((item: any) => ({
+              title: item?.title || null,
+              url: item?.url || null,
+              source: item?.source || null,
+              publishedAt: item?.published_at || item?.publishedAt || null,
+            }))
+          : [],
         errors: analystConsensus?.errors || (analystError ? [analystError] : []),
         selectedSymbol: selectedAnalysis?.symbol || null,
       },
@@ -446,6 +456,20 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
           analystCount: Number(analystConsensus?.analystCount || 0),
           webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+          structuredEvidence: {
+            ratings: analystConsensus?.recommendation || null,
+            priceTarget: analystConsensus?.priceTarget || null,
+            epsEstimates: Array.isArray(analystConsensus?.epsEstimates) ? analystConsensus.epsEstimates.slice(0, 4) : [],
+            revenueEstimates: Array.isArray(analystConsensus?.revenueEstimates) ? analystConsensus.revenueEstimates.slice(0, 4) : [],
+          },
+          webEvidence: Array.isArray(analystConsensus?.webEvidence?.results)
+            ? analystConsensus.webEvidence.results.slice(0, 6).map((item: any) => ({
+                title: item?.title || null,
+                url: item?.url || null,
+                source: item?.source || null,
+                publishedAt: item?.published_at || item?.publishedAt || null,
+              }))
+            : [],
         },
         contractSource: relevantContracts > 0 ? 'available' : 'none observed',
         congressSource: relevantCongress > 0 ? 'available' : 'none observed',
@@ -697,6 +721,1160 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           </div>
 
           <SignalScorecardPanel />
+
+          <section className="rounded-2xl border border-violet-400/10 bg-violet-400/[0.02] p-4">
+            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+              <div>
+                <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-violet-300">Analyst evidence</div>
+                <h3 className="text-sm font-black mt-1">Consensus & source context</h3>
+                <p className="text-[10px] text-white/35 mt-1">
+                  External analyst data is evidence input, not a prediction or trade instruction.
+                </p>
+              </div>
+              <div className="text-right text-[9px] font-mono text-white/35">
+                {analystLoading ? 'LOADING…' : analystError ? 'UNAVAILABLE' : analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null).toUpperCase() : 'NO DATA'}
+              </div>
+            </div>
+            {!selectedAnalysis ? (
+              <div className="mt-3 text-[10px] font-mono text-white/30">Select a holding to load analyst evidence.</div>
+            ) : analystConsensus ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+                  {[
+                    ['Strong buy', analystConsensus.recommendation?.strongBuy ?? 0],
+                    ['Buy', analystConsensus.recommendation?.buy ?? 0],
+                    ['Hold', analystConsensus.recommendation?.hold ?? 0],
+                    ['Sell', analystConsensus.recommendation?.sell ?? 0],
+                    ['Strong sell', analystConsensus.recommendation?.strongSell ?? 0],
+                  ].map(([label, value]) => <Info key={String(label)} label={String(label)} value={String(value)} />)}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                  <Info label="Analysts" value={String(analystConsensus.analystCount || 0)} />
+                  <Info label="Target median" value={analystConsensus.priceTarget?.median == null ? '—' : '
+            prices={livePrices}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+
+          <UnifiedEventTimeline
+            symbol={selected}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+        </>
+      )}
+
+      {tab === 'watchlist' && (
+        <Panel title="Watchlist intelligence universe" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+            {WATCHLIST.map(w => {
+              const quote = livePrices[w.symbol];
+              const isSelected = selected === w.symbol;
+              return (
+                <div key={w.symbol} className={'text-left border rounded-xl p-3 transition ' + (isSelected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
+                  <div className="flex justify-between items-start gap-2">
+                    <button type="button" onClick={() => setSelected(w.symbol)} className="text-left min-w-0">
+                      <span className="font-black text-xs">{w.symbol}</span>
+                      <div className="text-xs mt-1">{w.name}</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(w.symbol)}
+                      className="text-[9px] font-mono uppercase tracking-wider text-cyan-300/80 hover:text-cyan-200"
+                    >
+                      Analyze →
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between gap-2">
+                    <span className="font-mono font-black text-base">{quote?.price != null ? '$' + quote.price.toFixed(2) : '—'}</span>
+                    <span className={'text-[10px] font-mono ' + (quote?.changePct == null ? 'text-white/30' : quote.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                      {quote?.changePct == null ? 'quote pending' : (quote.changePct >= 0 ? '+' : '') + quote.changePct.toFixed(2) + '%'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-white/35 mt-2">{w.group} · {w.theme}</div>
+                  <div className="text-[9px] text-white/25 mt-2">Peers: {w.peers.join(' · ')}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {(() => {
+            const watch = WATCHLIST.find(item => item.symbol === selected);
+            if (!watch) return null;
+            const quote = livePrices[watch.symbol];
+            const groupInfo = intelligence.groups.find(item => item.name === watch.group);
+            const peerReturns = watch.peers
+              .map(peer => livePrices[peer]?.changePct)
+              .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+            const peerAverage = peerReturns.length ? peerReturns.reduce((a, b) => a + b, 0) / peerReturns.length : null;
+            const vsPeers = quote?.changePct != null && peerAverage != null ? quote.changePct - peerAverage : null;
+            const universeVs = groupInfo?.relativeToUniverse ?? null;
+
+            return (
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Watchlist analysis</div>
+                    <div className="text-lg font-black mt-1">{watch.symbol} · {watch.name}</div>
+                    <div className="text-[10px] text-white/35 mt-1">{watch.group} · {watch.theme}</div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 min-w-[420px] max-w-full">
+                    <Info label="Live price" value={quote?.price == null ? '—' : '$' + quote.price.toFixed(2)} />
+                    <Info label="Daily move" value={quote?.changePct == null ? '—' : (quote.changePct >= 0 ? '+' : '') + quote.changePct.toFixed(2) + '%'} />
+                    <Info label="Vs peers" value={vsPeers == null ? '—' : (vsPeers >= 0 ? '+' : '') + vsPeers.toFixed(2) + ' pts'} />
+                    <Info label="Group signal" value={groupInfo ? Math.round(groupInfo.score) + '/100' : '—'} />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Info label="Group breadth" value={groupInfo ? Math.round(groupInfo.breadth * 100) + '%' : '—'} />
+                  <Info label="Group vs universe" value={universeVs == null ? '—' : (universeVs >= 0 ? '+' : '') + universeVs.toFixed(2) + ' pts'} />
+                  <Info label="Peers" value={watch.peers.join(' · ') || 'No peers configured'} />
+                </div>
+
+                <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Analysis basis</div>
+                  <div className="text-[10px] text-white/50 mt-2 leading-5">
+                    {quote?.changePct == null
+                      ? 'Waiting for a live quote before calculating peer-relative performance.'
+                      : peerAverage == null
+                        ? 'Live price is available, but no peer quotes are currently available for a peer-relative comparison.'
+                        : 'Current daily move is compared with the configured peer basket; group signal combines daily return, breadth, and performance versus the tracked universe.'}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => changeTab('events')}
+                    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-white/55 hover:text-white"
+                  >
+                    Open Event Study
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Insight title="Memory cluster" body="SK Hynix · Micron · SanDisk · DRAM" icon={<BarChart3/>}/>
+            <Insight title="Compute cluster" body="NVDA · AMD · TSM · QCOM · INTC · CBRS" icon={<Network/>}/>
+            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware breadth" icon={<TrendingUp/>}/>
+          </div>
+        </Panel>
+      )}
+
+      {tab === 'rotation' && (
+        <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
+          <Panel title="Money rotation engine" subtitle="Relative-strength model across infrastructure, compute, memory and software">
+            <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={intelligence.groups.filter(g => g.avgChange !== 0 || g.members.some(m => livePrices[m])).map(g => ({group:g.name, score:Math.round(g.score), avg:g.avgChange}))}>
+              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" domain={[0,100]} tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Signal'] : [v + '%','Avg daily return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
+            </BarChart></ResponsiveContainer></div>
+            <div className="text-[10px] text-white/30">Signal = daily return + breadth + universe-relative performance. It is not a literal measure of capital flows.</div>
+          </Panel>
+          <Panel title="Pair monitor" subtitle="Relative-strength relationships that the model tests">
+            <div className="space-y-2">{intelligence.pairSignals.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
+              <div className="flex justify-between"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono ' + ((x.spread ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{x.spread == null ? '—' : (x.spread >= 0 ? '+' : '') + x.spread.toFixed(2) + ' pts'}</div></div>
+              <div className="text-[10px] text-white/35 mt-1">{x.label}</div>
+            </div>)}</div>
+          </Panel>
+        </div>
+      )}
+
+      {tab === 'events' && selectedAnalysis && (
+        <div className="space-y-3">
+          <Panel title="Event study universe" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
+            <div className="flex flex-wrap gap-2">
+              {analyses.map((position) => (
+                <button
+                  key={position.symbol}
+                  onClick={() => setSelected(position.symbol)}
+                  className={
+                    'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
+                    (selected === position.symbol
+                      ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
+                      : 'bg-white/[.02] border-white/10 text-white/45 hover:text-white hover:bg-white/[.04]')
+                  }
+                >
+                  {position.symbol}
+                </button>
+              ))}
+            </div>
+            <div className="text-[10px] text-white/30 mt-3">
+              {analyses.length} portfolio holdings supported · select a ticker to load its recent SEC events and historical price reactions.
+            </div>
+          </Panel>
+          <EventImpactExplorer symbol={selectedAnalysis.symbol} />
+        </div>
+      )}
+
+      {tab === 'network' && (
+        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        {selectedAnalysis ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-emerald-300">Selected holding</div>
+                <div className="text-2xl font-black mt-2">{selectedAnalysis.symbol}</div>
+                <div className="text-[10px] text-white/40 mt-1">{selectedAnalysis.name} · {selectedAnalysis.group}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Info label="Daily move" value={selectedAnalysis.dailyChangePct == null ? '—' : (selectedAnalysis.dailyChangePct >= 0 ? '+' : '') + selectedAnalysis.dailyChangePct.toFixed(2) + '%'} />
+                  <Info label="Peer average" value={selectedAnalysis.peerAverageChange == null ? '—' : (selectedAnalysis.peerAverageChange >= 0 ? '+' : '') + selectedAnalysis.peerAverageChange.toFixed(2) + '%'} />
+                </div>
+              </div>
+
+              <div className="hidden lg:flex items-center justify-center text-white/15">
+                <Network className="w-7 h-7" />
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Connected peers</div>
+                <div className="mt-3 space-y-2">
+                  {selectedAnalysis.peers.length === 0 && (
+                    <div className="text-[10px] font-mono text-white/30">No configured peer relationships for this holding.</div>
+                  )}
+                  {selectedAnalysis.peers.map(peerSymbol => {
+                    const peer = analyses.find(item => item.symbol === peerSymbol);
+                    const peerQuote = livePrices[peerSymbol];
+                    const selectedMove = selectedAnalysis.dailyChangePct;
+                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
+                    const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
+                    return (
+                      <button
+                        key={peerSymbol}
+                        type="button"
+                        onClick={() => setSelected(peerSymbol)}
+                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-black text-white">{peerSymbol}</div>
+                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
+                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
+                            </div>
+                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Insight title="Direct relationship" body={selectedAnalysis.peers.length + ' configured peer connection' + (selectedAnalysis.peers.length === 1 ? '' : 's') + ' for ' + selectedAnalysis.symbol + '.'} icon={<Network/>}/>
+              <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
+              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
+            </div>
+          </>
+        ) : (
+          <div className="text-[10px] font-mono text-white/30">Select a holding to inspect its peer relationships.</div>
+        )}
+        </Panel>
+      )}
+
+      <div className="text-[10px] text-white/30 flex items-center gap-2"><Globe2 className="w-3 h-3"/> Position states are model outputs for review, not automatic trade instructions.</div>
+    </div>
+  );
+}
+
+function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
+  return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
+    <div className="flex justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/>{h.minorPosition && <span className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] font-mono text-white/55">MINOR · {((h.portfolioWeight || 0) * 100).toFixed(1)}%</span>}</div>
+        <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
+        <div className="text-[10px] text-white/45 mt-1">Qty {h.quantity.toFixed(6)} · Avg ${h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '−') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="font-bold text-sm">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
+        <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
+        <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
+      </div>
+    </div>
+  </button>;
+}
+
+
+function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; currentPrice: number | null }) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    fetch("/api/company-scale?action=analyst&symbol=" + encodeURIComponent(symbol), { cache: "no-store" })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || "Analyst expectations unavailable");
+        return body;
+      })
+      .then(body => { if (!cancelled) setData(body); })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : "Analyst expectations unavailable"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [symbol]);
+
+  const recommendation = data?.recommendation || {};
+  const target = data?.priceTarget || {};
+  const median = Number.isFinite(Number(target.median)) ? Number(target.median) : null;
+  const mean = Number.isFinite(Number(target.mean)) ? Number(target.mean) : null;
+  const low = Number.isFinite(Number(target.low)) ? Number(target.low) : null;
+  const high = Number.isFinite(Number(target.high)) ? Number(target.high) : null;
+  const targetMove = currentPrice != null && currentPrice > 0 && median != null ? (median / currentPrice - 1) * 100 : null;
+  const ratingCount = ["strongBuy", "buy", "hold", "sell", "strongSell"].reduce((sum, key) => sum + Number(recommendation[key] || 0), 0);
+  const eps = Array.isArray(data?.epsEstimates) ? data.epsEstimates[0] : null;
+  const revenue = Array.isArray(data?.revenueEstimates) ? data.revenueEstimates[0] : null;
+
+  return (
+    <section data-testid="analyst-expectations" className="mt-4 rounded-xl border border-violet-400/15 bg-violet-400/[0.025] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-widest text-violet-300">External analyst expectations</div>
+          <div className="text-sm font-black text-white mt-1">Street estimates · separate from Forecast Track</div>
+          <div className="text-[9px] font-mono text-white/30 mt-1">External consensus and estimate data; not an AI Infra Watch forecast.</div>
+        </div>
+        <div className="text-[8px] font-mono uppercase text-white/25">{loading ? "Loading" : data?.source || "Finnhub"}</div>
+      </div>
+
+      {error && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{error}</div>}
+      {!error && loading && <div className="mt-3 text-[9px] font-mono text-white/30">Loading analyst expectations…</div>}
+
+      {!error && !loading && data && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0)} />
+            <Info label="Buy" value={String(recommendation.buy ?? 0)} />
+            <Info label="Hold" value={String(recommendation.hold ?? 0)} />
+            <Info label="Sell" value={String(recommendation.sell ?? 0)} />
+            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0)} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+            <Info label="Median target" value={median == null ? "—" : "$" + median.toFixed(2)} />
+            <Info label="Mean target" value={mean == null ? "—" : "$" + mean.toFixed(2)} />
+            <Info label="Target low" value={low == null ? "—" : "$" + low.toFixed(2)} />
+            <Info label="Target high" value={high == null ? "—" : "$" + high.toFixed(2)} />
+            <Info label="Vs current" value={targetMove == null ? "—" : (targetMove >= 0 ? "+" : "") + targetMove.toFixed(1) + "%"} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+            <Info label="Rating count" value={String(ratingCount)} />
+            <Info label="EPS estimate" value={eps?.average == null ? "—" : Number(eps.average).toFixed(2)} />
+            <Info label="Revenue estimate" value={revenue?.average == null ? "—" : "$" + (Number(revenue.average) / 1e9).toFixed(1) + "B"} />
+          </div>
+          <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Web analyst evidence</div>
+            <div className="text-[9px] text-white/30 mt-1">Independent web-search results are source links only; they are not converted into consensus numbers here.</div>
+            <div className="mt-2 space-y-1.5">
+              {(data.webEvidence?.results || []).slice(0, 4).map((item: any) => (
+                <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="block text-[9px] leading-4 text-cyan-300 hover:text-cyan-200">
+                  {item.title || item.url}
+                </a>
+              ))}
+              {!data.webEvidence?.results?.length && <span className="text-[8px] font-mono text-white/20">No web analyst results returned.</span>}
+            </div>
+            {data.webEvidence?.error && <div className="mt-2 text-[8px] font-mono text-amber-200/50">{data.webEvidence.error}</div>}
+          </div>
+          <div className="mt-3 text-[8px] font-mono text-white/20">
+            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() : "Retrieved time unavailable"}
+            {eps?.period ? " · EPS " + eps.period : ""}
+            {revenue?.period ? " · Revenue " + revenue.period : ""}
+            {data.errors?.length ? " · Some analyst endpoints unavailable" : ""}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
+  const [customTarget, setCustomTarget] = useState('');
+  const canCalculateExitScenarios = h.livePrice != null && !h.liveStale;
+  const isLeveraged = h.symbol === 'SOXL';
+  const addGroupThreshold = isLeveraged ? 68 : 62;
+  const addBreadthThreshold = isLeveraged ? 0.67 : 0.50;
+  const scenarios = [
+    canCalculateExitScenarios && h.livePrice != null ? { label: 'Current', price: h.livePrice } : null,
+    { label: 'Break-even (average cost)', price: h.averageCost },
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+10% from current', price: h.livePrice * 1.10 } : null,
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+20% from current', price: h.livePrice * 1.20 } : null,
+    historicalPrice.high52w != null ? { label: '52-week high', price: historicalPrice.high52w, date: historicalPrice.high52wDate } : null,
+    historicalPrice.historicalHigh != null ? { label: 'Historical high (available)', price: historicalPrice.historicalHigh, date: historicalPrice.historicalHighDate } : null,
+    Number(customTarget) > 0 ? { label: 'Custom target', price: Number(customTarget) } : null,
+  ].filter(Boolean) as Array<{label:string;price:number;date?:string}>;
+  const distanceTo52wHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.high52w != null && h.livePrice > 0
+    ? ((historicalPrice.high52w / h.livePrice) - 1) * 100
+    : null;
+  const distanceToHistoricalHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.historicalHigh != null && h.livePrice > 0
+    ? ((historicalPrice.historicalHigh / h.livePrice) - 1) * 100
+    : null;
+  const checks = [
+    { label: 'Below average cost', passed: canCalculateExitScenarios && h.livePrice != null && h.livePrice < h.averageCost, detail: canCalculateExitScenarios && h.livePrice != null ? '$' + h.livePrice.toFixed(2) + ' vs $' + h.averageCost.toFixed(2) : 'Fresh quote required' },
+    { label: 'Group score', passed: h.groupScore != null && h.groupScore >= addGroupThreshold, detail: h.groupScore == null ? 'No group score' : Math.round(h.groupScore) + '/100 · need ≥' + addGroupThreshold },
+    { label: 'Group breadth', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No breadth' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
+    { label: 'Group vs universe', passed: h.relativeToUniverse != null && h.relativeToUniverse >= 0, detail: h.relativeToUniverse == null ? 'No relative-strength reading' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts' },
+    { label: 'Vs tracked peers', passed: h.vsPeers != null && h.vsPeers >= 0, detail: h.vsPeers == null ? 'Peer quote required' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts' },
+  ];
+
+  return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
+    <div className="grid grid-cols-2 gap-2">
+      <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/>
+      <Info label="Current value" value={h.currentValue == null ? '—' : '$' + h.currentValue.toFixed(2)}/>
+      <Info label="P&L" value={h.livePrice == null ? '—' : (h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/>
+      <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
+      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
+      <Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/>
+      <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
+      <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
+    </div>
+    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
+      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
+      <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
+      <Info label="Average cost" value={h.averageCost.toFixed(2)} />
+      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
+      <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
+    </div>
+    <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+      <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+      {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
+      {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
+      {scenarios.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-[10px]">
+            <thead className="text-white/25 uppercase font-mono">
+              <tr>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Sale value</th>
+                <th className="py-2 pr-3">Profit / loss</th>
+                <th className="py-2 pr-3">Return</th>
+                <th className="py-2">From current</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => {
+                const saleValue = scenario.price * h.quantity;
+                const profit = saleValue - h.investedValue;
+                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
+                const fromCurrent = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0
+                  ? ((scenario.price / h.livePrice) - 1) * 100
+                  : null;
+                return (
+                  <tr key={scenario.label} className="border-t border-white/5">
+                    <td className="py-2 pr-3 text-white/60">
+                      {scenario.label}
+                      {scenario.date ? <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span> : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{'$' + scenario.price.toFixed(2)}</td>
+                    <td className="py-2 pr-3 font-mono">{'$' + saleValue.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%'}</td>
+                    <td className={'py-2 font-mono ' + (fromCurrent == null ? 'text-white/25' : fromCurrent >= 0 ? 'text-cyan-300' : 'text-rose-300')}>{fromCurrent == null ? '—' : (fromCurrent >= 0 ? '+' : '') + fromCurrent.toFixed(2) + '%'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Info label="52-week high distance" value={distanceTo52wHigh == null ? '—' : '+' + distanceTo52wHigh.toFixed(2) + '% from current'} />
+        <Info label="Historical high distance" value={distanceToHistoricalHigh == null ? '—' : '+' + distanceToHistoricalHigh.toFixed(2) + '% from current'} />
+      </div>
+      <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+        <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Custom target price</div>
+        <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={customTarget}
+            onChange={e => setCustomTarget(e.target.value)}
+            placeholder="Enter price"
+            aria-label="Custom target price"
+            className="w-full sm:w-44 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-mono text-white outline-none focus:border-cyan-400/30"
+          />
+          <div className="text-[9px] text-white/30">Adds a hypothetical full-position sale row; it is not a forecast or trading instruction.</div>
+        </div>
+      </div>
+    </div>
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
+      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : 'Use the gate breakdown below to see which conditions are currently preventing an average-in review.'}</div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+        {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}
+      </div>
+    </div>
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
+      <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
+    </div>
+    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
+      <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
+      <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
+      <div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div>
+    </div>
+  </Panel>;
+}
+
+function GateCheck({label,passed,detail}:{label:string;passed:boolean;detail:string;key?: string}) {
+  return <div className="border border-white/5 rounded-xl p-3 bg-black/10">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] font-mono uppercase text-white/55">{label}</span>
+      <span className={'text-[8px] font-mono font-bold uppercase ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span>
+    </div>
+    <div className="text-[10px] text-white/35 mt-2">{detail}</div>
+  </div>;
+}
+function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div>
+    <div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div>
+  </div>;
+}
+
+function StatePill({state}:{state:PositionAnalysis['state']}) {
+  const cls = state === 'ADD REVIEW'
+    ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
+    : state === 'RISK REVIEW'
+      ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
+  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
+}
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
+}
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
+} + Number(analystConsensus.priceTarget.median).toFixed(2)} />
+                  <Info label="Target mean" value={analystConsensus.priceTarget?.mean == null ? '—' : '
+            prices={livePrices}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+
+          <UnifiedEventTimeline
+            symbol={selected}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+        </>
+      )}
+
+      {tab === 'watchlist' && (
+        <Panel title="Watchlist intelligence universe" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+            {WATCHLIST.map(w => {
+              const quote = livePrices[w.symbol];
+              const isSelected = selected === w.symbol;
+              return (
+                <div key={w.symbol} className={'text-left border rounded-xl p-3 transition ' + (isSelected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02]')}>
+                  <div className="flex justify-between items-start gap-2">
+                    <button type="button" onClick={() => setSelected(w.symbol)} className="text-left min-w-0">
+                      <span className="font-black text-xs">{w.symbol}</span>
+                      <div className="text-xs mt-1">{w.name}</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(w.symbol)}
+                      className="text-[9px] font-mono uppercase tracking-wider text-cyan-300/80 hover:text-cyan-200"
+                    >
+                      Analyze →
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between gap-2">
+                    <span className="font-mono font-black text-base">{quote?.price != null ? '$' + quote.price.toFixed(2) : '—'}</span>
+                    <span className={'text-[10px] font-mono ' + (quote?.changePct == null ? 'text-white/30' : quote.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                      {quote?.changePct == null ? 'quote pending' : (quote.changePct >= 0 ? '+' : '') + quote.changePct.toFixed(2) + '%'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-white/35 mt-2">{w.group} · {w.theme}</div>
+                  <div className="text-[9px] text-white/25 mt-2">Peers: {w.peers.join(' · ')}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {(() => {
+            const watch = WATCHLIST.find(item => item.symbol === selected);
+            if (!watch) return null;
+            const quote = livePrices[watch.symbol];
+            const groupInfo = intelligence.groups.find(item => item.name === watch.group);
+            const peerReturns = watch.peers
+              .map(peer => livePrices[peer]?.changePct)
+              .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+            const peerAverage = peerReturns.length ? peerReturns.reduce((a, b) => a + b, 0) / peerReturns.length : null;
+            const vsPeers = quote?.changePct != null && peerAverage != null ? quote.changePct - peerAverage : null;
+            const universeVs = groupInfo?.relativeToUniverse ?? null;
+
+            return (
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Watchlist analysis</div>
+                    <div className="text-lg font-black mt-1">{watch.symbol} · {watch.name}</div>
+                    <div className="text-[10px] text-white/35 mt-1">{watch.group} · {watch.theme}</div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 min-w-[420px] max-w-full">
+                    <Info label="Live price" value={quote?.price == null ? '—' : '$' + quote.price.toFixed(2)} />
+                    <Info label="Daily move" value={quote?.changePct == null ? '—' : (quote.changePct >= 0 ? '+' : '') + quote.changePct.toFixed(2) + '%'} />
+                    <Info label="Vs peers" value={vsPeers == null ? '—' : (vsPeers >= 0 ? '+' : '') + vsPeers.toFixed(2) + ' pts'} />
+                    <Info label="Group signal" value={groupInfo ? Math.round(groupInfo.score) + '/100' : '—'} />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Info label="Group breadth" value={groupInfo ? Math.round(groupInfo.breadth * 100) + '%' : '—'} />
+                  <Info label="Group vs universe" value={universeVs == null ? '—' : (universeVs >= 0 ? '+' : '') + universeVs.toFixed(2) + ' pts'} />
+                  <Info label="Peers" value={watch.peers.join(' · ') || 'No peers configured'} />
+                </div>
+
+                <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Analysis basis</div>
+                  <div className="text-[10px] text-white/50 mt-2 leading-5">
+                    {quote?.changePct == null
+                      ? 'Waiting for a live quote before calculating peer-relative performance.'
+                      : peerAverage == null
+                        ? 'Live price is available, but no peer quotes are currently available for a peer-relative comparison.'
+                        : 'Current daily move is compared with the configured peer basket; group signal combines daily return, breadth, and performance versus the tracked universe.'}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => changeTab('events')}
+                    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-white/55 hover:text-white"
+                  >
+                    Open Event Study
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Insight title="Memory cluster" body="SK Hynix · Micron · SanDisk · DRAM" icon={<BarChart3/>}/>
+            <Insight title="Compute cluster" body="NVDA · AMD · TSM · QCOM · INTC · CBRS" icon={<Network/>}/>
+            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware breadth" icon={<TrendingUp/>}/>
+          </div>
+        </Panel>
+      )}
+
+      {tab === 'rotation' && (
+        <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
+          <Panel title="Money rotation engine" subtitle="Relative-strength model across infrastructure, compute, memory and software">
+            <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={intelligence.groups.filter(g => g.avgChange !== 0 || g.members.some(m => livePrices[m])).map(g => ({group:g.name, score:Math.round(g.score), avg:g.avgChange}))}>
+              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" domain={[0,100]} tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Signal'] : [v + '%','Avg daily return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
+            </BarChart></ResponsiveContainer></div>
+            <div className="text-[10px] text-white/30">Signal = daily return + breadth + universe-relative performance. It is not a literal measure of capital flows.</div>
+          </Panel>
+          <Panel title="Pair monitor" subtitle="Relative-strength relationships that the model tests">
+            <div className="space-y-2">{intelligence.pairSignals.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
+              <div className="flex justify-between"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono ' + ((x.spread ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{x.spread == null ? '—' : (x.spread >= 0 ? '+' : '') + x.spread.toFixed(2) + ' pts'}</div></div>
+              <div className="text-[10px] text-white/35 mt-1">{x.label}</div>
+            </div>)}</div>
+          </Panel>
+        </div>
+      )}
+
+      {tab === 'events' && selectedAnalysis && (
+        <div className="space-y-3">
+          <Panel title="Event study universe" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
+            <div className="flex flex-wrap gap-2">
+              {analyses.map((position) => (
+                <button
+                  key={position.symbol}
+                  onClick={() => setSelected(position.symbol)}
+                  className={
+                    'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
+                    (selected === position.symbol
+                      ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
+                      : 'bg-white/[.02] border-white/10 text-white/45 hover:text-white hover:bg-white/[.04]')
+                  }
+                >
+                  {position.symbol}
+                </button>
+              ))}
+            </div>
+            <div className="text-[10px] text-white/30 mt-3">
+              {analyses.length} portfolio holdings supported · select a ticker to load its recent SEC events and historical price reactions.
+            </div>
+          </Panel>
+          <EventImpactExplorer symbol={selectedAnalysis.symbol} />
+        </div>
+      )}
+
+      {tab === 'network' && (
+        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        {selectedAnalysis ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-emerald-300">Selected holding</div>
+                <div className="text-2xl font-black mt-2">{selectedAnalysis.symbol}</div>
+                <div className="text-[10px] text-white/40 mt-1">{selectedAnalysis.name} · {selectedAnalysis.group}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Info label="Daily move" value={selectedAnalysis.dailyChangePct == null ? '—' : (selectedAnalysis.dailyChangePct >= 0 ? '+' : '') + selectedAnalysis.dailyChangePct.toFixed(2) + '%'} />
+                  <Info label="Peer average" value={selectedAnalysis.peerAverageChange == null ? '—' : (selectedAnalysis.peerAverageChange >= 0 ? '+' : '') + selectedAnalysis.peerAverageChange.toFixed(2) + '%'} />
+                </div>
+              </div>
+
+              <div className="hidden lg:flex items-center justify-center text-white/15">
+                <Network className="w-7 h-7" />
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Connected peers</div>
+                <div className="mt-3 space-y-2">
+                  {selectedAnalysis.peers.length === 0 && (
+                    <div className="text-[10px] font-mono text-white/30">No configured peer relationships for this holding.</div>
+                  )}
+                  {selectedAnalysis.peers.map(peerSymbol => {
+                    const peer = analyses.find(item => item.symbol === peerSymbol);
+                    const peerQuote = livePrices[peerSymbol];
+                    const selectedMove = selectedAnalysis.dailyChangePct;
+                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
+                    const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
+                    return (
+                      <button
+                        key={peerSymbol}
+                        type="button"
+                        onClick={() => setSelected(peerSymbol)}
+                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-black text-white">{peerSymbol}</div>
+                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
+                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
+                            </div>
+                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Insight title="Direct relationship" body={selectedAnalysis.peers.length + ' configured peer connection' + (selectedAnalysis.peers.length === 1 ? '' : 's') + ' for ' + selectedAnalysis.symbol + '.'} icon={<Network/>}/>
+              <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
+              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
+            </div>
+          </>
+        ) : (
+          <div className="text-[10px] font-mono text-white/30">Select a holding to inspect its peer relationships.</div>
+        )}
+        </Panel>
+      )}
+
+      <div className="text-[10px] text-white/30 flex items-center gap-2"><Globe2 className="w-3 h-3"/> Position states are model outputs for review, not automatic trade instructions.</div>
+    </div>
+  );
+}
+
+function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
+  return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
+    <div className="flex justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/>{h.minorPosition && <span className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] font-mono text-white/55">MINOR · {((h.portfolioWeight || 0) * 100).toFixed(1)}%</span>}</div>
+        <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
+        <div className="text-[10px] text-white/45 mt-1">Qty {h.quantity.toFixed(6)} · Avg ${h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '−') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="font-bold text-sm">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
+        <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
+        <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
+      </div>
+    </div>
+  </button>;
+}
+
+
+function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; currentPrice: number | null }) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    fetch("/api/company-scale?action=analyst&symbol=" + encodeURIComponent(symbol), { cache: "no-store" })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || "Analyst expectations unavailable");
+        return body;
+      })
+      .then(body => { if (!cancelled) setData(body); })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : "Analyst expectations unavailable"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [symbol]);
+
+  const recommendation = data?.recommendation || {};
+  const target = data?.priceTarget || {};
+  const median = Number.isFinite(Number(target.median)) ? Number(target.median) : null;
+  const mean = Number.isFinite(Number(target.mean)) ? Number(target.mean) : null;
+  const low = Number.isFinite(Number(target.low)) ? Number(target.low) : null;
+  const high = Number.isFinite(Number(target.high)) ? Number(target.high) : null;
+  const targetMove = currentPrice != null && currentPrice > 0 && median != null ? (median / currentPrice - 1) * 100 : null;
+  const ratingCount = ["strongBuy", "buy", "hold", "sell", "strongSell"].reduce((sum, key) => sum + Number(recommendation[key] || 0), 0);
+  const eps = Array.isArray(data?.epsEstimates) ? data.epsEstimates[0] : null;
+  const revenue = Array.isArray(data?.revenueEstimates) ? data.revenueEstimates[0] : null;
+
+  return (
+    <section data-testid="analyst-expectations" className="mt-4 rounded-xl border border-violet-400/15 bg-violet-400/[0.025] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-widest text-violet-300">External analyst expectations</div>
+          <div className="text-sm font-black text-white mt-1">Street estimates · separate from Forecast Track</div>
+          <div className="text-[9px] font-mono text-white/30 mt-1">External consensus and estimate data; not an AI Infra Watch forecast.</div>
+        </div>
+        <div className="text-[8px] font-mono uppercase text-white/25">{loading ? "Loading" : data?.source || "Finnhub"}</div>
+      </div>
+
+      {error && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{error}</div>}
+      {!error && loading && <div className="mt-3 text-[9px] font-mono text-white/30">Loading analyst expectations…</div>}
+
+      {!error && !loading && data && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0)} />
+            <Info label="Buy" value={String(recommendation.buy ?? 0)} />
+            <Info label="Hold" value={String(recommendation.hold ?? 0)} />
+            <Info label="Sell" value={String(recommendation.sell ?? 0)} />
+            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0)} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+            <Info label="Median target" value={median == null ? "—" : "$" + median.toFixed(2)} />
+            <Info label="Mean target" value={mean == null ? "—" : "$" + mean.toFixed(2)} />
+            <Info label="Target low" value={low == null ? "—" : "$" + low.toFixed(2)} />
+            <Info label="Target high" value={high == null ? "—" : "$" + high.toFixed(2)} />
+            <Info label="Vs current" value={targetMove == null ? "—" : (targetMove >= 0 ? "+" : "") + targetMove.toFixed(1) + "%"} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+            <Info label="Rating count" value={String(ratingCount)} />
+            <Info label="EPS estimate" value={eps?.average == null ? "—" : Number(eps.average).toFixed(2)} />
+            <Info label="Revenue estimate" value={revenue?.average == null ? "—" : "$" + (Number(revenue.average) / 1e9).toFixed(1) + "B"} />
+          </div>
+          <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Web analyst evidence</div>
+            <div className="text-[9px] text-white/30 mt-1">Independent web-search results are source links only; they are not converted into consensus numbers here.</div>
+            <div className="mt-2 space-y-1.5">
+              {(data.webEvidence?.results || []).slice(0, 4).map((item: any) => (
+                <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="block text-[9px] leading-4 text-cyan-300 hover:text-cyan-200">
+                  {item.title || item.url}
+                </a>
+              ))}
+              {!data.webEvidence?.results?.length && <span className="text-[8px] font-mono text-white/20">No web analyst results returned.</span>}
+            </div>
+            {data.webEvidence?.error && <div className="mt-2 text-[8px] font-mono text-amber-200/50">{data.webEvidence.error}</div>}
+          </div>
+          <div className="mt-3 text-[8px] font-mono text-white/20">
+            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() : "Retrieved time unavailable"}
+            {eps?.period ? " · EPS " + eps.period : ""}
+            {revenue?.period ? " · Revenue " + revenue.period : ""}
+            {data.errors?.length ? " · Some analyst endpoints unavailable" : ""}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
+  const [customTarget, setCustomTarget] = useState('');
+  const canCalculateExitScenarios = h.livePrice != null && !h.liveStale;
+  const isLeveraged = h.symbol === 'SOXL';
+  const addGroupThreshold = isLeveraged ? 68 : 62;
+  const addBreadthThreshold = isLeveraged ? 0.67 : 0.50;
+  const scenarios = [
+    canCalculateExitScenarios && h.livePrice != null ? { label: 'Current', price: h.livePrice } : null,
+    { label: 'Break-even (average cost)', price: h.averageCost },
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+10% from current', price: h.livePrice * 1.10 } : null,
+    canCalculateExitScenarios && h.livePrice != null ? { label: '+20% from current', price: h.livePrice * 1.20 } : null,
+    historicalPrice.high52w != null ? { label: '52-week high', price: historicalPrice.high52w, date: historicalPrice.high52wDate } : null,
+    historicalPrice.historicalHigh != null ? { label: 'Historical high (available)', price: historicalPrice.historicalHigh, date: historicalPrice.historicalHighDate } : null,
+    Number(customTarget) > 0 ? { label: 'Custom target', price: Number(customTarget) } : null,
+  ].filter(Boolean) as Array<{label:string;price:number;date?:string}>;
+  const distanceTo52wHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.high52w != null && h.livePrice > 0
+    ? ((historicalPrice.high52w / h.livePrice) - 1) * 100
+    : null;
+  const distanceToHistoricalHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.historicalHigh != null && h.livePrice > 0
+    ? ((historicalPrice.historicalHigh / h.livePrice) - 1) * 100
+    : null;
+  const checks = [
+    { label: 'Below average cost', passed: canCalculateExitScenarios && h.livePrice != null && h.livePrice < h.averageCost, detail: canCalculateExitScenarios && h.livePrice != null ? '$' + h.livePrice.toFixed(2) + ' vs $' + h.averageCost.toFixed(2) : 'Fresh quote required' },
+    { label: 'Group score', passed: h.groupScore != null && h.groupScore >= addGroupThreshold, detail: h.groupScore == null ? 'No group score' : Math.round(h.groupScore) + '/100 · need ≥' + addGroupThreshold },
+    { label: 'Group breadth', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No breadth' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
+    { label: 'Group vs universe', passed: h.relativeToUniverse != null && h.relativeToUniverse >= 0, detail: h.relativeToUniverse == null ? 'No relative-strength reading' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts' },
+    { label: 'Vs tracked peers', passed: h.vsPeers != null && h.vsPeers >= 0, detail: h.vsPeers == null ? 'Peer quote required' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts' },
+  ];
+
+  return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
+    <div className="grid grid-cols-2 gap-2">
+      <Info label="Invested" value={'$' + h.investedValue.toFixed(2)}/>
+      <Info label="Current value" value={h.currentValue == null ? '—' : '$' + h.currentValue.toFixed(2)}/>
+      <Info label="P&L" value={h.livePrice == null ? '—' : (h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/>
+      <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
+      <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
+      <Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/>
+      <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
+      <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
+    </div>
+    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
+      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
+      <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
+      <Info label="Average cost" value={h.averageCost.toFixed(2)} />
+      <Info label="Upside evidence" value={h.potentialUpsideSignal} />
+      <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
+    </div>
+    <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
+    <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
+      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+      <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+      {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
+      {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
+      {scenarios.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left text-[10px]">
+            <thead className="text-white/25 uppercase font-mono">
+              <tr>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Sale value</th>
+                <th className="py-2 pr-3">Profit / loss</th>
+                <th className="py-2 pr-3">Return</th>
+                <th className="py-2">From current</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((scenario) => {
+                const saleValue = scenario.price * h.quantity;
+                const profit = saleValue - h.investedValue;
+                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
+                const fromCurrent = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0
+                  ? ((scenario.price / h.livePrice) - 1) * 100
+                  : null;
+                return (
+                  <tr key={scenario.label} className="border-t border-white/5">
+                    <td className="py-2 pr-3 text-white/60">
+                      {scenario.label}
+                      {scenario.date ? <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span> : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{'$' + scenario.price.toFixed(2)}</td>
+                    <td className="py-2 pr-3 font-mono">{'$' + saleValue.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}</td>
+                    <td className={'py-2 pr-3 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%'}</td>
+                    <td className={'py-2 font-mono ' + (fromCurrent == null ? 'text-white/25' : fromCurrent >= 0 ? 'text-cyan-300' : 'text-rose-300')}>{fromCurrent == null ? '—' : (fromCurrent >= 0 ? '+' : '') + fromCurrent.toFixed(2) + '%'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Info label="52-week high distance" value={distanceTo52wHigh == null ? '—' : '+' + distanceTo52wHigh.toFixed(2) + '% from current'} />
+        <Info label="Historical high distance" value={distanceToHistoricalHigh == null ? '—' : '+' + distanceToHistoricalHigh.toFixed(2) + '% from current'} />
+      </div>
+      <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+        <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Custom target price</div>
+        <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={customTarget}
+            onChange={e => setCustomTarget(e.target.value)}
+            placeholder="Enter price"
+            aria-label="Custom target price"
+            className="w-full sm:w-44 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-mono text-white outline-none focus:border-cyan-400/30"
+          />
+          <div className="text-[9px] text-white/30">Adds a hypothetical full-position sale row; it is not a forecast or trading instruction.</div>
+        </div>
+      </div>
+    </div>
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[.02] p-4">
+      <div className="flex items-center justify-between gap-2"><div className="text-[10px] font-mono uppercase text-white/35">Model state</div><StatePill state={h.state}/></div>
+      <div className="text-sm mt-2">{h.rationale}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
+    </div>
+    <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
+      <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
+      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : 'Use the gate breakdown below to see which conditions are currently preventing an average-in review.'}</div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+        {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}
+      </div>
+    </div>
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <RuleCard title="Add review trigger" body={h.addTrigger} tone="up"/>
+      <RuleCard title="Risk review trigger" body={h.riskTrigger} tone="down"/>
+    </div>
+    <div className="mt-3 bg-[#0F1115] border border-white/5 rounded-xl p-4">
+      <div className="text-[9px] font-mono uppercase text-white/25">Transmission chain</div>
+      <div className="text-sm mt-2 leading-6">{h.theme} → catalyst/news → revenue/capex/supply-chain effect → peer response → event persistence → portfolio rotation regime.</div>
+      <div className="text-[10px] text-white/30 mt-2">Peers: {h.peers.join(' · ')} · Geo/risk lens: {h.geo}</div>
+    </div>
+  </Panel>;
+}
+
+function GateCheck({label,passed,detail}:{label:string;passed:boolean;detail:string;key?: string}) {
+  return <div className="border border-white/5 rounded-xl p-3 bg-black/10">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] font-mono uppercase text-white/55">{label}</span>
+      <span className={'text-[8px] font-mono font-bold uppercase ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span>
+    </div>
+    <div className="text-[10px] text-white/35 mt-2">{detail}</div>
+  </div>;
+}
+function RuleCard({title,body,tone}:{title:string;body:string;tone:'up'|'down'}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className={'text-[10px] font-mono uppercase ' + (tone === 'up' ? 'text-emerald-400' : 'text-rose-400')}>{title}</div>
+    <div className="text-[10px] text-white/40 mt-2 leading-5">{body}</div>
+  </div>;
+}
+
+function StatePill({state}:{state:PositionAnalysis['state']}) {
+  const cls = state === 'ADD REVIEW'
+    ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20'
+    : state === 'RISK REVIEW'
+      ? 'bg-rose-400/10 text-rose-300 border-rose-400/20'
+      : state === 'INSUFFICIENT DATA'
+        ? 'bg-amber-400/10 text-amber-300 border-amber-400/20'
+        : 'bg-white/5 text-white/55 border-white/10';
+  return <span className={'inline-flex px-1.5 py-0.5 rounded border text-[8px] font-mono font-bold uppercase ' + cls}>{state}</span>;
+}
+
+function Panel({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <section className="bg-[#15181E] border border-white/10 rounded-2xl p-5">
+    <div className="mb-4"><div className="text-sm font-bold">{title}</div><div className="text-[11px] text-white/40 mt-1">{subtitle}</div></div>
+    {children}
+  </section>;
+}
+
+function Info({label,value}:{label:string;value:string}) {
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
+    <div className="text-xs mt-1">{value}</div>
+  </div>;
+}
+
+function Metric({label,value,suffix,tone,icon}:{label:string;value:string;suffix:string;tone:'up'|'down'|'warn'|'neutral';icon?:ReactNode}) {
+  const c = tone === 'up' ? 'text-emerald-400' : tone === 'down' ? 'text-rose-400' : tone === 'warn' ? 'text-amber-300' : 'text-white';
+  return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
+    <div className="flex items-center justify-between text-[9px] uppercase font-mono text-white/30">{label}{icon && <span className={c}>{icon}</span>}</div>
+    <div className={'text-lg font-black mt-2 ' + c}>{value}<span className="text-[10px] text-white/30 ml-1">{suffix}</span></div>
+  </div>;
+}
+
+function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
+  return <div className="border border-white/5 rounded-xl p-3">
+    <div className="flex items-center gap-2 text-xs font-bold">{icon}<span>{title}</span></div>
+    <div className="text-[10px] text-white/35 mt-2">{body}</div>
+  </div>;
+} + Number(analystConsensus.priceTarget.mean).toFixed(2)} />
+                  <Info label="Web evidence" value={String(analystConsensus.webEvidenceCount || 0)} />
+                </div>
+                {Array.isArray(analystConsensus.webEvidence?.results) && analystConsensus.webEvidence.results.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Evidence sources</div>
+                    <div className="space-y-1 mt-2">
+                      {analystConsensus.webEvidence.results.slice(0, 4).map((item: any, index: number) => (
+                        <a key={(item.url || item.title || index) + index} href={item.url || '#'} target="_blank" rel="noreferrer" className="block rounded-lg border border-white/5 bg-black/10 px-3 py-2 hover:bg-white/[.04]">
+                          <div className="text-[9px] text-white/60 truncate">{item.title || 'Analyst evidence source'}</div>
+                          <div className="text-[8px] font-mono text-white/25 mt-1">{item.source || 'Web evidence'}{item.published_at ? ' · ' + item.published_at : ''}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 text-[8px] font-mono text-white/20">
+                  JEV receives the structured ratings, price targets, estimates, freshness and web-evidence metadata above as evidence families; unavailable fields remain unavailable rather than being inferred.
+                </div>
+              </>
+            ) : (
+              <div className="mt-3 rounded-lg border border-amber-400/10 bg-amber-400/[0.02] px-3 py-2 text-[10px] text-amber-200/60">
+                {analystError || 'No analyst evidence is currently available.'}
+              </div>
+            )}
+          </section>
 
       <PortfolioSignalFusion
             prices={livePrices}
