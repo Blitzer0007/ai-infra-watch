@@ -168,3 +168,22 @@ def test_exploratory_congress_filters(page):
 
     page.get_by_role('button', name='Clear table filters', exact=True).click()
     page.get_by_text('3 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+
+def test_exploratory_portfolio_scenario_semantics(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.goto("/portfolio", wait_until="domcontentloaded")
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="visible", timeout=30000)
+
+    table = _table_with_header(page, "Reference")
+    historical = table.locator("tr").filter(has_text="Historical high (available)").first
+    assert historical.is_visible()
+    assert "$150.00" in historical.inner_text()
+    assert "2024-01-02" in historical.inner_text()
+
+    positive = table.locator("tr").filter(has_text="+10% from current").first
+    assert positive.locator(".text-emerald-300").count() >= 2
+
+    breakeven = table.locator("tr").filter(has_text="Break-even (average cost)").first
+    assert breakeven.locator(".text-rose-300").count() == 0
