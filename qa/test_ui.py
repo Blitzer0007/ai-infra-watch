@@ -36,7 +36,27 @@ def mock_local_apis(page):
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]}))
             return
         if '/api/forecast-verification' in url:
-            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'forecasts':[],'analytics':{'sampleSize':0,'byTickerHorizon':[],'byScenario':[],'byModel':[],'byDirection':[],'longTerm':{'verifiedCount':0}}})); return
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({
+                'model':'analogue-v1',
+                'config':{'horizon':20},
+                'forecasts':[],
+                'analytics':{
+                    'sampleSize':24,
+                    'sampleStatus':'descriptive',
+                    'directionalAccuracyPct':62.5,
+                    'medianAbsoluteError':4.2,
+                    'meanSignedErrorPct':0.8,
+                    'p25p75CoveragePct':68.0,
+                    'p10p90CoveragePct':91.0,
+                    'byTickerHorizon':[{'ticker':'NVDA','horizon':20,'count':24,'directionalAccuracyPct':62.5,'medianAbsoluteError':4.2,'p25p75CoveragePct':68.0}],
+                    'byScenario':[],
+                    'byModel':[],
+                    'byDirection':[],
+                    'validationGate':{'minimumRequired':50,'verifiedCount':24,'ready':False,'status':'limited'},
+                    'evidenceCoverage':{'forecastsWithSnapshot':24,'analystAvailable':20,'analystMissingOrFailed':4,'withNews':20,'withContracts':18,'withPolitical':12,'withMacro':16,'multiChannel':18},
+                    'longTerm':{'verifiedCount':24,'oldestVerifiedAt':'2026-01-01T00:00:00Z','newestVerifiedAt':'2026-10-01T00:00:00Z'}
+                }
+            })); return
         if '/api/ai-quality' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'runs':[],'analytics':{'aggregates':{},'latest':None,'previous':None,'regression':{'passed':True,'regressionCount':0,'regressions':[],'observed':[]}}})); return
         route.fulfill(status=200, content_type='application/json', body='{}')
