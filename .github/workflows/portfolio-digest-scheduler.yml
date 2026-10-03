@@ -1,0 +1,47 @@
+name: Portfolio Digest Scheduler
+run-name: Portfolio Digest • ${{ github.event.schedule || 'manual' }}
+
+on:
+  schedule:
+    # Five minutes past each requested hour to reduce top-of-hour scheduling congestion.
+    - cron: '5 6 * * *'
+      timezone: "Asia/Kolkata"
+    - cron: '5 12 * * *'
+      timezone: "Asia/Kolkata"
+    - cron: '5 18 * * *'
+      timezone: "Asia/Kolkata"
+    - cron: '5 22 * * *'
+      timezone: "Asia/Kolkata"
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-digest-scheduler
+  cancel-in-progress: false
+
+jobs:
+  send-digest:
+    name: Send Telegram portfolio digest
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Run portfolio digest
+        env:
+          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AIW_CRON_SECRET" ]; then
+            echo "::error::Missing AIW_CRON_SECRET repository secret."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $AIW_CRON_SECRET" \
+            --header "User-Agent: ai-infra-watch-github-actions/1.0" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 3 \
+            "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest"
+
+      - name: Record completion
+        run: echo "Portfolio digest scheduler completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
