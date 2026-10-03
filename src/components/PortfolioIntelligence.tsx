@@ -1,3 +1,4 @@
+import DataTable, { type DataTableColumn } from './DataTable';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
@@ -1275,41 +1276,19 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
       {scenarios.length > 0 && (
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-[10px]">
-            <thead className="text-white/25 uppercase font-mono">
-              <tr>
-                <th className="py-2 pr-3">Reference</th>
-                <th className="py-2 pr-3">Price</th>
-                <th className="py-2 pr-3">Sale value</th>
-                <th className="py-2 pr-3">Profit / loss</th>
-                <th className="py-2 pr-3">Return</th>
-                <th className="py-2">From current</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scenarios.map((scenario) => {
-                const saleValue = scenario.price * h.quantity;
-                const profit = saleValue - h.investedValue;
-                const returnPct = h.investedValue ? (profit / h.investedValue) * 100 : 0;
-                const fromCurrent = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0
-                  ? ((scenario.price / h.livePrice) - 1) * 100
-                  : null;
-                return (
-                  <tr key={scenario.label} className="border-t border-white/5">
-                    <td className="py-2 pr-3 text-white/60">
-                      {scenario.label}
-                      {scenario.date ? <span className="block text-[8px] text-white/25 mt-0.5">{scenario.date}</span> : null}
-                    </td>
-                    <td className="py-2 pr-3 font-mono">{'$' + scenario.price.toFixed(2)}</td>
-                    <td className="py-2 pr-3 font-mono">{'$' + saleValue.toFixed(2)}</td>
-                    <td className={'py-2 pr-3 font-mono ' + (profit >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}</td>
-                    <td className={'py-2 pr-3 font-mono ' + (returnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%'}</td>
-                    <td className={'py-2 font-mono ' + (fromCurrent == null ? 'text-white/25' : fromCurrent >= 0 ? 'text-cyan-300' : 'text-rose-300')}>{fromCurrent == null ? '—' : (fromCurrent >= 0 ? '+' : '') + fromCurrent.toFixed(2) + '%'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            rows={scenarios}
+            columns={[
+              { key: 'label', header: 'Reference', accessor: row => row.label, type: 'text', render: row => <div className="text-white/60">{row.label}{row.date ? <span className="block text-[8px] text-white/25 mt-0.5">{row.date}</span> : null}</div> },
+              { key: 'price', header: 'Price', accessor: row => row.price, type: 'currency', render: row => '$' + row.price.toFixed(2) },
+              { key: 'saleValue', header: 'Sale value', accessor: row => row.price * h.quantity, type: 'currency', render: row => '$' + (row.price * h.quantity).toFixed(2) },
+              { key: 'profit', header: 'Profit / loss', accessor: row => row.price * h.quantity - h.investedValue, type: 'currency', render: row => { const profit = row.price * h.quantity - h.investedValue; return <span className={profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{(profit >= 0 ? '+' : '') + '$' + profit.toFixed(2)}</span>; } },
+              { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const value = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return <span className={value >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{(value >= 0 ? '+' : '') + value.toFixed(2) + '%'}</span>; } },
+              { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const value = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return <span className={value == null ? 'text-white/25' : value >= 0 ? 'text-cyan-300' : 'text-rose-300'}>{value == null ? '—' : (value >= 0 ? '+' : '') + value.toFixed(2) + '%'}</span>; } },
+            ] as DataTableColumn<typeof scenarios[number]>[]}
+            rowKey={(row) => row.label}
+            initialSort={{ key: 'price', direction: 'asc' }}
+          />
         </div>
       )}
       <div className="mt-3 grid grid-cols-2 gap-2">
