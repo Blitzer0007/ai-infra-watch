@@ -171,15 +171,117 @@ def _compact_state(state: Any, max_chars: int = 8000) -> str:
     return text[:max_chars]
 
 
+def measured_evidence_quality(state: Any) -> dict[str, Any] | None:
+    """Compute evidence quality from retrieved evidence metadata, not model judgment.
+
+    Independent usable families establish the base level. Stale evidence,
+    missing requirements, conflicts and poor citation coverage can only reduce it.
+    """
+    if not isinstance(state, dict):
+        return None
+
+    availability = state.get("evidence_availability")
+    if not isinstance(availability, dict):
+        return None
+
+    usable_families = availability.get("usable_families") or []
+    usable_count = len(usable_families)
+    if usable_count <= 0:
+        score = 0.0
+    elif usable_count == 1:
+        score = 1.0
+    elif usable_count == 2:
+        score = 2.0
+    else:
+        score = 3.0
+
+    freshness_records = state.get("evidence_freshness") or []
+    statuses: list[str] = []
+    for record in freshness_records:
+        if not isinstance(record, dict):
+            continue
+        freshness = record.get("freshness")
+        if isinstance(freshness, dict):
+            status = str(freshness.get("status") or "").upper()
+            if status:
+                statuses.append(status)
+
+    fresh_count = statuses.count("FRESH")
+    aging_count = statuses.count("AGING")
+    stale_count = statuses.count("STALE")
+    known_count = fresh_count + aging_count + stale_count
+
+    if known_count and stale_count == known_count:
+        score = min(score, 1.0)
+    elif known_count and fresh_count == 0 and aging_count == known_count:
+        score = min(score, 2.0)
+
+    missing_required = availability.get("missing") or []
+    if missing_required:
+        score = min(score, 1.5)
+
+    conflicts = state.get("conflict_detection") or {}
+    conflict_count = int(conflicts.get("count") or 0) if isinstance(conflicts, dict) else 0
+    if conflict_count:
+        score = min(score, 1.0)
+
+    citation = state.get("citation_coverage") or {}
+    citation_ratio = citation.get("coverage") if isinstance(citation, dict) else None
+    if isinstance(citation_ratio, (int, float)) and citation_ratio < 0.5:
+        score = max(0.0, score - 0.5)
+
+    score = round(max(0.0, min(3.0, score)), 2)
+    return {
+        "score": score,
+        "percent": round(score / 3.0 * 100.0),
+        "label": (
+            "Minimal" if score < 0.75
+            else "Partial" if score < 1.5
+            else "Usable" if score < 2.25
+            else "Strong"
+        ),
+        "usable_family_count": usable_count,
+        "usable_families": list(usable_families),
+        "fresh_count": fresh_count,
+        "aging_count": aging_count,
+        "stale_count": stale_count,
+        "missing_required": list(missing_required),
+        "conflict_count": conflict_count,
+        "citation_coverage": citation_ratio,
+        "source": "deterministic_evidence_measurement",
+    }
+
+
+
 def assess(kind: str, state: Any, client: JevClient | None = None) -> JevEvaluation:
     key = kind.strip().lower()
     questions = ASSESSMENTS.get(key)
     if questions is None:
         return JevEvaluation(error=f"Unknown Jev assessment kind: {key!r}")
-    return (client or JevClient()).evaluate(
+    evaluation = (client or JevClient()).evaluate(
         state=_compact_state(state),
         questions=questions,
     )
+    measured = measured_evidence_quality(state)
+    if measured and evaluation.usable:
+        answer = evaluation.answers.get("evidence_quality")
+        if answer is not None:
+            # Evidence quality is a measured property of retrieved evidence.
+            # Jev can assess routing/context, but must not override the
+            # deterministic evidence measurement.
+            answer.score = measured["score"]
+            answer.legend = {
+                "0": "Minimal",
+                "1": "Partial",
+                "2": "Usable",
+                "3": "Strong",
+            }
+            if answer.confidence is not None:
+                answer.confidence = min(
+                    answer.confidence,
+                    max(0.0, min(1.0, measured["score"] / 3.0)),
+                )
+    return evaluation
 
 
-__all__ = ["ASSESSMENTS", "assess"]
+__all__ = ["ASSESSMENTS", "assess", "measured_evidence_quality"]
