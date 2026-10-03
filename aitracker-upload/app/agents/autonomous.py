@@ -910,6 +910,11 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                     if isinstance(score, (int, float))
                     else None
                 ),
+                "evidence_quality_source": (
+                    "deterministic_evidence_measurement"
+                    if isinstance(score, (int, float))
+                    else "unavailable"
+                ),
                 "model": evaluation.model,
                 "latency_ms": round(evaluation.latency_ms, 1),
                 "input_tokens": evaluation.input_tokens,
