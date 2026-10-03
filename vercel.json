@@ -21,6 +21,10 @@
       "destination": "/api/market?route=earnings-alerts"
     },
     {
+      "source": "/api/alert-notify",
+      "destination": "/api/market?route=alert-notify"
+    },
+    {
       "source": "/api/ai-quality",
       "destination": "/api/quality?route=ai-quality"
     },
