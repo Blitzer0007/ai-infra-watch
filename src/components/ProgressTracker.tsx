@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { rankSearchResults } from '../utils/search';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
-import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2 } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2, X } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
@@ -28,6 +28,32 @@ function matchesDate(milestoneDate: string, historyDate: string): boolean {
 
 interface ProgressTrackerProps {
   livePrices?: Record<string, { price: number; changePct: number }>;
+}
+
+const TRACKER_SYMBOLS_STORAGE_KEY = 'aiw-progress-tracker-symbols-v1';
+
+function loadTrackerSymbols(): string[] {
+  const defaults = Object.keys(STOCK_METADATA);
+  try {
+    const raw = localStorage.getItem(TRACKER_SYMBOLS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!Array.isArray(parsed)) return defaults;
+    const symbols = parsed
+      .filter((value): value is string => typeof value === 'string')
+      .map(value => value.trim().toUpperCase())
+      .filter(Boolean);
+    return [...new Set(symbols.length ? symbols : defaults)];
+  } catch {
+    return defaults;
+  }
+}
+
+function saveTrackerSymbols(symbols: string[]) {
+  try {
+    localStorage.setItem(TRACKER_SYMBOLS_STORAGE_KEY, JSON.stringify(symbols));
+  } catch {
+    // Browser storage is a convenience; tracker operation must still work without it.
+  }
 }
 
 const TRACKER_SYMBOL_ALIASES: Record<string, string> = {
@@ -62,6 +88,31 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [tickerResolving, setTickerResolving] = useState(false);
   const [tickerResolveError, setTickerResolveError] = useState<string | null>(null);
   const [resolvedIssuer, setResolvedIssuer] = useState<string | null>(null);
+  const [trackerSymbols, setTrackerSymbols] = useState<string[]>(() => loadTrackerSymbols());
+  const [customizeTracker, setCustomizeTracker] = useState(false);
+
+  const addTrackerSymbol = (symbol: string) => {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return;
+    setTrackerSymbols(prev => {
+      const next = prev.includes(normalized) ? prev : [...prev, normalized];
+      saveTrackerSymbols(next);
+      return next;
+    });
+  };
+
+  const removeTrackerSymbol = (symbol: string) => {
+    setTrackerSymbols(prev => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter(item => item !== symbol);
+      saveTrackerSymbols(next);
+      if (selectedStock === symbol) {
+        setSelectedStock(next[0]);
+        setActiveMilestoneId(null);
+      }
+      return next;
+    });
+  };
 
 
   // Combine the curated timeline with live SEC milestones for the selected symbol.
@@ -150,6 +201,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     if (aliased) {
       setTickerResolveError(null);
       setResolvedIssuer(null);
+      addTrackerSymbol(aliased);
       setSelectedStock(aliased);
       setActiveMilestoneId(null);
       return;
@@ -158,6 +210,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     if (/^[A-Z0-9.-]{1,20}$/.test(rawInput) && !rawInput.includes(' ')) {
       setTickerResolveError(null);
       setResolvedIssuer(null);
+      addTrackerSymbol(normalized);
       setSelectedStock(normalized);
       setActiveMilestoneId(null);
       return;
@@ -174,7 +227,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
       const rankedMatches = rankSearchResults(body.matches, rawInput);
       const match = rankedMatches[0] || body.matches[0];
-      setSelectedStock(String(match.ticker).toUpperCase());
+      const resolvedSymbol = String(match.ticker).toUpperCase();
+      addTrackerSymbol(resolvedSymbol);
+      setSelectedStock(resolvedSymbol);
       setResolvedIssuer(match.title || null);
       setActiveMilestoneId(null);
     } catch (err: any) {
@@ -300,29 +355,66 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {Object.keys(STOCK_METADATA).map((symbol) => {
-            const isSelected = selectedStock === symbol;
-            const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
-            return (
-              <button
-                key={symbol}
-                onClick={() => {
-                  setSelectedStock(symbol);
-                  setTickerInput('');
-                  setActiveMilestoneId(null);
-                }}
-                className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded border transition cursor-pointer flex items-center space-x-2 ${
-                  isSelected
-                    ? 'bg-white text-black border-white'
-                    : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                <span>{symbol}</span>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Saved tracker tickers</span>
+            <button
+              type="button"
+              onClick={() => setCustomizeTracker(value => !value)}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-white/5 text-[9px] font-mono font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              aria-expanded={customizeTracker}
+            >
+              {customizeTracker ? 'Done' : 'Customize'}
+            </button>
+          </div>
+          {customizeTracker && (
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[.03] p-2.5 text-[9px] font-mono text-white/45">
+              Search any public ticker or company above to add it. Use × on a chip to remove it from your saved tracker list.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {trackerSymbols.map((symbol) => {
+              const isSelected = selectedStock === symbol;
+              const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+              return (
+                <div
+                  key={symbol}
+                  className={`inline-flex items-center rounded border transition ${
+                    isSelected
+                      ? 'bg-white text-black border-white'
+                      : 'bg-white/5 text-white/60 border-white/10'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(symbol);
+                      setTickerInput('');
+                      setActiveMilestoneId(null);
+                    }}
+                    className="px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer hover:opacity-90"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span>{symbol}</span>
+                    </span>
+                  </button>
+                  {customizeTracker && (
+                    <button
+                      type="button"
+                      onClick={() => removeTrackerSymbol(symbol)}
+                      disabled={trackerSymbols.length <= 1}
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                      aria-label={`Remove ${symbol} from saved tracker tickers`}
+                      title={trackerSymbols.length <= 1 ? 'Keep at least one tracker ticker' : `Remove ${symbol}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-cyan-300">
