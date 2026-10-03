@@ -22,10 +22,12 @@ def _assert_sort_control(table, label: str):
         button = header.locator("button").first
         before = button.get_attribute("aria-sort")
         assert before in ("none", "ascending", "descending")
+        assert header.get_attribute("aria-sort") == before
         button.click()
         after = button.get_attribute("aria-sort")
         expected = "ascending" if before in ("none", "descending") else "descending"
         assert after == expected
+        assert header.get_attribute("aria-sort") == after
         button.click()
         assert button.get_attribute("aria-sort") == before
 
