@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,17 @@ def record_eval(metrics: dict[str, Any], failures: list[dict[str, Any]]) -> None
     _append({"kind": "eval", "ts": time.time(), "metrics": metrics, "failures": failures})
 
 
+def record_event(kind: str, metadata: dict[str, Any] | None = None) -> None:
+    """Record a lightweight operational event without capturing prompts."""
+    _append({
+        "kind": "event",
+        "event_kind": kind,
+        "ts": time.time(),
+        "event_id": uuid.uuid4().hex,
+        "metadata": metadata or {},
+    })
+
+
 def record_call(
     kind: str,
     prompt: str,
@@ -52,6 +64,7 @@ def record_call(
             "kind": "call",
             "call_kind": kind,
             "ts": time.time(),
+            "event_id": uuid.uuid4().hex,
             "prompt": prompt,
             "retrieved_docs": retrieved_docs or [],
             "metadata": metadata or {},
