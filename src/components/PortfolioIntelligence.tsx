@@ -596,7 +596,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Exposure, attribution & benchmark context</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
           <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
           <Info label="Weighted stress" value={weightedStress.score + '/100'} />
           <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
           <Info label="Top 3 concentration" value={top3ConcentrationPct.toFixed(1) + '%'} />
