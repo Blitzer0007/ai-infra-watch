@@ -600,7 +600,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <Info label="Weighted stress" value={weightedStress.score + '/100'} />
           <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
           <Info label="Top 3 concentration" value={top3ConcentrationPct.toFixed(1) + '%'} />
-          <Info label="Effective holdings" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1)} />
+          <Info label="Held positions" value={String(analyses.length)} />
+          <Info label="Effective holdings (HHI)" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day constant-weight stress backcast</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using current portfolio weights across the historical window; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
