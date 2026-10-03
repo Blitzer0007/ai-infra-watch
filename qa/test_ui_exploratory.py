@@ -121,3 +121,29 @@ def test_exploratory_global_table_accessibility(page):
         table = _table_with_header(page, label)
         assert table.locator("thead").count() == 1
         assert table.locator("tbody").count() == 1
+
+
+def test_exploratory_universal_search_pages_and_tickers(page):
+    mock_local_apis(page)
+    goto_app(page)
+    search_button = page.get_by_role("button", name="Open universal search")
+    search_button.click()
+    dialog = page.get_by_role("dialog", name="Universal search")
+    assert dialog.is_visible()
+    search = page.get_by_role("textbox", name="Search by ticker, company, page or alias")
+    search.fill("Salesforce")
+    page.wait_for_timeout(150)
+    assert dialog.get_by_role("button").filter(has_text="CRM").count() >= 1 or dialog.get_by_text("CRM", exact=True).count() >= 1
+
+    search.fill("portfolio")
+    page.wait_for_timeout(100)
+    page.get_by_role("button", name="Portfolio Intelligence").click()
+    assert "/portfolio" in page.url
+
+def test_exploratory_universal_search_keyboard_shortcut(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.keyboard.press("Control+KeyK")
+    assert page.get_by_role("dialog", name="Universal search").is_visible()
+    page.keyboard.press("Escape")
+    assert page.get_by_role("dialog", name="Universal search").count() == 0
