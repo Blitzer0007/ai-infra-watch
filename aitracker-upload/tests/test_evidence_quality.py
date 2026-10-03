@@ -2,7 +2,8 @@ from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 
 from app.agents.evidence_quality import normalize_freshness, detect_conflicts
-from app.jev.assess import measured_evidence_quality
+from app.jev.assess import assess, measured_evidence_quality
+from app.jev.client import JevAnswer, JevEvaluation
 
 
 def call(tool, output):
@@ -181,3 +182,30 @@ def test_measured_evidence_quality_missing_required_and_poor_citations_reduce_sc
     )
     assert result["score"] == 1.0
     assert result["percent"] == 33
+
+
+class _FakeAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                )
+            },
+            model="test",
+            latency_ms=1.0,
+            input_tokens=10,
+        )
+
+
+def test_jev_assessment_cannot_override_measured_evidence_quality():
+    state = measured_state(
+        ["analyst_consensus"],
+        [{"freshness": {"status": "FRESH"}}],
+    )
+    result = assess("research", state, client=_FakeAssessmentClient())
+    answer = result.answers["evidence_quality"]
+    assert answer.score == 1.0
+    assert answer.confidence == 1.0 / 3.0
