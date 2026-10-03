@@ -12,6 +12,82 @@ export type PeerCandidate = {
   freshQuote: boolean;
 };
 
+export type PeerTier = 'primary' | 'core' | 'extended';
+
+export type DynamicPeerCandidate = PeerCandidate & {
+  tier: PeerTier;
+  dimensions: {
+    configuredRelationship: boolean;
+    industryGroup: boolean;
+    endMarketTheme: boolean;
+    geography: boolean;
+    freshQuote: boolean;
+    size: 'available' | 'unavailable';
+    growth: 'available' | 'unavailable';
+    margins: 'available' | 'unavailable';
+    capitalIntensity: 'available' | 'unavailable';
+    analystCoverage: 'available' | 'unavailable';
+  };
+};
+
+export function selectDynamicPeers(
+  holding: StockUniverseEntry,
+  prices: Record<string, PricePoint> = {},
+): { primary: DynamicPeerCandidate | null; core: DynamicPeerCandidate[]; extended: DynamicPeerCandidate[] } {
+  const candidates = STOCK_UNIVERSE
+    .filter(candidate => candidate.symbol !== holding.symbol)
+    .map(candidate => {
+      const sameGroup = candidate.group === holding.group;
+      const themeMatches = themeOverlap(candidate.theme, holding.theme);
+      const sameGeo = candidate.geo === holding.geo;
+      const configuredRelationship = holding.peers.includes(candidate.symbol) || candidate.peers.includes(holding.symbol);
+      const freshQuote = prices[candidate.symbol]?.stale !== true && Number.isFinite(prices[candidate.symbol]?.price);
+      const score =
+        (configuredRelationship ? 30 : 0) +
+        (sameGroup ? 28 : 0) +
+        Math.min(themeMatches, 3) * 8 +
+        (sameGeo ? 8 : 0) +
+        (freshQuote ? 4 : 0);
+      const reasons = [
+        configuredRelationship ? 'Existing peer relationship' : null,
+        sameGroup ? 'Same industry group' : null,
+        themeMatches ? 'Overlapping end-market/theme' : null,
+        sameGeo ? 'Same geographic lens' : null,
+        freshQuote ? 'Fresh peer quote available' : null,
+      ].filter((value): value is string => Boolean(value));
+      return {
+        symbol: candidate.symbol,
+        name: candidate.name,
+        score,
+        reasons: reasons.length ? reasons : ['Universe comparability baseline'],
+        configuredRank: holding.peers.indexOf(candidate.symbol) >= 0 ? holding.peers.indexOf(candidate.symbol) + 1 : Number.MAX_SAFE_INTEGER,
+        sameGroup,
+        sameTheme: themeMatches > 0,
+        freshQuote,
+        tier: 'extended' as PeerTier,
+        dimensions: {
+          configuredRelationship,
+          industryGroup: sameGroup,
+          endMarketTheme: themeMatches > 0,
+          geography: sameGeo,
+          freshQuote,
+          size: 'unavailable',
+          growth: 'unavailable',
+          margins: 'unavailable',
+          capitalIntensity: 'unavailable',
+          analystCoverage: 'unavailable',
+        },
+      };
+    })
+    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
+
+  return {
+    primary: candidates[0] ? { ...candidates[0], tier: 'primary' } : null,
+    core: candidates.slice(1, 6).map(candidate => ({ ...candidate, tier: 'core' })),
+    extended: candidates.slice(6, 16).map(candidate => ({ ...candidate, tier: 'extended' })),
+  };
+}
+
 export type PeerCounterfactual = {
   peer: PeerCandidate | null;
   purchaseDate: string | null;
@@ -46,45 +122,7 @@ export function selectMostRelevantPeer(
   holding: StockUniverseEntry,
   prices: Record<string, PricePoint> = {},
 ): PeerCandidate | null {
-  const configured = holding.peers
-    .map(symbol => STOCK_UNIVERSE.find(item => item.symbol === symbol))
-    .filter((item): item is StockUniverseEntry => Boolean(item));
-
-  if (!configured.length) return null;
-
-  const scored = configured.map((candidate, index) => {
-    const sameGroup = candidate.group === holding.group;
-    const themeMatches = themeOverlap(candidate.theme, holding.theme);
-    const freshQuote = prices[candidate.symbol]?.stale !== true && Number.isFinite(prices[candidate.symbol]?.price);
-    const sameGeo = candidate.geo === holding.geo;
-    const score =
-      100 - index * 8 +
-      (sameGroup ? 28 : 0) +
-      themeMatches * 8 +
-      (sameGeo ? 5 : 0) +
-      (freshQuote ? 3 : 0);
-
-    const reasons = [
-      index === 0 ? 'Configured direct peer' : 'Configured peer',
-      sameGroup ? 'Same group' : null,
-      themeMatches ? 'Overlapping theme' : null,
-      sameGeo ? 'Same geographic lens' : null,
-      freshQuote ? 'Fresh peer quote available' : null,
-    ].filter((value): value is string => Boolean(value));
-
-    return {
-      symbol: candidate.symbol,
-      name: candidate.name,
-      score,
-      reasons,
-      configuredRank: index + 1,
-      sameGroup,
-      sameTheme: themeMatches > 0,
-      freshQuote,
-    };
-  });
-
-  return scored.sort((a, b) => b.score - a.score || a.configuredRank - b.configuredRank)[0] ?? null;
+  return selectDynamicPeers(holding, prices).primary;
 }
 
 export function calculatePeerCounterfactual(input: {
