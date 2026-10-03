@@ -24,6 +24,11 @@ export type PairSignal = {
   label: string;
 };
 
+export type RotationHorizon = '1D' | '5D' | '20D' | '60D' | '3M' | '6M';
+export type RotationGroup = IntelligenceGroup & { horizons: Record<RotationHorizon, number | null>; direction: 'strengthening' | 'weakening' | 'mixed' | 'insufficient'; };
+export type RotationPair = PairSignal & { history: number[]; trend: 'widening' | 'narrowing' | 'stable' | 'insufficient'; };
+export type MoneyRotationSnapshot = { groups: RotationGroup[]; pairs: RotationPair[]; selectedHorizon: RotationHorizon; methodology: string; freshness: string; };
+
 export type IntelligenceSnapshot = {
   groups: IntelligenceGroup[];
   portfolioBreadth: number;
@@ -112,4 +117,48 @@ export function buildIntelligence(prices: Record<string, PricePoint>): Intellige
     bottomGroup: sorted.at(-1)?.name || null,
     pairSignals,
   };
+}
+
+
+const ROTATION_HORIZONS: Array<{ key: RotationHorizon; days: number }> = [
+  { key: '1D', days: 1 }, { key: '5D', days: 5 }, { key: '20D', days: 20 },
+  { key: '60D', days: 60 }, { key: '3M', days: 63 }, { key: '6M', days: 126 },
+];
+
+function historicalReturn(points: Array<{ price: number }>, days: number): number | null {
+  if (points.length <= days) return null;
+  const end = points.at(-1)?.price ?? 0;
+  const start = points.at(-(days + 1))?.price ?? 0;
+  return start > 0 && end > 0 ? (end / start - 1) * 100 : null;
+}
+
+export function buildMoneyRotation(
+  histories: Record<string, Array<{ date: string; price: number }>>,
+  prices: Record<string, PricePoint>,
+): MoneyRotationSnapshot {
+  const now = new Date().toISOString();
+  const groupRows: RotationGroup[] = Object.entries(GROUP_MEMBERS).map(([name, members]) => {
+    const horizons = Object.fromEntries(ROTATION_HORIZONS.map(({ key, days }) => {
+      const values = members.map(symbol => historicalReturn(histories[symbol] || [], days)).filter((v): v is number => v != null);
+      return [key, values.length ? avg(values) : null];
+    })) as Record<RotationHorizon, number | null>;
+    const current = horizons['1D'];
+    const short = horizons['20D'];
+    const direction: RotationGroup['direction'] = current == null || short == null ? 'insufficient' : current > short + 0.5 ? 'strengthening' : current < short - 0.5 ? 'weakening' : 'mixed';
+    const live = members.map(symbol => prices[symbol]).filter(x => x && x.stale !== true);
+    const avgChange = avg(live.map(x => x.changePct).filter(Number.isFinite));
+    const breadth = live.length ? live.filter(x => x.changePct >= 0).length / live.length : 0;
+    return { name, members, avgChange, breadth, relativeToUniverse: 0, score: clamp(50 + (short ?? 0) * 2 + (breadth - 0.5) * 30, 0, 100), horizons, direction };
+  });
+  const pairs: RotationPair[] = PAIRS.map(([left, right, label]) => {
+    const leftHistory = histories[left] || []; const rightHistory = histories[right] || [];
+    const history = ROTATION_HORIZONS.map(({ days }) => {
+      const l = historicalReturn(leftHistory, days); const r = historicalReturn(rightHistory, days);
+      return l != null && r != null ? l - r : NaN;
+    }).filter(Number.isFinite) as number[];
+    const latest = history.at(-1); const prior = history.at(-2);
+    const trend: RotationPair['trend'] = latest == null || prior == null ? 'insufficient' : Math.abs(latest - prior) < 0.5 ? 'stable' : latest > prior ? 'widening' : 'narrowing';
+    return { left, right, label, spread: prices[left]?.stale !== true && prices[right]?.stale !== true ? (prices[left]?.changePct ?? 0) - (prices[right]?.changePct ?? 0) : null, history, trend };
+  });
+  return { groups: groupRows, pairs, selectedHorizon: '20D', methodology: 'Flow proxy = price momentum + breadth across the tracked universe; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
 }
