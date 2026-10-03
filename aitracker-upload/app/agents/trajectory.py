@@ -51,6 +51,38 @@ class AgentTrajectory(BaseModel):
     def reached(self, node: str) -> bool:
         return any(s.node == node for s in self.steps)
 
+    def validate(self) -> list[str]:
+        """Return deterministic trajectory invariant violations.
+
+        Agent trajectories are an audit artifact, so malformed traces should
+        be detectable without relying on a particular agent implementation.
+        Every tool/LLM event must belong to a node turn, durations must be
+        finite/non-negative, and node names must be present for every step.
+        """
+        violations: list[str] = []
+        previous_node = ""
+        for index, step in enumerate(self.steps):
+            if not step.node:
+                violations.append(f"step[{index}] missing node")
+            if step.duration_ms < 0 or step.duration_ms != step.duration_ms or step.duration_ms == float("inf"):
+                violations.append(f"step[{index}] invalid duration")
+            if step.kind == "node":
+                previous_node = step.node
+            elif step.kind in {"tool", "llm"}:
+                if not step.node:
+                    continue
+                if not previous_node:
+                    violations.append(f"step[{index}] {step.kind} has no preceding node")
+                elif step.node != previous_node:
+                    violations.append(
+                        f"step[{index}] {step.kind} belongs to {step.node!r} after {previous_node!r}"
+                    )
+        return violations
+
+    def is_valid(self) -> bool:
+        """Whether the trajectory satisfies the audit invariants."""
+        return not self.validate()
+
 
 def tool_call(
     tool: str,
