@@ -4,7 +4,7 @@ import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import DataTable, { type DataTableColumn } from './DataTable';
+import DataTable from './DataTable';
 
 interface CongressTradesProps {
   liveTrades?: CongressTrade[];
@@ -348,266 +348,6 @@ export default function CongressTrades(_props: CongressTradesProps) {
     return map;
   }, [reactions]);
 
-  const tableColumns: DataTableColumn<CongressTrade>[] = [
-    { key: 'politician', header: 'Filer / Chamber', accessor: row => row.politician, type: 'text',
-      render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></div> },
-    { key: 'stockSymbol', header: 'Symbol', accessor: row => row.stockSymbol, type: 'text',
-      render: row => <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">{row.stockSymbol}</span> },
-    { key: 'transactionType', header: 'Type', accessor: row => row.transactionType, type: 'text',
-      render: row => <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' + (row.transactionType === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}>{row.transactionType}</span> },
-    { key: 'amountRange', header: 'Amount Range', accessor: row => row.amountRange, type: 'text' },
-    { key: 'transactionDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
-    { key: 'filingDate', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
-    { key: 'tradeDayClose', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency',
-      render: row => { const reaction = reactionById.get(row.id); return reaction ? '
-      <JevDecisionPanel
-        kind="congress"
-        title="Congress disclosure review"
-        state={{
-          selected_symbol: symbolFilter,
-          source: sourceStatus.label,
-          chamber_filter: chamberFilter,
-          matched_trades: filtered.length,
-          trades: filtered.slice(0, 8).map((trade) => ({
-            symbol: trade.stockSymbol,
-            chamber: trade.chamber,
-            transaction_type: trade.transactionType,
-            amount_range: trade.amountRange,
-            transaction_date: trade.transactionDate || trade.date,
-            filing_date: trade.filingDate,
-          })),
-          historical_reaction_matches: reactionSummary.matched,
-        }}
-      />
-
-      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 04 / Signals</span>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
-          Congressional Trading Signals
-        </h1>
-        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
-          Track public congressional disclosure records across searchable tickers, company names, and members. The preset buttons are only shortcuts.
-        </p>
-      </div>
-
-      <div className="flex items-start space-x-3 bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 text-white/80">
-        <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
-        <div className="text-xs leading-relaxed">
-          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the disclosure/filing date when available. The transaction date remains a separate field and is not substituted for the disclosure timestamp.
-        </div>
-      </div>
-
-      <div className="bg-[#15181E]/30 border border-white/10 p-4 rounded-xl space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSymbolFilter('ALL')}
-            className={'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
-              (symbolFilter === 'ALL'
-                ? 'bg-white text-black border-white'
-                : 'bg-white/5 text-white/50 border-white/10 hover:text-white')}
-          >
-            Latest Global
-          </button>
-          {TRACKED_SYMBOLS.map((symbol) => (
-            <button
-              key={symbol}
-              onClick={() => setSymbolFilter(symbol)}
-              className={'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
-                (symbolFilter === symbol
-                  ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
-                  : 'bg-white/5 text-white/50 border-white/10 hover:text-white')}
-            >
-              {symbol}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-          <div className="flex space-x-2 w-full lg:w-auto">
-            {(['all', 'Senate', 'House'] as const).map((ch) => (
-              <button
-                key={ch}
-                onClick={() => setChamberFilter(ch)}
-                className={'px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded border transition flex-1 lg:flex-initial ' +
-                  (chamberFilter === ch
-                    ? 'bg-white text-black border-white'
-                    : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10')}
-              >
-                {ch === 'all' ? 'All Chambers' : ch}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterSelect
-              value={transactionFilter}
-              onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')}
-              label="Filter Congress trades by transaction type"
-              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
-            >
-              <option value="all">All Types</option>
-              <option value="buy">Buy only</option>
-              <option value="sell">Sell only</option>
-            </FilterSelect>
-            <FilterSelect
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')}
-              label="Filter Congress trades by transaction age"
-              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
-            >
-              <option value="all">All Dates</option>
-              <option value="30">Last 30 Days</option>
-              <option value="90">Last 90 Days</option>
-              <option value="365">Last 365 Days</option>
-            </FilterSelect>
-          </div>
-
-          <div className="relative w-full lg:w-80">
-            <FilterInput
-              type="text"
-              placeholder="Search member, company, or ticker..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              label="Search Congress trades by politician, company, symbol, type, amount, or date"
-              className="font-mono"
-            />
-            {search.trim() && globalLoading && (
-              <Loader2 className="w-3.5 h-3.5 text-cyan-300 absolute right-3 top-1/2 -translate-y-1/2" aria-label="Searching Congress trades" />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {symbolFilter !== 'ALL' && (
-        <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-cyan-300" />
-            <div>
-              <div className="text-xs font-black text-white uppercase tracking-wider">Historical price context · {symbolFilter}</div>
-              <div className="text-[9px] text-white/30 font-mono mt-1">
-                Anchored to the transaction date; this shows what the market did afterward and does not establish that the trade caused the move.
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <SummaryMetric label="Trades matched to history" value={String(reactionSummary.matched)} tone="text-white" />
-            <SummaryMetric label="Average next-day move" value={formatPct(reactionSummary.next)} tone={reactionTone(reactionSummary.next)} />
-            <SummaryMetric label="Average 5-day move" value={formatPct(reactionSummary.day5)} tone={reactionTone(reactionSummary.day5)} />
-            <SummaryMetric label="Average 20-day move" value={formatPct(reactionSummary.day20)} tone={reactionTone(reactionSummary.day20)} />
-          </div>
-
-          {historyLoading && (
-            <div className="text-[9px] font-mono text-white/30 mt-3">Loading 5-year market history…</div>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/40 font-mono">
-        <span>Congress data source:</span>
-        {sourceStatus.sourceUrl ? (
-          <a
-            href={sourceStatus.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={'inline-flex items-center gap-1 rounded border px-2 py-1 ' + sourceTone(sourceStatus)}
-          >
-            {sourceStatus.label}
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        ) : (
-          <span className={'rounded border px-2 py-1 ' + sourceTone(sourceStatus)}>
-            {sourceStatus.label}
-          </span>
-        )}
-        {sourceStatus.stale && (
-          <span className="text-cyan-300">• showing last-known-good records</span>
-        )}
-        {loading && (
-          <span className="inline-flex items-center gap-1 text-cyan-300">
-            <Loader2 className="w-3 h-3 animate-spin" /> Loading
-          </span>
-        )}
-        {sourceStatus.upstreamError && sourceStatus.kind !== 'unavailable' && (
-          <span className="text-amber-300">• Primary issue: {sourceStatus.upstreamError}</span>
-        )}
-        {error && <span className="text-rose-300">• {error}</span>}
-      </div>
-
-      {sourceStatus.kind === 'fallback' && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-400/15 bg-amber-400/5 p-3 text-[10px] text-amber-100/80">
-          <AlertTriangle className="w-4 h-4 text-amber-300 mt-0.5 flex-shrink-0" />
-          <div>
-            <span className="font-black uppercase tracking-wider text-amber-200">Fallback active:</span>{' '}
-            the primary Bargo feed was unavailable, so the API is serving normalized public congressional disclosure records from OpenRegs by DataDawn.
-            The fallback may not include a separate filing/disclosure timestamp or estimated trade price.
-          </div>
-        </div>
-      )}
-
-      {sourceStatus.kind === 'cache' && (
-        <div className="flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-[10px] text-cyan-100/80">
-          <Activity className="w-4 h-4 text-cyan-300 mt-0.5 flex-shrink-0" />
-          <div>
-            <span className="font-black uppercase tracking-wider text-cyan-200">Cache fallback active:</span>{' '}
-            both live sources were unavailable, so the page is showing the last successful dataset available to the server.
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-widest text-white/30">
-        <span aria-live="polite">{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
-        <button
-          type="button"
-          onClick={() => {
-            setSearch('');
-            setChamberFilter('all');
-            setTransactionFilter('all');
-            setDateFilter('all');
-            setSymbolFilter('ALL');
-          }}
-          className="rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/50 hover:text-white hover:bg-white/10 transition"
-        >
-          Clear table filters
-        </button>
-      </div>
-
-      <DataTable
-        rows={filtered}
-        columns={tableColumns}
-        rowKey={(row) => row.id}
-        loading={loading}
-        error={error}
-        empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'}
-        initialSort={{ key: 'transactionDate', direction: 'desc' }}
-      />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: string;
-}) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-black/10 p-3">
-      <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div>
-      <div className={'text-base font-black mt-1 ' + tone}>{value}</div>
-    </div>
-  );
-}
- + formatPrice(reaction.eventPrice) : '—'; } },
-    { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right',
-      render: row => { const reaction = reactionById.get(row.id); return <div><div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
-  ];
-
   return (
     <div className="space-y-6" id="congress-view">
       <JevDecisionPanel
@@ -824,79 +564,47 @@ function SummaryMetric({
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">
-          <table className="w-full border-collapse text-left text-xs font-mono">
-            <thead>
-              <tr className="border-b border-white/10 bg-[#0F1115]/60 text-white/40 uppercase tracking-widest text-[9px] font-black">
-                <th className="p-4">Filer / Chamber</th>
-                <th className="p-4">Symbol</th>
-                <th className="p-4">Type</th>
-                <th className="p-4">Amount Range</th>
-                <th className="p-4">Trade Date</th>
-                <th className="p-4">Filed</th>
-                <th className="p-4">Trade-Day Close</th>
-                <th className="p-4 text-right">Afterward</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-white/40">
-                    {loading
-                      ? 'Loading disclosure records…'
-                      : sourceStatus.kind === 'unavailable'
-                        ? 'No records available from the configured Congress sources.'
-                        : search.trim()
-                          ? 'No Congress records match the current search.'
-                          : 'No transactions found for the selected filters.'}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((t) => {
-                  const reaction = reactionById.get(t.id);
+          <DataTable
+            rows={filtered}
+            columns={[
+              { key: 'politician', header: 'Filer / Chamber', accessor: row => row.politician, type: 'text', render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></div> },
+              { key: 'stockSymbol', header: 'Symbol', accessor: row => row.stockSymbol, type: 'text', render: row => <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">{row.stockSymbol}</span> },
+              { key: 'transactionType', header: 'Type', accessor: row => row.transactionType, type: 'text', render: row => <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' + (row.transactionType === 'buy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}>{row.transactionType}</span> },
+              { key: 'amountRange', header: 'Amount Range', accessor: row => row.amountRange, type: 'text' },
+              { key: 'transactionDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
+              { key: 'filingDate', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
+              { key: 'tradeDayClose', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '
+        </div>
+      </div>
+    </div>
+  );
+}
 
-                  return (
-                    <tr key={t.id} className="hover:bg-white/5 transition">
-                      <td className="p-4 font-sans font-bold text-white">
-                        <div>{t.politician}</div>
-                        <div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{t.chamber}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white rounded text-[9px] font-black uppercase tracking-wider">
-                          {t.stockSymbol}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={'px-2 py-0.5 rounded text-[9px] font-bold uppercase ' +
-                          (t.transactionType === 'buy'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20')}
-                        >
-                          {t.transactionType}
-                        </span>
-                      </td>
-                      <td className="p-4 text-white/80 font-bold">{t.amountRange}</td>
-                      <td className="p-4 text-white/60 font-bold">{t.transactionDate || t.date || '—'}</td>
-                      <td className="p-4 text-white/40 font-bold">{t.filingDate || '—'}</td>
-                      <td className="p-4 text-white font-bold">
-                        {reaction ? '$' + formatPrice(reaction.eventPrice) : '—'}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>
-                          Next day {formatPct(reaction?.nextPct ?? null)}
-                        </div>
-                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>
-                          5 days {formatPct(reaction?.day5Pct ?? null)}
-                        </div>
-                        <div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>
-                          20 days {formatPct(reaction?.day20Pct ?? null)}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+function SummaryMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-black/10 p-3">
+      <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div>
+      <div className={'text-base font-black mt-1 ' + tone}>{value}</div>
+    </div>
+  );
+}
+ + formatPrice(reaction.eventPrice) : '—'; } },
+              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div><div className={'font-bold ' + reactionTone(reaction?.nextPct ?? null)}>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day5Pct ?? null)}>5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className={'text-[9px] mt-1 ' + reactionTone(reaction?.day20Pct ?? null)}>20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
+            ]}
+            rowKey={row => row.id}
+            loading={loading}
+            error={error}
+            empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'}
+            initialSort={{ key: 'transactionDate', direction: 'desc' }}
+          />
         </div>
       </div>
     </div>
