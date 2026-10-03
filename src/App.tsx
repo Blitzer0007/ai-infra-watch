@@ -9,6 +9,7 @@ import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
+import UniversalSearch from './components/UniversalSearch';
 
 const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
@@ -462,6 +463,10 @@ export default function App() {
 
         {/* 3. MAIN DASHBOARD MAINSPACE CONTAINER */}
         <main className="aiw-main flex-1 w-full min-w-0 max-w-full bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)]">
+          <div className="max-w-7xl mx-auto mb-3 flex justify-end">
+            <UniversalSearch onNavigate={handleNavigate} />
+          </div>
+
           {/* Universal Live AI Sync Controller Panel */}
           <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#15181E]/40 border border-white/10 rounded-2xl p-4 gap-4">
             <div className="flex items-center space-x-3">
