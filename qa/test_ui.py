@@ -20,7 +20,14 @@ def mock_local_apis(page):
             if 'action=analyst' in url:
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','source':'Finnhub analyst','retrievedAt':'2026-10-02T07:00:00Z','recommendation':{'period':'2026-09-30','strongBuy':5,'buy':20,'hold':8,'sell':2,'strongSell':1},'priceTarget':{'median':250,'mean':245,'low':180,'high':300},'epsEstimates':[{'period':'2026','average':2.5,'analysts':20}], 'revenueEstimates':[{'period':'2026','average':200000000000,'analysts':18}], 'available':['recommendation','priceTarget','epsEstimates','revenueEstimates'],'errors':[]})); return
             if 'action=history' in url:
-                points=[{'date':'2025-01-01','price':100.0},{'date':'2025-01-02','price':101.0}]*180
+                points=[
+                    {'date':'2024-01-02','price':150.0},
+                    {'date':'2024-01-03','price':149.0},
+                    {'date':'2025-10-01','price':100.0},
+                    {'date':'2026-01-02','price':101.0},
+                    {'date':'2026-09-30','price':120.0},
+                    {'date':'2026-10-01','price':118.0},
+                ]
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','points':points})); return
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','events':[]})); return
         if '/api/live-data' in url:
