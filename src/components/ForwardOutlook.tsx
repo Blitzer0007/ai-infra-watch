@@ -1,4 +1,3 @@
-import DataTable from './DataTable';
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
@@ -1254,20 +1253,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' pp'}</div></div>
           </div>
           <div className="text-[9px] font-mono text-white/35">{forecastAnalytics.validationGate?.verifiedCount || forecastAnalytics.sampleSize} verified forecasts · minimum validation sample: {forecastAnalytics.validationGate?.minimumRequired || FORECAST_VALIDATION_MINIMUM}</div>
-          <div className="overflow-x-auto"><DataTable
-          rows={forecastAnalytics.byTickerHorizon.slice(0,12)}
-          columns={[
-            { key: 'ticker', header: 'Ticker', accessor: row => row.ticker || '', type: 'text' },
-            { key: 'horizon', header: 'Horizon', accessor: row => row.horizon ?? null, type: 'number', render: row => row.horizon ? row.horizon + 'D' : '—' },
-            { key: 'count', header: 'N', accessor: row => row.count, type: 'number' },
-            { key: 'directionalAccuracyPct', header: 'Direction', accessor: row => row.directionalAccuracyPct ?? null, type: 'percent', render: row => row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1) + '%' },
-            { key: 'medianAbsoluteError', header: 'Typical prediction error', accessor: row => row.medianAbsoluteError ?? null, type: 'percent', render: row => row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2) + '%' },
-            { key: 'p25p75CoveragePct', header: 'Likely range', accessor: row => row.p25p75CoveragePct ?? null, type: 'percent', render: row => row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1) + '%' },
-          ]}
-          rowKey={(row, index) => String(row.ticker) + '-' + String(row.horizon) + '-' + index}
-          initialSort={{ key: 'ticker', direction: 'asc' }}
-          empty="No forecast verification analytics available yet."
-        /></div>
+          <div className="overflow-x-auto"><table className="min-w-full text-left text-[9px] font-mono"><thead className="text-white/25 uppercase"><tr><th className="px-2 py-1.5">Ticker</th><th className="px-2 py-1.5">Horizon</th><th className="px-2 py-1.5">N</th><th className="px-2 py-1.5">Direction</th><th className="px-2 py-1.5">Typical prediction error</th><th className="px-2 py-1.5">Likely range</th></tr></thead><tbody className="divide-y divide-white/5">{forecastAnalytics.byTickerHorizon.slice(0,12).map((row,index)=><tr key={String(row.ticker)+String(row.horizon)+index}><td className="px-2 py-1.5 text-white/65">{row.ticker || '—'}</td><td className="px-2 py-1.5 text-white/45">{row.horizon ? row.horizon+'D' : '—'}</td><td className="px-2 py-1.5 text-white/45">{row.count}</td><td className="px-2 py-1.5 text-white/55">{row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1)+'%'}</td></tr>)}</tbody></table></div>
         </div>
       )}
 <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
@@ -1431,21 +1417,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
           </div>
-          <div className="overflow-x-auto"><DataTable
-              rows={matrix.details}
-              columns={[
-                { key: 'ticker', header: 'Ticker', accessor: row => row.ticker, type: 'text' },
-                { key: 'horizon', header: 'Horizon', accessor: row => row.horizon, type: 'number', render: row => row.horizon + 'D' },
-                { key: 'tests', header: 'Tests', accessor: row => row.tests, type: 'number', align: 'right' },
-                { key: 'direction', header: 'Direction', accessor: row => row.direction, type: 'percent', align: 'right', render: row => (row.direction * 100).toFixed(0) + '%' },
-                { key: 'baselineDirection', header: 'Baseline', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
-                { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
-                { key: 'coverage50', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
-              ]}
-              rowKey={row => row.ticker + '-' + row.horizon}
-              initialSort={{ key: 'ticker', direction: 'asc' }}
-              empty="No validation matrix data available yet."
-            /></div>
+          <div className="overflow-x-auto"><table className="w-full text-[9px] font-mono"><thead><tr className="text-white/30 border-b border-white/5"><th className="text-left p-2">Ticker</th><th className="text-left p-2">Horizon</th><th className="text-right p-2">Tests</th><th className="text-right p-2">Direction</th><th className="text-right p-2">Baseline</th><th className="text-right p-2">Error</th><th className="text-right p-2">Likely range</th></tr></thead><tbody>{matrix.details.map(row => <tr key={row.ticker + '-' + row.horizon} className="border-b border-white/5 text-white/55"><td className="p-2 text-white/75">{row.ticker}</td><td className="p-2">{row.horizon}D</td><td className="p-2 text-right">{row.tests}</td><td className="p-2 text-right">{(row.direction*100).toFixed(0)}%</td><td className="p-2 text-right">{(row.baselineDirection*100).toFixed(0)}%</td><td className="p-2 text-right">{row.error.toFixed(1)}</td><td className="p-2 text-right">{(row.coverage50*100).toFixed(0)}%</td></tr>)}</tbody></table></div>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[8px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
         </div>}
       </div>
