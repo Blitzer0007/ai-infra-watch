@@ -76,7 +76,7 @@ export function selectDynamicPeers(
           margins: 'unavailable',
           capitalIntensity: 'unavailable',
           analystCoverage: 'unavailable',
-        },
+        } satisfies DynamicPeerCandidate['dimensions'],
       };
     })
     .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
