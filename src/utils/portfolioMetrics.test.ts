@@ -42,6 +42,21 @@ test('portfolio attribution preserves signed P&L contribution', () => {
   assert.equal(Number(rows[0]?.pnlContributionPct?.toFixed(2)), 133.33);
 });
 
+test('portfolio attribution keeps every valued holding available to the UI', () => {
+  const eleven = Array.from({ length: 11 }, (_, index) => ({
+    symbol: 'H' + (index + 1),
+    investedValue: 10,
+    currentValue: 10,
+    pnl: index - 5,
+    pnlPct: (index - 5) * 10,
+    dailyChangePct: 0,
+    group: 'AI',
+  }));
+  const rows = calculatePortfolioAttribution(eleven);
+  assert.equal(rows.length, 11);
+  assert.deepEqual(new Set(rows.map(row => row.symbol)), new Set(eleven.map(row => row.symbol)));
+});
+
 test('portfolio daily series uses common available history and keeps 30-day window', () => {
   const histories = {
     A: [
