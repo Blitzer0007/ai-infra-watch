@@ -305,7 +305,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
 
     return sourceTrades.filter((t) => {
       const matchesSymbol = symbolFilter === 'ALL' || needle ? true : t.stockSymbol === symbolFilter;
-      const matchesChamber = chamberFilter === 'all' || t.chamber === chamberFilter;
+      const normalizedChamber = String(t.chamber || '').trim().toLowerCase();
+      const matchesChamber = chamberFilter === 'all' || normalizedChamber === chamberFilter.toLowerCase();
       const matchesType = transactionFilter === 'all' || t.transactionType === transactionFilter;
       const tradeDate = t.transactionDate || t.date;
       const ageDays = tradeDate
