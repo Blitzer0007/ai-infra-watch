@@ -160,5 +160,5 @@ export function buildMoneyRotation(
     const trend: RotationPair['trend'] = latest == null || prior == null ? 'insufficient' : Math.abs(latest - prior) < 0.5 ? 'stable' : latest > prior ? 'widening' : 'narrowing';
     return { left, right, label, spread: prices[left]?.stale !== true && prices[right]?.stale !== true ? (prices[left]?.changePct ?? 0) - (prices[right]?.changePct ?? 0) : null, history, trend };
   });
-  return { groups: groupRows, pairs, selectedHorizon: '20D', methodology: 'Flow proxy = price momentum + volume/price breadth where available; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
+  return { groups: groupRows, pairs, selectedHorizon: '20D', methodology: 'Flow proxy = price momentum + breadth across the tracked universe; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
 }
