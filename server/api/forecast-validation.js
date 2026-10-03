@@ -54,6 +54,11 @@ export default async function handler(req, res) {
 
     const rows = await loadVerifiedForecasts({ ticker: ticker || null, horizon });
     const summary = buildForecastValidationSummary(rows);
+    let globalValidationGate = summary.validationGate;
+    if (ticker || horizon != null) {
+      const globalRows = await loadVerifiedForecasts({ horizon: 20 });
+      globalValidationGate = buildForecastValidationSummary(globalRows).validationGate;
+    }
 
     return res.status(200).json({
       ok: true,
@@ -64,6 +69,7 @@ export default async function handler(req, res) {
         truncated: rows.length >= MAX_ROWS,
       },
       ...summary,
+      globalValidationGate,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
