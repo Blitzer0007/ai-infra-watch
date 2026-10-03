@@ -33,7 +33,14 @@ export default function BuySellWatchlist() {
       try {
         const response = await authFetch('/api/alert-notify', { cache: 'no-store' });
         const data = await response.json().catch(() => ({}));
-        if (!cancelled) setTelegramConfigured(response.ok && data.telegram_configured === true);
+        if (!cancelled) {
+          if (response.status === 401) {
+            setTelegramConfigured(null);
+            setTelegramMessage('Authentication required. Refresh the dashboard session before enabling Telegram alerts.');
+          } else {
+            setTelegramConfigured(response.ok && data.telegram_configured === true);
+          }
+        }
       } catch {
         if (!cancelled) setTelegramConfigured(null);
       } finally {
@@ -297,11 +304,11 @@ export default function BuySellWatchlist() {
                       ? 'Server bot connected'
                       : telegramConfigured === false
                         ? 'Server bot not configured'
-                        : 'Unable to verify server configuration'}
+                        : telegramMessage || 'Authentication required' }
                 </div>
               </div>
               <span className={telegramConfigured === true ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}>
-                {telegramConfigured === true ? 'CONNECTED' : telegramChecking ? 'CHECKING' : 'NOT READY'}
+                {telegramConfigured === true ? 'CONNECTED' : telegramChecking ? 'CHECKING' : telegramMessage ? 'AUTH REQUIRED' : 'NOT READY'}
               </span>
             </div>
             <p className="text-[10px] text-white/40">Send price-target, Smart Move, and catalyst signals to your configured Telegram chat.</p>
