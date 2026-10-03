@@ -406,21 +406,37 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         stressTrendAverage,
         benchmarkComparisons,
       },
-      analystConsensus: analystConsensus ? {
-        source: analystConsensus.source || null,
-        retrievedAt: analystConsensus.retrievedAt || null,
-        ratingCounts: analystConsensus.recommendation || null,
-        analystCount: ['strongBuy','buy','hold','sell','strongSell'].reduce((sum, key) => sum + Number(analystConsensus?.recommendation?.[key] || 0), 0),
-        priceTarget: analystConsensus.priceTarget || null,
-        webEvidenceCount: Array.isArray(analystConsensus.webEvidence?.results) ? analystConsensus.webEvidence.results.length : 0,
-        errors: analystConsensus.errors || [],
-      } : null,
+      analystConsensus: {
+        status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
+          ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+          : 'missing',
+        source: analystConsensus?.source || null,
+        retrievedAt: analystConsensus?.retrievedAt || null,
+        freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
+        ratingCounts: analystConsensus?.recommendation || null,
+        analystCount: Number(analystConsensus?.analystCount || 0),
+        priceTarget: analystConsensus?.priceTarget || null,
+        webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+        errors: analystConsensus?.errors || (analystError ? [analystError] : []),
+        selectedSymbol: selectedAnalysis?.symbol || null,
+      },
       evidenceAvailability: {
         heldContracts: relevantContracts,
         heldCongressDisclosures: relevantCongress,
         heldPoliticalSignals: relevantPolitical,
         macroRiskItems: macroRisks.length,
         newsItems: news.length,
+        analystConsensus: {
+          status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
+            ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+            : 'missing',
+          symbol: selectedAnalysis?.symbol || null,
+          source: analystConsensus?.source || null,
+          retrievedAt: analystConsensus?.retrievedAt || null,
+          freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
+          analystCount: Number(analystConsensus?.analystCount || 0),
+          webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+        },
         contractSource: relevantContracts > 0 ? 'available' : 'none observed',
         congressSource: relevantCongress > 0 ? 'available' : 'none observed',
         politicalSource: relevantPolitical > 0 ? 'available' : 'none observed',
@@ -569,7 +585,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <>
           <div className="space-y-4">
             {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} />
+            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
             {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
             {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
@@ -958,10 +974,40 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
     </section>
   );
 }
-function PortfolioEvidenceCoverage({analyses,contracts,congressTrades,macroRisks,news}:{analyses:PositionAnalysis[];contracts:any[];congressTrades:any[];macroRisks:any[];news:any[]}) {
+function PortfolioEvidenceCoverage({
+  analyses,
+  contracts,
+  congressTrades,
+  macroRisks,
+  news,
+  analystConsensus,
+  analystLoading,
+  analystError,
+  selectedSymbol,
+}: {
+  analyses: PositionAnalysis[];
+  contracts: any[];
+  congressTrades: any[];
+  macroRisks: any[];
+  news: any[];
+  analystConsensus: any;
+  analystLoading: boolean;
+  analystError: string;
+  selectedSymbol: string | null;
+}) {
   const held = new Set(analyses.map(item => item.symbol));
   const secCount = contracts.filter(item => held.has(String(item?.company || item?.stockSymbol || '').toUpperCase())).length;
   const congressCount = congressTrades.filter(item => held.has(String(item?.stockSymbol || item?.symbol || '').toUpperCase())).length;
+  const analystStatus = analystLoading
+    ? 'loading'
+    : analystError
+      ? 'failed'
+      : analystConsensus
+        ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+        : 'missing';
+  const analystEvidenceCount = Array.isArray(analystConsensus?.webEvidence?.results)
+    ? analystConsensus.webEvidence.results.length
+    : Number(analystConsensus?.webEvidenceCount || 0);
   const channels = [
     { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
     { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
@@ -970,21 +1016,54 @@ function PortfolioEvidenceCoverage({analyses,contracts,congressTrades,macroRisks
     { label: 'Congress', value: congressCount, total: null },
     { label: 'News', value: news.length, total: null },
     { label: 'Macro', value: macroRisks.length, total: null },
+    { label: 'Analysts', value: analystStatus === 'available' ? 1 : 0, total: null },
   ];
   const available = channels.filter(item => item.value > 0).length;
   const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
+  const analystFresh = analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown';
+  const analystCount = Number(analystConsensus?.analystCount || 0);
+  const medianTarget = Number.isFinite(Number(analystConsensus?.priceTarget?.targetMedian))
+    ? Number(analystConsensus.priceTarget.targetMedian)
+    : Number.isFinite(Number(analystConsensus?.priceTarget?.median))
+      ? Number(analystConsensus.priceTarget.median)
+      : null;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div><h2 className="text-base font-black mt-1">{status}</h2><div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence or quality score.</div></div><div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mt-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
+        <h2 className="text-base font-black mt-1">{status}</h2>
+        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
+      </div>
+      <div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 mt-3">
       {channels.map(channel => <div key={channel.label} className={'rounded-lg border p-2 ' + (channel.value > 0 ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}>
         <div className="text-[8px] font-mono uppercase tracking-wider text-white/45">{channel.label}</div>
         <div className="text-[10px] font-mono font-bold mt-1">{channel.value > 0 ? 'AVAILABLE' : 'MISSING'}</div>
         {channel.total != null && <div className="text-[8px] font-mono text-white/25 mt-1">{channel.value}/{channel.total}</div>}
       </div>)}
     </div>
+    <div className="mt-3 rounded-xl border border-violet-400/10 bg-violet-400/[.025] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[8px] font-mono uppercase tracking-widest text-violet-300">Analyst evidence · selected holding</div>
+          <div className="text-[9px] text-white/30 mt-1">{selectedSymbol || 'No held holding selected'} · external consensus is separate from the AI Infra Watch forecast.</div>
+        </div>
+        <div className="text-[8px] font-mono uppercase text-white/35">{analystStatus}</div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+        <Info label="Analyst count" value={analystCount > 0 ? String(analystCount) : '—'} />
+        <Info label="Median target" value={medianTarget != null ? medianTarget.toFixed(2) : '—'} />
+        <Info label="Web evidence" value={analystEvidenceCount > 0 ? String(analystEvidenceCount) : '—'} />
+        <Info label="Freshness" value={analystFresh} />
+        <Info label="Retrieved" value={analystConsensus?.retrievedAt ? new Date(analystConsensus.retrievedAt).toLocaleString() : '—'} />
+      </div>
+      {analystConsensus?.source && <div className="mt-2 text-[8px] font-mono text-white/25">Source: {analystConsensus.source}</div>}
+      {analystError && <div className="mt-2 text-[8px] font-mono text-amber-200/60">Retrieval error: {analystError}</div>}
+      {!analystLoading && !analystError && analystStatus !== 'available' && <div className="mt-2 text-[8px] font-mono text-amber-200/60">No usable analyst evidence was retrieved for this selected holding.</div>}
+    </div>
   </section>;
 }
-
 function DecisionGateSummary({h}:{h:PositionAnalysis}) {
   const leveraged = h.symbol === 'SOXL';
   const groupThreshold = leveraged ? 68 : 62;
