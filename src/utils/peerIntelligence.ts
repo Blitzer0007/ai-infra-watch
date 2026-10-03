@@ -50,7 +50,7 @@ export function selectDynamicPeers(
         (freshQuote ? 4 : 0);
       const reasons = [
         configuredRelationship ? 'Configured direct peer' : null,
-        sameGroup ? 'Same industry group' : null,
+        sameGroup ? 'Same group' : null,
         themeMatches ? 'Overlapping end-market/theme' : null,
         sameGeo ? 'Same geographic lens' : null,
         freshQuote ? 'Fresh peer quote available' : null,
