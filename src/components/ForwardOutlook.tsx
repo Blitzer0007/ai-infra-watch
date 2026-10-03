@@ -6,6 +6,7 @@ import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/por
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
 import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
+import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
 
 type PricePoint = { date: string; price: number };
 
@@ -1136,7 +1137,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
         <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Verified forecasts aggregated by ticker, horizon, scenario and model.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}</span></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">50+ validation gate</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.validationGate?.ready ? 'READY' : 'BUILDING'}</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">50+ validation gate</div><div className="text-sm font-mono font-bold mt-1">{forecastValidationGate(forecastAnalytics.validationGate?.verifiedCount ?? forecastAnalytics.sampleSize).ready ? 'READY' : 'BUILDING'}</div></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample status</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.sampleStatus ? forecastAnalytics.sampleStatus.replace('-', ' ') : 'insufficient'}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Groups</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byTickerHorizon.length}</div></div>
@@ -1146,7 +1147,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' pp'}</div></div>
           </div>
-          <div className="text-[9px] font-mono text-white/35">{forecastAnalytics.validationGate?.verifiedCount || forecastAnalytics.sampleSize} verified forecasts · minimum validation sample: {forecastAnalytics.validationGate?.minimumRequired || 50}</div>
+          <div className="text-[9px] font-mono text-white/35">{forecastAnalytics.validationGate?.verifiedCount || forecastAnalytics.sampleSize} verified forecasts · minimum validation sample: {forecastAnalytics.validationGate?.minimumRequired || FORECAST_VALIDATION_MINIMUM}</div>
           <div className="overflow-x-auto"><table className="min-w-full text-left text-[9px] font-mono"><thead className="text-white/25 uppercase"><tr><th className="px-2 py-1.5">Ticker</th><th className="px-2 py-1.5">Horizon</th><th className="px-2 py-1.5">N</th><th className="px-2 py-1.5">Direction</th><th className="px-2 py-1.5">Typical prediction error</th><th className="px-2 py-1.5">Likely range</th></tr></thead><tbody className="divide-y divide-white/5">{forecastAnalytics.byTickerHorizon.slice(0,12).map((row,index)=><tr key={String(row.ticker)+String(row.horizon)+index}><td className="px-2 py-1.5 text-white/65">{row.ticker || '—'}</td><td className="px-2 py-1.5 text-white/45">{row.horizon ? row.horizon+'D' : '—'}</td><td className="px-2 py-1.5 text-white/45">{row.count}</td><td className="px-2 py-1.5 text-white/55">{row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1)+'%'}</td></tr>)}</tbody></table></div>
         </div>
       )}
@@ -1184,7 +1185,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           </div>
           <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
             <div className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2">
-              {forecastAnalytics.validationGate?.ready
+              {forecastValidationGate(forecastAnalytics.validationGate?.verifiedCount ?? forecastAnalytics.sampleSize).ready
                 ? 'Validation gate passed · 50+ verified forecasts'
                 : 'Validation gate building · 50 verified forecasts required'}
             </div>
