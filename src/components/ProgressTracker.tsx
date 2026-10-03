@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { rankSearchResults } from '../utils/search';
+import { loadTickerShortcuts, saveTickerShortcuts, normalizeTicker } from '../utils/tickerShortcuts';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
 import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2, X } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
@@ -30,31 +31,9 @@ interface ProgressTrackerProps {
   livePrices?: Record<string, { price: number; changePct: number }>;
 }
 
-const TRACKER_SYMBOLS_STORAGE_KEY = 'aiw-progress-tracker-symbols-v1';
+const loadTrackerSymbols = () => loadTickerShortcuts(Object.keys(STOCK_METADATA));
 
-function loadTrackerSymbols(): string[] {
-  const defaults = Object.keys(STOCK_METADATA);
-  try {
-    const raw = localStorage.getItem(TRACKER_SYMBOLS_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (!Array.isArray(parsed)) return defaults;
-    const symbols = parsed
-      .filter((value): value is string => typeof value === 'string')
-      .map(value => value.trim().toUpperCase())
-      .filter(Boolean);
-    return [...new Set(symbols)];
-  } catch {
-    return defaults;
-  }
-}
-
-function saveTrackerSymbols(symbols: string[]) {
-  try {
-    localStorage.setItem(TRACKER_SYMBOLS_STORAGE_KEY, JSON.stringify(symbols));
-  } catch {
-    // Browser storage is a convenience; tracker operation must still work without it.
-  }
-}
+const saveTrackerSymbols = saveTickerShortcuts;
 
 const TRACKER_SYMBOL_ALIASES: Record<string, string> = {
   SALESFORCE: 'CRM',
@@ -92,7 +71,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [customizeTracker, setCustomizeTracker] = useState(false);
 
   const addTrackerSymbol = (symbol: string) => {
-    const normalized = symbol.trim().toUpperCase();
+    const normalized = normalizeTicker(symbol);
     if (!normalized) return;
     setTrackerSymbols(prev => {
       const next = prev.includes(normalized) ? prev : [...prev, normalized];
@@ -103,7 +82,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
   const removeTrackerSymbol = (symbol: string) => {
     setTrackerSymbols(prev => {
-      if (prev.length <= 1) return prev;
       const next = prev.filter(item => item !== symbol);
       saveTrackerSymbols(next);
       if (selectedStock === symbol) {
