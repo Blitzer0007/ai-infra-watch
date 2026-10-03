@@ -112,7 +112,7 @@ class ApplicationResearchService:
         if not self.live:
             path = self._repo_root / "data" / "portfolio_snapshot.json"
             snapshot = json.loads(path.read_text(encoding="utf-8"))
-            positions = _records(snapshot.get("positions"))
+            positions = [row for row in _records(snapshot.get("positions")) if (_number(row.get("quantity"), 0.0) or 0.0) > 0]
             if requested:
                 positions = [row for row in positions if str(row.get("symbol", "")).upper() == requested]
             return {
@@ -128,6 +128,7 @@ class ApplicationResearchService:
             "portfolio_holdings",
             {"select": "*", "order": "symbol.asc"},
         )
+        rows = [row for row in rows if (_number(row.get("quantity"), 0.0) or 0.0) > 0]
         if requested:
             rows = [row for row in rows if str(row.get("symbol", "")).upper() == requested]
 

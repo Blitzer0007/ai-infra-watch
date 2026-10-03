@@ -11,6 +11,21 @@ type JevAnswer = {
   noul?: number | null;
 };
 
+type EvidenceMeasurement = {
+  score?: number | null;
+  percent?: number | null;
+  label?: string;
+  usable_family_count?: number;
+  usable_families?: string[];
+  fresh_count?: number;
+  aging_count?: number;
+  stale_count?: number;
+  missing_required?: string[];
+  conflict_count?: number;
+  citation_coverage?: number | null;
+  source?: string;
+};
+
 type Props = {
   kind: 'platform' | 'portfolio' | 'contracts' | 'events' | 'macro' | 'congress' | 'earnings';
   state: unknown;
@@ -58,6 +73,35 @@ export default function JevDecisionPanel({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [ran, setRan] = useState(false);
+
+  const evidenceMeasurement = useMemo<EvidenceMeasurement | null>(() => {
+    const value = (state as any)?.evidenceQualityInput;
+    if (!value || typeof value !== 'object') return null;
+    const availability = value.evidence_availability || {};
+    const families = Array.isArray(availability.usable_families) ? availability.usable_families : [];
+    const freshness = Array.isArray(value.evidence_freshness) ? value.evidence_freshness : [];
+    const statuses = freshness.map((item: any) => String(item?.freshness?.status || '').toUpperCase());
+    const fresh = statuses.filter((item: string) => item === 'FRESH').length;
+    const aging = statuses.filter((item: string) => item === 'AGING').length;
+    const stale = statuses.filter((item: string) => item === 'STALE').length;
+    let score = families.length >= 3 ? 3 : families.length === 2 ? 2 : families.length === 1 ? 1 : 0;
+    if (statuses.length && stale === statuses.length) score = Math.min(score, 1);
+    else if (statuses.length && fresh === 0 && aging === statuses.length) score = Math.min(score, 2);
+    const missing = Array.isArray(availability.missing) ? availability.missing : [];
+    if (missing.length) score = Math.min(score, 1.5);
+    return {
+      score,
+      percent: Math.round(score / 3 * 100),
+      label: score < .75 ? 'Minimal' : score < 1.5 ? 'Partial' : score < 2.25 ? 'Usable' : 'Strong',
+      usable_family_count: families.length,
+      usable_families: families,
+      fresh_count: fresh,
+      aging_count: aging,
+      stale_count: stale,
+      missing_required: missing,
+      source: 'portfolio measured evidence input',
+    };
+  }, [state]);
 
   const stableState = useMemo(() => JSON.stringify(state ?? {}), [state]);
 
@@ -119,6 +163,26 @@ export default function JevDecisionPanel({
           {busy ? 'Evaluating…' : ran ? 'Re-run Jev' : 'Run Jev Review'}
         </button>
       </div>
+
+      {evidenceMeasurement && (
+        <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.02] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300">Measured evidence state</div>
+              <div className="text-[9px] text-white/35 mt-1">Deterministic coverage input; Jev does not choose this score.</div>
+            </div>
+            <div className="text-sm font-black text-white">{evidenceMeasurement.percent}/100 · {evidenceMeasurement.label}</div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+            <div className="text-[8px] font-mono text-white/35">Families: <span className="text-white/70">{evidenceMeasurement.usable_family_count}</span></div>
+            <div className="text-[8px] font-mono text-white/35">Fresh: <span className="text-white/70">{evidenceMeasurement.fresh_count}</span></div>
+            <div className="text-[8px] font-mono text-white/35">Aging: <span className="text-white/70">{evidenceMeasurement.aging_count}</span></div>
+            <div className="text-[8px] font-mono text-white/35">Stale: <span className="text-white/70">{evidenceMeasurement.stale_count}</span></div>
+          </div>
+          {evidenceMeasurement.usable_families?.length ? <div className="mt-2 text-[8px] font-mono text-white/25">Sources: {evidenceMeasurement.usable_families.map(labelize).join(' · ')}</div> : null}
+          {evidenceMeasurement.missing_required?.length ? <div className="mt-1 text-[8px] font-mono text-amber-200/60">Missing: {evidenceMeasurement.missing_required.map(labelize).join(' · ')}</div> : null}
+        </div>
+      )}
 
       {!ran && (
         <div className="mt-3 text-[10px] font-mono text-white/25">

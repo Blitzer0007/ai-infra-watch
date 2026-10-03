@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
-import { buildIntelligence } from '../utils/intelligence';
+import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
@@ -11,10 +11,12 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import { buildPortfolioDailySeries, buildPortfolioHistoryValue, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
+import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
+import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 type Price = {
   price: number;
   changePct: number;
@@ -33,6 +35,13 @@ type HistoricalPriceState = {
   historicalHigh: number | null;
   historicalHighDate: string | null;
   error: string;
+};
+type SelectedChartState = {
+  loading: boolean;
+  points: PortfolioHistoryPoint[];
+  range: '5D' | '1M' | '3M' | '6M' | '1Y' | 'MAX';
+  error: string;
+  retrievedAt: string | null;
 };
 
 type Props = {
@@ -68,6 +77,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     historicalHighDate: null,
     error: '',
   });
+  const [chartRange, setChartRange] = useState<SelectedChartState['range']>('1Y');
+  const [selectedChart, setSelectedChart] = useState<SelectedChartState>({ loading: false, points: [], range: '1Y', error: '', retrievedAt: null });
+  const [peerComparison, setPeerComparison] = useState<PeerCounterfactual | null>(null);
+  const [peerPortfolioComparisons, setPeerPortfolioComparisons] = useState<PeerCounterfactual[]>([]);
+  const [peerLoading, setPeerLoading] = useState(false);
+  const [analystConsensus, setAnalystConsensus] = useState<any>(null);
+  const [analystLoading, setAnalystLoading] = useState(false);
+  const [analystError, setAnalystError] = useState('');
 
   useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
@@ -163,9 +180,159 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, [holdings.map(item => item.symbol).join(',')]);
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
+  const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
+  const [rotationGroup, setRotationGroup] = useState<string>('All');
+  const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices), [portfolioHistory.histories, livePrices]);
   const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
   useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
+  const selectedPeerSet = useMemo(() => selectedAnalysis ? selectDynamicPeers(STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol) ?? selectedAnalysis as any, livePrices) : { primary: null, core: [], extended: [] }, [selectedAnalysis?.symbol, livePrices]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedAnalysis?.symbol) {
+      setAnalystConsensus(null);
+      return () => { cancelled = true; };
+    }
+    setAnalystLoading(true);
+    setAnalystError('');
+    fetch('/api/company-scale?action=analyst&symbol=' + encodeURIComponent(selectedAnalysis.symbol), { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || 'Analyst consensus unavailable');
+        return body;
+      })
+      .then(body => { if (!cancelled) setAnalystConsensus(body); })
+      .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
+      .finally(() => { if (!cancelled) setAnalystLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedAnalysis?.symbol]);
+
+  useEffect(() => {
+    if (!holdings.length) return;
+    if (!holdings.some(item => item.symbol === selected)) setSelected(holdings[0].symbol);
+  }, [holdings, selected]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selected) {
+      setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
+      return () => { cancelled = true; };
+    }
+    setSelectedChart(prev => ({ ...prev, loading: true, range: chartRange, error: '' }));
+    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selected) + '&range=' + (chartRange === 'MAX' ? 'max' : '1y'), { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Live price history unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        const points = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }))
+          .sort((a: PortfolioHistoryPoint, b: PortfolioHistoryPoint) => a.date.localeCompare(b.date));
+        const days: Record<SelectedChartState['range'], number> = { '5D': 7, '1M': 31, '3M': 93, '6M': 186, '1Y': 366, 'MAX': 10000 };
+        const cutoff = Date.now() - days[chartRange] * 86400000;
+        const filtered = chartRange === 'MAX' ? points : points.filter(point => new Date(point.date + 'T00:00:00Z').getTime() >= cutoff);
+        setSelectedChart({ loading: false, points: filtered, range: chartRange, error: '', retrievedAt: new Date().toISOString() });
+      })
+      .catch(error => {
+        if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
+      });
+    return () => { cancelled = true; };
+  }, [selected, chartRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!analyses.length) {
+      setPeerPortfolioComparisons([]);
+      return () => { cancelled = true; };
+    }
+    const jobs = analyses.map(async analysis => {
+      const meta = STOCK_UNIVERSE.find(item => item.symbol === analysis.symbol);
+      if (!meta) return null;
+      const peer = selectMostRelevantPeer(meta, livePrices);
+      if (!peer) return null;
+      try {
+        const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(peer.symbol) + '&range=max', { cache: 'no-store' });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error('history unavailable');
+        const history = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }));
+        return calculatePeerCounterfactual({
+          holding: analysis,
+          peer,
+          peerHistory: history,
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: analysis.livePrice,
+        });
+      } catch {
+        return calculatePeerCounterfactual({
+          holding: analysis,
+          peer,
+          peerHistory: [],
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: analysis.livePrice,
+        });
+      }
+    });
+    Promise.all(jobs).then(results => {
+      if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)));
+    });
+    return () => { cancelled = true; };
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedAnalysis) {
+      setPeerComparison(null);
+      return () => { cancelled = true; };
+    }
+    const meta = STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol);
+    if (!meta) {
+      setPeerComparison(null);
+      return () => { cancelled = true; };
+    }
+    const peer = selectMostRelevantPeer(meta, livePrices);
+    if (!peer) {
+      setPeerComparison(null);
+      return () => { cancelled = true; };
+    }
+    setPeerLoading(true);
+    fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(peer.symbol) + '&range=max', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || 'Peer history unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        const history = body.points
+          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
+          .map((point: any) => ({ date: point.date, price: Number(point.price) }));
+        setPeerComparison(calculatePeerCounterfactual({
+          holding: selectedAnalysis,
+          peer,
+          peerHistory: history,
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: selectedAnalysis.livePrice,
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setPeerComparison(calculatePeerCounterfactual({
+          holding: selectedAnalysis,
+          peer,
+          peerHistory: [],
+          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
+          actualCurrentPrice: selectedAnalysis.livePrice,
+        }));
+      })
+      .finally(() => { if (!cancelled) setPeerLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices]);
+
   const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
     (group === 'All' || h.group === group) &&
     (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())
@@ -198,6 +365,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const stress = weightedStress;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
   const portfolioWeights = useMemo(() => Object.fromEntries(concentration.weights.map(item => [item.symbol, item.weight])), [concentration.weights]);
+  const portfolioHistoryValue = useMemo(() => buildPortfolioHistoryValue(
+    portfolioHistory.histories,
+    positions.map(item => ({ symbol: item.symbol, quantity: item.quantity, averageCost: item.averageCost })),
+  ), [portfolioHistory.histories, positions]);
+  const correlationSymbols = analyses.slice().sort((a, b) => (b.portfolioWeight ?? 0) - (a.portfolioWeight ?? 0)).slice(0, 8).map(item => item.symbol);
+  const portfolioCorrelation = useMemo(() => calculatePortfolioCorrelation(portfolioHistory.histories, correlationSymbols), [portfolioHistory.histories, correlationSymbols.join(',')]);
   const stressTrend = useMemo(() => buildPortfolioDailySeries(Object.fromEntries(Object.entries(portfolioHistory.histories).filter(([symbol]) => !['SPY', 'QQQ', 'SOXX'].includes(symbol))) as Record<string, PortfolioHistoryPoint[]>, portfolioWeights, 30), [portfolioHistory.histories, portfolioWeights]);
   const syntheticPortfolioHistory = useMemo(() => { if (!stressTrend.length) return []; let value = 100; const rows: PortfolioHistoryPoint[] = [{ date: stressTrend[0].date, price: value }]; stressTrend.slice(1).forEach(row => { value *= 1 + row.returnPct / 100; rows.push({ date: row.date, price: value }); }); return rows; }, [stressTrend]);
   const benchmarkComparisons = useMemo(() => comparePortfolioToBenchmarks(syntheticPortfolioHistory, Object.fromEntries(['SPY', 'QQQ', 'SOXX'].map(symbol => [symbol, portfolioHistory.histories[symbol] || []]))), [syntheticPortfolioHistory, portfolioHistory.histories]);
@@ -243,15 +416,83 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         stressTrendAverage,
         benchmarkComparisons,
       },
+      analystConsensus: {
+        status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
+          ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+          : 'missing',
+        source: analystConsensus?.source || null,
+        retrievedAt: analystConsensus?.retrievedAt || null,
+        freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
+        ratingCounts: analystConsensus?.recommendation || null,
+        analystCount: Number(analystConsensus?.analystCount || 0),
+        priceTarget: analystConsensus?.priceTarget || null,
+        webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+        epsEstimates: Array.isArray(analystConsensus?.epsEstimates) ? analystConsensus.epsEstimates : [],
+        revenueEstimates: Array.isArray(analystConsensus?.revenueEstimates) ? analystConsensus.revenueEstimates : [],
+        evidence: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.slice(0, 6).map((item: any) => ({
+          title: item?.title || null,
+          url: item?.url || null,
+          source: item?.source || null,
+          publishedAt: item?.published_at || item?.publishedAt || null,
+        })) : [],
+        errors: analystConsensus?.errors || (analystError ? [analystError] : []),
+        selectedSymbol: selectedAnalysis?.symbol || null,
+      },
       evidenceAvailability: {
         heldContracts: relevantContracts,
         heldCongressDisclosures: relevantCongress,
         heldPoliticalSignals: relevantPolitical,
         macroRiskItems: macroRisks.length,
         newsItems: news.length,
+        analystConsensus: {
+          status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
+            ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+            : 'missing',
+          symbol: selectedAnalysis?.symbol || null,
+          source: analystConsensus?.source || null,
+          retrievedAt: analystConsensus?.retrievedAt || null,
+          freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
+          analystCount: Number(analystConsensus?.analystCount || 0),
+          webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+          structuredEvidence: {
+            ratings: analystConsensus?.recommendation || null,
+            priceTarget: analystConsensus?.priceTarget || null,
+            epsEstimates: Array.isArray(analystConsensus?.epsEstimates) ? analystConsensus.epsEstimates.slice(0, 4) : [],
+            revenueEstimates: Array.isArray(analystConsensus?.revenueEstimates) ? analystConsensus.revenueEstimates.slice(0, 4) : [],
+          },
+        },
         contractSource: relevantContracts > 0 ? 'available' : 'none observed',
         congressSource: relevantCongress > 0 ? 'available' : 'none observed',
         politicalSource: relevantPolitical > 0 ? 'available' : 'none observed',
+      },
+      evidenceQualityInput: {
+        evidence_availability: {
+          required: [],
+          missing: [],
+          usable_families: [
+            ...(analyses.length > 0 ? ['portfolio'] : []),
+            ...(livePositions.length > 0 ? ['market'] : []),
+            ...(relevantContracts > 0 ? ['regulatory_primary'] : []),
+            ...(relevantCongress > 0 ? ['congress'] : []),
+            ...(news.length > 0 ? ['news'] : []),
+            ...(macroRisks.length > 0 ? ['macro'] : []),
+            ...(analystConsensus && !analystError && (analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? ['analyst_consensus'] : []),
+          ],
+        },
+        evidence_freshness: [
+          ...(analyses.length > 0 ? [{
+            freshness: {
+              status: livePositions.length === analyses.length ? 'FRESH' : livePositions.length > 0 ? 'AGING' : 'STALE',
+            },
+          }] : []),
+          ...(analystConsensus && !analystError ? [{
+            freshness: {
+              status: analystFreshness(analystConsensus.retrievedAt || null).toUpperCase(),
+            },
+          }] : []),
+        ],
+        conflict_detection: { detected: false, count: 0 },
+        citation_coverage: {},
       },
       guardrails: [
         'Measurements describe observed portfolio state; they are not trade instructions.',
@@ -274,6 +515,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     politicalSignals,
     macroRisks.length,
     news.length,
+    analystConsensus,
+    analystLoading,
+    analystError,
   ]);
 
 
@@ -343,13 +587,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       </section>
 
-      <JevDecisionPanel
-        kind="portfolio"
-        title="Portfolio decision context"
-        subtitle="Jev reviews the measured portfolio state and evidence coverage. It provides typed research triage and context only; it does not generate trade instructions."
-        state={decisionContext}
-      />
-
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
           <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Exposure, attribution & benchmark context</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
@@ -368,6 +605,53 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Concentration by group</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No valued holdings available.</div>}</div></div>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr] gap-3 mt-3">
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Portfolio history</div>
+                <div className="text-[9px] text-white/30 mt-1">Historical portfolio value using current recorded quantities against available market history. Transactions are not reconstructed.</div>
+              </div>
+              <div className="text-right text-[9px] font-mono text-white/35">
+                {portfolioHistoryValue.length ? portfolioHistoryValue[0].date + ' → ' + portfolioHistoryValue.at(-1)!.date : 'No history'}
+              </div>
+            </div>
+            <div className="h-40 mt-2">
+              {portfolioHistoryValue.length > 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={portfolioHistoryValue}>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} />
+                    <XAxis dataKey="date" hide />
+                    <YAxis hide domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(1), 'Indexed value']} />
+                    <Line type="monotone" dataKey="normalizedValue" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Need overlapping holding history to build portfolio history.</div>}
+            </div>
+            <div className="text-[8px] font-mono text-white/20 mt-1">Indexed to 100 at the first common available date; this is a historical reconstruction, not a forecast.</div>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Holding correlation</div>
+            <div className="text-[9px] text-white/30 mt-1">Pearson correlation of daily returns over the overlapping available history. At least five shared sessions are required.</div>
+            {portfolioCorrelation.symbols.length > 0 ? (
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-[8px] font-mono">
+                  <thead><tr><th className="text-left text-white/25 pb-2 pr-2">Ticker</th>{portfolioCorrelation.symbols.map(symbol => <th key={symbol} className="text-center text-white/25 pb-2 px-1">{symbol}</th>)}</tr></thead>
+                  <tbody>{portfolioCorrelation.symbols.map(left => <tr key={left}>
+                    <td className="text-white/55 py-1 pr-2 font-bold">{left}</td>
+                    {portfolioCorrelation.symbols.map(right => {
+                      const value = portfolioCorrelation.values[left]?.[right] ?? null;
+                      const sample = portfolioCorrelation.sampleDays[left]?.[right] ?? 0;
+                      return <td key={right} title={sample + ' overlapping sessions'} className="text-center px-1 py-1 text-white/50">{value == null ? '—' : value.toFixed(2)}</td>;
+                    })}
+                  </tr>)}</tbody>
+                </table>
+              </div>
+            ) : <div className="text-[9px] font-mono text-white/25 mt-3">No overlapping history available for correlation.</div>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">P&L contribution by holding</div><div className="space-y-2 mt-3">{attribution.slice(0, 6).map(item => <div key={item.symbol} className="flex items-center gap-3"><span className="w-12 text-[9px] font-mono font-bold text-white/65">{item.symbol}</span><div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className={item.pnlContribution >= 0 ? 'h-full bg-emerald-400/60' : 'h-full bg-rose-400/60'} style={{ width: Math.min(100, Math.abs(item.pnlContribution) / Math.max(1, Math.abs(attribution[0]?.pnlContribution || 1)) * 100) + '%' }} /></div><span className={'w-24 text-right text-[9px] font-mono ' + (item.pnlContribution >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.pnlContribution >= 0 ? '+' : ''}${item.pnlContribution.toFixed(2)}</span></div>)}{!attribution.length && <div className="text-[9px] font-mono text-white/25">No P&L attribution available.</div>}</div></div>
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Matched benchmark window</div><div className="space-y-2 mt-3">{benchmarkComparisons.map(item => <div key={item.benchmark} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-black">{item.benchmark}</div><div className="text-[8px] font-mono text-white/25">{item.sampleDays ? item.startDate + ' → ' + item.endDate + ' · ' + item.sampleDays + ' sessions' : 'No overlapping history'}</div></div><div className="text-right"><div className="text-[9px] font-mono text-white/45">Portfolio {item.portfolioReturnPct == null ? '—' : (item.portfolioReturnPct >= 0 ? '+' : '') + item.portfolioReturnPct.toFixed(2) + '%'}</div><div className="text-[9px] font-mono text-white/45">{item.benchmark} {item.benchmarkReturnPct == null ? '—' : (item.benchmarkReturnPct >= 0 ? '+' : '') + item.benchmarkReturnPct.toFixed(2) + '%'}</div><div className={'text-[9px] font-mono font-bold ' + (item.relativeReturnPct == null ? 'text-white/25' : item.relativeReturnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.relativeReturnPct == null ? 'Relative —' : 'Relative ' + (item.relativeReturnPct >= 0 ? '+' : '') + item.relativeReturnPct.toFixed(2) + ' pts'}</div></div></div>)}</div></div>
         </div>
@@ -394,11 +678,18 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'overview' && (
         <>
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.25fr] gap-4 items-start">
-            <div>
-              {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>} 
-            </div>
-            <Panel title="Held portfolio universe" subtitle="Live portfolio positions · quote freshness · model state · select a holding to update decision context">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
+            <section className="min-w-0 space-y-3" aria-label="Portfolio decision context">
+              <JevDecisionPanel
+                kind="portfolio"
+                title="Portfolio decision context"
+                subtitle="Typed research triage and context from measured portfolio evidence; not a trade instruction."
+                state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }}
+              />
+              {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
+            </section>
+            <section className="min-w-0">
+              <Panel title="Held portfolio universe" subtitle="Persistent positions · live quote state · select a holding to update the intelligence rendered below">
               <div className="flex flex-wrap gap-2 mb-3">
                 <div className="relative flex-1 min-w-48">
                   <FilterInput
@@ -418,7 +709,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </FilterSelect>
               </div>
               <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
-            </Panel>
+              </Panel>
+            </section>
+          </div>
+
+          <div className="space-y-4">
+            {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
+            <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
+            {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+            {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
+            <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
           </div>
 
           <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
@@ -550,16 +850,22 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'rotation' && (
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
-          <Panel title="Money rotation engine" subtitle="Relative-strength model across infrastructure, compute, memory and software">
-            <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={intelligence.groups.filter(g => g.avgChange !== 0 || g.members.some(m => livePrices[m])).map(g => ({group:g.name, score:Math.round(g.score), avg:g.avgChange}))}>
-              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" domain={[0,100]} tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Signal'] : [v + '%','Avg daily return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
+          <Panel title="Money rotation engine" subtitle="Multi-timeframe relative-strength and breadth proxy across infrastructure, compute, memory and software">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {(['1D','5D','20D','60D','3M','6M'] as RotationHorizon[]).map(h => <button key={h} onClick={() => setRotationHorizon(h)} className={'px-2.5 py-1.5 rounded border text-[9px] font-mono font-bold ' + (rotationHorizon === h ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-white/35')}>{h}</button>)}
+              <select value={rotationGroup} onChange={e => setRotationGroup(e.target.value)} className="ml-auto bg-[#15181E] border border-white/10 rounded px-2 py-1.5 text-[9px] font-mono text-white/55"><option value="All">All groups</option>{rotation.groups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}</select>
+            </div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => ({group:g.name, score:Math.round(g.score), move:g.horizons[rotationHorizon]}))}>
+              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Rotation signal'] : [typeof v === 'number' ? v.toFixed(1) + '%' : '—','Period return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
             </BarChart></ResponsiveContainer></div>
-            <div className="text-[10px] text-white/30">Signal = daily return + breadth + universe-relative performance. It is not a literal measure of capital flows.</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => <div key={g.name} className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex justify-between gap-2"><span className="text-xs font-bold">{g.name}</span><span className="text-[9px] font-mono uppercase text-white/40">{g.direction}</span></div><div className="text-[9px] text-white/35 mt-1">{g.members.join(' · ')}</div><div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">{(['1D','20D','60D'] as RotationHorizon[]).map(h => <div key={h}><span className="text-white/20">{h}</span><div className="text-white/60">{g.horizons[h] == null ? '—' : g.horizons[h]!.toFixed(1) + '%'}</div></div>)}</div></div>)}</div>
+            <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
           </Panel>
-          <Panel title="Pair monitor" subtitle="Relative-strength relationships that the model tests">
-            <div className="space-y-2">{intelligence.pairSignals.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
+          <Panel title="Pair monitor" subtitle="Relative-strength spread history and current transition state">
+            <div className="space-y-2">{rotation.pairs.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
               <div className="flex justify-between"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono ' + ((x.spread ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{x.spread == null ? '—' : (x.spread >= 0 ? '+' : '') + x.spread.toFixed(2) + ' pts'}</div></div>
-              <div className="text-[10px] text-white/35 mt-1">{x.label}</div>
+              <div className="text-[10px] text-white/35 mt-1">{x.label} · {x.trend}</div>
+              <div className="flex gap-1 mt-2">{x.history.slice(-6).map((v,i) => <span key={i} className={'h-2 flex-1 rounded ' + (v >= 0 ? 'bg-emerald-400/40' : 'bg-rose-400/40')} title={(v >= 0 ? '+' : '') + v.toFixed(2) + ' pts'} />)}</div>
             </div>)}</div>
           </Panel>
         </div>
@@ -612,49 +918,37 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
-                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Connected peers</div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer universe</div>
+                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from the full configured universe using transparent comparability signals.</div>
                 <div className="mt-3 space-y-2">
-                  {selectedAnalysis.peers.length === 0 && (
-                    <div className="text-[10px] font-mono text-white/30">No configured peer relationships for this holding.</div>
-                  )}
-                  {selectedAnalysis.peers.map(peerSymbol => {
+                  {selectedPeerSet.primary && (() => {
+                    const peerSymbol = selectedPeerSet.primary.symbol;
                     const peer = analyses.find(item => item.symbol === peerSymbol);
                     const peerQuote = livePrices[peerSymbol];
                     const selectedMove = selectedAnalysis.dailyChangePct;
                     const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
                     const spread = selectedMove != null && peerMove != null ? selectedMove - peerMove : null;
-                    return (
-                      <button
-                        key={peerSymbol}
-                        type="button"
-                        onClick={() => setSelected(peerSymbol)}
-                        className="w-full rounded-lg border border-white/5 bg-black/10 p-3 text-left hover:bg-white/[.04] transition"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-black text-white">{peerSymbol}</div>
-                            <div className="text-[8px] font-mono uppercase text-white/25 mt-1">
-                              {peer ? (peer.group === selectedAnalysis.group ? 'Same group' : 'Portfolio-linked') : 'Watchlist peer'}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={'text-[10px] font-mono font-bold ' + (peerMove == null ? 'text-white/30' : peerMove >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                              {peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}
-                            </div>
-                            <div className={'text-[8px] font-mono mt-1 ' + (spread == null ? 'text-white/25' : spread >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
-                              {spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
+                    return <button type="button" onClick={() => setSelected(peerSymbol)} className="w-full rounded-lg border border-violet-400/20 bg-violet-400/[.04] p-3 text-left hover:bg-white/[.04] transition">
+                      <div className="flex items-center justify-between gap-3"><div><div className="text-[8px] font-mono uppercase text-violet-300">Primary peer</div><div className="text-xs font-black text-white mt-1">{peerSymbol}</div><div className="text-[8px] text-white/25 mt-1">{selectedPeerSet.primary.reasons.join(' · ')}</div></div><div className="text-right"><div className="text-[10px] font-mono font-bold">{peerMove == null ? 'quote —' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}</div><div className="text-[8px] font-mono mt-1">{spread == null ? 'spread —' : 'vs selected ' + (spread >= 0 ? '+' : '') + spread.toFixed(2) + ' pts'}</div></div></div>
+                    </button>;
+                  })()}
+                  {selectedPeerSet.core.map(peerCandidate => {
+                    const peerSymbol = peerCandidate.symbol;
+                    const peer = analyses.find(item => item.symbol === peerSymbol);
+                    const peerQuote = livePrices[peerSymbol];
+                    const peerMove = peerQuote?.changePct ?? peer?.dailyChangePct ?? null;
+                    return <button key={peerSymbol} type="button" onClick={() => setSelected(peerSymbol)} className="w-full rounded-lg border border-white/5 bg-black/10 p-2.5 text-left hover:bg-white/[.04] transition">
+                      <div className="flex items-center justify-between gap-2"><div><div className="text-[10px] font-black text-white">{peerSymbol}</div><div className="text-[8px] text-white/25">{peerCandidate.reasons.join(' · ')}</div></div><div className="text-[8px] font-mono text-white/40">{peerMove == null ? '—' : (peerMove >= 0 ? '+' : '') + peerMove.toFixed(2) + '%'}</div></div>
+                    </button>;
                   })}
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-white/20 pt-1">Extended peers · {selectedPeerSet.extended.length}</div>
+                  <div className="flex flex-wrap gap-1.5">{selectedPeerSet.extended.map(peer => <button key={peer.symbol} type="button" onClick={() => setSelected(peer.symbol)} className="rounded-md border border-white/5 px-2 py-1 text-[8px] font-mono text-white/45 hover:text-white">{peer.symbol}</button>)}</div>
                 </div>
               </div>
             </div>
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-              <Insight title="Direct relationship" body={selectedAnalysis.peers.length + ' configured peer connection' + (selectedAnalysis.peers.length === 1 ? '' : 's') + ' for ' + selectedAnalysis.symbol + '.'} icon={<Network/>}/>
+              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from the universe.'} icon={<Network/>}/>
               <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
               <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
             </div>
@@ -715,8 +1009,10 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
   const mean = Number.isFinite(Number(target.mean)) ? Number(target.mean) : null;
   const low = Number.isFinite(Number(target.low)) ? Number(target.low) : null;
   const high = Number.isFinite(Number(target.high)) ? Number(target.high) : null;
-  const targetMove = currentPrice != null && currentPrice > 0 && median != null ? (median / currentPrice - 1) * 100 : null;
-  const ratingCount = ["strongBuy", "buy", "hold", "sell", "strongSell"].reduce((sum, key) => sum + Number(recommendation[key] || 0), 0);
+  const consensus = normalizeAnalystConsensus({ recommendation, priceTarget: target, currentPrice, retrievedAt: data?.retrievedAt ?? null, source: data?.source ?? null, analystCount: data?.analystCount ?? null });
+  const targetMove = consensus.target.medianUpsidePct;
+  const ratingCount = consensus.analystCount;
+  const freshness = analystFreshness(consensus.retrievedAt);
   const eps = Array.isArray(data?.epsEstimates) ? data.epsEstimates[0] : null;
   const revenue = Array.isArray(data?.revenueEstimates) ? data.revenueEstimates[0] : null;
 
@@ -737,11 +1033,11 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
       {!error && !loading && data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0)} />
-            <Info label="Buy" value={String(recommendation.buy ?? 0)} />
-            <Info label="Hold" value={String(recommendation.hold ?? 0)} />
-            <Info label="Sell" value={String(recommendation.sell ?? 0)} />
-            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0)} />
+            <Info label="Strong buy" value={String(recommendation.strongBuy ?? 0) + (ratingCount ? ' · ' + consensus.percentages.strongBuy.toFixed(0) + '%' : '')} />
+            <Info label="Buy" value={String(recommendation.buy ?? 0) + (ratingCount ? ' · ' + consensus.percentages.buy.toFixed(0) + '%' : '')} />
+            <Info label="Hold" value={String(recommendation.hold ?? 0) + (ratingCount ? ' · ' + consensus.percentages.hold.toFixed(0) + '%' : '')} />
+            <Info label="Sell" value={String(recommendation.sell ?? 0) + (ratingCount ? ' · ' + consensus.percentages.sell.toFixed(0) + '%' : '')} />
+            <Info label="Strong sell" value={String(recommendation.strongSell ?? 0) + (ratingCount ? ' · ' + consensus.percentages.strongSell.toFixed(0) + '%' : '')} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
             <Info label="Median target" value={median == null ? "—" : "$" + median.toFixed(2)} />
@@ -751,7 +1047,7 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             <Info label="Vs current" value={targetMove == null ? "—" : (targetMove >= 0 ? "+" : "") + targetMove.toFixed(1) + "%"} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
-            <Info label="Rating count" value={String(ratingCount)} />
+            <Info label="Analyst count" value={String(ratingCount)} />
             <Info label="EPS estimate" value={eps?.average == null ? "—" : Number(eps.average).toFixed(2)} />
             <Info label="Revenue estimate" value={revenue?.average == null ? "—" : "$" + (Number(revenue.average) / 1e9).toFixed(1) + "B"} />
           </div>
@@ -769,7 +1065,8 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             {data.webEvidence?.error && <div className="mt-2 text-[8px] font-mono text-amber-200/50">{data.webEvidence.error}</div>}
           </div>
           <div className="mt-3 text-[8px] font-mono text-white/20">
-            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() : "Retrieved time unavailable"}
+            {data.retrievedAt ? "Retrieved " + new Date(data.retrievedAt).toLocaleString() + " · " + freshness : "Retrieved time unavailable"}
+            {target.lastUpdated ? " · Targets " + target.lastUpdated : ""}
             {eps?.period ? " · EPS " + eps.period : ""}
             {revenue?.period ? " · Revenue " + revenue.period : ""}
             {data.errors?.length ? " · Some analyst endpoints unavailable" : ""}
@@ -779,6 +1076,148 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
     </section>
   );
 }
+function PortfolioEvidenceCoverage({
+  analyses,
+  contracts,
+  congressTrades,
+  macroRisks,
+  news,
+  analystConsensus,
+  analystLoading,
+  analystError,
+  selectedSymbol,
+}: {
+  analyses: PositionAnalysis[];
+  contracts: any[];
+  congressTrades: any[];
+  macroRisks: any[];
+  news: any[];
+  analystConsensus: any;
+  analystLoading: boolean;
+  analystError: string;
+  selectedSymbol: string | null;
+}) {
+  const held = new Set(analyses.map(item => item.symbol));
+  const secCount = contracts.filter(item => held.has(String(item?.company || item?.stockSymbol || '').toUpperCase())).length;
+  const congressCount = congressTrades.filter(item => held.has(String(item?.stockSymbol || item?.symbol || '').toUpperCase())).length;
+  const analystStatus = analystLoading
+    ? 'loading'
+    : analystError
+      ? 'failed'
+      : analystConsensus
+        ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+        : 'missing';
+  const analystEvidenceCount = Array.isArray(analystConsensus?.webEvidence?.results)
+    ? analystConsensus.webEvidence.results.length
+    : Number(analystConsensus?.webEvidenceCount || 0);
+  const channels = [
+    { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
+    { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
+    { label: 'Peers', value: analyses.filter(item => item.vsPeers != null).length, total: analyses.length },
+    { label: 'SEC / events', value: secCount, total: null },
+    { label: 'Congress', value: congressCount, total: null },
+    { label: 'News', value: news.length, total: null },
+    { label: 'Macro', value: macroRisks.length, total: null },
+    { label: 'Analysts', value: analystStatus === 'available' ? 1 : 0, total: null },
+  ];
+  const available = channels.filter(item => item.value > 0).length;
+  const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
+  const analystFresh = analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown';
+  const analystCount = Number(analystConsensus?.analystCount || 0);
+  const medianTarget = Number.isFinite(Number(analystConsensus?.priceTarget?.targetMedian))
+    ? Number(analystConsensus.priceTarget.targetMedian)
+    : Number.isFinite(Number(analystConsensus?.priceTarget?.median))
+      ? Number(analystConsensus.priceTarget.median)
+      : null;
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
+        <h2 className="text-base font-black mt-1">{status}</h2>
+        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
+      </div>
+      <div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 mt-3">
+      {channels.map(channel => <div key={channel.label} className={'rounded-lg border p-2 ' + (channel.value > 0 ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}>
+        <div className="text-[8px] font-mono uppercase tracking-wider text-white/45">{channel.label}</div>
+        <div className="text-[10px] font-mono font-bold mt-1">{channel.value > 0 ? 'AVAILABLE' : 'MISSING'}</div>
+        {channel.total != null && <div className="text-[8px] font-mono text-white/25 mt-1">{channel.value}/{channel.total}</div>}
+      </div>)}
+    </div>
+    <div className="mt-3 rounded-xl border border-violet-400/10 bg-violet-400/[.025] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[8px] font-mono uppercase tracking-widest text-violet-300">Analyst evidence · selected holding</div>
+          <div className="text-[9px] text-white/30 mt-1">{selectedSymbol || 'No held holding selected'} · external consensus is separate from the AI Infra Watch forecast.</div>
+        </div>
+        <div className="text-[8px] font-mono uppercase text-white/35">{analystStatus}</div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+        <Info label="Analyst count" value={analystCount > 0 ? String(analystCount) : '—'} />
+        <Info label="Median target" value={medianTarget != null ? medianTarget.toFixed(2) : '—'} />
+        <Info label="Web evidence" value={analystEvidenceCount > 0 ? String(analystEvidenceCount) : '—'} />
+        <Info label="Freshness" value={analystFresh} />
+        <Info label="Retrieved" value={analystConsensus?.retrievedAt ? new Date(analystConsensus.retrievedAt).toLocaleString() : '—'} />
+      </div>
+      {analystConsensus?.source && <div className="mt-2 text-[8px] font-mono text-white/25">Source: {analystConsensus.source}</div>}
+      {analystError && <div className="mt-2 text-[8px] font-mono text-amber-200/60">Retrieval error: {analystError}</div>}
+      {!analystLoading && !analystError && analystStatus !== 'available' && <div className="mt-2 text-[8px] font-mono text-amber-200/60">No usable analyst evidence was retrieved for this selected holding.</div>}
+    </div>
+  </section>;
+}
+function DecisionGateSummary({h}:{h:PositionAnalysis}) {
+  const leveraged = h.symbol === 'SOXL';
+  const groupThreshold = leveraged ? 68 : 62;
+  const breadthThreshold = leveraged ? 0.67 : 0.50;
+  const gates = [
+    ['Below average cost', h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
+    ['Group score', h.groupScore != null && h.groupScore >= groupThreshold],
+    ['Group breadth', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
+    ['Group vs universe', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
+    ['Peer relative', h.vsPeers != null && h.vsPeers >= 0],
+  ] as const;
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/55 p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision gates</div><h2 className="text-base font-black mt-1">Current evidence gate for {h.symbol}</h2></div><StatePill state={h.state}/></div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+      {gates.map(([label,passed]) => <div key={label} className={'rounded-lg border p-2 ' + (passed ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase text-white/45">{label}</span><span className={'text-[8px] font-mono font-bold ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span></div></div>)}
+    </div>
+  </section>;
+}
+
+function PortfolioPeerImpactSummary({comparisons}:{comparisons:PeerCounterfactual[]}) {
+  const available = comparisons.filter(item => item.status === 'available' && item.hypotheticalProfit != null && item.actualProfit != null);
+  const actualProfit = available.reduce((sum, item) => sum + (item.actualProfit ?? 0), 0);
+  const peerProfit = available.reduce((sum, item) => sum + (item.hypotheticalProfit ?? 0), 0);
+  const difference = peerProfit - actualProfit;
+  const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
+  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer counterfactual</h2><div className="text-[9px] text-white/35 mt-1">Same investment amounts and purchase dates where historical peer data is available. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><Info label="Actual profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer hypothetical" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
+  </section>;
+}
+
+function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:PositionAnalysis;chart:SelectedChartState;chartRange:SelectedChartState['range'];onChartRangeChange:(range:SelectedChartState['range'])=>void}) {
+  const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
+  return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex items-baseline gap-3 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'STALE QUOTE' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+    </div>
+    <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
+    <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
+    <div className="mt-2 flex flex-wrap justify-between gap-2 text-[8px] font-mono text-white/25"><span>{chart.points.length ? chart.points[0].date + ' → ' + chart.points.at(-1)?.date : 'No chart dates'}</span><span>{chart.retrievedAt ? 'History retrieved ' + new Date(chart.retrievedAt).toLocaleTimeString() : 'History timestamp unavailable'}</span></div>
+  </section>;
+}
+
+function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
+  return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer counterfactual</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical counterfactual · not a forecast</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Your return" value={h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}/><Info label="Peer return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Peer profit" value={comparison?.hypotheticalProfit == null ? '—' : comparison.hypotheticalProfit.toFixed(2)}/><Info label="Difference" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/><Info label="Peer entry" value={comparison?.peerEntryPrice == null ? '—' : comparison.peerEntryPrice.toFixed(2)}/></div>
+    <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
+  </section>;
+}
+
 function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
   const [customTarget, setCustomTarget] = useState('');
   const canCalculateExitScenarios = h.livePrice != null && !h.liveStale;

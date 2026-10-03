@@ -357,3 +357,80 @@ def test_swarm_healthy_partner_still_settles_after_one_hop():
     assert result.ok()
     assert result.answer == "the answer"
     assert result.path == ["research", "data"]
+
+
+# ===========================================================================
+# TRAJECTORY CONTRACT — malformed traces must be detectable deterministically.
+# ===========================================================================
+
+def test_agent_trajectory_validates_node_tool_order_and_duration():
+    from app.agents.trajectory import AgentTrajectory, Step
+
+    valid = AgentTrajectory(
+        steps=[
+            Step(node="plan", kind="node", duration_ms=1.0),
+            Step(node="plan", kind="tool", tool="stocks.get_quote", duration_ms=0.2),
+            Step(node="finalize", kind="node", duration_ms=0.4),
+            Step(node="finalize", kind="llm", tool="synthesis", duration_ms=0.1),
+        ]
+    )
+    assert valid.is_valid()
+    assert valid.validate() == []
+
+
+def test_agent_trajectory_flags_orphan_and_cross_node_steps():
+    from app.agents.trajectory import AgentTrajectory, Step
+
+    malformed = AgentTrajectory(
+        steps=[
+            Step(node="", kind="tool", tool="stocks.get_quote"),
+            Step(node="route", kind="node", duration_ms=1.0),
+            Step(node="execute", kind="tool", tool="stocks.get_quote", duration_ms=-1.0),
+        ]
+    )
+    violations = malformed.validate()
+    assert any("missing node" in item for item in violations)
+    assert any("invalid duration" in item for item in violations)
+    assert any("belongs to 'execute'" in item for item in violations)
+    assert not malformed.is_valid()
+
+
+def test_router_trajectory_is_audit_valid_after_partial_server_failure():
+    session = CrashableSession(
+        _STOCKS_SPECS,
+        call_returns={"list_watchlist": ["NVDA"]},
+        healthy_calls=1,
+    )
+    tb = MCPToolbox([_cfg("stocks")], _factory({"stocks": session}))
+    tb.connect()
+    try:
+        strategy = _canned(
+            ToolPlan(tool="stocks.list_watchlist", arguments={}, score=1.0),
+            ToolPlan(tool="stocks.get_snapshot", arguments={}, score=0.9),
+        )
+        result = ToolRouterAgent(tb, strategy=strategy).run("watchlist then snapshot")
+    finally:
+        tb.close()
+
+    assert result.trajectory.is_valid()
+    assert not result.calls[-1].ok
+
+
+def test_structured_trace_event_has_stable_operational_shape():
+    from app.eval import trace
+
+    captured = []
+    original = trace._append
+    trace._append = lambda obj: captured.append(obj)
+    try:
+        trace.record_event("sec_refresh", {"status": "healthy", "source": "sec"})
+    finally:
+        trace._append = original
+
+    assert len(captured) == 1
+    event = captured[0]
+    assert event["kind"] == "event"
+    assert event["event_kind"] == "sec_refresh"
+    assert event["event_id"]
+    assert event["metadata"] == {"status": "healthy", "source": "sec"}
+    assert isinstance(event["ts"], float)

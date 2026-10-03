@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -31,6 +32,8 @@ class AnalystSnapshot:
     price_target: dict[str, Any]
     eps_estimates: list[dict[str, Any]]
     revenue_estimates: list[dict[str, Any]]
+    retrieved_at: str
+    analyst_count: int
 
     def model_dump(self) -> dict[str, Any]:
         return {
@@ -40,6 +43,8 @@ class AnalystSnapshot:
             "price_target": self.price_target,
             "eps_estimates": self.eps_estimates,
             "revenue_estimates": self.revenue_estimates,
+            "retrievedAt": self.retrieved_at,
+            "analystCount": self.analyst_count,
         }
 
 
@@ -150,6 +155,8 @@ class AnalystService:
         if not recommendation and not price_target and not eps_raw and not revenue_raw:
             raise QuoteError("NO_DATA", f"no analyst expectations for {symbol}")
 
+        rating_keys = ("strongBuy", "buy", "hold", "sell", "strongSell")
+        analyst_count = sum(max(0, int(recommendation.get(key) or 0)) for key in rating_keys)
         return AnalystSnapshot(
             symbol=symbol,
             source="finnhub-analyst",
@@ -157,6 +164,8 @@ class AnalystService:
             price_target=price_target,
             eps_estimates=_list_records((eps_raw or {}).get("data") if isinstance(eps_raw, dict) else eps_raw),
             revenue_estimates=_list_records((revenue_raw or {}).get("data") if isinstance(revenue_raw, dict) else revenue_raw),
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            analyst_count=analyst_count,
         )
 
 

@@ -16,6 +16,7 @@ FRESHNESS_WINDOWS_HOURS: dict[str, tuple[float, float]] = {
     "sec": (24 * 30, 24 * 90),
     "earnings": (24 * 14, 24 * 90),
     "event_study": (24 * 90, 24 * 365),
+    "analyst_consensus": (24, 24 * 7),
     "congress": (24 * 30, 24 * 180),
     "macro": (24 * 7, 24 * 30),
     "executive": (48, 24 * 7),

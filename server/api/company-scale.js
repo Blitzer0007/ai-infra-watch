@@ -1,4 +1,4 @@
-import { history as routedHistory, providerSymbol } from '../../api/_market-data.js';
+import { history as routedHistory, providerSymbol, quote as routedQuote } from '../../api/_market-data.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
   loadedAt: 0,
@@ -423,31 +423,75 @@ async function handleAnalyst(req, res) {
   const epsEstimates = Array.isArray(epsRaw) ? epsRaw : Array.isArray(epsRaw?.data) ? epsRaw.data : [];
   const revenueEstimates = Array.isArray(revenueRaw) ? revenueRaw : Array.isArray(revenueRaw?.data) ? revenueRaw.data : [];
 
-  if (!Object.keys(values).length) {
+  const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
+
+  let currentPrice = null;
+  let quoteSource = null;
+  let quoteRetrievedAt = null;
+  try {
+    const quote = await routedQuote(symbol);
+    currentPrice = normalizeAnalystValue(quote?.price);
+    quoteSource = quote?.source || quote?.provider || null;
+    quoteRetrievedAt = quote?.asOf || null;
+  } catch {
+    // Consensus remains useful without a current quote; target upside is then unavailable.
+  }
+
+  const ratingCounts = {
+    strongBuy: Number(recommendation.strongBuy || 0),
+    buy: Number(recommendation.buy || 0),
+    hold: Number(recommendation.hold || 0),
+    sell: Number(recommendation.sell || 0),
+    strongSell: Number(recommendation.strongSell || 0),
+  };
+  const analystCount = Object.values(ratingCounts).reduce((sum, value) => sum + value, 0);
+  const hasRecommendationEvidence = recommendationRows.some(row =>
+    row && Object.values(row).some(value => value !== null && value !== undefined && value !== '')
+  );
+  const hasPriceTargetEvidence = [
+    priceTarget.targetHigh,
+    priceTarget.targetLow,
+    priceTarget.targetMean,
+    priceTarget.targetMedian,
+  ].some(value => Number.isFinite(Number(value)));
+  const hasEstimateEvidence = epsEstimates.some(row => row && (
+    Number.isFinite(Number(row?.epsAvg ?? row?.epsAverage)) ||
+    Number.isFinite(Number(row?.epsHigh)) ||
+    Number.isFinite(Number(row?.epsLow))
+  )) || revenueEstimates.some(row => row && (
+    Number.isFinite(Number(row?.revenueAvg ?? row?.revenueAverage)) ||
+    Number.isFinite(Number(row?.revenueHigh)) ||
+    Number.isFinite(Number(row?.revenueLow))
+  ));
+  const structuredEvidenceAvailable = hasRecommendationEvidence || hasPriceTargetEvidence || hasEstimateEvidence;
+  const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
+
+  if (!structuredEvidenceAvailable && !webEvidence.results?.length) {
     return res.status(503).json({
       symbol,
-      source: 'Finnhub analyst',
+      source: 'external-analyst-consensus',
       available: [],
       errors,
-    webEvidence: await fetchAnalystWebEvidence(symbol, 14, 6),
-      error: 'Analyst expectations provider unavailable.',
+      webEvidence,
+      consensusAvailable: false,
+      error: 'No external analyst consensus source returned usable evidence.',
     });
   }
 
-  const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
-
+  const retrievedAt = new Date().toISOString();
   const data = {
     symbol,
-    source: 'Finnhub analyst',
+    source: Object.keys(values).length ? 'Finnhub analyst' : 'external analyst web evidence',
     webEvidence,
-    retrievedAt: new Date().toISOString(),
+    retrievedAt,
+    consensusAvailable: structuredEvidenceAvailable,
+    structuredEvidenceAvailable,
+    currentPrice,
+    quoteSource,
+    quoteRetrievedAt,
     recommendation: {
       period: recommendation.period || null,
-      strongBuy: Number(recommendation.strongBuy || 0),
-      buy: Number(recommendation.buy || 0),
-      hold: Number(recommendation.hold || 0),
-      sell: Number(recommendation.sell || 0),
-      strongSell: Number(recommendation.strongSell || 0),
+      ...ratingCounts,
     },
     priceTarget: {
       lastUpdated: priceTarget.lastUpdated || priceTarget.lastUpdatedAt || null,
@@ -471,7 +515,17 @@ async function handleAnalyst(req, res) {
       analysts: Number(row?.numberAnalysts || 0) || null,
     })),
     available: Object.keys(values),
+    analystCount,
+    webEvidenceCount,
     errors,
+    provenance: {
+      consensusProvider: structuredEvidenceAvailable ? 'Finnhub' : null,
+      consensusRetrievedAt: structuredEvidenceAvailable ? retrievedAt : null,
+      quoteProvider: quoteSource,
+      quoteRetrievedAt,
+      webProvider: webEvidence.provider || null,
+      webRetrievedAt: retrievedAt,
+    },
   };
 
   analystCache.set(symbol, { loadedAt: Date.now(), data });

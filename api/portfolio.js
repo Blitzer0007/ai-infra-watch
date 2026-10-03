@@ -79,7 +79,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ lots: rows.map(normalizeLot), persistent: true, source: 'supabase' });
       }
       const rows = await supabase('portfolio_holdings?select=*&order=symbol.asc', { method: 'GET' });
-      const holdings = rows.map(normalize);
+      const holdings = rows.map(normalize).filter(holding => holding.quantity > 0);
       if (String(req.query?.includeLots || '') === 'true') {
         const lots = await supabase('portfolio_purchase_lots?select=*&order=purchase_date.asc,created_at.asc', { method: 'GET' });
         const byHolding = new Map();

@@ -463,6 +463,50 @@ def test_deterministic_insufficient_summary_is_explicit():
     assert "Conclusions are provisional" in summary
 
 
+def test_driver_plan_progresses_through_distinct_evidence_channels():
+    from types import SimpleNamespace
+    from app.agents.autonomous import _driver_research_plan
+
+    def tool(name, properties):
+        return SimpleNamespace(
+            qualified_name=name,
+            description=name,
+            input_schema={"properties": properties, "required": []},
+        )
+
+    tools = [
+        tool("stocks.get_quotes", {"symbols": {}}),
+        tool("news.search", {"query": {}, "days": {}}),
+        tool("filings.get_catalysts", {"symbols": {}}),
+        tool("stocks.get_earnings", {"symbol": {}}),
+        tool("stocks.get_event_study", {"symbol": {}}),
+    ]
+    question = "What is the reason for RUM large move detected?"
+    calls = []
+
+    plan = _driver_research_plan(question, tools, calls)
+    assert plan["tool"] == "stocks.get_quotes"
+
+    calls.append(ToolCallRecord(tool="stocks.get_quotes", arguments={"symbols": ["RUM"]}, ok=True, output={"quotes": [{"symbol": "RUM", "price": 7.68}]}))
+    plan = _driver_research_plan(question, tools, calls)
+    assert plan["tool"] == "news.search"
+
+    calls.append(ToolCallRecord(tool="news.search", arguments={"query": "RUM", "days": 7}, ok=True, output={"articles": [{"title": "RUM update"}]}))
+    plan = _driver_research_plan(question, tools, calls)
+    assert plan["tool"] == "filings.get_catalysts"
+
+    calls.append(ToolCallRecord(tool="filings.get_catalysts", arguments={"symbols": ["RUM"]}, ok=True, output={"filings": []}))
+    plan = _driver_research_plan(question, tools, calls)
+    assert plan["tool"] == "stocks.get_earnings"
+
+    calls.append(ToolCallRecord(tool="stocks.get_earnings", arguments={"symbol": "RUM"}, ok=True, output={"events": []}))
+    plan = _driver_research_plan(question, tools, calls)
+    assert plan["tool"] == "stocks.get_event_study"
+
+    calls.append(ToolCallRecord(tool="stocks.get_event_study", arguments={"symbol": "RUM"}, ok=True, output={"events": []}))
+    assert _driver_research_plan(question, tools, calls)["action"] == "final"
+
+
 def test_generic_research_does_not_require_sec_when_two_families_are_available():
     from app.agents.autonomous import _required_evidence_families, _evidence_availability
     from app.agents.schemas import ToolCallRecord
@@ -726,6 +770,37 @@ def test_evidence_availability_distinguishes_empty_failed_and_missing():
     # MISSING status is still visible in the stable channel matrix; status
     # counts cover required/observed families rather than all optional channels.
     assert result["status_counts"]["MISSING"] == 0
+
+
+def test_analyst_evidence_requires_actual_payload():
+    from app.agents.autonomous import _evidence_availability
+    from app.agents.schemas import ToolCallRecord
+
+    empty = ToolCallRecord(
+        tool="stocks.get_analyst_expectations",
+        arguments={"symbol": "NVDA"},
+        ok=True,
+        output={"symbol": "NVDA", "source": "Finnhub", "retrievedAt": "2026-10-03T00:00:00Z", "analystCount": 0},
+    )
+    usable = ToolCallRecord(
+        tool="stocks.get_analyst_expectations",
+        arguments={"symbol": "NVDA"},
+        ok=True,
+        output={
+            "symbol": "NVDA",
+            "source": "Finnhub",
+            "retrievedAt": "2026-10-03T00:00:00Z",
+            "analystCount": 12,
+            "priceTarget": {"median": 210},
+        },
+    )
+
+    empty_result = _evidence_availability("What are analysts expecting for NVDA?", [empty])
+    usable_result = _evidence_availability("What are analysts expecting for NVDA?", [usable])
+
+    assert empty_result["channels"]["analyst_consensus"]["status"] == "EMPTY"
+    assert usable_result["channels"]["analyst_consensus"]["status"] == "AVAILABLE"
+    assert usable_result["usable_families"].count("analyst_consensus") == 1
 
 
 def test_jev_gate_prefers_new_evidence_family():

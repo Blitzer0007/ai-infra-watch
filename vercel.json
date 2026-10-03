@@ -69,5 +69,28 @@
       "maxDuration": 60,
       "excludeFiles": "{aitracker-upload/app/eval/**,aitracker-upload/app/harness/**,aitracker-upload/app/universe/**,aitracker-upload/tests/**,aitracker-upload/data/filings/**}"
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
+  ]
 }

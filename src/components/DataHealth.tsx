@@ -62,6 +62,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const aging = entries.filter(([, item]) => sourceHealth(item).label === 'AGING').length;
   const stale = entries.filter(([, item]) => sourceHealth(item).label === 'STALE').length;
   const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
+  const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT').length;
+  const fallback = entries.filter(([, item]) => Boolean(item?.fallback)).length;
 
   return (
     <div className="space-y-6">
@@ -83,6 +85,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <Metric label="Aging" value={aging} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Stale" value={stale} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
+        <Metric label="Fallbacks" value={fallback} icon={<RefreshCw className="w-4 h-4"/>}/>
         <Metric label="Total channels" value={entries.length} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
 
@@ -105,6 +109,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                   {item?.refreshIntervalSeconds ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
                   {item?.fallback ? ' · fallback' : ''}
                   {item?.upstreamError ? ' · upstream issue' : ''}
+                  {item?.lastRefreshStatus ? ' · refresh ' + item.lastRefreshStatus : ''}
+                  {item?.lastRefreshError ? ' · refresh error: ' + item.lastRefreshError : ''}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">

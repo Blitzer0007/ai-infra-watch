@@ -220,6 +220,90 @@ def _jev_route(question: str, tools: list[ToolInfo], client: JevClient) -> JevDe
         criteria={**JEV_ROUTE_CRITERIA},
     )
 
+def _record_jev_route(question: str, tools: list[ToolInfo], client: Any, *, action: str) -> dict[str, Any]:
+    """Record a structured JEV route without losing usable fields on fallback.
+
+    The route is execution metadata: if JEV returns a typed decision, preserve
+    its choice/confidence/probabilities/model. If routing itself fails, return
+    an explicit fallback state rather than silently dropping the route object.
+    """
+    try:
+        decision = _jev_route(question, tools, client)
+        # Read the core route fields independently so an optional metadata
+        # conversion can never discard a valid JEV choice. The route choice is
+        # the contract consumed by forced research and its regression tests.
+        choice = str(getattr(decision, "choice", "") or "")
+        confidence_raw = getattr(decision, "confidence", 0.0)
+        probabilities_raw = getattr(decision, "probabilities", None)
+        model = str(getattr(decision, "model", "") or "")
+        latency_raw = getattr(decision, "latency_ms", 0.0)
+
+        try:
+            confidence = float(confidence_raw or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        try:
+            probabilities = dict(probabilities_raw or {})
+        except (TypeError, ValueError):
+            probabilities = {}
+        try:
+            latency_ms = round(float(latency_raw or 0.0), 1)
+        except (TypeError, ValueError):
+            latency_ms = 0.0
+
+        return {
+            "enabled": True,
+            "choice": choice,
+            "confidence": confidence,
+            "probabilities": probabilities,
+            "model": model,
+            "latency_ms": latency_ms,
+            "action": action,
+        }
+    except Exception as exc:
+        # Keep route recording resilient to optional tool metadata. A JEV
+        # client can still make the routing decision without the discovered
+        # tool catalog, so retry the typed decision with a minimal state before
+        # declaring routing unavailable.
+        try:
+            decision = client.choose(
+                state=f"AI Infra Watch research question: {question}",
+                instructions="Which research route should run first? Choose multi_source when the question asks why/what changed or clearly needs multiple evidence sources.",
+                criteria={**JEV_ROUTE_CRITERIA},
+            )
+            return {
+                "enabled": True,
+                "choice": str(getattr(decision, "choice", "") or ""),
+                "confidence": float(getattr(decision, "confidence", 0.0) or 0.0),
+                "probabilities": dict(getattr(decision, "probabilities", None) or {}),
+                "model": str(getattr(decision, "model", "") or ""),
+                "latency_ms": round(float(getattr(decision, "latency_ms", 0.0) or 0.0), 1),
+                "action": action,
+                "route_retry": True,
+                "route_error": f"{type(exc).__name__}: {exc}",
+            }
+        except Exception as retry_exc:
+            # The route decision itself is the critical state. If optional
+            # serialization still fails, preserve a previously extracted JEV
+            # choice instead of replacing the entire route with a choice-less
+            # fallback object.
+            if "choice" in locals() and str(choice or "").strip():
+                return {
+                    "enabled": True,
+                    "choice": str(choice),
+                    "confidence": 0.0,
+                    "probabilities": {},
+                    "model": "",
+                    "latency_ms": 0.0,
+                    "action": action,
+                    "route_error": f"{type(exc).__name__}: {exc}; retry={type(retry_exc).__name__}: {retry_exc}",
+                }
+            return {
+                "enabled": True,
+                "action": "fallback",
+                "error": f"{type(exc).__name__}: {exc}; retry={type(retry_exc).__name__}: {retry_exc}",
+            }
+
 def _tool_for_jev_route(route: str, tools: list[ToolInfo]) -> ToolInfo | None:
     patterns = JEV_ROUTE_PATTERNS.get(route, ())
     if not patterns:
@@ -261,124 +345,111 @@ Rules:
 
 
 def _driver_research_plan(question: str, tools: list[ToolInfo], calls: list[ToolCallRecord]) -> dict[str, Any] | None:
-    """Build a bounded evidence sequence for 'what changed / why / drivers' questions.
+    """Build a bounded evidence sequence for price-move/catalyst questions.
 
-    Prefer one batched quote call, then historical earnings-event reaction, then
-    a filing search. This avoids spending the six-step budget on repeated
-    per-symbol quote calls and gives the synthesizer evidence about both price
-    reaction and material disclosures.
+    These questions get a deterministic cross-source packet before synthesis:
+    quote -> recent news -> SEC/company filings -> earnings -> event study.
+    Each channel is attempted at most once and the gate later decides whether
+    the resulting evidence is sufficient.
     """
     lower = question.lower()
-    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts", "changed recently", "what changed", "recent developments", "could affect", "affect", "stock price")
+    terms = ("driver", "drivers", "why", "cause", "causes", "catalyst", "catalysts",
+             "changed recently", "what changed", "recent developments", "could affect",
+             "affect", "stock price", "large move", "price move", "price movement")
     if not any(term in lower for term in terms):
         return None
     symbols = [s.upper() for s in extract_symbols(question)]
     if not symbols:
         return None
 
-    def successful_tool(predicate):
+    def successful(predicate):
         return any(c.ok and predicate(c) for c in calls)
 
-    # Step 1: one quote batch for all explicitly named symbols.
-    batch = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_quotes")
-            and "symbols" in ((t.input_schema or {}).get("properties") or {})
-        ),
+    def tool_ending(name: str, required: str | None = None):
+        return next(
+            (t for t in tools
+             if t.qualified_name.lower().endswith(name)
+             and (required is None or required in ((t.input_schema or {}).get("properties") or {}))),
+            None,
+        )
+
+    # 1. Current market state.
+    quote_batch = tool_ending(".get_quotes", "symbols")
+    if quote_batch is not None and not successful(lambda c: c.tool.lower().endswith(".get_quotes")):
+        return {"action": "tool", "tool": quote_batch.qualified_name,
+                "arguments": {"symbols": symbols},
+                "reason": "driver question: establish the observed price move first"}
+
+    # 2. Recent news is a primary driver-discovery channel.
+    news = next(
+        (t for t in tools if t.qualified_name.lower().endswith(".search")
+         and t.qualified_name.lower().startswith("news.")
+         and "query" in ((t.input_schema or {}).get("properties") or {})),
         None,
     )
-    if batch is not None and not successful_tool(
-        lambda c: c.tool.lower().endswith(".get_quotes")
-        or c.tool.lower().endswith(".get_quote")
-    ):
-        return {
-            "action": "tool",
-            "tool": batch.qualified_name,
-            "arguments": {"symbols": symbols},
-            "reason": "driver question: batch current quotes before causal research",
-        }
+    if news is not None and not successful(lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")):
+        return {"action": "tool", "tool": news.qualified_name,
+                "arguments": {"query": " ".join(symbols), "days": 7},
+                "reason": "driver question: retrieve recent news for named symbols"}
 
-    # Step 2: use event-study evidence only when the user explicitly asks
-    # about earnings/reactions. On serverless deployments, running one event
-    # study per ticker can consume the whole step budget before filings/news
-    # are retrieved, which was a major source of slow or incomplete answers.
-    event_terms = ("earnings", "earning", "event study", "price reaction", "reaction", "reacted", "historical market data", "historical price data", "price history", "historical stock price")
-    needs_event_study = any(term in lower for term in event_terms)
-    if needs_event_study:
-        event_tools = [
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_event_study")
-            and "symbol" in ((t.input_schema or {}).get("properties") or {})
-        ]
-        completed_events = {
+    # 3. Primary SEC/company disclosure evidence.
+    catalysts = next(
+        (t for t in tools if t.qualified_name.lower().endswith(".get_catalysts")
+         and "symbols" in ((t.input_schema or {}).get("properties") or {})),
+        None,
+    )
+    if catalysts is not None and not successful(lambda c: c.tool.lower().endswith(".get_catalysts")):
+        return {"action": "tool", "tool": catalysts.qualified_name,
+                "arguments": {"symbols": symbols},
+                "reason": "driver question: retrieve company-specific SEC catalyst evidence"}
+
+    # Explicit analyst questions get structured consensus evidence before synthesis.
+    analyst_question = any(term in lower for term in (
+        "analyst", "price target", "target price", "consensus", "wall street",
+        "estimate revision", "analyst rating", "ratings",
+    ))
+    if analyst_question:
+        analyst = next(
+            (t for t in tools
+             if t.qualified_name.lower().endswith(".get_analyst_expectations")
+             and "symbol" in ((t.input_schema or {}).get("properties") or {})),
+            None,
+        )
+        completed_analyst = {
             str((c.arguments or {}).get("symbol", "")).upper()
-            for c in calls
-            if c.ok and c.tool.lower().endswith(".get_event_study")
+            for c in calls if c.ok and c.tool.lower().endswith(".get_analyst_expectations")
         }
+        if analyst is not None:
+            for symbol in symbols[:1]:
+                if symbol not in completed_analyst:
+                    return {"action": "tool", "tool": analyst.qualified_name,
+                            "arguments": {"symbol": symbol},
+                            "reason": f"analyst question: retrieve structured consensus evidence for {symbol}"}
+
+    # 4. Earnings/results context even when the user did not explicitly say "earnings".
+    earnings = tool_ending(".get_earnings", "symbol")
+    completed_earnings = {str((c.arguments or {}).get("symbol", "")).upper()
+                          for c in calls if c.ok and c.tool.lower().endswith(".get_earnings")}
+    if earnings is not None:
         for symbol in symbols[:1]:
-            if symbol not in completed_events and event_tools:
-                return {
-                    "action": "tool",
-                    "tool": event_tools[0].qualified_name,
-                    "arguments": {"symbol": symbol},
-                    "reason": f"driver question: retrieve historical earnings price reaction for {symbol}",
-                }
+            if symbol not in completed_earnings:
+                return {"action": "tool", "tool": earnings.qualified_name,
+                        "arguments": {"symbol": symbol},
+                        "reason": f"driver question: check earnings/results context for {symbol}"}
 
-    # Step 3: retrieve company-specific SEC evidence in one batched call.
-    # The generic RAG corpus may contain sector-level documents that do not
-    # mention the requested tickers. get_catalysts uses primary EDGAR 8-K data
-    # and preserves accession URLs, material-event items, and contract evidence.
-    catalyst_tool = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".get_catalysts")
-            and "symbols" in ((t.input_schema or {}).get("properties") or {})
-        ),
-        None,
-    )
-    if catalyst_tool is not None and not successful_tool(
-        lambda c: c.tool.lower().endswith(".get_catalysts")
-    ):
-        return {
-            "action": "tool",
-            "tool": catalyst_tool.qualified_name,
-            "arguments": {"symbols": symbols},
-            "reason": "driver question: retrieve company-specific SEC catalyst evidence",
-        }
+    # 5. Historical event evidence, useful for distinguishing a current move from
+    # a recurring earnings/event reaction pattern.
+    event = tool_ending(".get_event_study", "symbol")
+    completed_events = {str((c.arguments or {}).get("symbol", "")).upper()
+                        for c in calls if c.ok and c.tool.lower().endswith(".get_event_study")}
+    if event is not None:
+        for symbol in symbols[:1]:
+            if symbol not in completed_events:
+                return {"action": "tool", "tool": event.qualified_name,
+                        "arguments": {"symbol": symbol},
+                        "reason": f"driver question: retrieve historical event-study evidence for {symbol}"}
 
-    # Step 4: retrieve recent market/company news for the explicitly named
-    # symbols. One keyword search keeps the bounded six-tool budget while
-    # adding the missing news/macroeconomic evidence layer.
-    news_search = next(
-        (
-            t for t in tools
-            if t.qualified_name.lower().endswith(".search")
-            and t.qualified_name.lower().startswith("news.")
-            and "query" in ((t.input_schema or {}).get("properties") or {})
-        ),
-        None,
-    )
-    if news_search is not None and not successful_tool(
-        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
-    ):
-        return {
-            "action": "tool",
-            "tool": news_search.qualified_name,
-            "arguments": {"query": " ".join(symbols), "days": 7},
-            "reason": "driver question: retrieve recent news for named symbols",
-        }
-
-    # Once quotes, historical event studies, SEC catalysts, and news have all
-    # been collected, stop the bounded investigation.
-    if successful_tool(lambda c: c.tool.lower().endswith(".get_catalysts")) and successful_tool(
-        lambda c: c.tool.lower().startswith("news.") and c.tool.lower().endswith(".search")
-    ):
-        return {"action": "final", "answer": ""}
-
-    return None
-
-
+    return {"action": "final", "answer": ""}
 
 def _portfolio_research_symbols(calls: list[ToolCallRecord]) -> list[str]:
     """Extract held ticker symbols from the live portfolio-context result."""
@@ -649,11 +720,37 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
             return any(key not in metadata_only and has_payload(child) for key, child in value.items())
         return True
 
+    def has_analyst_payload(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        recommendation = value.get("recommendation")
+        if isinstance(recommendation, dict) and any(
+            key in recommendation and isinstance(recommendation.get(key), (int, float)) and float(recommendation.get(key) or 0) > 0
+            for key in ("strongBuy", "buy", "hold", "sell", "strongSell")
+        ):
+            return True
+        target = value.get("priceTarget")
+        if isinstance(target, dict) and any(
+            isinstance(target.get(key), (int, float)) and target.get(key) is not None
+            for key in ("low", "high", "mean", "median", "targetLow", "targetHigh", "targetMean", "targetMedian")
+        ):
+            return True
+        for key in ("epsEstimates", "revenueEstimates", "results", "webEvidence"):
+            payload = value.get(key)
+            if isinstance(payload, list) and any(isinstance(item, dict) and item for item in payload):
+                return True
+            if isinstance(payload, dict) and has_payload(payload):
+                return True
+        return False
+
     for family in families:
         family_calls = [call for call in calls if _evidence_family(call.tool) == family]
         successful = [call for call in family_calls if call.ok]
         failed = [call for call in family_calls if not call.ok]
-        usable = [call for call in successful if has_payload(call.output)]
+        usable = [
+            call for call in successful
+            if (has_analyst_payload(call.output) if family == "analyst_consensus" else has_payload(call.output))
+        ]
 
         if usable:
             status = "AVAILABLE"
@@ -838,6 +935,11 @@ def _store_evidence_gate(question: str, calls: list[ToolCallRecord], client: Jev
                     round(max(0.0, min(3.0, float(score))) / 3.0 * 100.0)
                     if isinstance(score, (int, float))
                     else None
+                ),
+                "evidence_quality_source": (
+                    "deterministic_evidence_measurement"
+                    if isinstance(score, (int, float))
+                    else "unavailable"
                 ),
                 "model": evaluation.model,
                 "latency_ms": round(evaluation.latency_ms, 1),
@@ -1132,7 +1234,7 @@ class AutonomousMCPAgent:
     def __init__(self, toolbox: MCPToolbox, client: LLMClient | None = None, max_steps: int | None = None, planner: Any | None = None, jev: JevClient | None = None) -> None:
         self.toolbox = toolbox
         self.client = client or LLMClient()
-        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "4" if os.getenv("VERCEL") else "6"))
+        self.max_steps = max_steps or int(os.getenv("AUTONOMOUS_MAX_STEPS", "6" if os.getenv("VERCEL") else "8"))
         self.planner = planner
         self.jev = jev or JevClient()
         self.last_jev: dict[str, Any] = {}
@@ -1277,6 +1379,7 @@ class AutonomousMCPAgent:
                 calls,
                 [tool.qualified_name for tool in self.toolbox.tools()],
                 AgentTrajectory(steps=steps),
+                jev=self.last_jev,
                 answer_source="none",
                 error="no successful tool calls",
                 resolution="error",
@@ -1395,6 +1498,24 @@ class AutonomousMCPAgent:
         evidence_enabled = _needs_evidence_gate(question) and self.jev.enabled
         step_limit = self.max_steps + (2 if evidence_enabled else 0)
 
+        # Record the driver JEV route before entering the execution loop. This
+        # makes the route state deterministic and independent of which planning
+        # branch is selected later in the iteration.
+        is_driver_question = any(
+            term in question.lower()
+            for term in (
+                "driver", "drivers", "why", "cause", "causes",
+                "catalyst", "catalysts", "changed recently", "what changed",
+            )
+        )
+        if self.jev.enabled and is_driver_question and not self.last_jev:
+            self.last_jev = _record_jev_route(
+                question,
+                tools,
+                self.jev,
+                action="forced_driver_plan",
+            )
+
         for iteration in range(1, step_limit + 1):
             gate = self.last_jev.get("evidence_gate") or {}
             successful_count = sum(1 for call in calls if call.ok)
@@ -1448,43 +1569,6 @@ class AutonomousMCPAgent:
                 # Driver investigations record Jev routing once, while the
                 # bounded evidence sequence controls retrieval for known driver
                 # questions.
-                if (
-                    iteration == 1
-                    and self.jev.enabled
-                    and not self.last_jev
-                    and any(
-                        term in question.lower()
-                        for term in (
-                            "driver",
-                            "drivers",
-                            "why",
-                            "cause",
-                            "causes",
-                            "catalyst",
-                            "catalysts",
-                            "changed recently",
-                            "what changed",
-                        )
-                    )
-                ):
-                    try:
-                        decision = _jev_route(question, tools, self.jev)
-                        self.last_jev = {
-                            "enabled": True,
-                            "choice": decision.choice,
-                            "confidence": decision.confidence,
-                            "probabilities": decision.probabilities or {},
-                            "model": decision.model,
-                            "latency_ms": round(decision.latency_ms, 1),
-                            "action": "forced_driver_plan",
-                        }
-                    except Exception as exc:
-                        self.last_jev = {
-                            "enabled": True,
-                            "action": "fallback",
-                            "error": f"{type(exc).__name__}: {exc}",
-                        }
-
                 # Custom planners are used by tests and integrations to control
                 # the exact next action; keep the production-only forced driver
                 # sequence out of that injected planner path.
@@ -1774,6 +1858,7 @@ class AutonomousMCPAgent:
             calls,
             discovered,
             AgentTrajectory(steps=steps),
+            jev=self.last_jev,
             error="no successful tool calls",
             resolution="error",
         )

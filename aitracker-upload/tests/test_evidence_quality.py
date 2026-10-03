@@ -2,6 +2,8 @@ from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 
 from app.agents.evidence_quality import normalize_freshness, detect_conflicts
+from app.jev.assess import assess, measured_evidence_quality
+from app.jev.client import JevAnswer, JevEvaluation
 
 
 def call(tool, output):
@@ -92,3 +94,172 @@ def test_conflict_scoping_keeps_same_record_contradiction():
     report = detect_conflicts(calls)
     assert report["detected"] is True
     assert report["items"][0]["entity"] == "NVDA"
+
+
+def measured_state(families, freshness=None, missing=None, conflicts=0, citation=None):
+    return {
+        "evidence_availability": {
+            "usable_families": families,
+            "missing": missing or [],
+        },
+        "evidence_freshness": freshness or [],
+        "conflict_detection": {"detected": conflicts > 0, "count": conflicts},
+        "citation_coverage": {} if citation is None else {"coverage": citation},
+    }
+
+
+def test_measured_evidence_quality_single_analyst_source_is_partial():
+    result = measured_evidence_quality(
+        measured_state(
+            ["analyst_consensus"],
+            [{"freshness": {"status": "FRESH"}}],
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["percent"] == 33
+    assert result["label"] == "Partial"
+
+
+def test_measured_evidence_quality_three_fresh_sources_is_strong():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+        )
+    )
+    assert result["score"] == 3.0
+    assert result["percent"] == 100
+    assert result["label"] == "Strong"
+
+
+def test_measured_evidence_quality_stale_sources_are_capped():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "STALE"}},
+                {"freshness": {"status": "STALE"}},
+                {"freshness": {"status": "STALE"}},
+            ],
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["label"] == "Partial"
+
+
+def test_measured_evidence_quality_conflict_reduces_strong_evidence():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "regulatory_primary"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+            conflicts=1,
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["conflict_count"] == 1
+
+
+def test_measured_evidence_quality_missing_required_and_poor_citations_reduce_score():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+            missing=["regulatory_primary"],
+            citation=0.2,
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["percent"] == 33
+
+
+class _FakeAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                )
+            },
+            model="test",
+            latency_ms=1.0,
+            input_tokens=10,
+        )
+
+
+def test_jev_assessment_cannot_override_measured_evidence_quality():
+    state = measured_state(
+        ["analyst_consensus"],
+        [{"freshness": {"status": "FRESH"}}],
+    )
+    result = assess("research", state, client=_FakeAssessmentClient())
+    answer = result.answers["evidence_quality"]
+    assert answer.score == 1.0
+    assert answer.confidence == 1.0 / 3.0
+
+
+def test_measured_evidence_quality_unknown_state_does_not_claim_strength():
+    result = measured_evidence_quality({})
+    assert result is None
+
+
+class _FakeChoiceAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "context": JevAnswer(
+                    type="choice",
+                    choice="supportive",
+                    confidence=1.4,
+                ),
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                ),
+            },
+            model="test",
+        )
+
+
+def test_jev_confidence_is_bounded_and_capped_by_measured_evidence():
+    state = measured_state(
+        ["analyst_consensus"],
+        [{"freshness": {"status": "FRESH"}}],
+    )
+    result = assess("portfolio", state, client=_FakeChoiceAssessmentClient())
+    assert result.answers["context"].confidence == 1.0 / 3.0
+    assert result.answers["evidence_quality"].confidence == 1.0 / 3.0
+
+
+class _NoEvidenceAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                )
+            },
+            model="test",
+        )
+
+
+def test_jev_confidence_is_zero_when_no_measured_evidence_exists():
+    state = measured_state([])
+    result = assess("research", state, client=_NoEvidenceAssessmentClient())
+    assert result.answers["evidence_quality"].confidence == 0.0
