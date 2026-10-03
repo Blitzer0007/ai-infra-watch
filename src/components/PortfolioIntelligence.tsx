@@ -1290,6 +1290,8 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
           { key: 'price', header: 'Price', accessor: row => row.price, type: 'currency', render: row => '$' + row.price.toFixed(2) },
           { key: 'saleValue', header: 'Sale value', accessor: row => row.price * h.quantity, type: 'currency', render: row => '$' + (row.price * h.quantity).toFixed(2) },
           { key: 'profit', header: 'Profit / loss', accessor: row => row.price * h.quantity - h.investedValue, type: 'currency', render: row => { const v = row.price * h.quantity - h.investedValue; return <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + '
+          { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const v = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
+          { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
         ]}
       />
         </div>
@@ -1386,7 +1388,7 @@ function Info({label,value}:{label:string;value:string}) {
       ? 'up'
       : upper === 'MIXED' || upper === 'WAIT' || upper.includes('STALE') || upper.includes('UNAVAILABLE') || upper.includes('INSUFFICIENT')
         ? 'warn'
-        : /^[+−-]?(?:\$?\d[\d,.]*)(?:%| PTS| EQ\\.)/.test(upper)
+        : /^[+−-]?(?:\$?\d[\d,.]*)(?:%| PTS| EQ\.)/.test(upper)
           ? (textValue.startsWith('+') ? 'up' : textValue.startsWith('-') || textValue.startsWith('−') ? 'down' : 'neutral')
           : 'neutral';
   const valueClass = semanticTone === 'up' ? 'text-emerald-300' : semanticTone === 'down' ? 'text-rose-300' : semanticTone === 'warn' ? 'text-amber-300' : 'text-white';
@@ -1410,8 +1412,8 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
     <div className="text-[10px] text-white/35 mt-2">{body}</div>
   </div>;
 } + v.toFixed(2)}</span>; } },
-          { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const v = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
-          { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
+          { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const v = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; } },
+          { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; } },
         ]}
       />
         </div>
@@ -1501,9 +1503,20 @@ function Panel({title,subtitle,children}:{title:string;subtitle:string;children:
 }
 
 function Info({label,value}:{label:string;value:string}) {
+  const textValue = String(value);
+  const upper = textValue.toUpperCase();
+  const semanticTone =
+    upper === 'SUPPORTED' || upper === 'AVAILABLE' || upper === 'PASS' || upper.includes('FRESH')
+      ? 'up'
+      : upper === 'MIXED' || upper === 'WAIT' || upper.includes('STALE') || upper.includes('UNAVAILABLE') || upper.includes('INSUFFICIENT')
+        ? 'warn'
+        : /^[+−-]?(?:\$?\d[\d,.]*)(?:%| PTS| EQ\.)/.test(upper)
+          ? (textValue.startsWith('+') ? 'up' : textValue.startsWith('-') || textValue.startsWith('−') ? 'down' : 'neutral')
+          : 'neutral';
+  const valueClass = semanticTone === 'up' ? 'text-emerald-300' : semanticTone === 'down' ? 'text-rose-300' : semanticTone === 'warn' ? 'text-amber-300' : 'text-white';
   return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
     <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
-    <div className="text-xs mt-1">{value}</div>
+    <div className={'text-xs mt-1 font-medium ' + valueClass}>{value}</div>
   </div>;
 }
 
