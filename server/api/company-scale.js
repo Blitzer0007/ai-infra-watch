@@ -437,18 +437,6 @@ async function handleAnalyst(req, res) {
     // Consensus remains useful without a current quote; target upside is then unavailable.
   }
 
-  if (!structuredEvidenceAvailable && !webEvidence.results?.length) {
-    return res.status(503).json({
-      symbol,
-      source: 'external-analyst-consensus',
-      available: [],
-      errors,
-      webEvidence,
-      consensusAvailable: false,
-      error: 'No external analyst consensus source returned usable evidence.',
-    });
-  }
-
   const ratingCounts = {
     strongBuy: Number(recommendation.strongBuy || 0),
     buy: Number(recommendation.buy || 0),
@@ -477,6 +465,18 @@ async function handleAnalyst(req, res) {
   ));
   const structuredEvidenceAvailable = hasRecommendationEvidence || hasPriceTargetEvidence || hasEstimateEvidence;
   const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
+
+  if (!structuredEvidenceAvailable && !webEvidence.results?.length) {
+    return res.status(503).json({
+      symbol,
+      source: 'external-analyst-consensus',
+      available: [],
+      errors,
+      webEvidence,
+      consensusAvailable: false,
+      error: 'No external analyst consensus source returned usable evidence.',
+    });
+  }
 
   const retrievedAt = new Date().toISOString();
   const data = {
