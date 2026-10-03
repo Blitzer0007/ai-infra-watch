@@ -422,6 +422,22 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       },
       evidenceAvailability: {
         heldContracts: relevantContracts,
+        heldCongressDisclosures: relevantCongress,
+        heldPoliticalSignals: relevantPolitical,
+        macroRiskItems: macroRisks.length,
+        newsItems: news.length,
+        analystConsensus: {
+          status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
+            ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+            : 'missing',
+          symbol: selectedAnalysis?.symbol || null,
+          source: analystConsensus?.source || null,
+          retrievedAt: analystConsensus?.retrievedAt || null,
+          freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
+          analystCount: Number(analystConsensus?.analystCount || 0),
+          webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
+        },
+        contractSource: relevantContracts > 0 ? 'available' : 'none observed',
       evidenceQualityInput: {
         evidence_availability: {
           required: [],
@@ -451,22 +467,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         conflict_detection: { detected: false, count: 0 },
         citation_coverage: {},
       },
-        heldCongressDisclosures: relevantCongress,
-        heldPoliticalSignals: relevantPolitical,
-        macroRiskItems: macroRisks.length,
-        newsItems: news.length,
-        analystConsensus: {
-          status: analystLoading ? 'loading' : analystError ? 'failed' : analystConsensus
-            ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
-            : 'missing',
-          symbol: selectedAnalysis?.symbol || null,
-          source: analystConsensus?.source || null,
-          retrievedAt: analystConsensus?.retrievedAt || null,
-          freshness: analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown',
-          analystCount: Number(analystConsensus?.analystCount || 0),
-          webEvidenceCount: Array.isArray(analystConsensus?.webEvidence?.results) ? analystConsensus.webEvidence.results.length : Number(analystConsensus?.webEvidenceCount || 0),
-        },
-        contractSource: relevantContracts > 0 ? 'available' : 'none observed',
         congressSource: relevantCongress > 0 ? 'available' : 'none observed',
         politicalSource: relevantPolitical > 0 ? 'available' : 'none observed',
       },
