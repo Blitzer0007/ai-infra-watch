@@ -127,6 +127,7 @@ async function sendTelegram(events) {
   if (!botToken || !chatId) return { sent: 0, errors: ['Telegram credentials are not configured.'] };
 
   let sent = 0;
+  const sentEventKeys = [];
   const errors = [];
   for (const event of events) {
     try {
@@ -144,11 +145,12 @@ async function sendTelegram(events) {
         throw new Error(String(payload?.description || 'Telegram HTTP ' + response.status));
       }
       sent += 1;
+      sentEventKeys.push(event.stateKey);
     } catch (error) {
       errors.push(event.symbol + ': ' + String(error?.message || error));
     }
   }
-  return { sent, errors };
+  return { sent, sentEventKeys, errors };
 }
 
 function todayKey() {
@@ -286,14 +288,7 @@ async function evaluate() {
   }
 
   const delivery = await sendTelegram(events);
-  const deliveredKeys = new Set();
-  if (delivery.sent) {
-    // Events are delivered sequentially; rebuild the successful prefix when no per-event
-    // delivery identifier is returned. A partial failure is conservatively left retryable.
-    if (!delivery.errors.length && delivery.sent === events.length) {
-      events.forEach(event => deliveredKeys.add(event.stateKey));
-    }
-  }
+  const deliveredKeys = new Set(delivery.sentEventKeys || []);
 
   for (const symbol of watchedSymbols) {
     const q = quotes.get(symbol);
