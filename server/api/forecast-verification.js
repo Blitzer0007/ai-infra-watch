@@ -249,9 +249,28 @@ function forecastAnalytics(rows) {
     });
     return {bucket,...aggregate(subset)};
   });
+  const evidenceSnapshots = verified
+    .map(row => row.evidence_snapshot)
+    .filter(snapshot => snapshot && typeof snapshot === 'object');
+  const evidenceCoverage = {
+    forecastsWithSnapshot: evidenceSnapshots.length,
+    analystAvailable: evidenceSnapshots.filter(snapshot => snapshot?.analystConsensus?.status === 'available').length,
+    analystMissingOrFailed: evidenceSnapshots.filter(snapshot => snapshot?.analystConsensus?.status === 'missing' || snapshot?.analystConsensus?.status === 'failed').length,
+    withNews: evidenceSnapshots.filter(snapshot => Number(snapshot?.counts?.news) > 0).length,
+    withContracts: evidenceSnapshots.filter(snapshot => Number(snapshot?.counts?.contracts) > 0).length,
+    withPolitical: evidenceSnapshots.filter(snapshot => Number(snapshot?.counts?.political) > 0).length,
+    withMacro: evidenceSnapshots.filter(snapshot => Number(snapshot?.counts?.macro) > 0).length,
+    multiChannel: evidenceSnapshots.filter(snapshot => {
+      const counts = snapshot?.counts || {};
+      return ['news', 'contracts', 'political', 'macro'].filter(key => Number(counts[key]) > 0).length +
+        (snapshot?.analystConsensus?.status === 'available' ? 1 : 0) >= 2;
+    }).length,
+  };
+
   return {
     sampleSize:verified.length,
     sampleStatus: overall.sampleStatus,
+    evidenceCoverage,
     directionalAccuracyPct: overall.directionalAccuracyPct,
     medianAbsoluteError: overall.medianAbsoluteError,
     meanSignedErrorPct: overall.meanSignedErrorPct,
