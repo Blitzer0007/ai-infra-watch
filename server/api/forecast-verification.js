@@ -262,6 +262,12 @@ function forecastAnalytics(rows) {
     byScenario:grouped(row=>String(row.scenario_id||'unknown'),row=>({scenarioId:String(row.scenario_id||'unknown')})),
     byModel:grouped(row=>String(row.model_version||'analogue-v1'),row=>({modelVersion:String(row.model_version||'analogue-v1')})),
     byDirection,
+    validationGate: {
+      minimumRequired: 50,
+      verifiedCount: verified.length,
+      ready: verified.length >= 50,
+      status: verified.length >= 50 ? '50+ validated forecasts' : 'building validation sample',
+    },
     longTerm:{
       verifiedCount:verified.length,
       oldestVerifiedAt:verified.map(row=>row.verified_at).filter(Boolean).sort()[0]||null,
@@ -342,10 +348,11 @@ export default async function handler(req, res) {
         });
       }
 
-      const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=100', { headers: headers() });
+      const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=500', { headers: headers() });
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to load forecasts.' });
-      return send(res, 200, { forecasts: data.map(normalize), analytics: forecastAnalytics(data) });
+      const analytics = forecastAnalytics(data);
+      return send(res, 200, { forecasts: data.map(normalize), analytics });
     }
 
     if (req.method === 'POST') {
