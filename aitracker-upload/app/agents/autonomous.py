@@ -1384,29 +1384,25 @@ class AutonomousMCPAgent:
         evidence_enabled = _needs_evidence_gate(question) and self.jev.enabled
         step_limit = self.max_steps + (2 if evidence_enabled else 0)
 
-        for iteration in range(1, step_limit + 1):
-            # Record the JEV route before any deterministic driver planning.
-            # This must happen even when the available test/tool catalog cannot
-            # satisfy the full driver evidence sequence (including max_steps=1).
-            if (
-                iteration == 1
-                and self.jev.enabled
-                and not self.last_jev
-                and any(
-                    term in question.lower()
-                    for term in (
-                        "driver", "drivers", "why", "cause", "causes",
-                        "catalyst", "catalysts", "changed recently", "what changed",
-                    )
-                )
-            ):
-                self.last_jev = _record_jev_route(
-                    question,
-                    tools,
-                    self.jev,
-                    action="forced_driver_plan",
-                )
+        # Record the driver JEV route before entering the execution loop. This
+        # makes the route state deterministic and independent of which planning
+        # branch is selected later in the iteration.
+        is_driver_question = any(
+            term in question.lower()
+            for term in (
+                "driver", "drivers", "why", "cause", "causes",
+                "catalyst", "catalysts", "changed recently", "what changed",
+            )
+        )
+        if self.jev.enabled and is_driver_question and not self.last_jev:
+            self.last_jev = _record_jev_route(
+                question,
+                tools,
+                self.jev,
+                action="forced_driver_plan",
+            )
 
+        for iteration in range(1, step_limit + 1):
             gate = self.last_jev.get("evidence_gate") or {}
             successful_count = sum(1 for call in calls if call.ok)
             gate_checked = int(gate.get("checked_after_successful_calls", 0) or 0)
