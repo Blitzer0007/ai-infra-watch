@@ -24,11 +24,15 @@ function sampleStatus(count) {
 }
 
 export function summarizeForecastRows(rows = []) {
-  const verified = rows.filter(row =>
-    String(row?.status || 'verified') === 'verified' &&
-    Number.isFinite(Number(row?.actual_return)) &&
-    Number.isFinite(Number(row?.median))
-  );
+  const verified = rows.filter(row => {
+    const actualRaw = row?.actual_return;
+    const medianRaw = row?.median;
+    return String(row?.status || 'verified') === 'verified' &&
+      actualRaw !== null && actualRaw !== undefined && actualRaw !== '' &&
+      medianRaw !== null && medianRaw !== undefined && medianRaw !== '' &&
+      Number.isFinite(Number(actualRaw)) &&
+      Number.isFinite(Number(medianRaw));
+  });
 
   const eligible = verified.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
   const signedErrors = verified
