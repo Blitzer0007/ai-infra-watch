@@ -73,14 +73,14 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           <div className="text-2xl font-black mt-2">Evidence Availability</div>
           <div className="text-xs text-white/45 mt-1">What evidence is currently available to the research engine, and where fallbacks or gaps exist.</div>
         </div>
-        <button onClick={onRefresh} disabled={isLoading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-mono uppercase text-white/60 hover:text-white disabled:opacity-40">
+        <button aria-label="Refresh evidence data" onClick={onRefresh} disabled={isLoading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-mono uppercase text-white/60 hover:text-white disabled:opacity-40">
           <RefreshCw className={isLoading ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} /> Refresh evidence
         </button>
       </div>
 
       {error && <div className="rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-200">{error}</div>}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3" aria-label="Data health summary">
         <Metric label="Healthy" value={healthy} icon={<ShieldCheck className="w-4 h-4"/>}/>
         <Metric label="Aging" value={aging} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Stale" value={stale} icon={<Activity className="w-4 h-4"/>}/>
@@ -90,9 +90,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <Metric label="Total channels" value={entries.length} icon={<ShieldAlert className="w-4 h-4"/>}/>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden">
+      <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden" aria-label="Evidence channel health">
         <div className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 border-b border-white/10 text-[9px] font-mono uppercase tracking-widest text-white/35">
-          <span>Evidence channel</span><span>Status</span>
+          <span>Evidence channel</span><span className="text-right">Status</span>
         </div>
         {entries.map(([key, item]) => {
           const status = String(item?.status || 'NOT_FOUND');

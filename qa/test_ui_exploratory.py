@@ -121,3 +121,14 @@ def test_exploratory_global_table_accessibility(page):
         table = _table_with_header(page, label)
         assert table.locator("thead").count() == 1
         assert table.locator("tbody").count() == 1
+
+
+def test_exploratory_data_health_summary_and_refresh(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.goto("/health", wait_until="domcontentloaded")
+    page.get_by_text("Evidence Availability").wait_for(state="visible", timeout=30000)
+    assert page.get_by_label("Data health summary").is_visible()
+    assert page.get_by_label("Evidence channel health").is_visible()
+    refresh = page.get_by_role("button", name="Refresh evidence data")
+    assert refresh.is_visible()
