@@ -1254,8 +1254,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' pp'}</div></div>
           </div>
           <div className="text-[9px] font-mono text-white/35">{forecastAnalytics.validationGate?.verifiedCount || forecastAnalytics.sampleSize} verified forecasts · minimum validation sample: {forecastAnalytics.validationGate?.minimumRequired || FORECAST_VALIDATION_MINIMUM}</div>
-          <div className="overflow-x-auto"><DataTable
-          rows={forecastAnalytics.byTickerHorizon.slice(0, 12)}
+          <div className="overflow-x-auto"><DataTable<any>
+          rows={forecastAnalytics.byTickerHorizon.slice(0, 12) as any[]}
           rowKey={(row, index) => String(row.ticker) + String(row.horizon) + index}
           empty="No verified forecast history is available yet."
           initialSort={{ key: 'ticker', direction: 'asc' }}
