@@ -12,7 +12,7 @@ const rules = [
   { name: 'OpenAI secret key', re: /sk-[A-Za-z0-9]{20,}/ },
   { name: 'GitHub token', re: /gh[pousr]_[A-Za-z0-9_]{20,}/ },
   { name: 'AWS access key', re: /AKIA[0-9A-Z]{16}/ },
-  { name: 'hard-coded bearer token', re: /Authorization\\s*[:=]\\s*["']Bearer\\s+[A-Za-z0-9._-]{20,}["']/i },
+  { name: 'hard-coded bearer token', re: /Authorization\s*[:=]\s*["']Bearer\s+[A-Za-z0-9._-]{20,}["']/i },
 ];
 
 const findings = [];
