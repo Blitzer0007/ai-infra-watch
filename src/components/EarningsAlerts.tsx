@@ -44,10 +44,19 @@ type EarningsResponse = {
   lookahead_days?: number;
   upcoming?: EarningsAlert[];
   historical?: Record<string, HistoricalEarnings[]>;
-  notification?: { configured?: boolean; sent?: number; error?: string | null };
+  notification?: {
+    configured?: boolean;
+    sent?: number;
+    error?: string | null;
+    channels?: {
+      webhook?: { configured?: boolean; sent?: number; error?: string | null } | null;
+      telegram?: { configured?: boolean; sent?: number; error?: string | null } | null;
+    };
+  };
   configuration?: {
     finnhub_configured?: boolean;
     webhook_configured?: boolean;
+    telegram_configured?: boolean;
     cron_secret_configured?: boolean;
   };
   error?: string | null;
@@ -169,7 +178,9 @@ export default function EarningsAlerts() {
     ? historicalRows
     : historicalRows.filter(row => row.symbol === historySymbolFilter);
 
-  const serverReady = Boolean(data?.configuration?.finnhub_configured && data?.configuration?.webhook_configured);
+  const telegramReady = Boolean(data?.configuration?.telegram_configured);
+  const webhookReady = Boolean(data?.configuration?.webhook_configured);
+  const serverReady = Boolean(data?.configuration?.finnhub_configured && (telegramReady || webhookReady));
 
   return (
     <section className="max-w-7xl mx-auto mb-6 rounded-2xl border border-amber-400/20 bg-amber-400/[0.03] p-4 md:p-5">
@@ -214,6 +225,12 @@ export default function EarningsAlerts() {
             }>
               Server alert {serverReady ? 'ready' : 'needs Vercel env'}
             </span>
+            <span className={telegramReady
+              ? 'rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-cyan-300'
+              : 'rounded border border-white/10 bg-white/5 px-2 py-1 text-white/25'
+            }>
+              Telegram {telegramReady ? 'ready' : 'not configured'}
+            </span>
 
             <button
               onClick={enableBrowserAlerts}
@@ -227,6 +244,7 @@ export default function EarningsAlerts() {
         <div className="rounded-xl border border-white/5 bg-black/15 px-3 py-2 text-[9px] font-mono text-white/30">
           <span className="text-white/50">Server alert schedule:</span> daily pre-earnings check at 08:30 IST ·
           <span className="text-white/50"> Calendar:</span> Finnhub earnings calendar ·
+          <span className="text-white/50"> Telegram:</span> direct server delivery when configured ·
           <span className="text-white/50"> Dashboard refresh:</span> every 15 minutes ·
           <span className="text-white/50"> Browser alert:</span> only while this dashboard is open
         </div>
@@ -407,7 +425,8 @@ export default function EarningsAlerts() {
           <div className="flex items-start gap-2 rounded-xl border border-white/5 bg-black/15 p-3 text-[9px] leading-relaxed text-white/35">
             <CheckCircle2 className="mt-0.5 w-3.5 h-3.5 text-amber-300/70 flex-shrink-0" />
             <p>
-              To make the alert independent of the open browser, set <span className="text-white/65">FINNHUB_API_KEY</span> and
+              To make the alert independent of the open browser, set <span className="text-white/65">FINNHUB_API_KEY</span> and either
+              <span className="text-white/65"> TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID</span> or
               <span className="text-white/65"> NOTIFY_WEBHOOK_URL</span> in Vercel, then set matching <span className="text-white/65">CRON_SECRET</span> in Vercel
               and <span className="text-white/65">AIW_CRON_SECRET</span> in GitHub Actions secrets.
             </p>
