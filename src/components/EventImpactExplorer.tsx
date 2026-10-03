@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, ShieldAlert } from 'lucide-react';
 import JevDecisionPanel from './JevDecisionPanel';
-import { FilterSelect } from './FilterControls';
+import { FilterBar, FilterSelect } from './FilterControls';
+import DataTable, { type DataTableColumn } from './DataTable';
 import { summarizeSample } from '../utils/measurement';
 
 type HistoryPoint = { date: string; price: number };
@@ -370,10 +371,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
 
       {!loading && !error && rows.length > 0 && (
         <>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[.02] p-3">
-            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">
-              Table filter · {visibleRows.length} of {rows.length} events
-            </div>
+          <div className="mb-3">
+            <FilterBar resultCount={visibleRows.length} totalCount={rows.length} onClear={() => setCategoryFilter('all')}>
             <FilterSelect
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -385,73 +384,38 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 <option key={category} value={category}>{category}</option>
               ))}
             </FilterSelect>
+            </FilterBar>
           </div>
 
-          <div className="overflow-x-auto max-h-[560px] overflow-y-auto border border-white/5 rounded-xl aiw-scroll-region">
-          <table className="w-full text-[10px] font-mono">
-            <thead className="bg-white/[.03] text-white/35 uppercase tracking-wider">
-              <tr>
-                <th className="text-left p-3">Event</th>
-                <th className="text-left p-3">Date</th>
-                <th className="text-right p-3">Event Day</th>
-                <th className="text-right p-3">Next Trading Day</th>
-                <th className="text-right p-3">5th Trading Day</th>
-                <th className="text-right p-3">20th Trading Day</th>
-                <th className="text-right p-3">Next Trading Day vs Market</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map(({ event, reaction }) => {
-                const t1Relative = reaction
-                  ? relative(reaction.t1, reaction.spyT1)
-                  : null;
-
-                return (
-                  <tr key={event.id} className="border-t border-white/5 align-top">
-                    <td className="p-3 min-w-[240px]">
+          <div className="max-h-[560px] overflow-y-auto aiw-scroll-region">
+            <DataTable
+              rows={visibleRows}
+              rowKey={({ event }) => event.id}
+              initialSort={{ key: 'date', direction: 'desc' }}
+              columns={[
+                {
+                  key: 'event',
+                  header: 'Event',
+                  accessor: row => row.event.title,
+                  render: ({ event }) => (
+                    <div className="min-w-[240px]">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-white font-bold">{event.title}</div>
-                        <span className="px-2 py-0.5 rounded border border-white/10 bg-white/[.03] text-[8px] uppercase tracking-wider text-white/45">
-                          {event.category || 'Other'}
-                        </span>
+                        <span className="px-2 py-0.5 rounded border border-white/10 bg-white/[.03] text-[8px] uppercase tracking-wider text-white/45">{event.category || 'Other'}</span>
                       </div>
-                      <div className="text-white/25 mt-1">
-                        {event.description || event.source || 'SEC EDGAR'}
-                      </div>
-                      {event.url && (
-                        <a
-                          className="text-cyan-300 hover:text-cyan-200 underline mt-1 inline-block"
-                          href={event.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          SEC filing
-                        </a>
-                      )}
-                    </td>
-                    <td className="p-3 whitespace-nowrap text-white/50">{event.date}</td>
-                    <td className="p-3 text-right text-white">
-                      {reaction?.eventPrice != null
-                        ? '$' + reaction.eventPrice.toFixed(2)
-                        : '—'}
-                    </td>
-                    <td className={'p-3 text-right font-bold ' + tone(reaction?.t1 ?? null)}>
-                      {formatPct(reaction?.t1 ?? null)}
-                    </td>
-                    <td className={'p-3 text-right font-bold ' + tone(reaction?.t5 ?? null)}>
-                      {formatPct(reaction?.t5 ?? null)}
-                    </td>
-                    <td className={'p-3 text-right font-bold ' + tone(reaction?.t20 ?? null)}>
-                      {formatPct(reaction?.t20 ?? null)}
-                    </td>
-                    <td className={'p-3 text-right font-bold ' + tone(t1Relative)}>
-                      {formatPct(t1Relative)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <div className="text-white/25 mt-1">{event.description || event.source || 'SEC EDGAR'}</div>
+                      {event.url && <a className="text-cyan-300 hover:text-cyan-200 underline mt-1 inline-block" href={event.url} target="_blank" rel="noreferrer">SEC filing</a>}
+                    </div>
+                  )
+                },
+                { key: 'date', header: 'Date', accessor: row => row.event.date, type: 'date', className: 'whitespace-nowrap' },
+                { key: 'eventPrice', header: 'Event Day', accessor: row => row.reaction?.eventPrice ?? null, type: 'currency', align: 'right', render: row => row.reaction?.eventPrice != null ? '$' + row.reaction.eventPrice.toFixed(2) : '—' },
+                { key: 't1', header: 'Next Trading Day', accessor: row => row.reaction?.t1 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t1 ?? null)}>{formatPct(row.reaction?.t1 ?? null)}</span> },
+                { key: 't5', header: '5th Trading Day', accessor: row => row.reaction?.t5 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t5 ?? null)}>{formatPct(row.reaction?.t5 ?? null)}</span> },
+                { key: 't20', header: '20th Trading Day', accessor: row => row.reaction?.t20 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t20 ?? null)}>{formatPct(row.reaction?.t20 ?? null)}</span> },
+                { key: 'relative', header: 'Next Day vs Market', accessor: row => row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null, type: 'percent', align: 'right', render: row => { const value = row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null; return <span className={'font-bold ' + tone(value)}>{formatPct(value)}</span>; } }
+              ] satisfies DataTableColumn<(typeof visibleRows)[number]>[]}
+            />
           </div>
         </>
       )}

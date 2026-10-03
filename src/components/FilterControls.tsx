@@ -46,3 +46,23 @@ export function FilterSelect({ label, children, className = '', ...props }: Filt
     </select>
   );
 }
+
+export function FilterBar({ children, resultCount, totalCount, onClear, clearLabel = 'Clear filters' }: {
+  children: ReactNode;
+  resultCount?: number;
+  totalCount?: number;
+  onClear?: () => void;
+  clearLabel?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[.02] p-3" role="group" aria-label="Table filters">
+      <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">{children}</div>
+      {(resultCount != null || onClear) && (
+        <div className="flex items-center gap-2 shrink-0">
+          {resultCount != null && <span className="text-[9px] font-mono text-white/35" aria-live="polite">{totalCount != null ? resultCount + ' of ' + totalCount : resultCount + ' results'}</span>}
+          {onClear && <button type="button" onClick={onClear} className="min-h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-[9px] font-mono uppercase tracking-wider text-white/55 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50">{clearLabel}</button>}
+        </div>
+      )}
+    </div>
+  );
+}
