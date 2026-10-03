@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, ShieldAlert } from 'lucide-react';
 import JevDecisionPanel from './JevDecisionPanel';
-import { FilterSelect } from './FilterControls';
+import { FilterBar, FilterSelect } from './FilterControls';
 import DataTable, { type DataTableColumn } from './DataTable';
 import { summarizeSample } from '../utils/measurement';
 
@@ -371,10 +371,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
 
       {!loading && !error && rows.length > 0 && (
         <>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[.02] p-3">
-            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">
-              Table filter · {visibleRows.length} of {rows.length} events
-            </div>
+          <div className="mb-3">
+            <FilterBar resultCount={visibleRows.length} totalCount={rows.length} onClear={() => setCategoryFilter('all')}>
             <FilterSelect
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -386,6 +384,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 <option key={category} value={category}>{category}</option>
               ))}
             </FilterSelect>
+            </FilterBar>
           </div>
 
           <div className="max-h-[560px] overflow-y-auto aiw-scroll-region">
