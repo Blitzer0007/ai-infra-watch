@@ -214,3 +214,52 @@ def test_jev_assessment_cannot_override_measured_evidence_quality():
 def test_measured_evidence_quality_unknown_state_does_not_claim_strength():
     result = measured_evidence_quality({})
     assert result is None
+
+
+class _FakeChoiceAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "context": JevAnswer(
+                    type="choice",
+                    choice="supportive",
+                    confidence=1.4,
+                ),
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                ),
+            },
+            model="test",
+        )
+
+
+def test_jev_confidence_is_bounded_and_capped_by_measured_evidence():
+    state = measured_state(
+        ["analyst_consensus"],
+        [{"freshness": {"status": "FRESH"}}],
+    )
+    result = assess("portfolio", state, client=_FakeChoiceAssessmentClient())
+    assert result.answers["context"].confidence == 1.0 / 3.0
+    assert result.answers["evidence_quality"].confidence == 1.0 / 3.0
+
+
+class _NoEvidenceAssessmentClient:
+    def evaluate(self, *, state, questions):
+        return JevEvaluation(
+            answers={
+                "evidence_quality": JevAnswer(
+                    type="score",
+                    score=3.0,
+                    confidence=0.99,
+                )
+            },
+            model="test",
+        )
+
+
+def test_jev_confidence_is_zero_when_no_measured_evidence_exists():
+    state = measured_state([])
+    result = assess("research", state, client=_NoEvidenceAssessmentClient())
+    assert result.answers["evidence_quality"].confidence == 0.0
