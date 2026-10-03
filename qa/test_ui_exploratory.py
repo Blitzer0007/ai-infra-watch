@@ -137,7 +137,7 @@ def test_exploratory_universal_search_pages_and_tickers(page):
 
     search.fill("portfolio")
     page.wait_for_timeout(100)
-    page.get_by_role("button", name="Portfolio Intelligence").click()
+    dialog.get_by_role("button", name="Portfolio Intelligence Holdings, exposure, attribution and stress").click()
     assert "/portfolio" in page.url
 
 def test_exploratory_universal_search_keyboard_shortcut(page):
