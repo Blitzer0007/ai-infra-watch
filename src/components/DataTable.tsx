@@ -60,7 +60,7 @@ export default function DataTable<T>({
               {columns.map(column => {
                 const active = sort?.key === column.key;
                 return (
-                  <th key={column.key} scope="col" className={'p-3 whitespace-nowrap ' + align(column.align) + ' ' + (column.className || '')}>
+                  <th key={column.key} scope="col" aria-sort={active ? (sort?.direction === 'asc' ? 'ascending' : 'descending') : 'none'} className={'p-3 whitespace-nowrap ' + align(column.align) + ' ' + (column.className || '')}>
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 min-h-8 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 rounded"
