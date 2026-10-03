@@ -59,7 +59,7 @@ export function normalizeAnalystConsensus(input: AnalystConsensusInput): Analyst
     Math.round(finite(input.analystCount) ?? RATING_KEYS.reduce((sum, key) => sum + ratings[key], 0)),
   );
   const percentages = RATING_KEYS.reduce((result, key) => {
-    result[key] = analystCount > 0 ? (ratings[key] / analystCount) * 100 : 0;
+    result[key] = analystCount > 0 ? Number(((ratings[key] / analystCount) * 100).toFixed(2)) : 0;
     return result;
   }, {} as Record<keyof AnalystRecommendationCounts, number>);
 
