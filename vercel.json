@@ -33,6 +33,10 @@
       "destination": "/api/market?route=alert-notify"
     },
     {
+      "source": "/api/forecast-validation",
+      "destination": "/api/market?route=forecast-validation"
+    },
+    {
       "source": "/api/ai-quality",
       "destination": "/api/quality?route=ai-quality"
     },
