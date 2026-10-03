@@ -209,3 +209,8 @@ def test_jev_assessment_cannot_override_measured_evidence_quality():
     answer = result.answers["evidence_quality"]
     assert answer.score == 1.0
     assert answer.confidence == 1.0 / 3.0
+
+
+def test_measured_evidence_quality_unknown_state_does_not_claim_strength():
+    result = measured_evidence_quality({})
+    assert result is None
