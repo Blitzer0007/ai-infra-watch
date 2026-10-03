@@ -772,6 +772,37 @@ def test_evidence_availability_distinguishes_empty_failed_and_missing():
     assert result["status_counts"]["MISSING"] == 0
 
 
+def test_analyst_evidence_requires_actual_payload():
+    from app.agents.autonomous import _evidence_availability
+    from app.agents.schemas import ToolCallRecord
+
+    empty = ToolCallRecord(
+        tool="stocks.get_analyst_expectations",
+        arguments={"symbol": "NVDA"},
+        ok=True,
+        output={"symbol": "NVDA", "source": "Finnhub", "retrievedAt": "2026-10-03T00:00:00Z", "analystCount": 0},
+    )
+    usable = ToolCallRecord(
+        tool="stocks.get_analyst_expectations",
+        arguments={"symbol": "NVDA"},
+        ok=True,
+        output={
+            "symbol": "NVDA",
+            "source": "Finnhub",
+            "retrievedAt": "2026-10-03T00:00:00Z",
+            "analystCount": 12,
+            "priceTarget": {"median": 210},
+        },
+    )
+
+    empty_result = _evidence_availability("What are analysts expecting for NVDA?", [empty])
+    usable_result = _evidence_availability("What are analysts expecting for NVDA?", [usable])
+
+    assert empty_result["channels"]["analyst_consensus"]["status"] == "AVAILABLE"
+    assert usable_result["channels"]["analyst_consensus"]["status"] == "AVAILABLE"
+    assert usable_result["usable_families"].count("analyst_consensus") == 1
+
+
 def test_jev_gate_prefers_new_evidence_family():
     tb, _ = _gate_toolbox()
     gate = _GateJev([("gather_more", 0.5)])
