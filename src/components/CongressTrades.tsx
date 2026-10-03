@@ -564,7 +564,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
 
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">
-          <DataTable
+          <DataTable<CongressTrade>
             rows={filtered}
             rowKey={(row) => row.id}
             loading={loading || globalLoading}
