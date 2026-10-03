@@ -1,0 +1,41 @@
+name: Server Smart Alerts
+run-name: Server Smart Alerts • ${{ github.event.schedule || 'manual' }}
+
+on:
+  schedule:
+    # Evaluate server-side price/Smart Move alerts every 10 minutes.
+    # Catalyst feeds are scanned every 30 minutes by the endpoint to reduce upstream load.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: server-smart-alerts
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Evaluate and deliver smart alerts
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Run server smart alert evaluator
+        env:
+          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AIW_CRON_SECRET" ]; then
+            echo "::error::Missing AIW_CRON_SECRET repository secret."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $AIW_CRON_SECRET" \
+            --header "User-Agent: ai-infra-watch-github-actions/1.0" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 3 \
+            "https://ai-infra-watch-theta.vercel.app/api/server-alerts?scheduled=1"
+
+      - name: Record completion
+        run: echo "Server smart alert evaluation completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
