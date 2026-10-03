@@ -18,6 +18,13 @@ def _assert_sort_control(table, label: str):
         f"Table header '{label}' is not interactive/sortable; "
         "expected a button or role=button."
     )
+    if has_button:
+        button = header.locator("button").first
+        assert button.get_attribute("aria-sort") in ("none", "ascending", "descending")
+        button.click()
+        assert button.get_attribute("aria-sort") == "ascending"
+        button.click()
+        assert button.get_attribute("aria-sort") == "descending"
 
 
 def test_exploratory_sorting_congress(page):
