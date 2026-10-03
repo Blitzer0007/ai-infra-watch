@@ -50,7 +50,7 @@ jobs:
         env:
           QA_BASE_URL: http://127.0.0.1:3000
           QA_UI_MOCKS: "true"
-        run: python -m pytest -q qa/test_ui.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py
 
   api:
     name: API contract validation
@@ -104,4 +104,4 @@ jobs:
           QA_BASE_URL: ${{ vars.QA_BASE_URL }}
           QA_HEADERS_JSON: ${{ secrets.QA_HEADERS_JSON }}
           QA_STORAGE_STATE_B64: ${{ secrets.QA_STORAGE_STATE_B64 }}
-        run: python -m pytest -q qa/test_ui.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py
