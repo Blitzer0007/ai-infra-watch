@@ -1431,8 +1431,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
           </div>
-          <div className="overflow-x-auto"><DataTable
-            rows={matrix.details}
+          <div className="overflow-x-auto"><DataTable<any>
+            rows={matrix.details as any[]}
             rowKey={(row) => row.ticker + '-' + row.horizon}
             empty="No forecast validation matrix rows available."
             initialSort={{ key: 'ticker', direction: 'asc' }}
