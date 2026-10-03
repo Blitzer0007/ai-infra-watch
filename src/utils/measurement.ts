@@ -259,7 +259,91 @@ export function comparePortfolioToBenchmarks(
   return results;
 }
 
-export type StressInput = {
+
+export type PortfolioHoldingHistoryInput = {
+  symbol: string;
+  quantity: number;
+  averageCost: number;
+};
+
+export type PortfolioHistoryValuePoint = {
+  date: string;
+  value: number;
+  normalizedValue: number;
+};
+
+export type PortfolioCorrelation = {
+  symbols: string[];
+  values: Record<string, Record<string, number | null>>;
+  sampleDays: Record<string, Record<string, number>>;
+};
+
+function pearsonCorrelation(a: number[], b: number[]): number | null {
+  if (a.length < 5 || a.length !== b.length) return null;
+  const meanA = a.reduce((sum, value) => sum + value, 0) / a.length;
+  const meanB = b.reduce((sum, value) => sum + value, 0) / b.length;
+  const centeredA = a.map(value => value - meanA);
+  const centeredB = b.map(value => value - meanB);
+  const numerator = centeredA.reduce((sum, value, index) => sum + value * centeredB[index], 0);
+  const denominator = Math.sqrt(
+    centeredA.reduce((sum, value) => sum + value ** 2, 0) *
+    centeredB.reduce((sum, value) => sum + value ** 2, 0),
+  );
+  return denominator > 0 ? numerator / denominator : null;
+}
+
+export function buildPortfolioHistoryValue(
+  histories: Record<string, HistoricalPricePoint[]>,
+  holdings: PortfolioHoldingHistoryInput[],
+): PortfolioHistoryValuePoint[] {
+  const active = holdings.filter(item =>
+    Number.isFinite(item.quantity) && item.quantity > 0 && Array.isArray(histories[item.symbol]) && histories[item.symbol].length,
+  );
+  if (!active.length) return [];
+  const priceMaps = Object.fromEntries(
+    active.map(item => [
+      item.symbol,
+      new Map(histories[item.symbol].map(point => [point.date, point.price])),
+    ]),
+  ) as Record<string, Map<string, number>>;
+  const dates = [...new Set(active.flatMap(item => [...priceMaps[item.symbol].keys()]))].sort();
+  const rows = dates.map(date => {
+    const available = active
+      .map(item => ({ item, price: priceMaps[item.symbol].get(date) }))
+      .filter(row => Number.isFinite(row.price)) as Array<{ item: PortfolioHoldingHistoryInput; price: number }>;
+    if (!available.length) return null;
+    const value = available.reduce((sum, row) => sum + row.item.quantity * row.price, 0);
+    return { date, value };
+  }).filter((row): row is { date: string; value: number } => row != null && row.value > 0);
+  const firstValue = rows[0]?.value ?? null;
+  return rows.map(row => ({
+    ...row,
+    normalizedValue: firstValue ? (row.value / firstValue) * 100 : 100,
+  }));
+}
+
+export function calculatePortfolioCorrelation(
+  histories: Record<string, HistoricalPricePoint[]>,
+  symbols: string[],
+): PortfolioCorrelation {
+  const selected = symbols.filter(symbol => Array.isArray(histories[symbol]) && histories[symbol].length);
+  const returns = Object.fromEntries(selected.map(symbol => [symbol, returnMap(histories[symbol])])) as Record<string, Map<string, number>>;
+  const values: Record<string, Record<string, number | null>> = {};
+  const sampleDays: Record<string, Record<string, number>> = {};
+  selected.forEach(left => {
+    values[left] = {};
+    sampleDays[left] = {};
+    selected.forEach(right => {
+      const dates = [...returns[left].keys()].filter(date => returns[right].has(date)).sort();
+      const a = dates.map(date => returns[left].get(date) as number);
+      const b = dates.map(date => returns[right].get(date) as number);
+      values[left][right] = left === right ? 1 : pearsonCorrelation(a, b);
+      sampleDays[left][right] = dates.length;
+    });
+  });
+  return { symbols: selected, values, sampleDays };
+}
+\nexport type StressInput = {
   dailyChanges: number[];
   highMacroCount: number;
   mediumMacroCount: number;
