@@ -38,9 +38,11 @@ async function verifyDueForecasts() {
     try {
       const marketData = await routedHistory(String(forecast.ticker).toUpperCase(), '5y');
       const points = marketData.points || [];
-      const point = points.find(item => item.date >= forecast.target_date) || points[points.length - 1];
+      // Never verify against a point before the forecast target date.
+      // If the market history has not reached the target yet, leave it pending.
+      const point = points.find(item => item.date >= forecast.target_date);
       if (!point || !(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
-        throw new Error('No usable market point yet.');
+        throw new Error('No market point on or after the target date yet.');
       }
 
       const actualReturn = (Number(point.price) / Number(forecast.entry_price) - 1) * 100;
