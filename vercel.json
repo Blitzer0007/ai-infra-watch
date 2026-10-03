@@ -51,7 +51,19 @@
     },
     {
       "path": "/api/portfolio-digest",
-      "schedule": "0 23 * * *"
+      "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/portfolio-digest",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/portfolio-digest",
+      "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/portfolio-digest",
+      "schedule": "30 16 * * *"
     },
     {
       "path": "/api/signal-scorecard",

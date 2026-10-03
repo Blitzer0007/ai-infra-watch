@@ -75,12 +75,13 @@ export default async function handler(req, res) {
   if (!requireAccess(req, res)) return;
 
   if (req.method === 'GET') {
+    const botTokenConfigured = Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim());
+    const chatIdConfigured = Boolean(String(process.env.TELEGRAM_CHAT_ID || '').trim());
     return res.status(200).json({
       ok: true,
-      telegram_configured: Boolean(
-        String(process.env.TELEGRAM_BOT_TOKEN || '').trim()
-        && String(process.env.TELEGRAM_CHAT_ID || '').trim()
-      ),
+      telegram_configured: botTokenConfigured && chatIdConfigured,
+      telegram_bot_token_configured: botTokenConfigured,
+      telegram_chat_id_configured: chatIdConfigured,
     });
   }
 
