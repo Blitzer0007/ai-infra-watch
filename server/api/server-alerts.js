@@ -1,11 +1,11 @@
 import { requireAccess } from '../../api/_access-auth.js';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
-const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-
 const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
 const MAX_SMART_ALERTS_PER_SCAN = 10;
+
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
 function isCron(req) {
   const secret = String(process.env.CRON_SECRET || '').trim();
@@ -223,16 +223,17 @@ async function evaluate() {
     for (const symbol of watchedSymbols) {
       const q = quotes.get(symbol);
       const magnitude = Math.abs(q?.changePct ?? 0);
+
       if (!q || magnitude < threshold) {
         for (const direction of ['up', 'down']) {
-          const staleKey = 'large-move:' + symbol + ':' + direction;
-          const priorState = states.get(staleKey);
-          if (priorState?.active) {
+          const key = 'large-move:' + symbol + ':' + direction;
+          const previous = states.get(key);
+          if (previous?.active) {
             stateUpdates.push({
-              event_key: staleKey,
+              event_key: key,
               active: false,
               last_seen_at: timestamp,
-              last_triggered_at: priorState.last_triggered_at || null,
+              last_triggered_at: previous.last_triggered_at || null,
               metadata: { symbol, type: 'large-move', direction, threshold },
             });
           }
@@ -244,7 +245,8 @@ async function evaluate() {
       const key = 'large-move:' + symbol + ':' + direction;
       const previous = states.get(key);
       const lastTriggered = previous?.last_triggered_at ? Date.parse(previous.last_triggered_at) : 0;
-      const inCooldown = Number.isFinite(lastTriggered) && lastTriggered > 0 && (Date.parse(timestamp) - lastTriggered) < LARGE_MOVE_COOLDOWN_MS;
+      const elapsedMs = lastTriggered > 0 ? Date.parse(timestamp) - lastTriggered : Number.POSITIVE_INFINITY;
+      const inCooldown = elapsedMs < LARGE_MOVE_COOLDOWN_MS;
       if (previous?.active && inCooldown) continue;
 
       const severity = magnitude >= threshold * LARGE_MOVE_CRITICAL_MULTIPLIER ? 'critical' : 'high';
@@ -360,7 +362,7 @@ export default async function handler(req, res) {
 }
  + q.price.toFixed(2) + '. ' +
           (severity === 'critical'
-            ? 'Move is at least ' + (LARGE_MOVE_CRITICAL_MULTIPLIER * threshold).toFixed(2) + '%.'
+            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
             : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
         source: 'Yahoo Finance quote',
       });
