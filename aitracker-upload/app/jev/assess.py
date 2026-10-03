@@ -263,7 +263,19 @@ def assess(kind: str, state: Any, client: JevClient | None = None) -> JevEvaluat
         questions=questions,
     )
     measured = measured_evidence_quality(state)
+    if evaluation.usable:
+        for answer in evaluation.answers.values():
+            if answer.confidence is None:
+                continue
+            # JEV confidence is a probability-like value. Keep the API contract
+            # bounded even if an upstream response returns an invalid number.
+            answer.confidence = max(0.0, min(1.0, float(answer.confidence)))
+
     if measured and evaluation.usable:
+        evidence_cap = max(0.0, min(1.0, measured["score"] / 3.0))
+        for answer in evaluation.answers.values():
+            if answer.confidence is not None:
+                answer.confidence = min(answer.confidence, evidence_cap)
         answer = evaluation.answers.get("evidence_quality")
         if answer is not None:
             # Evidence quality is a measured property of retrieved evidence.
