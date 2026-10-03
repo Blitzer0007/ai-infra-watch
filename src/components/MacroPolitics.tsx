@@ -5,7 +5,6 @@ import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/por
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
 import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
-import DataTable from './DataTable';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
@@ -89,21 +88,32 @@ function PortfolioScenarioSensitivity({
       </div>
 
       <div className="overflow-x-auto">
-        <DataTable
-        rows={portfolioRows}
-        columns={[
-          { key: 'symbol', header: 'Holding', accessor: row => row.symbol, type: 'text' },
-          { key: 'portfolioWeight', header: 'Portfolio wt.', accessor: row => row.portfolioWeight, type: 'percent', align: 'right', render: row => row.portfolioWeight.toFixed(1) + '%' },
-          { key: 'taiwan', header: 'TSMC', accessor: row => row.taiwan.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /> },
-          { key: 'power', header: 'Power', accessor: row => row.power.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.power.level} basis={row.power.basis} /> },
-          { key: 'export', header: 'Export', accessor: row => row.export.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
-          { key: 'sensitivity', header: 'Sensitivity', accessor: row => row.sensitivity, type: 'number', align: 'right', render: row => row.sensitivity + '/100' },
-          { key: 'weightedContribution', header: 'Weighted contribution', accessor: row => row.weightedContribution, type: 'number', align: 'right', render: row => row.weightedContribution.toFixed(1) },
-        ]}
-        rowKey={row => row.symbol}
-        initialSort={{ key: 'sensitivity', direction: 'desc' }}
-        empty="No portfolio exposure data available."
-      />
+        <table className="w-full min-w-[900px] text-[10px] font-mono">
+          <thead className="text-white/30 uppercase tracking-wider">
+            <tr>
+              <th className="text-left p-2">Holding</th>
+              <th className="text-right p-2">Portfolio wt.</th>
+              <th className="text-center p-2">TSMC</th>
+              <th className="text-center p-2">Power</th>
+              <th className="text-center p-2">Export</th>
+              <th className="text-right p-2">Sensitivity</th>
+              <th className="text-right p-2">Weighted contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {portfolioRows.map((row) => (
+              <tr key={row.symbol} className="border-t border-white/5">
+                <td className="p-2 font-black text-white">{row.symbol}</td>
+                <td className="p-2 text-right text-white/60">{row.portfolioWeight.toFixed(1)}%</td>
+                <td className="p-2 text-center"><ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.power.level} basis={row.power.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.export.level} basis={row.export.basis} /></td>
+                <td className="p-2 text-right font-black text-white">{row.sensitivity}/100</td>
+                <td className="p-2 text-right text-cyan-300 font-bold">{row.weightedContribution.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="text-[9px] text-white/25 font-mono mt-3">
@@ -143,18 +153,26 @@ function PortfolioExposureMatrix({ contracts = [], news = [], positions = [] }: 
       </div>
 
       <div className="overflow-x-auto">
-        <DataTable
-        rows={derivedExposure}
-        columns={[
-          { key: 'symbol', header: 'Holding', accessor: row => row.symbol, type: 'text' },
-          { key: 'taiwan', header: 'TSMC disruption', accessor: row => row.taiwan.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /> },
-          { key: 'power', header: 'Power shortfall', accessor: row => row.power.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.power.level} basis={row.power.basis} /> },
-          { key: 'export', header: 'AI-chip export controls', accessor: row => row.export.level, type: 'text', align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
-        ]}
-        rowKey={row => row.symbol}
-        initialSort={{ key: 'symbol', direction: 'asc' }}
-        empty="No portfolio exposure data available."
-      />
+        <table className="w-full min-w-[760px] text-[10px] font-mono">
+          <thead className="text-white/30 uppercase tracking-wider">
+            <tr>
+              <th className="text-left p-2">Holding</th>
+              <th className="text-center p-2">TSMC disruption</th>
+              <th className="text-center p-2">Power shortfall</th>
+              <th className="text-center p-2">AI-chip export controls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {derivedExposure.map((row) => (
+              <tr key={row.symbol} className="border-t border-white/5">
+                <td className="p-2 font-black text-white">{row.symbol}</td>
+                <td className="p-2 text-center"><ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.power.level} basis={row.power.basis} /></td>
+                <td className="p-2 text-center"><ExposurePill level={row.export.level} basis={row.export.basis} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
