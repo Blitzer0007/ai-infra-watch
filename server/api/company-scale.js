@@ -1,4 +1,4 @@
-import { history as routedHistory, providerSymbol } from '../../api/_market-data.js';
+import { history as routedHistory, providerSymbol, quote as routedQuote } from '../../api/_market-data.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
   loadedAt: 0,
@@ -423,18 +423,31 @@ async function handleAnalyst(req, res) {
   const epsEstimates = Array.isArray(epsRaw) ? epsRaw : Array.isArray(epsRaw?.data) ? epsRaw.data : [];
   const revenueEstimates = Array.isArray(revenueRaw) ? revenueRaw : Array.isArray(revenueRaw?.data) ? revenueRaw.data : [];
 
-  if (!Object.keys(values).length) {
-    return res.status(503).json({
-      symbol,
-      source: 'Finnhub analyst',
-      available: [],
-      errors,
-    webEvidence: await fetchAnalystWebEvidence(symbol, 14, 6),
-      error: 'Analyst expectations provider unavailable.',
-    });
+  const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
+
+  let currentPrice = null;
+  let quoteSource = null;
+  let quoteRetrievedAt = null;
+  try {
+    const quote = await routedQuote(symbol);
+    currentPrice = normalizeAnalystValue(quote?.price);
+    quoteSource = quote?.source || quote?.provider || null;
+    quoteRetrievedAt = quote?.asOf || null;
+  } catch {
+    // Consensus remains useful without a current quote; target upside is then unavailable.
   }
 
-  const webEvidence = await fetchAnalystWebEvidence(symbol, 14, 6);
+  if (!Object.keys(values).length && !webEvidence.results?.length) {
+    return res.status(503).json({
+      symbol,
+      source: 'external-analyst-consensus',
+      available: [],
+      errors,
+      webEvidence,
+      consensusAvailable: false,
+      error: 'No external analyst consensus source returned usable evidence.',
+    });
+  }
 
   const ratingCounts = {
     strongBuy: Number(recommendation.strongBuy || 0),
@@ -446,11 +459,16 @@ async function handleAnalyst(req, res) {
   const analystCount = Object.values(ratingCounts).reduce((sum, value) => sum + value, 0);
   const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
 
+  const retrievedAt = new Date().toISOString();
   const data = {
     symbol,
-    source: 'Finnhub analyst',
+    source: Object.keys(values).length ? 'Finnhub analyst' : 'external analyst web evidence',
     webEvidence,
-    retrievedAt: new Date().toISOString(),
+    retrievedAt,
+    consensusAvailable: Object.keys(values).length > 0,
+    currentPrice,
+    quoteSource,
+    quoteRetrievedAt,
     recommendation: {
       period: recommendation.period || null,
       ...ratingCounts,
@@ -480,6 +498,14 @@ async function handleAnalyst(req, res) {
     analystCount,
     webEvidenceCount,
     errors,
+    provenance: {
+      consensusProvider: Object.keys(values).length ? 'Finnhub' : null,
+      consensusRetrievedAt: Object.keys(values).length ? retrievedAt : null,
+      quoteProvider: quoteSource,
+      quoteRetrievedAt,
+      webProvider: webEvidence.provider || null,
+      webRetrievedAt: retrievedAt,
+    },
   };
 
   analystCache.set(symbol, { loadedAt: Date.now(), data });
