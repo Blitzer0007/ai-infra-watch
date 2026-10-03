@@ -229,13 +229,35 @@ def _record_jev_route(question: str, tools: list[ToolInfo], client: Any, *, acti
     """
     try:
         decision = _jev_route(question, tools, client)
+        # Read the core route fields independently so an optional metadata
+        # conversion can never discard a valid JEV choice. The route choice is
+        # the contract consumed by forced research and its regression tests.
+        choice = str(getattr(decision, "choice", "") or "")
+        confidence_raw = getattr(decision, "confidence", 0.0)
+        probabilities_raw = getattr(decision, "probabilities", None)
+        model = str(getattr(decision, "model", "") or "")
+        latency_raw = getattr(decision, "latency_ms", 0.0)
+
+        try:
+            confidence = float(confidence_raw or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        try:
+            probabilities = dict(probabilities_raw or {})
+        except (TypeError, ValueError):
+            probabilities = {}
+        try:
+            latency_ms = round(float(latency_raw or 0.0), 1)
+        except (TypeError, ValueError):
+            latency_ms = 0.0
+
         return {
             "enabled": True,
-            "choice": str(getattr(decision, "choice", "") or ""),
-            "confidence": float(getattr(decision, "confidence", 0.0) or 0.0),
-            "probabilities": dict(getattr(decision, "probabilities", None) or {}),
-            "model": str(getattr(decision, "model", "") or ""),
-            "latency_ms": round(float(getattr(decision, "latency_ms", 0.0) or 0.0), 1),
+            "choice": choice,
+            "confidence": confidence,
+            "probabilities": probabilities,
+            "model": model,
+            "latency_ms": latency_ms,
             "action": action,
         }
     except Exception as exc:
