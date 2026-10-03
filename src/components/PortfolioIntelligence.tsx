@@ -1379,9 +1379,20 @@ function Panel({title,subtitle,children}:{title:string;subtitle:string;children:
 }
 
 function Info({label,value}:{label:string;value:string}) {
+  const textValue = String(value);
+  const upper = textValue.toUpperCase();
+  const semanticTone =
+    upper === 'SUPPORTED' || upper === 'AVAILABLE' || upper === 'PASS' || upper.includes('FRESH')
+      ? 'up'
+      : upper === 'MIXED' || upper === 'WAIT' || upper.includes('STALE') || upper.includes('UNAVAILABLE') || upper.includes('INSUFFICIENT')
+        ? 'warn'
+        : /^[+−-]?(?:\$?\d[\d,.]*)(?:%| PTS| EQ\\.)/.test(upper)
+          ? (textValue.startsWith('+') ? 'up' : textValue.startsWith('-') || textValue.startsWith('−') ? 'down' : 'neutral')
+          : 'neutral';
+  const valueClass = semanticTone === 'up' ? 'text-emerald-300' : semanticTone === 'down' ? 'text-rose-300' : semanticTone === 'warn' ? 'text-amber-300' : 'text-white';
   return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
     <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
-    <div className="text-xs mt-1">{value}</div>
+    <div className={'text-xs mt-1 font-medium ' + valueClass}>{value}</div>
   </div>;
 }
 
