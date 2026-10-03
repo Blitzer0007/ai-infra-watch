@@ -416,7 +416,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 { key: 'relative', header: 'Next Day vs Market', accessor: row => row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null, type: 'percent', align: 'right', render: row => { const value = row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null; return <span className={'font-bold ' + tone(value)}>{formatPct(value)}</span>; } }
               ] satisfies DataTableColumn<(typeof visibleRows)[number]>[]}
             />
-          </div></div>
+          </div>
         </>
       )}
 
