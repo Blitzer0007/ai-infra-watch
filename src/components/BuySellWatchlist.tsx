@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AppConfig, loadConfig, saveConfig, formatPrice } from '../utils';
 import { STOCK_METADATA } from '../data';
 import { Bell, BellOff, Trash2, Plus, Star, Zap, ShieldCheck } from 'lucide-react';
-import { loadAlertEvents, requestBrowserNotifications } from '../utils/alertEngine';
+import { authFetch } from '../utils/apiAuth';
+import { loadAlertEvents, notifyTelegram, requestBrowserNotifications, isTelegramEnabled, setTelegramEnabled } from '../utils/alertEngine';
 import EarningsAlerts from './EarningsAlerts';
 
 export default function BuySellWatchlist() {
@@ -16,10 +17,31 @@ export default function BuySellWatchlist() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied'
   );
+  const [telegramEnabled, setTelegramEnabledState] = useState(() => isTelegramEnabled());
+  const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
+  const [telegramChecking, setTelegramChecking] = useState(true);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramMessage, setTelegramMessage] = useState('');
 
   useEffect(() => {
     setConfig(loadConfig());
     setAlertEvents(loadAlertEvents());
+
+    let cancelled = false;
+    const checkTelegram = async () => {
+      setTelegramChecking(true);
+      try {
+        const response = await authFetch('/api/alert-notify', { cache: 'no-store' });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled) setTelegramConfigured(response.ok && data.telegram_configured === true);
+      } catch {
+        if (!cancelled) setTelegramConfigured(null);
+      } finally {
+        if (!cancelled) setTelegramChecking(false);
+      }
+    };
+    void checkTelegram();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -93,6 +115,56 @@ export default function BuySellWatchlist() {
     const updated = { ...config, largeMovePct: parsed };
     setConfig(updated);
     saveConfig(updated);
+  };
+
+  const handleTelegramToggle = async () => {
+    setTelegramMessage('');
+    if (!telegramEnabled) {
+      if (telegramConfigured !== true) {
+        setTelegramMessage('Telegram is not configured on the server. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel.');
+        return;
+      }
+      setTelegramEnabled(true);
+      setTelegramEnabledState(true);
+      setTelegramMessage('Telegram alerts enabled for this browser session.');
+      return;
+    }
+
+    setTelegramEnabled(false);
+    setTelegramEnabledState(false);
+    setTelegramMessage('Telegram alerts disabled on this browser. Scheduled server-side digests and earnings alerts are unchanged.');
+  };
+
+  const handleTelegramTest = async () => {
+    if (!telegramEnabled || telegramConfigured !== true || telegramTesting) return;
+    setTelegramTesting(true);
+    setTelegramMessage('Sending test alert…');
+    try {
+      const response = await authFetch('/api/alert-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: {
+            id: 'telegram-test:' + Date.now(),
+            type: 'price',
+            severity: 'info',
+            symbol: 'AIW',
+            title: 'Telegram connection test',
+            message: 'Your AI Infra Watch Telegram signal channel is connected and receiving dashboard alerts.',
+            timestamp: Date.now(),
+            source: 'Watchlist settings',
+          },
+        }),
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || data?.delivery?.error || 'Telegram test failed.');
+      setTelegramMessage('Test alert sent successfully. Check your Telegram chat.');
+    } catch (error) {
+      setTelegramMessage(error instanceof Error ? error.message : 'Telegram test failed.');
+    } finally {
+      setTelegramTesting(false);
+    }
   };
 
   const handleBrowserNotifications = async () => {
@@ -212,6 +284,48 @@ export default function BuySellWatchlist() {
               </button>
             </div>
             <p className="text-[10px] text-white/40">New SEC material-agreement filings and congressional disclosures for watched symbols.</p>
+          </div>
+
+          <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Telegram Notifications</span>
+                <div className="text-[9px] text-white/30 mt-1">
+                  {telegramChecking
+                    ? 'Checking server configuration…'
+                    : telegramConfigured === true
+                      ? 'Server bot connected'
+                      : telegramConfigured === false
+                        ? 'Server bot not configured'
+                        : 'Unable to verify server configuration'}
+                </div>
+              </div>
+              <span className={telegramConfigured === true ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}>
+                {telegramConfigured === true ? 'CONNECTED' : telegramChecking ? 'CHECKING' : 'NOT READY'}
+              </span>
+            </div>
+            <p className="text-[10px] text-white/40">Send price-target, Smart Move, and catalyst signals to your configured Telegram chat.</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void handleTelegramToggle()}
+                disabled={telegramChecking || telegramConfigured !== true}
+                className={telegramEnabled
+                  ? 'px-3 py-2 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50'
+                  : 'px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50'}
+              >
+                {telegramEnabled ? '✓ Telegram enabled' : 'Enable Telegram alerts'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleTelegramTest()}
+                disabled={!telegramEnabled || telegramConfigured !== true || telegramTesting}
+                className="px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
+              >
+                {telegramTesting ? 'Sending…' : 'Send test alert'}
+              </button>
+            </div>
+            {telegramMessage && <p className="text-[9px] text-white/50 leading-relaxed">{telegramMessage}</p>}
           </div>
 
           <div className="pt-3 border-t border-white/10 space-y-3">

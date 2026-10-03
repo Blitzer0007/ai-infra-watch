@@ -18,6 +18,7 @@ export interface AlertEvent {
 
 export const ALERT_EVENTS_KEY = 'aiw_alert_events_v1';
 export const ALERT_STATE_KEY = 'aiw_alert_state_v1';
+export const TELEGRAM_ENABLED_KEY = 'aiw_telegram_alerts_enabled_v1';
 const MAX_EVENTS = 100;
 
 export function loadAlertEvents(): AlertEvent[] {
@@ -46,6 +47,23 @@ function loadAlertState(): Record<string, boolean> {
 
 function saveAlertState(state: Record<string, boolean>): void {
   localStorage.setItem(ALERT_STATE_KEY, JSON.stringify(state));
+}
+
+export function isTelegramEnabled(): boolean {
+  try {
+    return localStorage.getItem(TELEGRAM_ENABLED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setTelegramEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(TELEGRAM_ENABLED_KEY, 'true');
+    else localStorage.removeItem(TELEGRAM_ENABLED_KEY);
+  } catch {
+    // ignore local storage failures
+  }
 }
 
 function eventId(type: AlertEventType, symbol: string, suffix: string): string {
@@ -131,7 +149,7 @@ export function requestBrowserNotifications(): Promise<NotificationPermission> {
 }
 
 export async function notifyTelegram(events: AlertEvent[]): Promise<void> {
-  if (!events.length || !getAccessToken()) return;
+  if (!events.length || !getAccessToken() || !isTelegramEnabled()) return;
 
   try {
     const response = await authFetch('/api/alert-notify', {
