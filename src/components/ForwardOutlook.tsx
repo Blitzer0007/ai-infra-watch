@@ -7,6 +7,7 @@ import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
 import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
+import { createForecastEvidenceSnapshot, type ForecastEvidenceSnapshot } from '../utils/forecastEvidence';
 
 type PricePoint = { date: string; price: number };
 
@@ -721,10 +722,86 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       setVerificationMessage('This ticker, horizon, scenario, and model are already being tracked.');
       return;
     }
+    const capturedAt = new Date().toISOString();
+    let analystEvidence: {
+      status: 'available' | 'missing' | 'failed';
+      source: string | null;
+      retrievedAt: string | null;
+      analystCount: number | null;
+      medianTarget: number | null;
+      webEvidenceCount: number;
+      error: string | null;
+    } = {
+      status: 'missing',
+      source: null,
+      retrievedAt: null,
+      analystCount: null,
+      medianTarget: null,
+      webEvidenceCount: 0,
+      error: null,
+    };
+
+    try {
+      const analystResponse = await fetch('/api/company-scale?action=analyst&symbol=' + encodeURIComponent(selectedStock));
+      const analystBody = await analystResponse.json().catch(() => ({}));
+      const hasEvidence = Boolean(
+        analystBody?.consensusAvailable ||
+        analystBody?.structuredEvidenceAvailable ||
+        Number(analystBody?.webEvidenceCount) > 0
+      );
+      if (analystResponse.ok && hasEvidence) {
+        analystEvidence = {
+          status: 'available',
+          source: analystBody?.source || null,
+          retrievedAt: analystBody?.retrievedAt || null,
+          analystCount: Number.isFinite(Number(analystBody?.analystCount)) ? Number(analystBody.analystCount) : null,
+          medianTarget: Number.isFinite(Number(analystBody?.priceTarget?.median)) ? Number(analystBody.priceTarget.median) : null,
+          webEvidenceCount: Math.max(0, Number(analystBody?.webEvidenceCount) || 0),
+          error: null,
+        };
+      } else if (analystResponse.status === 503 || !hasEvidence) {
+        analystEvidence = {
+          ...analystEvidence,
+          status: 'missing',
+          error: analystBody?.error || null,
+        };
+      } else {
+        analystEvidence = {
+          ...analystEvidence,
+          status: 'failed',
+          error: analystBody?.error || 'Analyst evidence request failed.',
+        };
+      }
+    } catch (error: any) {
+      analystEvidence = {
+        ...analystEvidence,
+        status: 'failed',
+        error: error?.message || 'Analyst evidence request failed.',
+      };
+    }
+
+    const evidenceSnapshot = createForecastEvidenceSnapshot({
+      capturedAt,
+      ticker: selectedStock,
+      currentPrice,
+      changePct: metrics.dailyChange,
+      quoteSource: 'forward_outlook_live_price',
+      momentum20Pct: metrics.momentum,
+      volatilityAnnualizedPct: metrics.volatility,
+      oneYearReturnPct: metrics.oneYear,
+      historyThrough: history[history.length - 1]?.date || null,
+      analyst: analystEvidence,
+      contracts,
+      news,
+      political: politicalSignals,
+      macro: macroRisks,
+    });
+
     const snapshot: ForecastSnapshot = {
-      id: crypto.randomUUID(), ticker: selectedStock, createdAt: new Date().toISOString(),
-      targetDate: addBusinessDays(new Date(), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
+      id: crypto.randomUUID(), ticker: selectedStock, createdAt: capturedAt,
+      targetDate: addBusinessDays(new Date(capturedAt), horizon), horizon, scenarioId, entryPrice: currentPrice, modelVersion,
       median: analysis.median, p25: analysis.p25, p75: analysis.p75, p10: analysis.p10, p90: analysis.p90, status: 'pending',
+      evidenceSnapshot,
       decisionThesis: portfolioContext.holding?.decisionThesis || portfolioContext.thesis || '',
       lossLimitPct: portfolioContext.holding?.lossLimitPct ?? null,
       exitRuleType: portfolioContext.holding?.exitRuleType ?? null,
