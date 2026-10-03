@@ -364,6 +364,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const concentration = useMemo(() => calculatePortfolioConcentration(portfolioMetricInputs), [portfolioMetricInputs]);
   const weightedStress = useMemo(() => calculatePortfolioStressScore(portfolioMetricInputs, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length), [portfolioMetricInputs, macroRisks]);
   const stress = weightedStress;
+  const macroHighCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
+  const macroMediumCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
   const portfolioWeights = useMemo(() => Object.fromEntries(concentration.weights.map(item => [item.symbol, item.weight])), [concentration.weights]);
   const portfolioHistoryValue = useMemo(() => buildPortfolioHistoryValue(
@@ -580,6 +582,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
+            <div className="text-[8px] font-mono text-white/25 mt-1">{macroHighCount} high · {macroMediumCount} medium · capped at 30</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
@@ -593,11 +596,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Exposure, attribution & benchmark context</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
           <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
           <Info label="Weighted stress" value={weightedStress.score + '/100'} />
           <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
           <Info label="Top 3 concentration" value={top3ConcentrationPct.toFixed(1) + '%'} />
-          <Info label="Effective holdings" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1)} />
+          <Info label="Held positions" value={String(analyses.length)} />
+          <Info label="Effective holdings (HHI)" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day constant-weight stress backcast</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using current portfolio weights across the historical window; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
@@ -653,7 +657,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
-          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">P&L contribution by holding</div><div className="space-y-2 mt-3">{attribution.slice(0, 6).map(item => <div key={item.symbol} className="flex items-center gap-3"><span className="w-12 text-[9px] font-mono font-bold text-white/65">{item.symbol}</span><div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className={item.pnlContribution >= 0 ? 'h-full bg-emerald-400/60' : 'h-full bg-rose-400/60'} style={{ width: Math.min(100, Math.abs(item.pnlContribution) / Math.max(1, Math.abs(attribution[0]?.pnlContribution || 1)) * 100) + '%' }} /></div><span className={'w-24 text-right text-[9px] font-mono ' + (item.pnlContribution >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.pnlContribution >= 0 ? '+' : ''}${item.pnlContribution.toFixed(2)}</span></div>)}{!attribution.length && <div className="text-[9px] font-mono text-white/25">No P&L attribution available.</div>}</div></div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">P&L contribution by holding</div><div className="space-y-2 mt-3">{attribution.map(item => <div key={item.symbol} className="flex items-center gap-3"><span className="w-12 text-[9px] font-mono font-bold text-white/65">{item.symbol}</span><div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className={item.pnlContribution >= 0 ? 'h-full bg-emerald-400/60' : 'h-full bg-rose-400/60'} style={{ width: Math.min(100, Math.abs(item.pnlContribution) / Math.max(1, Math.abs(attribution[0]?.pnlContribution || 1)) * 100) + '%' }} /></div><span className={'w-24 text-right text-[9px] font-mono ' + (item.pnlContribution >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.pnlContribution >= 0 ? '+' : ''}${item.pnlContribution.toFixed(2)}</span></div>)}{!attribution.length && <div className="text-[9px] font-mono text-white/25">No P&L attribution available.</div>}</div></div>
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Matched benchmark window</div><div className="space-y-2 mt-3">{benchmarkComparisons.map(item => <div key={item.benchmark} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-black">{item.benchmark}</div><div className="text-[8px] font-mono text-white/25">{item.sampleDays ? item.startDate + ' → ' + item.endDate + ' · ' + item.sampleDays + ' sessions' : 'No overlapping history'}</div></div><div className="text-right"><div className="text-[9px] font-mono text-white/45">Portfolio {item.portfolioReturnPct == null ? '—' : (item.portfolioReturnPct >= 0 ? '+' : '') + item.portfolioReturnPct.toFixed(2) + '%'}</div><div className="text-[9px] font-mono text-white/45">{item.benchmark} {item.benchmarkReturnPct == null ? '—' : (item.benchmarkReturnPct >= 0 ? '+' : '') + item.benchmarkReturnPct.toFixed(2) + '%'}</div><div className={'text-[9px] font-mono font-bold ' + (item.relativeReturnPct == null ? 'text-white/25' : item.relativeReturnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.relativeReturnPct == null ? 'Relative —' : 'Relative ' + (item.relativeReturnPct >= 0 ? '+' : '') + item.relativeReturnPct.toFixed(2) + ' pts'}</div></div></div>)}</div></div>
         </div>
         <div className="mt-3 text-[8px] font-mono text-white/20">Weighted stress measures observed moves and exposure concentration, not a forecast. P&L attribution is descriptive. Benchmark comparisons are descriptive matched-window measurements.</div>
@@ -680,7 +684,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       {tab === 'overview' && (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
-            <section className="min-w-0 space-y-3" aria-label="Portfolio decision context">
+            <section className="min-w-0 space-y-3 self-start xl:sticky xl:top-4" aria-label="Portfolio decision context">
               <JevDecisionPanel
                 kind="portfolio"
                 title="Portfolio decision context"
@@ -709,7 +713,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
                 </FilterSelect>
               </div>
-              <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
               </Panel>
             </section>
           </div>
@@ -1285,9 +1289,9 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
           { key: 'reference', header: 'Reference', accessor: row => row.label, render: row => <div><span className="text-white/60">{row.label}</span>{row.date ? <span className="block text-[8px] text-white/25 mt-0.5">{row.date}</span> : null}</div> },
           { key: 'price', header: 'Price', accessor: row => row.price, type: 'currency', render: row => '$' + row.price.toFixed(2) },
           { key: 'saleValue', header: 'Sale value', accessor: row => row.price * h.quantity, type: 'currency', render: row => '$' + (row.price * h.quantity).toFixed(2) },
-          { key: 'profit', header: 'Profit / loss', accessor: row => row.price * h.quantity - h.investedValue, type: 'currency', render: row => { const v = row.price * h.quantity - h.investedValue; return (v >= 0 ? '+' : '') + '$' + v.toFixed(2); } },
-          { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const v = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; } },
-          { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; } },
+          { key: 'profit', header: 'Profit / loss', accessor: row => row.price * h.quantity - h.investedValue, type: 'currency', render: row => { const v = row.price * h.quantity - h.investedValue; return <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + '$' + v.toFixed(2)}</span>; } },
+          { key: 'return', header: 'Return', accessor: row => h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0, type: 'percent', render: row => { const v = h.investedValue ? ((row.price * h.quantity - h.investedValue) / h.investedValue) * 100 : 0; return <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
+          { key: 'fromCurrent', header: 'From current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
         ]}
       />
         </div>
@@ -1377,9 +1381,14 @@ function Panel({title,subtitle,children}:{title:string;subtitle:string;children:
 }
 
 function Info({label,value}:{label:string;value:string}) {
+  const textValue = String(value);
+  const upper = textValue.toUpperCase();
+  const positive = upper === 'SUPPORTED' || upper === 'AVAILABLE' || upper === 'PASS' || upper.includes('FRESH') || /^\+/.test(textValue);
+  const negative = upper === 'WEAK' || upper === 'FAILED' || upper.includes('ERROR') || upper.includes('STALE') || upper.includes('UNAVAILABLE') || /^[-−]/.test(textValue);
+  const tone = positive ? 'text-emerald-300' : negative ? 'text-rose-300' : upper === 'MIXED' || upper === 'WAIT' || upper.includes('INSUFFICIENT') ? 'text-amber-300' : 'text-white';
   return <div className="bg-white/[.025] border border-white/5 rounded-xl p-3">
     <div className="text-[9px] uppercase font-mono text-white/25">{label}</div>
-    <div className="text-xs mt-1">{value}</div>
+    <div className={'text-xs mt-1 font-medium ' + tone}>{value}</div>
   </div>;
 }
 

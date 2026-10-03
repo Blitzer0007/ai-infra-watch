@@ -178,3 +178,14 @@ def test_unified_event_timeline_uses_consolidated_api(page):
     page.wait_for_timeout(1500)
     assert not any("/api/stock-milestones" in url for url in requests)
     assert not any("/api/stock-history" in url for url in requests)
+
+def test_event_study_identifies_selected_ticker(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("SELECTED TICKER", exact=True).wait_for(state="visible", timeout=30000)
+    assert page.get_by_text("NVDA", exact=True).count() >= 1
+    assert page.get_by_text(
+        "Every metric and event below is calculated for this ticker only. SPY is the comparison market."
+    ).count() == 1

@@ -37,40 +37,155 @@ async function quote(symbol) {
   return { price, changePct: Number.isFinite(prev) && prev ? (price / prev - 1) * 100 : 0 };
 }
 
+const MACRO_RISKS = [
+  { title: 'Taiwan advanced-node exposure', level: 'HIGH' },
+  { title: 'AI-chip export controls', level: 'HIGH' },
+  { title: 'Data-center power availability', level: 'MEDIUM' },
+];
+
+function calculateEffectiveHoldings(rows) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  if (!total) return null;
+  const hhi = rows.reduce((sum, row) => {
+    const weight = row.value / total;
+    return sum + weight * weight;
+  }, 0);
+  return hhi > 0 ? 1 / hhi : null;
+}
+
+function signedMoney(value) {
+  return (value >= 0 ? '+' : '') + '$' + value.toFixed(2);
+}
+
+function signedPct(value) {
+  return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+}
+
 async function buildDigest() {
   const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
   const rows = await Promise.all(holdings.map(async holding => {
+    const symbol = String(holding.symbol).trim().toUpperCase();
+    const quantity = Number(holding.quantity);
+    const cost = Number(holding.average_cost);
     try {
-      const q = await quote(String(holding.symbol).toUpperCase());
-      const quantity = Number(holding.quantity);
-      const cost = Number(holding.average_cost);
+      const q = await quote(symbol);
       const value = q.price * quantity;
       const pnl = (q.price - cost) * quantity;
-      return { symbol: String(holding.symbol).toUpperCase(), value, pnl, pnlPct: cost ? (q.price / cost - 1) * 100 : 0, changePct: q.changePct };
-    } catch {
-      return { symbol: String(holding.symbol).toUpperCase(), value: 0, pnl: 0, pnlPct: 0, changePct: null };
+      return {
+        symbol,
+        price: q.price,
+        quantity,
+        averageCost: cost,
+        value,
+        pnl,
+        pnlPct: cost ? (q.price / cost - 1) * 100 : 0,
+        changePct: q.changePct,
+        quoteStatus: 'fresh',
+      };
+    } catch (error) {
+      return {
+        symbol,
+        price: null,
+        quantity,
+        averageCost: cost,
+        value: 0,
+        pnl: null,
+        pnlPct: null,
+        changePct: null,
+        quoteStatus: 'unavailable',
+        error: error instanceof Error ? error.message : 'quote unavailable',
+      };
     }
   }));
-  const valid = rows.filter(row => row.value > 0);
+
+  const valid = rows.filter(row => row.quoteStatus === 'fresh' && row.value > 0);
+  const unavailable = rows.filter(row => row.quoteStatus !== 'fresh');
   const totalValue = valid.reduce((sum, row) => sum + row.value, 0);
+  const totalCost = valid.reduce((sum, row) => sum + row.averageCost * row.quantity, 0);
   const totalPnl = valid.reduce((sum, row) => sum + row.pnl, 0);
-  const movers = [...valid].filter(row => row.changePct != null).sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 5);
+  const totalPnlPct = totalCost ? (totalValue / totalCost - 1) * 100 : null;
+  const dailyMoves = valid.filter(row => row.changePct != null).map(row => row.changePct);
+  const breadthPositive = dailyMoves.filter(value => value > 0).length;
+  const breadthTotal = dailyMoves.length;
+  const breadthPct = breadthTotal ? (breadthPositive / breadthTotal) * 100 : null;
+  const avgDailyMove = dailyMoves.length ? dailyMoves.reduce((sum, value) => sum + value, 0) / dailyMoves.length : null;
+  const sortedByValue = [...valid].sort((a, b) => b.value - a.value);
+  const largest = sortedByValue[0] || null;
+  const top3Value = sortedByValue.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+  const top3Pct = totalValue ? (top3Value / totalValue) * 100 : null;
+  const effectiveHoldings = calculateEffectiveHoldings(valid);
+  const gainers = [...valid].filter(row => row.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 3);
+  const decliners = [...valid].filter(row => row.changePct < 0).sort((a, b) => a.changePct - b.changePct).slice(0, 3);
+  const pnlContributors = [...valid].sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)).slice(0, 5);
+  const attention = [...valid]
+    .filter(row => (row.changePct != null && row.changePct <= -3) || (row.pnl < 0 && row.changePct != null && row.changePct < 0))
+    .sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0))
+    .slice(0, 5);
+
+  const macroHigh = MACRO_RISKS.filter(item => item.level === 'HIGH').length;
+  const macroMedium = MACRO_RISKS.filter(item => item.level === 'MEDIUM').length;
+  const macroLoad = Math.min(30, macroHigh * 12 + macroMedium * 6);
   const date = new Date().toISOString().slice(0, 10);
+
   const lines = [
-    'AI Infra Watch — Daily Portfolio Summary',
+    'AI Infra Watch — Daily Intelligence Brief',
     date,
     '',
-    'Portfolio value: $' + totalValue.toFixed(2),
-    'Unrealized P&L: ' + (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toFixed(2),
+    'PORTFOLIO',
+    'Value: $' + totalValue.toFixed(2),
+    'Unrealized P&L: ' + signedMoney(totalPnl) + (totalPnlPct == null ? '' : ' · ' + signedPct(totalPnlPct)),
+    'Breadth: ' + (breadthPct == null ? '—' : breadthPct.toFixed(0) + '% positive') + (avgDailyMove == null ? '' : ' · Avg daily move ' + signedPct(avgDailyMove)),
+    'Quote coverage: ' + valid.length + '/' + rows.length + ' fresh' + (unavailable.length ? ' · ' + unavailable.length + ' unavailable' : ''),
     '',
-    'Largest daily moves:',
-    ...movers.map(row => row.symbol + ': ' + (row.changePct >= 0 ? '+' : '') + row.changePct.toFixed(2) + '% · P&L ' + (row.pnl >= 0 ? '+' : '') + '$' + row.pnl.toFixed(2)),
+    'EXPOSURE',
+    'Largest holding: ' + (largest ? largest.symbol + ' · ' + (largest.value / totalValue * 100).toFixed(1) + '%' : '—'),
+    'Top 3 concentration: ' + (top3Pct == null ? '—' : top3Pct.toFixed(1) + '%'),
+    'Diversification equivalent: ' + (effectiveHoldings == null ? '—' : effectiveHoldings.toFixed(1) + ' effective positions'),
     '',
-    'Measurement only — no trading instructions.'
+    'DAILY LEADERS',
+    'Gainers:' + (gainers.length ? ' ' + gainers.map(row => row.symbol + ' ' + signedPct(row.changePct)).join(' · ') : ' none'),
+    'Decliners:' + (decliners.length ? ' ' + decliners.map(row => row.symbol + ' ' + signedPct(row.changePct)).join(' · ') : ' none'),
+    '',
+    'P&L CONTRIBUTORS',
+    ...pnlContributors.map(row => row.symbol + ': ' + signedMoney(row.pnl) + ' · ' + signedPct(row.pnlPct)),
+    '',
+    'MACRO RISK MAP',
+    'Load: ' + macroLoad + '/30 · ' + macroHigh + ' high · ' + macroMedium + ' medium · capped at 30',
+    'Themes: ' + MACRO_RISKS.map(item => item.title).join(' · '),
+    '',
+    'ATTENTION',
+    ...(attention.length
+      ? attention.map(row => row.symbol + ': daily ' + signedPct(row.changePct) + ' · P&L ' + signedMoney(row.pnl))
+      : ['No holding met the current daily attention threshold.']),
+    ...(unavailable.length ? ['', 'QUOTE UNAVAILABLE', ...unavailable.map(row => row.symbol + ': quote unavailable; excluded from totals and P&L.') ] : []),
+    '',
+    'Per-holding snapshot',
+    ...rows.map(row => row.quoteStatus === 'fresh'
+      ? row.symbol + ': $' + row.price.toFixed(2) + ' · ' + signedPct(row.changePct) + ' · P&L ' + signedMoney(row.pnl)
+      : row.symbol + ': quote unavailable'),
+    '',
+    'Measurement only — no trading instructions. Macro risk map is deterministic; it is not a live event score.'
   ];
-  return { date, text: lines.join('\n'), rows: valid, totalValue, totalPnl };
-}
 
+  return {
+    date,
+    text: lines.join('\n'),
+    rows,
+    totalValue,
+    totalPnl,
+    totalPnlPct,
+    breadthPct,
+    avgDailyMove,
+    largestHolding: largest?.symbol || null,
+    top3ConcentrationPct: top3Pct,
+    effectiveHoldings,
+    macroLoad,
+    macroHigh,
+    macroMedium,
+    attention: attention.map(row => row.symbol),
+    quoteCoverage: { fresh: valid.length, total: rows.length, unavailable: unavailable.length },
+  };
+}
 async function deliver(digest, channels) {
   const delivered = [];
   const errors = [];

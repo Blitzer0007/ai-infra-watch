@@ -7,7 +7,7 @@ import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuo
 import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
 import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
-import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser } from './utils/alertEngine';
+import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser, notifyTelegram } from './utils/alertEngine';
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
 
 const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
@@ -123,6 +123,7 @@ export default function App() {
     if (config.browserNotifications) {
       events.forEach(notifyBrowser);
     }
+    void notifyTelegram(events);
   }, [config, tickerPrices]);
 
   useEffect(() => {
@@ -191,6 +192,7 @@ export default function App() {
         if (activeConfig.browserNotifications) {
           catalystEvents.forEach(notifyBrowser);
         }
+        void notifyTelegram(catalystEvents);
       }
       // Sync stockPrices to tickerPrices
       if (data.stockPrices) {

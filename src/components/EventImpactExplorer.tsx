@@ -294,6 +294,19 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       title={'Historical event impact · ' + symbol}
       subtitle="SEC filing chronology linked to verified price history; SPY is used as market context, not causal proof."
     >
+      <div className="mb-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[.04] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">SELECTED TICKER</div>
+            <div className="text-2xl font-black mt-1">{symbol.trim().toUpperCase()}</div>
+            <div className="text-[10px] text-white/45 mt-1">Every metric and event below is calculated for this ticker only. SPY is the comparison market.</div>
+          </div>
+          <div className="text-right text-[9px] font-mono text-white/30">
+            <div>EVENTS {events.length}</div>
+            <div className="mt-1">MATCHED REACTIONS {summary.events}</div>
+          </div>
+        </div>
+      </div>
       <JevDecisionPanel
         kind="events"
         title={'Event-study evidence review · ' + symbol}
@@ -340,13 +353,13 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
         <Metric label="Events matched" value={String(summary.events)} suffix="SEC events" />
         <Metric
-          label="Mean Next Trading Day Reaction"
+          label={symbol.toUpperCase() + " · Mean Next Trading Day Reaction"}
           value={formatPct(summary.avgT1)}
           suffix={`n=${summary.n} · ${summary.quality} · median ${formatPct(summary.medianT1)}`}
           valueClass={tone(summary.avgT1)}
         />
         <Metric
-          label="Mean Next Trading Day vs Market"
+          label={symbol.toUpperCase() + " · Mean Next Trading Day vs Market"}
           value={formatPct(summary.avgRelativeT1)}
           suffix={`pts vs SPY · n=${summary.relativeN} · median ${formatPct(summary.medianRelativeT1)}`}
           valueClass={tone(summary.avgRelativeT1)}
