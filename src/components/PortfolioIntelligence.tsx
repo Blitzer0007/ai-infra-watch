@@ -422,6 +422,35 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       },
       evidenceAvailability: {
         heldContracts: relevantContracts,
+      evidenceQualityInput: {
+        evidence_availability: {
+          required: [],
+          missing: [],
+          usable_families: [
+            ...(analyses.length > 0 ? ['portfolio'] : []),
+            ...(livePositions.length > 0 ? ['market'] : []),
+            ...(relevantContracts > 0 ? ['regulatory_primary'] : []),
+            ...(relevantCongress > 0 ? ['congress'] : []),
+            ...(news.length > 0 ? ['news'] : []),
+            ...(macroRisks.length > 0 ? ['macro'] : []),
+            ...(analystConsensus && !analystError && (analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? ['analyst_consensus'] : []),
+          ],
+        },
+        evidence_freshness: [
+          ...(analyses.length > 0 ? [{
+            freshness: {
+              status: livePositions.length === analyses.length ? 'FRESH' : livePositions.length > 0 ? 'AGING' : 'STALE',
+            },
+          }] : []),
+          ...(analystConsensus && !analystError ? [{
+            freshness: {
+              status: analystFreshness(analystConsensus.retrievedAt || null).toUpperCase(),
+            },
+          }] : []),
+        ],
+        conflict_detection: { detected: false, count: 0 },
+        citation_coverage: {},
+      },
         heldCongressDisclosures: relevantCongress,
         heldPoliticalSignals: relevantPolitical,
         macroRiskItems: macroRisks.length,
