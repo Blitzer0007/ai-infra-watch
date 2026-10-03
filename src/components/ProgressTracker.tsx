@@ -42,7 +42,7 @@ function loadTrackerSymbols(): string[] {
       .filter((value): value is string => typeof value === 'string')
       .map(value => value.trim().toUpperCase())
       .filter(Boolean);
-    return [...new Set(symbols.length ? symbols : defaults)];
+    return [...new Set(symbols)];
   } catch {
     return defaults;
   }
@@ -403,10 +403,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                     <button
                       type="button"
                       onClick={() => removeTrackerSymbol(symbol)}
-                      disabled={trackerSymbols.length <= 1}
-                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 cursor-pointer"
                       aria-label={`Remove ${symbol} from saved tracker tickers`}
-                      title={trackerSymbols.length <= 1 ? 'Keep at least one tracker ticker' : `Remove ${symbol}`}
+                      title={`Remove ${symbol}`}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
