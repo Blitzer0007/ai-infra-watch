@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { rankSearchResults } from '../utils/search';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot } from 'recharts';
 import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2 } from 'lucide-react';
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
@@ -171,7 +172,8 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         throw new Error(body?.error || 'No public ticker match found');
       }
 
-      const match = body.matches[0];
+      const rankedMatches = rankSearchResults(body.matches, rawInput);
+      const match = rankedMatches[0] || body.matches[0];
       setSelectedStock(String(match.ticker).toUpperCase());
       setResolvedIssuer(match.title || null);
       setActiveMilestoneId(null);
