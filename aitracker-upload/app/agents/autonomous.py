@@ -720,11 +720,37 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
             return any(key not in metadata_only and has_payload(child) for key, child in value.items())
         return True
 
+    def has_analyst_payload(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        recommendation = value.get("recommendation")
+        if isinstance(recommendation, dict) and any(
+            key in recommendation and isinstance(recommendation.get(key), (int, float)) and float(recommendation.get(key) or 0) > 0
+            for key in ("strongBuy", "buy", "hold", "sell", "strongSell")
+        ):
+            return True
+        target = value.get("priceTarget")
+        if isinstance(target, dict) and any(
+            isinstance(target.get(key), (int, float)) and target.get(key) is not None
+            for key in ("low", "high", "mean", "median", "targetLow", "targetHigh", "targetMean", "targetMedian")
+        ):
+            return True
+        for key in ("epsEstimates", "revenueEstimates", "results", "webEvidence"):
+            payload = value.get(key)
+            if isinstance(payload, list) and any(isinstance(item, dict) and item for item in payload):
+                return True
+            if isinstance(payload, dict) and has_payload(payload):
+                return True
+        return False
+
     for family in families:
         family_calls = [call for call in calls if _evidence_family(call.tool) == family]
         successful = [call for call in family_calls if call.ok]
         failed = [call for call in family_calls if not call.ok]
-        usable = [call for call in successful if has_payload(call.output)]
+        usable = [
+            call for call in successful
+            if (has_analyst_payload(call.output) if family == "analyst_consensus" else has_payload(call.output))
+        ]
 
         if usable:
             status = "AVAILABLE"
