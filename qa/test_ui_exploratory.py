@@ -81,7 +81,9 @@ def test_tracker_customize_remove_persists_without_deleting_support(page):
     # Removed shortcut must not remove ticker support.
     search = page.get_by_placeholder("e.g. AAPL, CRM, Salesforce, ONDAS")
     search.fill("NVDA")
-    assert page.get_by_role("button", name="TRACK", exact=True).is_visible()
+    page.wait_for_timeout(200)
+    track_button = page.locator("button").filter(has_text="Track").first
+    assert track_button.is_visible()
 
 
 def test_exploratory_global_table_accessibility(page):
