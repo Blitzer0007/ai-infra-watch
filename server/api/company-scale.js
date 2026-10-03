@@ -437,7 +437,7 @@ async function handleAnalyst(req, res) {
     // Consensus remains useful without a current quote; target upside is then unavailable.
   }
 
-  if (!Object.keys(values).length && !webEvidence.results?.length) {
+  if (!structuredEvidenceAvailable && !webEvidence.results?.length) {
     return res.status(503).json({
       symbol,
       source: 'external-analyst-consensus',
@@ -457,6 +457,25 @@ async function handleAnalyst(req, res) {
     strongSell: Number(recommendation.strongSell || 0),
   };
   const analystCount = Object.values(ratingCounts).reduce((sum, value) => sum + value, 0);
+  const hasRecommendationEvidence = recommendationRows.some(row =>
+    row && Object.values(row).some(value => value !== null && value !== undefined && value !== '')
+  );
+  const hasPriceTargetEvidence = [
+    priceTarget.targetHigh,
+    priceTarget.targetLow,
+    priceTarget.targetMean,
+    priceTarget.targetMedian,
+  ].some(value => Number.isFinite(Number(value)));
+  const hasEstimateEvidence = epsEstimates.some(row => row && (
+    Number.isFinite(Number(row?.epsAvg ?? row?.epsAverage)) ||
+    Number.isFinite(Number(row?.epsHigh)) ||
+    Number.isFinite(Number(row?.epsLow))
+  )) || revenueEstimates.some(row => row && (
+    Number.isFinite(Number(row?.revenueAvg ?? row?.revenueAverage)) ||
+    Number.isFinite(Number(row?.revenueHigh)) ||
+    Number.isFinite(Number(row?.revenueLow))
+  ));
+  const structuredEvidenceAvailable = hasRecommendationEvidence || hasPriceTargetEvidence || hasEstimateEvidence;
   const webEvidenceCount = Array.isArray(webEvidence.results) ? webEvidence.results.length : 0;
 
   const retrievedAt = new Date().toISOString();
@@ -465,7 +484,8 @@ async function handleAnalyst(req, res) {
     source: Object.keys(values).length ? 'Finnhub analyst' : 'external analyst web evidence',
     webEvidence,
     retrievedAt,
-    consensusAvailable: Object.keys(values).length > 0,
+    consensusAvailable: structuredEvidenceAvailable,
+    structuredEvidenceAvailable,
     currentPrice,
     quoteSource,
     quoteRetrievedAt,
@@ -499,8 +519,8 @@ async function handleAnalyst(req, res) {
     webEvidenceCount,
     errors,
     provenance: {
-      consensusProvider: Object.keys(values).length ? 'Finnhub' : null,
-      consensusRetrievedAt: Object.keys(values).length ? retrievedAt : null,
+      consensusProvider: structuredEvidenceAvailable ? 'Finnhub' : null,
+      consensusRetrievedAt: structuredEvidenceAvailable ? retrievedAt : null,
       quoteProvider: quoteSource,
       quoteRetrievedAt,
       webProvider: webEvidence.provider || null,
