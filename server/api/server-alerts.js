@@ -3,6 +3,10 @@ import { requireAccess } from '../../api/_access-auth.js';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
+const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
+const MAX_SMART_ALERTS_PER_SCAN = 10;
+
 function isCron(req) {
   const secret = String(process.env.CRON_SECRET || '').trim();
   return Boolean(secret) && req.headers?.authorization === 'Bearer ' + secret;
@@ -153,10 +157,6 @@ async function sendTelegram(events) {
   return { sent, sentEventKeys, errors };
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 async function evaluate() {
   const config = await getConfig();
   const portfolioSymbols = await getPortfolioSymbols();
@@ -220,23 +220,152 @@ async function evaluate() {
 
   if (config.large_move_enabled) {
     const threshold = Math.max(0.1, Number(config.large_move_pct) || 5);
-    const date = todayKey();
     for (const symbol of watchedSymbols) {
       const q = quotes.get(symbol);
-      if (!q || Math.abs(q.changePct) < threshold) continue;
+      const magnitude = Math.abs(q?.changePct ?? 0);
+      if (!q || magnitude < threshold) {
+        for (const direction of ['up', 'down']) {
+          const staleKey = 'large-move:' + symbol + ':' + direction;
+          const priorState = states.get(staleKey);
+          if (priorState?.active) {
+            stateUpdates.push({
+              event_key: staleKey,
+              active: false,
+              last_seen_at: timestamp,
+              last_triggered_at: priorState.last_triggered_at || null,
+              metadata: { symbol, type: 'large-move', direction, threshold },
+            });
+          }
+        }
+        continue;
+      }
+
       const direction = q.changePct >= 0 ? 'up' : 'down';
-      const key = 'large-move:' + symbol + ':' + date + ':' + direction;
+      const key = 'large-move:' + symbol + ':' + direction;
       const previous = states.get(key);
-      if (previous?.active) continue;
+      const lastTriggered = previous?.last_triggered_at ? Date.parse(previous.last_triggered_at) : 0;
+      const inCooldown = Number.isFinite(lastTriggered) && lastTriggered > 0 && (Date.parse(timestamp) - lastTriggered) < LARGE_MOVE_COOLDOWN_MS;
+      if (previous?.active && inCooldown) continue;
+
+      const severity = magnitude >= threshold * LARGE_MOVE_CRITICAL_MULTIPLIER ? 'critical' : 'high';
       events.push({
         stateKey: key,
         type: 'large-move',
-        severity: Math.abs(q.changePct) >= threshold * 2 ? 'critical' : 'high',
+        severity,
         symbol,
         title: symbol + ' large move detected',
-        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + Math.abs(q.changePct).toFixed(2) + '% today at $' + q.price.toFixed(2) + '.',
+        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at 
+
+  let catalystFeed = null;
+  if (config.catalyst_alerts) {
+    try {
+      const minute = now.getUTCMinutes();
+      if (minute % 30 === 0 || String(process.env.SMART_ALERT_FORCE || '').toLowerCase() === 'true') {
+        catalystFeed = await fetchCatalystFeed();
+      }
+    } catch {
+      catalystFeed = null;
+    }
+
+    const allowed = new Set(watchedSymbols);
+    for (const contract of Array.isArray(catalystFeed?.contracts) ? catalystFeed.contracts : []) {
+      const symbol = String(contract?.company || '').trim().toUpperCase();
+      const id = String(contract?.id || '').trim();
+      if (!symbol || !allowed.has(symbol) || !id) continue;
+      const key = 'catalyst:contract:' + id;
+      if (states.has(key)) continue;
+      events.push({
+        stateKey: key,
+        type: 'catalyst',
+        severity: 'high',
+        symbol,
+        title: symbol + ' SEC agreement detected',
+        message: (contract?.client || 'Material definitive agreement') + ' · ' + (contract?.value || 'Value not quantified') + (contract?.dateSigned ? ' · ' + contract.dateSigned : ''),
+        source: 'SEC EDGAR',
+      });
+    }
+
+    for (const trade of Array.isArray(catalystFeed?.congressTrades) ? catalystFeed.congressTrades : []) {
+      const symbol = String(trade?.stockSymbol || '').trim().toUpperCase();
+      const id = String(trade?.id || '').trim();
+      if (!symbol || !allowed.has(symbol) || !id) continue;
+      const key = 'catalyst:congress:' + id;
+      if (states.has(key)) continue;
+      events.push({
+        stateKey: key,
+        type: 'catalyst',
+        severity: 'medium',
+        symbol,
+        title: symbol + ' congressional trade disclosed',
+        message: (trade?.politician || 'Unknown filer') + ' reported a ' + (trade?.transactionType || 'transaction') + ' in the range ' + (trade?.amountRange || 'not disclosed') + (trade?.date ? ' · ' + trade.date : ''),
+        source: 'Congressional disclosure feed',
+      });
+    }
+  }
+
+  const delivery = await sendTelegram(events);
+  const deliveredKeys = new Set(delivery.sentEventKeys || []);
+
+  for (const symbol of watchedSymbols) {
+    const q = quotes.get(symbol);
+    if (!q) continue;
+    // Quote evaluation itself is observable even when no alert is triggered.
+    // Persist only active/triggered states below to keep the state table compact.
+  }
+
+  for (const event of events) {
+    if (!deliveredKeys.has(event.stateKey)) continue;
+    stateUpdates.push({
+      event_key: event.stateKey,
+      active: true,
+      last_seen_at: timestamp,
+      last_triggered_at: timestamp,
+      metadata: {
+        symbol: event.symbol,
+        type: event.type,
+        title: event.title,
+      },
+    });
+  }
+
+  await upsertRows('server_alert_state', stateUpdates);
+
+  return {
+    evaluated_symbols: watchedSymbols.length,
+    fresh_quotes: quotes.size,
+    configured_price_rules: normalizedAlerts.filter(alert => alert.active).length,
+    candidate_events: events.length,
+    sent: delivery.sent,
+    errors: delivery.errors,
+    catalyst_scan: Boolean(catalystFeed),
+    checked_at: timestamp,
+  };
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!authorize(req, res)) return;
+
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  }
+
+  try {
+    const summary = await evaluate();
+    const status = summary.errors.length && !summary.sent ? 502 : 200;
+    return res.status(status).json({ ok: true, ...summary });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Server alert evaluation failed' });
+  }
+}
+ + q.price.toFixed(2) + '. ' +
+          (severity === 'critical'
+            ? 'Move is at least ' + (LARGE_MOVE_CRITICAL_MULTIPLIER * threshold).toFixed(2) + '%.'
+            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
         source: 'Yahoo Finance quote',
       });
+
+      if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
     }
   }
 
