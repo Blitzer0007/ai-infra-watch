@@ -1788,6 +1788,7 @@ class AutonomousMCPAgent:
             calls,
             discovered,
             AgentTrajectory(steps=steps),
+            jev=self.last_jev,
             error="no successful tool calls",
             resolution="error",
         )
