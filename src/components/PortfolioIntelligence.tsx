@@ -684,7 +684,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       {tab === 'overview' && (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
-            <section className="min-w-0 space-y-3" aria-label="Portfolio decision context">
+            <section className="min-w-0 space-y-3 self-start xl:sticky xl:top-4" aria-label="Portfolio decision context">
               <JevDecisionPanel
                 kind="portfolio"
                 title="Portfolio decision context"
@@ -713,7 +713,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
                 </FilterSelect>
               </div>
-              <div className="space-y-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
               </Panel>
             </section>
           </div>
