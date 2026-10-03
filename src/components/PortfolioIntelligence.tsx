@@ -492,6 +492,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     macroRisks.length,
     news.length,
     analystConsensus,
+    analystLoading,
+    analystError,
   ]);
 
 
