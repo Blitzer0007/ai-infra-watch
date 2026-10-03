@@ -188,29 +188,47 @@ async function upsertModelConfig(row){
   return d[0];
 }
 
+function sampleStatus(count) {
+  if (count < 10) return 'insufficient';
+  if (count < 25) return 'early';
+  if (count < 50) return 'developing';
+  if (count < 100) return 'initial-validation';
+  return 'established';
+}
+
+function aggregateForecastSubset(subset) {
+  if (!subset.length) return {
+    count: 0, sampleStatus: sampleStatus(0), directionalAccuracyPct: null,
+    medianAbsoluteError: null, meanSignedErrorPct: null,
+    p25p75CoveragePct: null, p10p90CoveragePct: null
+  };
+  const eligible = subset.filter(row => Number(row.actual_return)!==0 && Number(row.median)!==0);
+  const direction = eligible.length
+    ? eligible.filter(row => Math.sign(Number(row.actual_return))===Math.sign(Number(row.median))).length/eligible.length*100
+    : null;
+  const signedErrors = subset.map(row => Number(row.actual_return)-Number(row.median)).filter(Number.isFinite);
+  const errors = signedErrors.map(value => Math.abs(value)).sort((a,b)=>a-b);
+  const middle = subset.filter(row=>Number(row.p25)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p75)).length/subset.length*100;
+  const wide = subset.filter(row=>Number(row.p10)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p90)).length/subset.length*100;
+  return {
+    count: subset.length,
+    sampleStatus: sampleStatus(subset.length),
+    directionalAccuracyPct: direction==null?null:Number(direction.toFixed(2)),
+    medianAbsoluteError: errors.length ? Number(errors[Math.floor((errors.length-1)*0.5)].toFixed(4)) : null,
+    meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(4)) : null,
+    p25p75CoveragePct: Number(middle.toFixed(2)),
+    p10p90CoveragePct: Number(wide.toFixed(2)),
+  };
+}
+
 function forecastAnalytics(rows) {
   const verified = rows.filter(row =>
     String(row.status) === 'verified' &&
     Number.isFinite(Number(row.actual_return)) &&
     Number.isFinite(Number(row.median))
   );
-  const aggregate = (subset) => {
-    if (!subset.length) return { count:0, directionalAccuracyPct:null, medianAbsoluteError:null, p25p75CoveragePct:null, p10p90CoveragePct:null };
-    const eligible = subset.filter(row => Number(row.actual_return)!==0 && Number(row.median)!==0);
-    const direction = eligible.length
-      ? eligible.filter(row => Math.sign(Number(row.actual_return))===Math.sign(Number(row.median))).length/eligible.length*100
-      : null;
-    const errors = subset.map(row=>Math.abs(Number(row.actual_return)-Number(row.median))).sort((a,b)=>a-b);
-    const middle = subset.filter(row=>Number(row.p25)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p75)).length/subset.length*100;
-    const wide = subset.filter(row=>Number(row.p10)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p90)).length/subset.length*100;
-    return {
-      count:subset.length,
-      directionalAccuracyPct:direction==null?null:Number(direction.toFixed(2)),
-      medianAbsoluteError:Number(errors[Math.floor((errors.length-1)*0.5)].toFixed(4)),
-      p25p75CoveragePct:Number(middle.toFixed(2)),
-      p10p90CoveragePct:Number(wide.toFixed(2)),
-    };
-  };
+  const aggregate = aggregateForecastSubset;
+  const overall = aggregate(verified);
   const grouped=(keyFn, decorate)=>{
     const map=new Map();
     for(const row of verified){
@@ -231,6 +249,12 @@ function forecastAnalytics(rows) {
   });
   return {
     sampleSize:verified.length,
+    sampleStatus: overall.sampleStatus,
+    directionalAccuracyPct: overall.directionalAccuracyPct,
+    medianAbsoluteError: overall.medianAbsoluteError,
+    meanSignedErrorPct: overall.meanSignedErrorPct,
+    p25p75CoveragePct: overall.p25p75CoveragePct,
+    p10p90CoveragePct: overall.p10p90CoveragePct,
     byTickerHorizon:grouped(
       row=>String(row.ticker||'').toUpperCase()+'|'+String(Number(row.horizon)),
       row=>({ticker:String(row.ticker||'').toUpperCase(),horizon:Number(row.horizon)})
