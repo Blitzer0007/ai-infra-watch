@@ -1216,7 +1216,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
         <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Verified forecasts aggregated by ticker, horizon, scenario and model.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}</span></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">50+ validation gate</div><div className="text-sm font-mono font-bold mt-1">{forecastValidationGate(forecastAnalytics.validationGate?.verifiedCount ?? forecastAnalytics.sampleSize).ready ? 'READY' : 'BUILDING'}</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">50+ validation gate</div><div className="text-sm font-mono font-bold mt-1">{forecastValidationGate(forecastAnalytics?.validationGate?.verifiedCount ?? forecastAnalytics?.sampleSize ?? 0).ready ? 'READY' : 'BUILDING'}</div></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample status</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.sampleStatus ? forecastAnalytics.sampleStatus.replace('-', ' ') : 'insufficient'}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Groups</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byTickerHorizon.length}</div></div>
@@ -1263,14 +1263,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
           </div>
-          {forecastAnalytics.evidenceCoverage && (
+          {forecastAnalytics?.evidenceCoverage && (
             <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Creation-time evidence coverage</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[9px] font-mono">
-                <div><span className="text-white/30">Snapshots</span><span className="ml-2 text-white/70">{forecastAnalytics.evidenceCoverage.forecastsWithSnapshot}</span></div>
-                <div><span className="text-white/30">Analyst</span><span className="ml-2 text-white/70">{forecastAnalytics.evidenceCoverage.analystAvailable}</span></div>
-                <div><span className="text-white/30">News</span><span className="ml-2 text-white/70">{forecastAnalytics.evidenceCoverage.withNews}</span></div>
-                <div><span className="text-white/30">Multi-channel</span><span className="ml-2 text-white/70">{forecastAnalytics.evidenceCoverage.multiChannel}</span></div>
+                <div><span className="text-white/30">Snapshots</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.forecastsWithSnapshot}</span></div>
+                <div><span className="text-white/30">Analyst</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.analystAvailable}</span></div>
+                <div><span className="text-white/30">News</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.withNews}</span></div>
+                <div><span className="text-white/30">Multi-channel</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.multiChannel}</span></div>
               </div>
               <div className="mt-2 text-[8px] text-white/25">Descriptive coverage of evidence captured when forecasts were created; it does not measure forecast quality or imply that any evidence caused an outcome.</div>
             </div>
@@ -1278,7 +1278,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
           <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
             <div className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2">
-              {forecastValidationGate(forecastAnalytics.validationGate?.verifiedCount ?? forecastAnalytics.sampleSize).ready
+              {forecastValidationGate(forecastAnalytics?.validationGate?.verifiedCount ?? forecastAnalytics?.sampleSize ?? 0).ready
                 ? 'Validation gate passed · 50+ verified forecasts'
                 : 'Validation gate building · 50 verified forecasts required'}
             </div>
