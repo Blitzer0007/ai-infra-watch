@@ -1,4 +1,4 @@
-import DataTable, { type DataTableColumn } from './DataTable';
+import DataTable from './DataTable';
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarRange, ChevronRight, Loader2, Search, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
@@ -1263,7 +1263,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             { key: 'directionalAccuracyPct', header: 'Direction', accessor: row => row.directionalAccuracyPct ?? null, type: 'percent', render: row => row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1) + '%' },
             { key: 'medianAbsoluteError', header: 'Typical prediction error', accessor: row => row.medianAbsoluteError ?? null, type: 'percent', render: row => row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2) + '%' },
             { key: 'p25p75CoveragePct', header: 'Likely range', accessor: row => row.p25p75CoveragePct ?? null, type: 'percent', render: row => row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1) + '%' },
-          ] as DataTableColumn<typeof forecastAnalytics.byTickerHorizon[number]>[]}
+          ]}
           rowKey={(row, index) => String(row.ticker) + '-' + String(row.horizon) + '-' + index}
           initialSort={{ key: 'ticker', direction: 'asc' }}
           empty="No forecast verification analytics available yet."
@@ -1441,8 +1441,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 { key: 'baselineDirection', header: 'Baseline', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
                 { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
                 { key: 'coverage50', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
-              ] as DataTableColumn<typeof matrix.details[number]>[]}
-              rowKey={(row) => row.ticker + '-' + row.horizon}
+              ]}
+              rowKey={row => row.ticker + '-' + row.horizon}
               initialSort={{ key: 'ticker', direction: 'asc' }}
               empty="No validation matrix data available yet."
             /></div>
