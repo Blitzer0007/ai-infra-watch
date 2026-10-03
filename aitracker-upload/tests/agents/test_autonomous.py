@@ -798,7 +798,7 @@ def test_analyst_evidence_requires_actual_payload():
     empty_result = _evidence_availability("What are analysts expecting for NVDA?", [empty])
     usable_result = _evidence_availability("What are analysts expecting for NVDA?", [usable])
 
-    assert empty_result["channels"]["analyst_consensus"]["status"] == "AVAILABLE"
+    assert empty_result["channels"]["analyst_consensus"]["status"] == "EMPTY"
     assert usable_result["channels"]["analyst_consensus"]["status"] == "AVAILABLE"
     assert usable_result["usable_families"].count("analyst_consensus") == 1
 
