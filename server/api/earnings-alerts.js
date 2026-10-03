@@ -396,6 +396,60 @@ async function sendWebhook(alerts) {
 }
 
 
+
+async function sendTelegram(alerts) {
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!botToken || !chatId) {
+    return {
+      configured: false,
+      attempted: alerts.length > 0,
+      sent: 0,
+      error: 'TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are not configured.',
+    };
+  }
+
+  if (!alerts.length) {
+    return { configured: true, attempted: false, sent: 0, error: null };
+  }
+
+  let sent = 0;
+  const errors = [];
+
+  for (const alert of alerts) {
+    const text = '🔔 AI Infra Watch · Earnings Alert\n\n' + alert.message;
+    try {
+      const response = await fetch(
+        'https://api.telegram.org/bot' + botToken + '/sendMessage',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, text }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const payload = await response.json();
+          detail = payload?.description ? ' ' + payload.description : '';
+        } catch {}
+        throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail);
+      }
+      sent += 1;
+    } catch (error) {
+      errors.push(alert.symbol + ': ' + String(error?.message || error));
+    }
+  }
+
+  return {
+    configured: true,
+    attempted: true,
+    sent,
+    error: errors.length ? errors.join(' · ') : null,
+  };
+}
+
 const HISTORY_MAX_SYMBOLS = 12;
 const HISTORY_DEFAULT_LIMIT = 6;
 const HISTORY_CACHE_MS = 5 * 60 * 1000;
@@ -563,18 +617,54 @@ export default async function handler(req, res) {
   const isVercelCron = String(req.headers['user-agent'] || '').includes('vercel-cron/1.0');
   const notify = String(req.query?.notify || '') === '1' || isVercelCron;
   let delivered = {
-    configured: Boolean(String(process.env.NOTIFY_WEBHOOK_URL || '').trim()),
+    configured: Boolean(String(process.env.NOTIFY_WEBHOOK_URL || '').trim())
+      || Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim() && String(process.env.TELEGRAM_CHAT_ID || '').trim()),
     attempted: false,
     sent: 0,
     error: null,
+    channels: {
+      webhook: null,
+      telegram: null,
+    },
   };
 
   if (notify) {
     if (!authorizedForNotify(req)) {
       return res.status(401).json({ ok: false, error: 'Unauthorized earnings notification trigger.' });
     }
+
     const due = upcoming.filter(event => event.days_until === leadDays);
-    delivered = await sendWebhook(due);
+    const [webhookDelivery, telegramDelivery] = await Promise.all([
+      sendWebhook(due),
+      sendTelegram(due),
+    ]);
+
+    const configuredDeliveries = [
+      ['webhook', webhookDelivery],
+      ['telegram', telegramDelivery],
+    ].filter(([, result]) => result.configured);
+
+    const successfulDeliveries = configuredDeliveries.filter(([, result]) =>
+      result.sent === due.length && !result.error
+    );
+
+    const deliveryErrors = configuredDeliveries
+      .filter(([, result]) => result.error)
+      .map(([channel, result]) => channel + ': ' + result.error);
+
+    delivered = {
+      configured: configuredDeliveries.length > 0,
+      attempted: due.length > 0,
+      sent: successfulDeliveries.length
+        ? due.length
+        : Math.max(0, ...configuredDeliveries.map(([, result]) => result.sent)),
+      error: deliveryErrors.length ? deliveryErrors.join(' · ') : null,
+      channels: {
+        webhook: webhookDelivery,
+        telegram: telegramDelivery,
+      },
+    };
+
     console.log(JSON.stringify({
       route: '/api/earnings-alerts',
       source: calendar.ok ? 'finnhub' : 'unavailable',
@@ -583,10 +673,10 @@ export default async function handler(req, res) {
       delivery: delivered,
     }));
 
-    // The scheduler must fail when an alert was due but delivery did not
-    // succeed. Returning HTTP 200 here would make GitHub Actions report a
-    // successful run even though the notification was never delivered.
-    if (due.length > 0 && (!delivered.configured || delivered.error || delivered.sent !== due.length)) {
+    // The scheduler must fail when a due alert cannot be delivered by any
+    // configured notification channel. Telegram can be the only channel;
+    // the existing webhook remains supported as an optional parallel path.
+    if (due.length > 0 && (!delivered.configured || successfulDeliveries.length === 0)) {
       res.setHeader('Cache-Control', 'no-store');
       return res.status(502).json({
         ok: false,
@@ -597,7 +687,7 @@ export default async function handler(req, res) {
         monitored_symbols: Array.from(profiles.keys()),
         upcoming,
         notification: delivered,
-        error: delivered.error || 'Notification delivery did not confirm all due alerts.',
+        error: delivered.error || 'Notification delivery did not confirm any configured channel for all due alerts.',
       });
     }
   }
@@ -615,6 +705,10 @@ export default async function handler(req, res) {
     configuration: {
       finnhub_configured: Boolean(String(process.env.FINNHUB_API_KEY || '').trim()),
       webhook_configured: Boolean(String(process.env.NOTIFY_WEBHOOK_URL || '').trim()),
+      telegram_configured: Boolean(
+        String(process.env.TELEGRAM_BOT_TOKEN || '').trim()
+        && String(process.env.TELEGRAM_CHAT_ID || '').trim()
+      ),
       cron_secret_configured: Boolean(String(process.env.CRON_SECRET || '').trim()),
     },
     error: calendar.ok ? null : calendar.error,
