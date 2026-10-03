@@ -1175,7 +1175,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <CheckCircle2 className="w-4 h-4 text-cyan-300" />
             <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Live forecast accuracy</span>
           </div>
-          <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here.</p>
+          <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here. Direction, error, bias, and coverage are descriptive while the sample is below 50; the validation gate is considered established only at 50+ verified forecasts.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
@@ -1183,6 +1183,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
           </div>
           <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
+            <div className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2">
+              {forecastAnalytics.validationGate?.ready
+                ? 'Validation gate passed · 50+ verified forecasts'
+                : 'Validation gate building · 50 verified forecasts required'}
+            </div>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
                 <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Verification drift monitor</div>
