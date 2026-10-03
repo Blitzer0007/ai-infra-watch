@@ -6,6 +6,8 @@ on:
     paths:
       - "src/**"
       - "api/**"
+      - "server/**"
+      - "supabase/**"
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
