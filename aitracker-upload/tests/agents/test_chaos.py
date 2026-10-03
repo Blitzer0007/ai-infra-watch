@@ -414,3 +414,23 @@ def test_router_trajectory_is_audit_valid_after_partial_server_failure():
 
     assert result.trajectory.is_valid()
     assert not result.calls[-1].ok
+
+
+def test_structured_trace_event_has_stable_operational_shape():
+    from app.eval import trace
+
+    captured = []
+    original = trace._append
+    trace._append = lambda obj: captured.append(obj)
+    try:
+        trace.record_event("sec_refresh", {"status": "healthy", "source": "sec"})
+    finally:
+        trace._append = original
+
+    assert len(captured) == 1
+    event = captured[0]
+    assert event["kind"] == "event"
+    assert event["event_kind"] == "sec_refresh"
+    assert event["event_id"]
+    assert event["metadata"] == {"status": "healthy", "source": "sec"}
+    assert isinstance(event["ts"], float)
