@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 
 from app.agents.evidence_quality import normalize_freshness, detect_conflicts
+from app.jev.assess import measured_evidence_quality
 
 
 def call(tool, output):
@@ -92,3 +93,91 @@ def test_conflict_scoping_keeps_same_record_contradiction():
     report = detect_conflicts(calls)
     assert report["detected"] is True
     assert report["items"][0]["entity"] == "NVDA"
+
+
+def measured_state(families, freshness=None, missing=None, conflicts=0, citation=None):
+    return {
+        "evidence_availability": {
+            "usable_families": families,
+            "missing": missing or [],
+        },
+        "evidence_freshness": freshness or [],
+        "conflict_detection": {"detected": conflicts > 0, "count": conflicts},
+        "citation_coverage": {} if citation is None else {"coverage": citation},
+    }
+
+
+def test_measured_evidence_quality_single_analyst_source_is_partial():
+    result = measured_evidence_quality(
+        measured_state(
+            ["analyst_consensus"],
+            [{"freshness": {"status": "FRESH"}}],
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["percent"] == 33
+    assert result["label"] == "Partial"
+
+
+def test_measured_evidence_quality_three_fresh_sources_is_strong():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+        )
+    )
+    assert result["score"] == 3.0
+    assert result["percent"] == 100
+    assert result["label"] == "Strong"
+
+
+def test_measured_evidence_quality_stale_sources_are_capped():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "STALE"}},
+                {"freshness": {"status": "STALE"}},
+                {"freshness": {"status": "STALE"}},
+            ],
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["label"] == "Partial"
+
+
+def test_measured_evidence_quality_conflict_reduces_strong_evidence():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "regulatory_primary"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+            conflicts=1,
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["conflict_count"] == 1
+
+
+def test_measured_evidence_quality_missing_required_and_poor_citations_reduce_score():
+    result = measured_evidence_quality(
+        measured_state(
+            ["market", "news", "analyst_consensus"],
+            [
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+                {"freshness": {"status": "FRESH"}},
+            ],
+            missing=["regulatory_primary"],
+            citation=0.2,
+        )
+    )
+    assert result["score"] == 1.0
+    assert result["percent"] == 33
