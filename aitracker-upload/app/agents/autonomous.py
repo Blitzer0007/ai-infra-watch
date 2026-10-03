@@ -283,6 +283,21 @@ def _record_jev_route(question: str, tools: list[ToolInfo], client: Any, *, acti
                 "route_error": f"{type(exc).__name__}: {exc}",
             }
         except Exception as retry_exc:
+            # The route decision itself is the critical state. If optional
+            # serialization still fails, preserve a previously extracted JEV
+            # choice instead of replacing the entire route with a choice-less
+            # fallback object.
+            if "choice" in locals() and str(choice or "").strip():
+                return {
+                    "enabled": True,
+                    "choice": str(choice),
+                    "confidence": 0.0,
+                    "probabilities": {},
+                    "model": "",
+                    "latency_ms": 0.0,
+                    "action": action,
+                    "route_error": f"{type(exc).__name__}: {exc}; retry={type(retry_exc).__name__}: {retry_exc}",
+                }
             return {
                 "enabled": True,
                 "action": "fallback",
