@@ -861,9 +861,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Historical tests: ' + backtest.rows.length,
         'Directional hit rate: ' + (backtest.directionalAccuracy * 100).toFixed(1) + '%',
         'Median absolute error: ' + backtest.medianAbsoluteError.toFixed(1) + ' percentage points',
-        'P25-P75 coverage: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
+        'Likely range coverage: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
         'Calibration buckets: ' + JSON.stringify(backtest.calibration),
-        'P10-P90 coverage: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
+        'Wider expected range coverage: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
         'Recent test rows: ' + JSON.stringify(compactRows),
         'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
       ].join('\n');
@@ -975,11 +975,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
-                ['10th percentile', analysis.p10],
-                ['25th percentile', analysis.p25],
+                ['Wider range low', analysis.p10],
+                ['Likely range low', analysis.p25],
                 ['Median', analysis.median],
-                ['75th percentile', analysis.p75],
-                ['90th percentile', analysis.p90],
+                ['Likely range high', analysis.p75],
+                ['Wider range high', analysis.p90],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-xl border border-white/5 bg-black/10 p-3">
                   <div className="text-[8px] font-mono uppercase text-white/30">{label}</div>
@@ -1144,7 +1144,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' pp'}</div></div>
           </div>
-          <div className="overflow-x-auto"><table className="min-w-full text-left text-[9px] font-mono"><thead className="text-white/25 uppercase"><tr><th className="px-2 py-1.5">Ticker</th><th className="px-2 py-1.5">Horizon</th><th className="px-2 py-1.5">N</th><th className="px-2 py-1.5">Direction</th><th className="px-2 py-1.5">Median error</th><th className="px-2 py-1.5">P25-P75</th></tr></thead><tbody className="divide-y divide-white/5">{forecastAnalytics.byTickerHorizon.slice(0,12).map((row,index)=><tr key={String(row.ticker)+String(row.horizon)+index}><td className="px-2 py-1.5 text-white/65">{row.ticker || '—'}</td><td className="px-2 py-1.5 text-white/45">{row.horizon ? row.horizon+'D' : '—'}</td><td className="px-2 py-1.5 text-white/45">{row.count}</td><td className="px-2 py-1.5 text-white/55">{row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1)+'%'}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="min-w-full text-left text-[9px] font-mono"><thead className="text-white/25 uppercase"><tr><th className="px-2 py-1.5">Ticker</th><th className="px-2 py-1.5">Horizon</th><th className="px-2 py-1.5">N</th><th className="px-2 py-1.5">Direction</th><th className="px-2 py-1.5">Typical prediction error</th><th className="px-2 py-1.5">Likely range</th></tr></thead><tbody className="divide-y divide-white/5">{forecastAnalytics.byTickerHorizon.slice(0,12).map((row,index)=><tr key={String(row.ticker)+String(row.horizon)+index}><td className="px-2 py-1.5 text-white/65">{row.ticker || '—'}</td><td className="px-2 py-1.5 text-white/45">{row.horizon ? row.horizon+'D' : '—'}</td><td className="px-2 py-1.5 text-white/45">{row.count}</td><td className="px-2 py-1.5 text-white/55">{row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2)+'%'}</td><td className="px-2 py-1.5 text-white/55">{row.p25p75CoveragePct == null ? '—' : row.p25p75CoveragePct.toFixed(1)+'%'}</td></tr>)}</tbody></table></div>
         </div>
       )}
 <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-4 space-y-3">
@@ -1177,7 +1177,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
           </div>
           <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -1237,13 +1237,13 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               <div className="text-[9px] font-mono text-violet-200/60 uppercase">Active forecast model: {modelVersion}{modelConfig?.validation_tests ? ' · validated on ' + modelConfig.validation_tests + ' tests' : ''}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Directional</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Median abs. error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P25–P75 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">P10–P90 coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Likely range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Wider expected range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct-direction lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
               </div>
@@ -1251,9 +1251,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 {backtest.rows.slice(-8).reverse().map(row => (
                   <div key={row.asOfDate} className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/5 px-2 py-1.5 text-[9px] font-mono text-white/45">
                     <span>{row.asOfDate} → {row.targetDate}</span>
-                    <span>Median {formatReturn(row.median)}</span>
+                    <span>Typical expected move {formatReturn(row.median)}</span>
                     <span>Actual {formatReturn(row.actual)}</span>
-                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'P25–P75' : 'outside P25–P75'}</span>
+                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'Likely range' : 'outside Likely range'}</span>
                   </div>
                 ))}
               </div>
@@ -1279,10 +1279,10 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg median error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P50 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg P80 coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-[9px] font-mono"><thead><tr className="text-white/30 border-b border-white/5"><th className="text-left p-2">Ticker</th><th className="text-left p-2">Horizon</th><th className="text-right p-2">Tests</th><th className="text-right p-2">Direction</th><th className="text-right p-2">Baseline</th><th className="text-right p-2">Error</th><th className="text-right p-2">P25–P75</th></tr></thead><tbody>{matrix.details.map(row => <tr key={row.ticker + '-' + row.horizon} className="border-b border-white/5 text-white/55"><td className="p-2 text-white/75">{row.ticker}</td><td className="p-2">{row.horizon}D</td><td className="p-2 text-right">{row.tests}</td><td className="p-2 text-right">{(row.direction*100).toFixed(0)}%</td><td className="p-2 text-right">{(row.baselineDirection*100).toFixed(0)}%</td><td className="p-2 text-right">{row.error.toFixed(1)}</td><td className="p-2 text-right">{(row.coverage50*100).toFixed(0)}%</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-[9px] font-mono"><thead><tr className="text-white/30 border-b border-white/5"><th className="text-left p-2">Ticker</th><th className="text-left p-2">Horizon</th><th className="text-right p-2">Tests</th><th className="text-right p-2">Direction</th><th className="text-right p-2">Baseline</th><th className="text-right p-2">Error</th><th className="text-right p-2">Likely range</th></tr></thead><tbody>{matrix.details.map(row => <tr key={row.ticker + '-' + row.horizon} className="border-b border-white/5 text-white/55"><td className="p-2 text-white/75">{row.ticker}</td><td className="p-2">{row.horizon}D</td><td className="p-2 text-right">{row.tests}</td><td className="p-2 text-right">{(row.direction*100).toFixed(0)}%</td><td className="p-2 text-right">{(row.baselineDirection*100).toFixed(0)}%</td><td className="p-2 text-right">{row.error.toFixed(1)}</td><td className="p-2 text-right">{(row.coverage50*100).toFixed(0)}%</td></tr>)}</tbody></table></div>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[8px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
         </div>}
       </div>
