@@ -37,7 +37,7 @@ async function sendTelegram(events) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: {
+          body: JSON.stringify({
             chat_id: chatId,
             text: [
               '🚨 AI Infra Watch · Signal Alert',
@@ -49,7 +49,7 @@ async function sendTelegram(events) {
               'Source: dashboard signal monitor',
               'Information alert only; no trade instruction is inferred.',
             ].join('\n'),
-          },
+          }),
           signal: AbortSignal.timeout(10000),
         },
       );
