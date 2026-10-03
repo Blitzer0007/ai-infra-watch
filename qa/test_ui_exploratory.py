@@ -132,3 +132,39 @@ def test_exploratory_data_health_summary_and_refresh(page):
     assert page.get_by_label("Evidence channel health").is_visible()
     refresh = page.get_by_role("button", name="Refresh evidence data")
     assert refresh.is_visible()
+
+
+def test_exploratory_congress_filters(page):
+    mock_local_apis(page)
+    import json as _json
+
+    def congress_route(route):
+        if '/api/congress-trades' not in route.request.url:
+            return route.continue_()
+        route.fulfill(
+            status=200,
+            content_type='application/json',
+            body=_json.dumps({
+                'source': 'qa',
+                'sourceLabel': 'QA mocked Congress source',
+                'trades': [
+                    {'id':'qa-house-buy','politician':'House Member','chamber':'HOUSE','stockSymbol':'NVDA','transactionType':'buy','amountRange':'$1,001 - $15,000','transactionDate':'2026-09-20','filingDate':'2026-09-22','date':'2026-09-20'},
+                    {'id':'qa-senate-sell','politician':'Senate Member','chamber':'SENATE','stockSymbol':'NVDA','transactionType':'sell','amountRange':'$15,001 - $50,000','transactionDate':'2026-09-10','filingDate':'2026-09-12','date':'2026-09-10'},
+                    {'id':'qa-house-sell','politician':'House Seller','chamber':'HOUSE','stockSymbol':'NVDA','transactionType':'sell','amountRange':'$1,001 - $15,000','transactionDate':'2026-08-20','filingDate':'2026-08-22','date':'2026-08-20'},
+                ],
+            }),
+        )
+
+    page.route('**/api/congress-trades*', congress_route)
+    goto_app(page)
+    page.get_by_test_id('nav-congress').click()
+    page.get_by_text('3 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+
+    page.get_by_role('button', name='House', exact=True).click()
+    page.get_by_text('2 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+
+    page.get_by_label('Filter Congress trades by transaction type').select_option('buy')
+    page.get_by_text('1 matching disclosure', exact=True).wait_for(state='visible', timeout=30000)
+
+    page.get_by_role('button', name='Clear table filters', exact=True).click()
+    page.get_by_text('3 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
