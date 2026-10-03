@@ -11,7 +11,7 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { buildPortfolioDailySeries, buildPortfolioHistoryValue, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import { buildPortfolioDailySeries, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
@@ -722,14 +722,30 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
           <SignalScorecardPanel />
 
+      <PortfolioSignalFusion
+            prices={livePrices}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+
+          <UnifiedEventTimeline
+            symbol={selected}
+            contracts={contracts}
+            congressTrades={congressTrades}
+            macroRisks={macroRisks}
+            news={news}
+            politicalSignals={politicalSignals}
+          />
+
           <section className="rounded-2xl border border-violet-400/10 bg-violet-400/[0.02] p-4">
             <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
               <div>
                 <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-violet-300">Analyst evidence</div>
                 <h3 className="text-sm font-black mt-1">Consensus & source context</h3>
-                <p className="text-[10px] text-white/35 mt-1">
-                  External analyst data is evidence input, not a prediction or trade instruction.
-                </p>
+                <p className="text-[10px] text-white/35 mt-1">External analyst data is evidence input, not a prediction or trade instruction.</p>
               </div>
               <div className="text-right text-[9px] font-mono text-white/35">
                 {analystLoading ? 'LOADING…' : analystError ? 'UNAVAILABLE' : analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null).toUpperCase() : 'NO DATA'}
@@ -751,22 +767,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                   <Info label="Analysts" value={String(analystConsensus.analystCount || 0)} />
                   <Info label="Target median" value={analystConsensus.priceTarget?.median == null ? '—' : '
-            prices={livePrices}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
-
-          <UnifiedEventTimeline
-            symbol={selected}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
         </>
       )}
 
@@ -1301,22 +1301,6 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
   </div>;
 } + Number(analystConsensus.priceTarget.median).toFixed(2)} />
                   <Info label="Target mean" value={analystConsensus.priceTarget?.mean == null ? '—' : '
-            prices={livePrices}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
-
-          <UnifiedEventTimeline
-            symbol={selected}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
         </>
       )}
 
@@ -1865,9 +1849,7 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
                     </div>
                   </div>
                 )}
-                <div className="mt-3 text-[8px] font-mono text-white/20">
-                  JEV receives the structured ratings, price targets, estimates, freshness and web-evidence metadata above as evidence families; unavailable fields remain unavailable rather than being inferred.
-                </div>
+                <div className="mt-3 text-[8px] font-mono text-white/20">JEV receives structured ratings, targets, estimates, freshness and web-evidence metadata as evidence families; unavailable fields remain unavailable.</div>
               </>
             ) : (
               <div className="mt-3 rounded-lg border border-amber-400/10 bg-amber-400/[0.02] px-3 py-2 text-[10px] text-amber-200/60">
@@ -1875,24 +1857,6 @@ function Insight({title,body,icon}:{title:string;body:string;icon:ReactNode}) {
               </div>
             )}
           </section>
-
-      <PortfolioSignalFusion
-            prices={livePrices}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
-
-          <UnifiedEventTimeline
-            symbol={selected}
-            contracts={contracts}
-            congressTrades={congressTrades}
-            macroRisks={macroRisks}
-            news={news}
-            politicalSignals={politicalSignals}
-          />
         </>
       )}
 
