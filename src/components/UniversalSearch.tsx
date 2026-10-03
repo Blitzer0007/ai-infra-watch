@@ -19,6 +19,22 @@ type SearchItem = {
   aliases?: string[];
 };
 
+const TICKER_ALIASES: Record<string, string[]> = {
+  CRM: ['salesforce', 'salesforce.com'],
+  GOOG: ['google', 'alphabet'],
+  SNDK: ['sandisk', 'western digital'],
+  TSM: ['tsmc', 'taiwan semiconductor'],
+  ONDS: ['ondas', 'ondas networks'],
+  NBIS: ['nebius'],
+  DGXX: ['digi power', 'digi power x'],
+  NVDA: ['nvidia'],
+  MU: ['micron'],
+  MSFT: ['microsoft'],
+  AMD: ['advanced micro devices'],
+  META: ['meta', 'facebook'],
+  NOW: ['servicenow'],
+};
+
 const PAGE_ITEMS: SearchItem[] = [
   { id: 'overview', kind: 'page', title: 'Overview', subtitle: 'Dashboard summary and live intelligence', view: 'overview', aliases: ['home', 'dashboard'] },
   { id: 'contracts', kind: 'page', title: 'Contracts', subtitle: 'Infrastructure contracts and filings', view: 'contracts', aliases: ['filings', 'agreements'] },
@@ -51,7 +67,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
         title: symbol,
         subtitle: meta?.name || 'Public ticker',
         symbol,
-        aliases: meta ? [meta.name, meta.sector] : [],
+        aliases: meta ? [meta.name, meta.sector, ...(TICKER_ALIASES[symbol] || [])] : (TICKER_ALIASES[symbol] || []),
       };
     });
   }, [shortcuts]);
