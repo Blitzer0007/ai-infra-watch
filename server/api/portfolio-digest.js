@@ -411,17 +411,59 @@ export default async function handler(req, res) {
   if (!authorize(req, res)) return;
   try {
     if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    if (isCron(req)) await reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
-    const digest = await buildDigest();
-    if (req.method === 'GET' && !isCron(req)) {
-      return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
+
+    const scheduled = isCron(req);
+    const recovery = String(req.query?.recovery || '') === '1';
+    let slotKey = null;
+    if (scheduled && !recovery) {
+      slotKey = getDigestSlotKey(req);
+      const claimed = await claimDigestSlot(slotKey);
+      if (!claimed) {
+        return res.status(200).json({ ok: true, skipped: true, reason: 'digest slot already completed or in progress', slotKey });
+      }
     }
-    const requested = req.method === 'POST'
-      ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
-      : [];
-    const delivery = await deliver(digest, requested);
-    return res.status(delivery.errors.length && !delivery.delivered.length ? 502 : 200).json({ ok: true, ...digest, delivery });
+
+    try {
+      if (scheduled) await reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
+      const digest = await buildDigest();
+      if (req.method === 'GET' && !scheduled) {
+        return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
+      }
+      const requested = req.method === 'POST'
+        ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const delivery = await deliver(digest, requested);
+
+      if (recovery) {
+        const missing = [];
+        const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const rows = await supabase('portfolio_digest_runs?slot_key=like.' + encodeURIComponent(dateKey + '-%') + '&select=slot_key,status');
+        for (const hour of ['00','06','12','18','22']) {
+          const key = dateKey + '-' + hour;
+          if (hour === '00') continue;
+          if (!rows.some(row => row.slot_key === key && row.status === 'completed')) missing.push(hour + ':05');
+        }
+        if (!missing.length) {
+          return res.status(200).json({ ok: true, recovery: true, skipped: true, reason: 'all scheduled digest slots completed', delivery });
+        }
+        digest.text = 'Scheduler recovery · missed digest slot(s): ' + missing.join(', ') + '\n\n' + digest.text;
+        const recoveryDelivery = await deliver(digest, requested);
+        return res.status(recoveryDelivery.errors.length && !recoveryDelivery.delivered.length ? 502 : 200).json({ ok: true, recovery: true, missedSlots: missing, delivery: recoveryDelivery });
+      }
+
+      if (slotKey) {
+        await updateDigestRun(slotKey, delivery.errors.length && !delivery.delivered.length ? 'failed' : 'completed', {
+          completed_at: new Date().toISOString(),
+          delivery,
+          error: delivery.errors.length ? delivery.errors.join(' · ') : null,
+        });
+      }
+      return res.status(delivery.errors.length && !delivery.delivered.length ? 502 : 200).json({ ok: true, ...digest, delivery, slotKey });
+    } catch (error) {
+      if (slotKey) await updateDigestRun(slotKey, 'failed', { completed_at: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Portfolio digest failed' });
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Portfolio digest failed' });
   }
 }
