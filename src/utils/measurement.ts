@@ -203,48 +203,6 @@ function returnMap(history: HistoricalPricePoint[]) {
   }
   return map;
 }
-function transactionQuantitiesBeforeDate(
-  transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
-  date: string,
-  symbolFilter?: Set<string>,
-) {
-  const quantities: Record<string, number> = {};
-  const ordered = [...transactions]
-    .filter(row => row.tradeDate < date && (!symbolFilter || symbolFilter.has(String(row.symbol).toUpperCase())))
-    .sort((a, b) => a.tradeDate.localeCompare(b.tradeDate) || Number(a.sourceRow || 0) - Number(b.sourceRow || 0));
-
-  for (const row of ordered) {
-    const symbol = String(row.symbol || '').toUpperCase();
-    const quantity = Number(row.quantity);
-    if (!symbol || !(quantity > 0)) continue;
-    const current = quantities[symbol] ?? 0;
-    quantities[symbol] = row.transactionType === 'SELL'
-      ? Math.max(0, current - quantity)
-      : current + quantity;
-  }
-  return quantities;
-}
-
-function applyTransactionsOnDate(
-  quantities: Record<string, number>,
-  transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
-  date: string,
-  symbolFilter?: Set<string>,
-) {
-  const ordered = [...transactions]
-    .filter(row => row.tradeDate === date && (!symbolFilter || symbolFilter.has(String(row.symbol).toUpperCase())))
-    .sort((a, b) => Number(a.sourceRow || 0) - Number(b.sourceRow || 0));
-  for (const row of ordered) {
-    const symbol = String(row.symbol || '').toUpperCase();
-    const quantity = Number(row.quantity);
-    if (!symbol || !(quantity > 0)) continue;
-    const current = quantities[symbol] ?? 0;
-    quantities[symbol] = row.transactionType === 'SELL'
-      ? Math.max(0, current - quantity)
-      : current + quantity;
-  }
-}
-
 export function buildPortfolioDailySeriesFromTransactions(
   histories: Record<string, HistoricalPricePoint[]>,
   transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
