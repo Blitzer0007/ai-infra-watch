@@ -157,7 +157,7 @@ export function calculatePeerCounterfactual(input: {
     return {
       peer, purchaseDate, peerEntryDate: null, peerEntryPrice: null, peerCurrentPrice,
       hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
-      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
+      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, actualCostBasis: null, difference: null,
       differencePctPoints: null, basis: transactions.length ? 'broker-transactions' : 'single-entry',
       status: purchaseDate ? 'history-unavailable' : 'entry-unavailable',
     };
