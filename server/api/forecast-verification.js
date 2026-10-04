@@ -312,6 +312,7 @@ function normalize(row) {
     p10: Number(row.p10),
     p90: Number(row.p90),
     modelVersion: row.model_version || 'analogue-v1',
+    createdSource: row.created_source || 'forward_outlook',
     evidenceSnapshot: row.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : undefined,
     status: row.status,
     verifiedAt: row.verified_at || undefined,
@@ -396,6 +397,7 @@ export default async function handler(req, res) {
         horizon: String(body.horizon), scenario_id: body.scenarioId, entry_price: Number(body.entryPrice), median: Number(body.median),
         p25: Number(body.p25), p75: Number(body.p75), p10: Number(body.p10), p90: Number(body.p90),
         model_version: String(body.modelVersion || 'analogue-v1'),
+        created_source: String(body.createdSource || 'forward_outlook'),
         evidence_snapshot: body.evidenceSnapshot && typeof body.evidenceSnapshot === 'object' ? body.evidenceSnapshot : {},
         status: 'pending'
       };
