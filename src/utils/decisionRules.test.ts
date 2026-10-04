@@ -150,7 +150,7 @@ testFn('ruleDistance: staged trailing activates after take-profit and uses the p
   const trailing = result.rules.find(rule => rule.type === 'trailing stop');
   assert.ok(trailing);
   assert.equal(trailing.target, 85);
-  assert.equal(trailing.activatedDate, '2026-10-02');
+  assert.equal((trailing as any).activatedDate, '2026-10-02');
 });
 
 testFn('ruleDistance: staged state can be persisted and reused after restart', () => {
