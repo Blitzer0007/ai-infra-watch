@@ -98,22 +98,17 @@ function signedPct(value) {
 }
 
 async function fetchDecisionCenter() {
-  const secret = String(process.env.CRON_SECRET || '').trim();
-  if (!secret) return null;
-  try {
-    const response = await fetch('https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center', {
-      headers: {
-        Authorization: 'Bearer ' + secret,
-        'User-Agent': 'ai-infra-watch-daily-digest/2.0',
-      },
-      signal: AbortSignal.timeout(12000),
+  const secret=String(process.env.CRON_SECRET||'').trim();
+  if(!secret) return {decision:null,error:'CRON_SECRET is not configured'};
+  try{
+    const response=await fetch('https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center',{
+      headers:{Authorization:'Bearer '+secret,'User-Agent':'ai-infra-watch-daily-digest/3.0'},
+      signal:AbortSignal.timeout(12000),
     });
-    if (!response.ok) return null;
-    const body = await response.json().catch(() => null);
-    return body?.ok ? body : null;
-  } catch {
-    return null;
-  }
+    if(!response.ok) return {decision:null,error:'Decision center HTTP '+response.status};
+    const body=await response.json().catch(()=>null);
+    return body?.ok?{decision:body,error:null}:{decision:null,error:'Decision center returned an invalid response'};
+  }catch(error){return {decision:null,error:error instanceof Error?error.message:'Decision center request failed'};}
 }
 
 function buildDecisionFirstText(decision, fallbackDate, weekly) {
@@ -259,7 +254,8 @@ async function buildDigest() {
   const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const date = localDate;
 
-  const decision = await fetchDecisionCenter();
+  const decisionResult = await fetchDecisionCenter();
+  const decision = decisionResult.decision;
   const isSunday = new Intl.DateTimeFormat('en-US', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', weekday: 'short' }).format(new Date()) === 'Sun';
   const weekly = isSunday ? await getWeeklyDecisionReview().catch(() => null) : null;
 
@@ -286,7 +282,8 @@ async function buildDigest() {
   }
 
   const lines = [
-    'AI Infra Watch — Daily Intelligence Brief',
+    'Decision layer unavailable — showing basic summary',
+    'Decision layer error: ' + (decisionResult.error || 'unknown'),
     date,
     '',
     'PORTFOLIO',
