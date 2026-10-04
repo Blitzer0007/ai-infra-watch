@@ -1,3 +1,4 @@
+import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -74,6 +75,9 @@ function normalizeLot(row) {
     riskBeta: row.risk_beta == null ? null : Number(row.risk_beta),
     riskLeverage: row.risk_leverage == null ? 1 : Number(row.risk_leverage),
     scenarioShockPct: row.scenario_shock_pct == null ? 15 : Number(row.scenario_shock_pct),
+    dataQuality: row.__qualityWarnings?.length ? 'review' : 'ok',
+    dataQualityWarnings: row.__qualityWarnings || [],
+    marketClose: row.__marketClose || null,
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
     createdAt: row.created_at,
@@ -105,6 +109,43 @@ function transactionQuality(row) {
   };
 }
 
+function isWeekend(date) {
+  const value = new Date(String(date || '') + 'T00:00:00Z');
+  const day = value.getUTCDay();
+  return Number.isNaN(value.getTime()) ? false : day === 0 || day === 6;
+}
+
+function previousOrSamePoint(points, date) {
+  const ordered = [...(points || [])].filter(point => point?.date && Number(point?.price) > 0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let match = null;
+  for (const point of ordered) {
+    if (String(point.date) <= String(date)) match = point;
+    else break;
+  }
+  return match;
+}
+
+async function applyMarketQuality(rows, symbolField, dateField, priceField) {
+  const symbols = [...new Set(rows.map(row => String(row?.[symbolField] || '').toUpperCase()).filter(Boolean))];
+  const histories = {};
+  await Promise.all(symbols.map(async symbol => {
+    try { histories[symbol] = await routedHistory(symbol, '1y'); } catch {}
+  }));
+  return rows.map(row => {
+    const warnings = [...(row.__qualityWarnings || [])];
+    const date = String(row?.[dateField] || '');
+    const symbol = String(row?.[symbolField] || '').toUpperCase();
+    if (date && isWeekend(date)) warnings.push('trade date falls on weekend; review against prior market close');
+    const enteredPrice = Number(row?.[priceField]);
+    const market = previousOrSamePoint(histories[symbol]?.points || [], date);
+    const marketPrice = Number(market?.price);
+    if (enteredPrice > 0 && marketPrice > 0 && Math.abs(enteredPrice - marketPrice) > Math.max(0.05, Math.abs(marketPrice) * 0.05)) {
+      warnings.push('entered price differs >5% from market close (' + market.date + ')');
+    }
+    return { ...row, __marketClose: market ? { date: market.date, price: marketPrice } : null, __qualityWarnings: [...new Set(warnings)] };
+  });
+}
+
 function normalizeTransaction(row) {
   const quality = transactionQuality(row);
   return {
@@ -126,6 +167,7 @@ function normalizeTransaction(row) {
     currency: quality.currency,
     dataQuality: quality.status,
     dataQualityWarnings: quality.warnings,
+    marketClose: row.__marketClose || null,
     createdAt: row.created_at,
   };
 }
@@ -173,42 +215,63 @@ export default async function handler(req, res) {
           '&select=*&order=purchase_date.asc,created_at.asc',
           { method: 'GET' }
         );
-        return res.status(200).json({ lots: rows.map(normalizeLot), persistent: true, source: 'supabase' });
+        const checkedLots = await applyMarketQuality(rows.map(row => ({ ...row, __qualityWarnings: transactionQuality({ trade_date: row.purchase_date, quantity: row.quantity, amount: row.invested_amount, price: row.execution_price, currency: row.currency }).warnings })), 'symbol', 'purchase_date', 'execution_price');
+        return res.status(200).json({ lots: checkedLots.map(normalizeLot), persistent: true, source: 'supabase' });
       }
       const rows = await supabase('portfolio_holdings?select=*&order=symbol.asc', { method: 'GET' });
       const holdings = rows.map(normalize).filter(holding => holding.quantity > 0);
       if (String(req.query?.includeTransactions || '') === 'true') {
         const transactionRows = await supabase('portfolio_transactions?select=*&order=trade_date.asc,source_row.asc', { method: 'GET' });
-        const normalizedTransactions = transactionRows.map(normalizeTransaction);
-        const transactionQuality = {
+        const checkedTransactions = await applyMarketQuality(
+          transactionRows.map(row => ({ ...row, __qualityWarnings: transactionQuality(row).warnings })),
+          'symbol',
+          'trade_date',
+          'price',
+        );
+        const normalizedTransactions = checkedTransactions.map(normalizeTransaction);
+        const transactionQualitySummary = {
           total: normalizedTransactions.length,
           review: normalizedTransactions.filter(row => row.dataQuality === 'review').length,
           derived: normalizedTransactions.filter(row => row.quantityDerived || row.priceDerived).length,
+          weekendDates: normalizedTransactions.filter(row => (row.dataQualityWarnings || []).some(w => w.startsWith('trade date falls on weekend'))).length,
+          priceVsMarketClose: normalizedTransactions.filter(row => (row.dataQualityWarnings || []).some(w => w.startsWith('entered price differs'))).length,
           currencies: [...new Set(normalizedTransactions.map(row => row.currency))],
         };
         return res.status(200).json({
           holdings,
           transactions: normalizedTransactions,
-          transactionQuality,
+          transactionQuality: transactionQualitySummary,
           persistent: true,
           source: 'supabase',
         });
-      }
-      if (String(req.query?.includeLots || '') === 'true') {
+        if (String(req.query?.includeLots || '') === 'true') {
         const lots = await supabase('portfolio_purchase_lots?select=*&order=purchase_date.asc,created_at.asc', { method: 'GET' });
+        const checkedLots = await applyMarketQuality(
+          lots.map(row => ({ ...row, __qualityWarnings: transactionQuality({
+            trade_date: row.purchase_date,
+            quantity: row.quantity,
+            amount: row.invested_amount,
+            price: row.execution_price,
+            currency: row.currency,
+          }).warnings })),
+          'symbol',
+          'purchase_date',
+          'execution_price',
+        );
+        const normalizedLots = checkedLots.map(normalizeLot);
         const byHolding = new Map();
-        for (const lot of lots) {
-          const list = byHolding.get(lot.holding_id) || [];
-          list.push(normalizeLot(lot));
-          byHolding.set(lot.holding_id, list);
+        for (const lot of normalizedLots) {
+          const list = byHolding.get(lot.holdingId) || [];
+          list.push(lot);
+          byHolding.set(lot.holdingId, list);
         }
-        return res.status(200).json({
-          holdings: holdings.map(h => ({ ...h, purchaseLots: byHolding.get(h.id) || [] })),
-          persistent: true,
-          source: 'supabase',
-        });
-      }
-      return res.status(200).json({ holdings, persistent: true, source: 'supabase' });
+        const lotQuality = {
+          total: normalizedLots.length,
+          review: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).length).length,
+          weekendDates: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).some(w => w.startsWith('trade date falls on weekend'))).length,
+          priceVsMarketClose: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).some(w => w.startsWith('entered price differs'))).length,
+        };
+        return res.status(200).json({ holdings, persistent: true, source: 'supabase' });
     }
 
     if (req.method === 'POST') {
