@@ -80,7 +80,7 @@ function PortfolioScenarioSensitivity({
             <h3 className="text-xs font-black uppercase tracking-widest text-white">Stock-Specific Scenario Sensitivity</h3>
           </div>
           <p className="text-[10px] text-white/35 mt-1 font-mono max-w-3xl">
-            Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
+            Maps your current scenario inputs onto the risk & sensitivity map and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
           </p>
         </div>
         <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3">
@@ -411,7 +411,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
 
       {portfolioLoading && (
         <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[.02] px-4 py-3 text-[9px] font-mono text-cyan-200/50">
-          Loading current portfolio holdings for macro exposure…
+          Loading current portfolio holdings for macro risk…
         </div>
       )}
       {!portfolioLoading && portfolioError && (
