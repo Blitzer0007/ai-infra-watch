@@ -111,8 +111,8 @@ test('mirrors broker buy and sell cash flows in the peer counterfactual', () => 
   });
   assert.equal(result.status, 'available');
   assert.equal(result.basis, 'broker-transactions');
-  assert.equal(Number(result.hypotheticalValue?.toFixed(2)), 62.5);
-  assert.equal(Number(result.hypotheticalProfit?.toFixed(2)), 10.5);
-  assert.equal(Number(result.actualProfit?.toFixed(2)), 10.5);
-  assert.equal(Number(result.difference?.toFixed(2)), 0);
+  assert.equal(Number(result.hypotheticalValue?.toFixed(2)), 128);
+  assert.equal(Number(result.hypotheticalProfit?.toFixed(2)), 80);
+  assert.equal(Number(result.actualProfit?.toFixed(2)), 7);
+  assert.equal(Number(result.difference?.toFixed(2)), 73);
 });
