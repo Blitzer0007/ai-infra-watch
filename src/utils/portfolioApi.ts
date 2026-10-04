@@ -75,8 +75,6 @@ export async function addPortfolioPurchase(input: {
   executionPrice: number;
   purchaseDate?: string | null;
   notes?: string;
-  targetAllocationPct?: number | null;
-  maxAllocationPct?: number | null;
 }) {
   const response = await authFetch('/api/portfolio', {
     method: 'POST',
@@ -105,6 +103,8 @@ export async function createPortfolioHolding(input: {
   averageCost: number;
   purchaseDate?: string | null;
   notes?: string;
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
 }) {
   const response = await authFetch('/api/portfolio', {
     method: 'POST',
