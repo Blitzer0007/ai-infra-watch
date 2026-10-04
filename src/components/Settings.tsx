@@ -86,7 +86,7 @@ export default function Settings() {
 
             <p className="text-xs text-slate-400 leading-relaxed">
               Register a free Finnhub API Key (up to 60 calls/minute) to query genuine stock quotes and pricing. 
-              Leave empty to run realistic simulated trackers. Keys remain client-side only.
+              Leave empty to use the server-side live market quote fallback. The current quote path does not generate simulated prices. Keys remain client-side only.
             </p>
 
             <div className="space-y-1.5 font-mono text-xs">
