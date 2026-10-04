@@ -1,5 +1,6 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory } from '../../api/_market-data.js';
+import { scoreDecision } from '../utils/decisionRules.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -45,10 +46,7 @@ function twentiethSessionAfter(points, date) {
 function benchmarkForHolding(h) {
   return String(h?.risk_group || '').toLowerCase() === 'semiconductor' ? 'SOXX' : 'SPY';
 }
-function scoreDecision(decision, excessReturn) {
-  if (!Number.isFinite(excessReturn)) return null;
-  return ['REDUCE_REVIEW', 'EXIT_REVIEW'].includes(decision) ? -excessReturn : excessReturn;
-}
+
 function ruleTextFromHolding(h) {
   const parts = [];
   if (Number(h.loss_limit_pct) > 0) parts.push('Loss limit ' + Number(h.loss_limit_pct).toFixed(1) + '%');
