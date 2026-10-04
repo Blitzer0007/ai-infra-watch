@@ -1,10 +1,14 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
+import { calculateActualPortfolio, evaluateRuleStages, ruleDistance, simulateSameCash, countIndependentForecasts } from '../utils/decisionRules.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const LEVERAGE = { SOXL: 3 };
-
+const DIGEST_TIME_ZONE = process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata';
+function localDate(value = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: DIGEST_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+}
 function sbHeaders() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service configuration is missing');
   return {
@@ -13,6 +17,8 @@ function sbHeaders() {
     'Content-Type': 'application/json',
   };
 }
+
+
 
 async function supabase(path) {
   const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, { headers: sbHeaders() });
@@ -54,134 +60,7 @@ function transactionNetCash(transaction) {
   return transaction.transaction_type === 'SELL' ? Math.max(0, amount - brokerage) : amount + brokerage;
 }
 
-function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
-  const priceByDate = new Map((benchmarkHistory?.points || []).map(point => [point.date, Number(point.price)]));
-  let shares = 0;
-  let netDeposits = 0;
-  const ordered = [...transactions].sort(
-    (a, b) => String(a.trade_date).localeCompare(String(b.trade_date)) || Number(a.source_row || 0) - Number(b.source_row || 0),
-  );
 
-  for (const tx of ordered) {
-    const price = priceByDate.get(tx.trade_date);
-    if (!(price > 0)) continue;
-
-    if (tx.transaction_type === 'BUY') {
-      const cash = transactionNetCash(tx);
-      shares += cash / price;
-      netDeposits += cash;
-    } else {
-      const cash = transactionNetCash(tx);
-      const sharesToSell = Math.min(shares, cash / price);
-      shares -= sharesToSell;
-      netDeposits -= cash;
-    }
-  }
-
-  const value = shares * benchmarkCurrent;
-  return {
-    value,
-    netDeposits,
-    pnl: value - netDeposits,
-    shares,
-  };
-}
-
-function calculateActualPortfolio(holdings, transactionRows, quotes) {
-  const currentValue = holdings.reduce((sum, holding) => {
-    const q = quotes[holding.symbol];
-    return sum + (q?.price > 0 ? q.price * Number(holding.quantity) : 0);
-  }, 0);
-
-  let buyCash = 0;
-  let saleCash = 0;
-  for (const tx of transactionRows) {
-    if (tx.transaction_type === 'BUY') buyCash += transactionNetCash(tx);
-    else saleCash += transactionNetCash(tx);
-  }
-
-  const netContributed = buyCash - saleCash;
-  const pnl = currentValue - netContributed;
-  return {
-    currentValue,
-    buyCash,
-    saleCash,
-    netContributed,
-    pnl,
-  };
-}
-
-function ruleDistance(holding, quote, history) {
-  const price = quote?.price;
-  if (!(price > 0)) return null;
-
-  const rules = [];
-  const lossPct = Number(holding.loss_limit_pct);
-  if (Number.isFinite(lossPct) && lossPct > 0) {
-    const stop = Number(holding.average_cost) * (1 - lossPct / 100);
-    if (stop > 0) {
-      const distancePct = (price / stop - 1) * 100;
-      rules.push({
-        type: 'loss limit',
-        target: stop,
-        distancePct,
-        breached: price <= stop,
-      });
-    }
-  }
-
-  const alertPrices = Array.isArray(holding.broker_alert_prices) ? holding.broker_alert_prices.map(Number).filter(v => v > 0) : [];
-  for (const target of alertPrices) {
-    const distancePct = (price / target - 1) * 100;
-    rules.push({
-      type: 'broker alert',
-      target,
-      distancePct,
-      breached: price <= target,
-    });
-  }
-
-  const exitType = String(holding.exit_rule_type || '').toLowerCase();
-  const exitValue = Number(holding.exit_rule_value);
-  if (exitType.includes('trailing') && Number.isFinite(exitValue) && exitValue > 0 && Array.isArray(history?.points) && history.points.length) {
-    const start = String(holding.purchase_date || history.points[0]?.date || '');
-    const since = history.points.filter(point => point.date >= start && Number(point.price) > 0);
-    const peak = since.reduce((max, point) => Math.max(max, Number(point.price)), 0);
-    const stop = peak * (1 - exitValue / 100);
-    if (stop > 0) {
-      const distancePct = (price / stop - 1) * 100;
-      rules.push({
-        type: 'trailing stop',
-        target: stop,
-        distancePct,
-        breached: price <= stop,
-      });
-    }
-  }
-
-  if (exitType.includes('time') && Number.isFinite(exitValue) && exitValue > 0 && holding.purchase_date) {
-    const today = dateOnly(new Date());
-    const heldDays = daysBetween(holding.purchase_date, today);
-    const distanceDays = exitValue - heldDays;
-    rules.push({
-      type: 'time limit',
-      target: exitValue,
-      distancePct: distanceDays,
-      breached: heldDays >= exitValue,
-      unit: 'days',
-    });
-  }
-
-  if (!rules.length) return { state: 'no-rule', rules: [], nearest: null };
-  const actionable = rules.filter(rule => !rule.unit);
-  const nearest = actionable.length
-    ? [...actionable].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0]
-    : [...rules].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0];
-
-  if (rules.some(rule => rule.breached)) return { state: 'breached', rules, nearest };
-  if (rules.some(rule => !rule.unit && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
-  return { state: 'clear', rules, nearest };
-}
 
 async function fetchSignalGate() {
   const rows = await supabase(
