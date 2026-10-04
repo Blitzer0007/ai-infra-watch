@@ -237,10 +237,10 @@ def test_held_portfolio_filters_and_sort_mount(page):
     portfolio.get_by_label("Sort held portfolio universe").wait_for(state="visible", timeout=30000)
 
 
-def test_autopilot_signals_panel_mounts(page):
+def test_autopilot_signals_panel_mounts_on_macro_page(page):
     mock_local_apis(page)
     goto_app(page)
-    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_test_id("nav-macro").click()
     panel = page.get_by_test_id("autopilot-signals")
     panel.wait_for(state="visible", timeout=30000)
     assert "AUTOPILOT / X SIGNALS" in panel.inner_text()
