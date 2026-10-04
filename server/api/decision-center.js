@@ -331,6 +331,9 @@ export default async function handler(req, res) {
         continue;
       }
       const rules = ruleDistance(holding, q, histories[symbol]);
+      if (rules?.nextState && JSON.stringify(rules.nextState) !== JSON.stringify(holding.rule_stage_state || {})) {
+        stageUpdates.push({ id: holding.id, state: rules.nextState });
+      }
       ruleStates.push({
         symbol,
         state: rules.state,
