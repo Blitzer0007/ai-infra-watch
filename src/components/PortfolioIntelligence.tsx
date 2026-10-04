@@ -620,7 +620,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             <div className="text-[8px] font-mono text-white/25 mt-1">{macroHighCount} high · {macroMediumCount} medium · capped at 30</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Source coverage</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.freshCount}/{analyses.length} fresh</div>
           </div>
         </div>
@@ -909,7 +909,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'rotation' && (
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
-          <Panel title="Money rotation engine" subtitle="Multi-timeframe relative-strength and breadth proxy across infrastructure, compute, memory and software">
+          <Panel title="Money rotation engine" subtitle="Compare performance across time periods and market groups">
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {(['1D','5D','20D','60D','3M','6M'] as RotationHorizon[]).map(h => <button key={h} onClick={() => setRotationHorizon(h)} aria-pressed={rotationHorizon === h} className={'px-2.5 py-1.5 rounded border text-[9px] font-mono font-bold ' + (rotationHorizon === h ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-white/35')}>{h}</button>)}
               <select value={rotationGroup} onChange={e => setRotationGroup(e.target.value)} aria-label="Filter money rotation group" className="ml-auto bg-[#15181E] border border-white/10 rounded px-2 py-1.5 text-[9px] font-mono text-white/55"><option value="All">All groups</option>{rotation.groups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}</select>
@@ -950,7 +950,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'events' && selectedAnalysis && (
         <div className="space-y-3">
-          <Panel title="Event study universe" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
+          <Panel title="Event study stocks" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
             <div className="flex flex-wrap gap-2">
               {analyses.map((position) => (
                 <button
@@ -1080,7 +1080,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <div className="text-right shrink-0">
         <div className="font-black text-base">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
         <div className={'text-[10px] font-mono font-bold ' + dailyClass}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</div>
-        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'STALE QUOTE' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
+        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'QUOTE NEEDS REFRESH' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
       </div>
     </div>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/5">
@@ -1248,7 +1248,7 @@ function PortfolioEvidenceCoverage({
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
+        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Source coverage</div>
         <h2 className="text-base font-black mt-1">{status}</h2>
         <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
       </div>
@@ -1294,7 +1294,7 @@ function DecisionGateSummary({h}:{h:PositionAnalysis}) {
     ['Peer relative', h.vsPeers != null && h.vsPeers >= 0],
   ] as const;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/55 p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision gates</div><h2 className="text-base font-black mt-1">Current evidence check for {h.symbol}</h2></div><StatePill state={h.state}/></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision checks</div><h2 className="text-base font-black mt-1">Current evidence check for {h.symbol}</h2></div><StatePill state={h.state}/></div>
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
       {gates.map(([label,passed]) => <div key={label} className={'rounded-lg border p-2 ' + (passed ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase text-white/45">{label}</span><span className={'text-[8px] font-mono font-bold ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span></div></div>)}
     </div>
@@ -1318,7 +1318,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
-      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'STALE QUOTE' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'QUOTE NEEDS REFRESH' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
     <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
@@ -1328,7 +1328,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
 
 function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
   return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer counterfactual</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical comparison · not a forecast</div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">What-if peer comparison</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical comparison · not a forecast</div></div>
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer value if same trades' : 'Peer value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/><Info label="Value difference" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/></div>
     <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.basis === 'broker-transactions' ? 'Mirrors your broker buy/sell cash flows in the peer using each transaction date. This compares historical total-return outcomes, not a forecast.' : comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
   </section>;
