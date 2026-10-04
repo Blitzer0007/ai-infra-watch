@@ -79,7 +79,7 @@ async function loadEarningsEvents(symbol: string): Promise<TimelineEvent[]> {
   }
 }
 
-async async function loadAutopilotEvents(symbol: string): Promise<{ events: TimelineEvent[]; undated: number }> {
+async function loadAutopilotEvents(symbol: string): Promise<{ events: TimelineEvent[]; undated: number }> {
   try {
     const response = await fetch('/api/autopilot-signals?limit=12', { cache: 'no-store' });
     const payload = await response.json().catch(() => ({}));
