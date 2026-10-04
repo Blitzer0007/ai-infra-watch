@@ -1309,14 +1309,7 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:Array<PeerCounter
   const actualProfit = available.reduce((sum, item) => sum + (item.actualProfit ?? 0), 0);
   const peerProfit = available.reduce((sum, item) => sum + (item.hypotheticalProfit ?? 0), 0);
   const difference = peerProfit - actualProfit;
-  const totalBasis = available.reduce((sum, item) => {
-    const basis = item.actualProfit != null && item.actualReturnPct != null && item.actualReturnPct !== 0
-      ? Math.abs(item.actualProfit / (item.actualReturnPct / 100))
-      : item.actualProfit != null && item.hypotheticalReturnPct != null && item.hypotheticalReturnPct !== 0
-        ? Math.abs(item.actualProfit / (item.hypotheticalReturnPct / 100))
-        : 0;
-    return sum + basis;
-  }, 0);
+  const totalBasis = available.reduce((sum, item) => sum + (Number.isFinite(item.actualCostBasis) ? Math.abs(Number(item.actualCostBasis)) : 0), 0);
   const aggregateReturnGap = totalBasis > 0 ? (difference / totalBasis) * 100 : null;
   const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
   const contributors = [...available]
