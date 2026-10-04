@@ -29,6 +29,22 @@ async function supabase(path, options = {}) {
   return data;
 }
 
+function normalizeBrokerAlerts(row) {
+  const structured = Array.isArray(row?.broker_alerts) ? row.broker_alerts : [];
+  if (structured.length) return structured.map(item => ({
+    price: Number(item?.price),
+    direction: item?.direction === 'below' ? 'below' : 'above',
+    label: String(item?.label || ''),
+  })).filter(item => Number.isFinite(item.price) && item.price > 0);
+  return Array.isArray(row?.broker_alert_prices)
+    ? row.broker_alert_prices.map(Number).filter(v => Number.isFinite(v) && v > 0).map(price => ({ price, direction: 'above', label: 'legacy review' }))
+    : [];
+}
+
+function normalizeRuleStages(value) {
+  return Array.isArray(value) ? value.filter(stage => stage && typeof stage === 'object') : [];
+}
+
 function normalizeLot(row) {
   return {
     id: row.id,
@@ -46,6 +62,11 @@ function normalizeLot(row) {
     exitRuleText: row.exit_rule_text || '',
     practicalNotes: row.practical_notes || '',
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    brokerAlerts: normalizeBrokerAlerts(row),
+    ruleStages: normalizeRuleStages(row.rule_stages),
+    ruleStageState: row.rule_stage_state && typeof row.rule_stage_state === 'object' ? row.rule_stage_state : {},
+    riskGroup: row.risk_group || null,
+    shockSensitivity: row.shock_sensitivity == null ? 1 : Number(row.shock_sensitivity),
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
     createdAt: row.created_at,
@@ -91,6 +112,11 @@ function normalize(row) {
     exitRuleText: row.exit_rule_text || '',
     practicalNotes: row.practical_notes || '',
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    brokerAlerts: normalizeBrokerAlerts(row),
+    ruleStages: normalizeRuleStages(row.rule_stages),
+    ruleStageState: row.rule_stage_state && typeof row.rule_stage_state === 'object' ? row.rule_stage_state : {},
+    riskGroup: row.risk_group || null,
+    shockSensitivity: row.shock_sensitivity == null ? 1 : Number(row.shock_sensitivity),
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
   };
@@ -220,6 +246,23 @@ export default async function handler(req, res) {
       if (body.exitRuleText !== undefined) payload.exit_rule_text = body.exitRuleText || null;
       if (body.practicalNotes !== undefined) payload.practical_notes = body.practicalNotes || null;
       if (body.brokerAlertPrices !== undefined) payload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
+      if (body.brokerAlerts !== undefined) {
+        payload.broker_alerts = Array.isArray(body.brokerAlerts)
+          ? body.brokerAlerts.map(item => ({
+              price: Number(item?.price),
+              direction: item?.direction === 'below' ? 'below' : 'above',
+              label: String(item?.label || ''),
+            })).filter(item => Number.isFinite(item.price) && item.price > 0)
+          : [];
+        payload.broker_alert_prices = payload.broker_alerts.map(item => item.price);
+      }
+      if (body.ruleStages !== undefined) payload.rule_stages = Array.isArray(body.ruleStages) ? body.ruleStages : [];
+      if (body.ruleStageState !== undefined) payload.rule_stage_state = body.ruleStageState && typeof body.ruleStageState === 'object' && !Array.isArray(body.ruleStageState) ? body.ruleStageState : {};
+      if (body.riskGroup !== undefined) payload.risk_group = body.riskGroup == null || body.riskGroup === '' ? null : String(body.riskGroup).trim().slice(0, 80);
+      if (body.shockSensitivity !== undefined) {
+        payload.shock_sensitivity = body.shockSensitivity == null || body.shockSensitivity === '' ? null : Number(body.shockSensitivity);
+        if (payload.shock_sensitivity != null && (!Number.isFinite(payload.shock_sensitivity) || payload.shock_sensitivity <= 0 || payload.shock_sensitivity > 10)) return res.status(400).json({ error: 'shockSensitivity must be between 0 and 10' });
+      }
       if (body.targetAllocationPct !== undefined) payload.target_allocation_pct = body.targetAllocationPct == null || body.targetAllocationPct === '' ? null : Number(body.targetAllocationPct);
       if (body.maxAllocationPct !== undefined) payload.max_allocation_pct = body.maxAllocationPct == null || body.maxAllocationPct === '' ? null : Number(body.maxAllocationPct);
       if (payload.quantity != null && (!Number.isFinite(payload.quantity) || payload.quantity <= 0)) return res.status(400).json({ error: 'quantity must be positive' });
