@@ -480,6 +480,35 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
   useEffect(() => {
     let cancelled = false;
+    setEarningsLoading(true);
+    setEarningsError(null);
+    fetch('/api/earnings-alerts?symbol=' + encodeURIComponent(selectedStock) + '&days=30', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok && response.status !== 503) throw new Error(body?.error || 'Earnings calendar unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        setEarnings(Array.isArray(body?.upcoming) ? body.upcoming : []);
+        if (body?.configuration?.finnhub_configured === false) {
+          setEarningsError('Real earnings calendar is not configured on the server (FINNHUB_API_KEY missing). No earnings event is inferred from news.');
+        } else if (body?.error) {
+          setEarningsError(String(body.error));
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setEarnings([]);
+          setEarningsError(error instanceof Error ? error.message : 'Earnings calendar unavailable');
+        }
+      })
+      .finally(() => { if (!cancelled) setEarningsLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedStock]);
+
+  useEffect(() => {
+    let cancelled = false;
     async function loadPersistentForecasts() {
       try {
         const response = await fetch('/api/forecast-verification', { cache: 'no-store' });
