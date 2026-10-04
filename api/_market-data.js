@@ -1,7 +1,10 @@
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
   SOXL: 'SOXL',
-  VIVO: 'VVPR',
+  // VivoPower changed Nasdaq ticker from VVPR to VIVO on 2026-03-16.
+  // Yahoo Finance exposes the current symbol as VIVO; keep VVPR as a legacy alias.
+  VIVO: 'VIVO',
+  VVPR: 'VIVO',
   CBRS: 'CBRS',
   TSM: 'TSM',
   '000660.KS': '000660.KS'

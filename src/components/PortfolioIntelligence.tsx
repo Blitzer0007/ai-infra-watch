@@ -1,7 +1,7 @@
 import DataTable from './DataTable';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
@@ -64,6 +64,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   });
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
+  const [holdingFilter, setHoldingFilter] = useState<'All' | 'Positive Today' | 'Negative Today' | 'Below Cost' | 'Needs Review'>('All');
+  const [holdingSort, setHoldingSort] = useState<'Symbol' | 'P&L %' | 'Daily Move' | 'Value'>('Symbol');
   const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
@@ -335,10 +337,24 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     return () => { cancelled = true; };
   }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices]);
 
-  const filtered: PositionAnalysis[] = useMemo(() => analyses.filter((h: PositionAnalysis) =>
-    (group === 'All' || h.group === group) &&
-    (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase().includes(q.toLowerCase())
-  ), [analyses, q, group]);
+  const filtered: PositionAnalysis[] = useMemo(() => {
+    const result = analyses.filter((h: PositionAnalysis) => {
+      const searchable = (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase();
+      if (group !== 'All' && h.group !== group) return false;
+      if (!searchable.includes(q.trim().toLowerCase())) return false;
+      if (holdingFilter === 'Positive Today' && !(h.dailyChangePct != null && h.dailyChangePct > 0)) return false;
+      if (holdingFilter === 'Negative Today' && !(h.dailyChangePct != null && h.dailyChangePct < 0)) return false;
+      if (holdingFilter === 'Below Cost' && !(h.livePrice != null && h.livePrice < h.averageCost)) return false;
+      if (holdingFilter === 'Needs Review' && !['ADD REVIEW', 'RISK REVIEW', 'INSUFFICIENT DATA'].includes(h.state)) return false;
+      return true;
+    });
+    return result.sort((a, b) => {
+      if (holdingSort === 'P&L %') return (b.pnlPct ?? -Infinity) - (a.pnlPct ?? -Infinity);
+      if (holdingSort === 'Daily Move') return (b.dailyChangePct ?? -Infinity) - (a.dailyChangePct ?? -Infinity);
+      if (holdingSort === 'Value') return (b.currentValue ?? b.investedValue) - (a.currentValue ?? a.investedValue);
+      return a.symbol.localeCompare(b.symbol);
+    });
+  }, [analyses, q, group, holdingFilter, holdingSort]);
 
   const breadthMoves = analyses
     .filter(h => typeof h.dailyChangePct === 'number' && Number.isFinite(h.dailyChangePct))
@@ -696,8 +712,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </section>
             <section className="min-w-0">
               <Panel title="Held portfolio universe" subtitle="Persistent positions · live quote state · select a holding to update the intelligence rendered below">
-              <div className="flex flex-wrap gap-2 mb-3">
-                <div className="relative flex-1 min-w-48">
+              <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,1.4fr)_180px_170px_150px] gap-2">
                   <FilterInput
                     value={q}
                     onChange={e => setQ(e.target.value)}
@@ -705,15 +721,34 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                     label="Search held portfolio universe by ticker, name, or theme"
                     icon={<Search className="w-3.5 h-3.5" />}
                   />
+                  <FilterSelect
+                    value={group}
+                    onChange={e => setGroup(e.target.value)}
+                    label="Filter held portfolio universe by group"
+                  >
+                    {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
+                  </FilterSelect>
+                  <FilterSelect
+                    value={holdingFilter}
+                    onChange={e => setHoldingFilter(e.target.value as typeof holdingFilter)}
+                    label="Filter held portfolio universe by state"
+                  >
+                    {['All', 'Positive Today', 'Negative Today', 'Below Cost', 'Needs Review'].map(value => <option key={value}>{value}</option>)}
+                  </FilterSelect>
+                  <FilterSelect
+                    value={holdingSort}
+                    onChange={e => setHoldingSort(e.target.value as typeof holdingSort)}
+                    label="Sort held portfolio universe"
+                  >
+                    {['Symbol', 'P&L %', 'Daily Move', 'Value'].map(value => <option key={value}>{value}</option>)}
+                  </FilterSelect>
                 </div>
-                <FilterSelect
-                  value={group}
-                  onChange={e => setGroup(e.target.value)}
-                  label="Filter held portfolio universe by group"
-                >
-                  {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
-                </FilterSelect>
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                  <div className="text-[9px] font-mono text-white/35" aria-live="polite">{filtered.length} shown · {analyses.length} held · {livePositions.length} fresh quotes</div>
+                  {selectedAnalysis && <div className="text-[9px] font-mono text-cyan-300/80">Selected: <span className="font-bold">{selectedAnalysis.symbol}</span></div>}
+                </div>
               </div>
+
               <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
               </Panel>
             </section>
@@ -858,24 +893,42 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
           <Panel title="Money rotation engine" subtitle="Multi-timeframe relative-strength and breadth proxy across infrastructure, compute, memory and software">
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              {(['1D','5D','20D','60D','3M','6M'] as RotationHorizon[]).map(h => <button key={h} onClick={() => setRotationHorizon(h)} className={'px-2.5 py-1.5 rounded border text-[9px] font-mono font-bold ' + (rotationHorizon === h ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-white/35')}>{h}</button>)}
-              <select value={rotationGroup} onChange={e => setRotationGroup(e.target.value)} className="ml-auto bg-[#15181E] border border-white/10 rounded px-2 py-1.5 text-[9px] font-mono text-white/55"><option value="All">All groups</option>{rotation.groups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}</select>
+              {(['1D','5D','20D','60D','3M','6M'] as RotationHorizon[]).map(h => <button key={h} onClick={() => setRotationHorizon(h)} aria-pressed={rotationHorizon === h} className={'px-2.5 py-1.5 rounded border text-[9px] font-mono font-bold ' + (rotationHorizon === h ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-white/35')}>{h}</button>)}
+              <select value={rotationGroup} onChange={e => setRotationGroup(e.target.value)} aria-label="Filter money rotation group" className="ml-auto bg-[#15181E] border border-white/10 rounded px-2 py-1.5 text-[9px] font-mono text-white/55"><option value="All">All groups</option>{rotation.groups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}</select>
             </div>
-            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => ({group:g.name, score:Math.round(g.score), move:g.horizons[rotationHorizon]}))}>
-              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Rotation signal'] : [typeof v === 'number' ? v.toFixed(1) + '%' : '—','Period return']}/><Bar dataKey="score" fill="#34d399" radius={[5,5,0,0]}/>
+            <div className="flex flex-wrap gap-2 mb-2 text-[8px] font-mono uppercase tracking-wider">
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-300">Strengthening</span>
+              <span className="rounded-full border border-rose-400/20 bg-rose-400/10 px-2 py-1 text-rose-300">Weakening</span>
+              <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-amber-300">Mixed</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-white/45">Insufficient</span>
+            </div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => ({group:g.name, score:Math.round(g.score), move:g.horizons[rotationHorizon], direction:g.direction}))}>
+              <CartesianGrid stroke="#ffffff10" vertical={false}/><XAxis dataKey="group" stroke="#ffffff35" tick={{fontSize:9}} interval={0} angle={-18} textAnchor="end" height={55}/><YAxis stroke="#ffffff35" tick={{fontSize:10}}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid #ffffff20'}} formatter={(v,n) => n === 'score' ? [v + '/100','Rotation signal'] : [typeof v === 'number' ? v.toFixed(1) + '%' : '—','Period return']}/><Bar dataKey="score" radius={[5,5,0,0]}>{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => <Cell key={g.name} fill={rotationDirectionColor(g.direction)} />)}</Bar>
             </BarChart></ResponsiveContainer></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => <div key={g.name} className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex justify-between gap-2"><span className="text-xs font-bold">{g.name}</span><span className="text-[9px] font-mono uppercase text-white/40">{g.direction}</span></div><div className="text-[9px] text-white/35 mt-1">{g.members.join(' · ')}</div><div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">{(['1D','20D','60D'] as RotationHorizon[]).map(h => <div key={h}><span className="text-white/20">{h}</span><div className="text-white/60">{g.horizons[h] == null ? '—' : g.horizons[h]!.toFixed(1) + '%'}</div></div>)}</div></div>)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => {
+              const tone = rotationDirectionClass(g.direction);
+              return <div key={g.name} className={'rounded-xl border p-3 ' + tone.card}>
+                <div className="flex justify-between gap-2 items-start"><div><span className="text-xs font-bold">{g.name}</span><span className={'ml-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-mono uppercase ' + tone.pill}>{g.direction}</span></div><span className={'text-[10px] font-mono font-bold ' + tone.text}>{Math.round(g.score)}/100</span></div>
+                <div className="text-[9px] text-white/35 mt-1">{g.members.join(' · ')}</div>
+                <div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">{(['1D','20D','60D'] as RotationHorizon[]).map(h => <div key={h}><span className="text-white/20">{h}</span><div className={'font-bold ' + rotationReturnClass(g.horizons[h])}>{g.horizons[h] == null ? '—' : (g.horizons[h]! >= 0 ? '+' : '') + g.horizons[h]!.toFixed(1) + '%'}</div></div>)}</div>
+              </div>;
+            })}</div>
             <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
           </Panel>
           <Panel title="Pair monitor" subtitle="Relative-strength spread history and current transition state">
-            <div className="space-y-2">{rotation.pairs.map(x => <div key={x.left+x.right} className="border border-white/5 rounded-xl p-3">
-              <div className="flex justify-between"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono ' + ((x.spread ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{x.spread == null ? '—' : (x.spread >= 0 ? '+' : '') + x.spread.toFixed(2) + ' pts'}</div></div>
-              <div className="text-[10px] text-white/35 mt-1">{x.label} · {x.trend}</div>
-              <div className="flex gap-1 mt-2">{x.history.slice(-6).map((v,i) => <span key={i} className={'h-2 flex-1 rounded ' + (v >= 0 ? 'bg-emerald-400/40' : 'bg-rose-400/40')} title={(v >= 0 ? '+' : '') + v.toFixed(2) + ' pts'} />)}</div>
-            </div>)}</div>
+            <div className="space-y-2">{rotation.pairs.map(x => {
+              const spreadClass = x.spread == null ? 'text-white/35' : x.spread >= 0 ? 'text-emerald-300' : 'text-rose-300';
+              const trendClass = x.trend === 'widening' ? 'text-emerald-300' : x.trend === 'narrowing' ? 'text-rose-300' : x.trend === 'stable' ? 'text-amber-300' : 'text-white/35';
+              return <div key={x.left+x.right} className={'rounded-xl border p-3 ' + (x.spread == null ? 'border-white/5 bg-black/10' : x.spread >= 0 ? 'border-emerald-400/10 bg-emerald-400/[.025]' : 'border-rose-400/10 bg-rose-400/[.025]')}>
+                <div className="flex justify-between gap-3"><div className="text-xs font-bold">{x.left} ↔ {x.right}</div><div className={'text-[10px] font-mono font-bold ' + spreadClass}>{x.spread == null ? '—' : (x.spread >= 0 ? '+' : '') + x.spread.toFixed(2) + ' pts'}</div></div>
+                <div className="text-[10px] text-white/35 mt-1">{x.label} · <span className={trendClass}>{x.trend}</span></div>
+                <div className="flex gap-1 mt-2">{x.history.slice(-6).map((v,i) => <span key={i} className={'h-2 flex-1 rounded ' + (v >= 0 ? 'bg-emerald-400/40' : 'bg-rose-400/40')} title={(v >= 0 ? '+' : '') + v.toFixed(2) + ' pts'} />)}</div>
+              </div>;
+            })}</div>
           </Panel>
         </div>
       )}
+
 
       {tab === 'events' && selectedAnalysis && (
         <div className="space-y-3">
@@ -970,22 +1023,61 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   );
 }
 
+function rotationDirectionColor(direction: 'strengthening' | 'weakening' | 'mixed' | 'insufficient') {
+  return direction === 'strengthening' ? '#34d399' : direction === 'weakening' ? '#fb7185' : direction === 'mixed' ? '#fbbf24' : '#64748b';
+}
+function rotationDirectionClass(direction: 'strengthening' | 'weakening' | 'mixed' | 'insufficient') {
+  if (direction === 'strengthening') return { card: 'border-emerald-400/15 bg-emerald-400/[.035]', pill: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300', text: 'text-emerald-300' };
+  if (direction === 'weakening') return { card: 'border-rose-400/15 bg-rose-400/[.035]', pill: 'border-rose-400/20 bg-rose-400/10 text-rose-300', text: 'text-rose-300' };
+  if (direction === 'mixed') return { card: 'border-amber-400/15 bg-amber-400/[.035]', pill: 'border-amber-400/20 bg-amber-400/10 text-amber-300', text: 'text-amber-300' };
+  return { card: 'border-white/8 bg-white/[.02]', pill: 'border-white/10 bg-white/5 text-white/45', text: 'text-white/50' };
+}
+function rotationReturnClass(value: number | null) {
+  return value == null ? 'text-white/35' : value >= 0 ? 'text-emerald-300' : 'text-rose-300';
+}
+function MiniMetric({label,value,valueClass='text-white/75'}:{label:string;value:string;valueClass?:string}) {
+  return <div className="rounded-lg border border-white/5 bg-black/10 px-2 py-1.5">
+    <div className="text-[8px] font-mono uppercase tracking-wider text-white/25">{label}</div>
+    <div className={'text-[10px] font-mono font-bold mt-0.5 ' + valueClass}>{value}</div>
+  </div>;
+}
+
 function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
-  return <button type="button" onClick={onSelect} className={'w-full text-left border rounded-xl p-3 ' + (selected ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-white/5 bg-white/[.02] hover:bg-white/[.04]')}>
-    <div className="flex justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2"><span className="font-black text-sm">{h.symbol}</span><StatePill state={h.state}/>{h.minorPosition && <span className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] font-mono text-white/55">MINOR · {((h.portfolioWeight || 0) * 100).toFixed(1)}%</span>}</div>
-        <div className="text-[10px] text-white/40 truncate">{h.name} · {h.group}</div>
-        <div className="text-[10px] text-white/45 mt-1">Qty {h.quantity.toFixed(6)} · Avg ${h.averageCost.toFixed(2)} · P&L {h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '−') + h.pnlPct.toFixed(2) + '%'}{h.purchaseDate ? ' · Bought ' + h.purchaseDate : ''}</div>
+  const pnlClass = h.livePrice == null ? 'text-white/35' : h.pnl >= 0 ? 'text-emerald-300' : 'text-rose-300';
+  const dailyClass = h.dailyChangePct == null ? 'text-white/35' : h.dailyChangePct >= 0 ? 'text-emerald-300' : 'text-rose-300';
+  const value = h.currentValue ?? h.investedValue;
+  const weight = (h.portfolioWeight || 0) * 100;
+  return <button type="button" onClick={onSelect} aria-pressed={selected} className={'group w-full text-left border rounded-xl p-3 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-300/50 ' + (selected ? 'border-cyan-300/30 bg-cyan-300/[.05] shadow-[inset_3px_0_0_rgba(103,232,249,.85)]' : 'border-white/5 bg-white/[.02] hover:border-white/10 hover:bg-white/[.035]')}>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-black text-sm tracking-tight">{h.symbol}</span>
+          <StatePill state={h.state}/>
+          {selected && <span className="px-1.5 py-0.5 rounded border border-cyan-300/20 bg-cyan-300/10 text-cyan-200 text-[8px] font-mono uppercase">Selected</span>}
+          {h.minorPosition && <span className="px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/45 text-[8px] font-mono">Minor · {weight.toFixed(1)}%</span>}
+        </div>
+        <div className="text-[10px] text-white/45 truncate mt-1">{h.name}</div>
+        <div className="text-[9px] font-mono uppercase tracking-wider text-white/25 mt-1">{h.group}</div>
       </div>
       <div className="text-right shrink-0">
-        <div className="font-bold text-sm">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
-        <div className={'text-[10px] font-mono ' + ((h.dailyChangePct ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</div>
-        <div className="text-[9px] text-white/25 mt-1">{h.livePrice != null ? (h.liveStale ? 'stale quote' : 'fresh quote') + (h.liveProvider ? ' · ' + h.liveProvider : '') : 'quote unavailable'}</div>
+        <div className="font-black text-base">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
+        <div className={'text-[10px] font-mono font-bold ' + dailyClass}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</div>
+        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'STALE QUOTE' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
       </div>
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/5">
+      <MiniMetric label="Qty" value={h.quantity.toFixed(4)} />
+      <MiniMetric label="Avg cost" value={'$' + h.averageCost.toFixed(2)} />
+      <MiniMetric label="P&L" value={h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'} valueClass={pnlClass} />
+      <MiniMetric label="Value" value={'$' + value.toFixed(2)} valueClass="text-white/85" />
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-[8px] font-mono text-white/25">
+      <span>Portfolio weight {weight.toFixed(1)}%</span>
+      <span>{h.purchaseDate ? 'Bought ' + h.purchaseDate : 'Purchase date not set'}</span>
     </div>
   </button>;
 }
+
 
 
 function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; currentPrice: number | null }) {
@@ -1207,7 +1299,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex items-baseline gap-3 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
+      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
       <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'STALE QUOTE' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
@@ -1276,8 +1368,18 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
     <ForecastValidationPanel symbol={h.symbol} horizon={20} />
     <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
-      <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
-      <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Exit / Profit Scenarios</div>
+          <div className="text-base font-black mt-1">{h.symbol} · {h.name}</div>
+          <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+        </div>
+        <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[.05] px-2.5 py-2 text-right">
+          <div className="text-[8px] font-mono uppercase tracking-wider text-cyan-200/70">Stock symbol</div>
+          <div className="text-sm font-black font-mono text-cyan-100">{h.symbol}</div>
+          <div className="text-[8px] font-mono text-white/30">Qty {h.quantity.toFixed(4)}</div>
+        </div>
+      </div>
       {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
       {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
       {scenarios.length > 0 && (

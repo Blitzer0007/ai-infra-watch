@@ -67,6 +67,27 @@ jobs:
           print("political signals:", len(body["politicalSignals"]))
           PY
 
+      - name: Check VIVO historical market data
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 25 "https://ai-infra-watch-theta.vercel.app/api/company-scale?action=history&symbol=VIVO&range=1y" -o /tmp/vivo-history.json
+          python - <<'PY'
+          import json
+
+          with open("/tmp/vivo-history.json", encoding="utf-8") as f:
+              body = json.load(f)
+
+          if body.get("symbol") != "VIVO":
+              raise SystemExit(f"unexpected VIVO history symbol: {body}")
+          if not isinstance(body.get("points"), list) or len(body["points"]) < 2:
+              raise SystemExit(f"VIVO historical data unavailable or too short: {body}")
+          if body.get("stale") is True:
+              raise SystemExit(f"VIVO history unexpectedly fell back to stale data: {body}")
+
+          print("VIVO historical market data smoke check passed")
+          print("provider:", body.get("provider"))
+          print("points:", len(body["points"]))
+
       - name: Check consolidated earnings history endpoint
         run: |
           set -euo pipefail
