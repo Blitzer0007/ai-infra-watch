@@ -156,9 +156,9 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         </div>
 
         <div className="rounded-xl border border-white/5 bg-black/10 p-3">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-white/25">Your result vs doing nothing special</div>
+          <div className="text-[9px] font-mono uppercase tracking-widest text-white/25">Your result vs simple benchmark</div>
           <div className="text-sm font-black mt-1">Same cash-flow benchmark</div>
-          <div className="text-[9px] text-white/35 mt-1">Your real dated deposits/withdrawals are compared with putting the same cash into a benchmark on the same dates.</div>
+          <div className="text-[9px] text-white/35 mt-1">Your real dated cash flows are compared with putting the same cash into a broad market benchmark on the same dates.</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
             <MiniResult label="You" value={signedMoney(portfolio.cashFlowPnl)} />
             <MiniResult label="SPY" value={signedMoney(spy?.pnl)} />

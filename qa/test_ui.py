@@ -57,6 +57,20 @@ def mock_local_apis(page):
                     'longTerm':{'verifiedCount':24,'oldestVerifiedAt':'2026-01-01T00:00:00Z','newestVerifiedAt':'2026-10-01T00:00:00Z'}
                 }
             })); return
+        if '/api/decision-center' in url:
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({
+                'ok': True,
+                'checkedAt': '2026-10-04T02:00:00Z',
+                'actionItems': [
+                    {'severity':'WATCH','symbol':'NVDA','title':'Close to your rule','detail':'Price is approaching your review level.','impact':None},
+                    {'severity':'SETUP','symbol':'META','title':'No active rule','detail':'Add a loss limit or exit rule.','impact':None}
+                ],
+                'rules': {'total':11,'breached':0,'near':1,'noRule':4,'noData':0},
+                'portfolio': {'holdings':11,'currentValue':570.83,'netContributed':580.83,'cashFlowPnl':-10.00,'concentrationTop3Pct':42.1,'semiconductorShock15Pct':-79.50},
+                'benchmark': {'SPY': {'value':600,'netDeposits':580,'pnl':20,'shares':1}, 'SOXX': {'value':590,'netDeposits':580,'pnl':10,'shares':1}},
+                'earnings': [{'symbol':'NVDA','date':'2026-10-08','daysUntil':4,'hour':'amc'}],
+                'forecast': {'verified':24,'pending':14,'due':0,'remaining':26,'tickers':7,'dates':20,'distinctTickerDates':22,'gate':'building'}
+            })); return
         if '/api/autopilot-signals' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({
                 'ok': True,
@@ -245,3 +259,15 @@ def test_autopilot_signals_panel_mounts_on_macro_page(page):
     panel.wait_for(state="visible", timeout=30000)
     assert "AUTOPILOT / X SIGNALS" in panel.inner_text()
     assert "joinautopilot" in panel.inner_text()
+
+
+def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
+    mock_local_apis(page)
+    goto_app(page)
+    center = page.get_by_test_id("decision-impact-center")
+    center.wait_for(state="visible", timeout=30000)
+    assert "What matters for you now" in center.inner_text()
+    assert "Same cash-flow benchmark" in center.inner_text()
+    assert "verified" in center.inner_text()
+    assert "/50" in center.inner_text()
+    assert "NVDA" in center.inner_text()
