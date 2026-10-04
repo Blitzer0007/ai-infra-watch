@@ -299,15 +299,33 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
       (excessSoxx == null ? '' : ' · Edge ' + signedMoney(excessSoxx)),
   );
 
+  const riskScenarios = Array.isArray(portfolio.riskScenarios)
+    ? portfolio.riskScenarios.filter(item => Number.isFinite(Number(item?.shock)))
+    : [];
+  const scenarioTotal = Number(portfolio.scenarioShockTotal ?? portfolio.semiconductorShock15Pct ?? 0);
+  const scenarioComponentTotal = riskScenarios.reduce((sum, item) => sum + Number(item.shock), 0);
+  const scenarioReconciliationGap = Number.isFinite(scenarioTotal) && Number.isFinite(scenarioComponentTotal)
+    ? scenarioTotal - scenarioComponentTotal
+    : null;
+  const visibleRiskScenarios = riskScenarios.slice(0, 6);
+  const omittedRiskScenarios = riskScenarios.slice(6);
+  const omittedStress = omittedRiskScenarios.reduce((sum, item) => sum + Number(item.shock), 0);
+
   lines.push(
     '',
     'RISK',
     'Top 3 holdings: ' + (portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '% of value'),
-    'Scenario stress total: ' + signedMoney(Number(portfolio.scenarioShockTotal ?? portfolio.semiconductorShock15Pct ?? 0)),
-    ...((portfolio.riskScenarios || []).slice(0, 3).map(item =>
+    'Scenario stress total: ' + signedMoney(scenarioTotal) + ' across ' + riskScenarios.length + ' risk groups',
+    ...visibleRiskScenarios.map(item =>
       '  ' + String(item.group).toUpperCase() + ': ' + signedMoney(Number(item.shock)) + ' · shock ' +
         (item.effectiveShockPct == null ? '—' : Number(item.effectiveShockPct).toFixed(1) + '%')
-    )),
+    ),
+    ...(omittedRiskScenarios.length
+      ? ['  OTHER GROUPS: ' + signedMoney(omittedStress) + ' · ' + omittedRiskScenarios.length + ' more']
+      : []),
+    ...(scenarioReconciliationGap != null && Math.abs(scenarioReconciliationGap) >= 0.01
+      ? ['DATA QUALITY · scenario total differs from displayed risk-group sum by ' + signedMoney(scenarioReconciliationGap) + '.']
+      : []),
   );
 
   const forecast = decision?.forecast || {};
