@@ -435,6 +435,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [decisionEditing, setDecisionEditing] = useState(false);
   const [decisionSaving, setDecisionSaving] = useState(false);
   const [decisionMessage, setDecisionMessage] = useState<string | null>(null);
+  const [earnings, setEarnings] = useState<Array<{ symbol: string; date: string; hour?: string | null; days_until?: number; title?: string }>>([]);
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [earningsError, setEarningsError] = useState<string | null>(null);
   const [decisionDraft, setDecisionDraft] = useState({
     thesis: '', lossLimitPct: '', exitRuleType: 'trailing_stop', exitRuleValue: '', exitRuleText: '', practicalNotes: '', brokerAlerts: '',
   });
