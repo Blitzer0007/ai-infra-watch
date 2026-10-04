@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import testFn from 'node:test';
 import { ruleDistance } from '../../server/api/decision-center.js';
 
-const rklb = (price, overrides = {}) =>
+const rklb = (price: number, overrides: Record<string, any> = {}) =>
   ruleDistance(
     {
       symbol: 'RKLB',
