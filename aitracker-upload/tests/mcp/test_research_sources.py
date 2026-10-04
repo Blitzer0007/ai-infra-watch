@@ -106,3 +106,43 @@ def test_executive_catalog_contains_nebius_and_musk():
     names = {row["name"] for row in EXECUTIVE_PROFILES}
     assert "Arkady Volozh" in names
     assert "Elon Musk" in names
+
+
+def test_autopilot_platform_profile_is_configured():
+    from mcp_servers.stocks.social_research import AUTOPILOT_PROFILES
+    profile = AUTOPILOT_PROFILES[0]
+    assert profile["name"] == "Autopilot"
+    assert profile["x_username"] == "joinautopilot"
+    assert "joinautopilot.com" in profile["official_domains"]
+
+
+class FakePlatformSearch:
+    def search(self, query, domains=None, days=7, limit=12):
+        if domains == ["x.com"]:
+            return {
+                "results": [{
+                    "title": "See the $NVDA portfolio",
+                    "snippet": "Holdings are from Nvidia's 13F disclosure.",
+                    "url": "https://x.com/joinautopilot/status/123",
+                    "published_at": "2026-10-04T00:00:00Z",
+                }],
+                "error": None,
+            }
+        return {
+            "results": [{
+                "title": "Autopilot NVDA Portfolio",
+                "snippet": "View portfolio",
+                "url": "https://joinautopilot.com/landing/1/1343",
+                "published_at": "2026-10-04T00:00:00Z",
+            }],
+            "error": None,
+        }
+
+
+def test_platform_signals_extracts_official_x_and_tickers():
+    from mcp_servers.stocks.social_research import PlatformSignalsService
+    result = PlatformSignalsService(FakePlatformSearch()).get()
+    assert result["xUsername"] == "joinautopilot"
+    assert result["officialCoverage"] == 2
+    assert "NVDA" in result["tickers"]
+    assert result["signals"][0]["signalType"] in {"platform_social_signal", "platform_coverage"}
