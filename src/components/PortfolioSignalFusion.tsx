@@ -116,7 +116,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
 
   const signals = [
     ...contracts
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.company))
+      .filter(x => x && portfolioSymbols.includes(String(x.company || '').toUpperCase()))
       .sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned)))
       .slice(0, 3)
       .map(x => ({
@@ -129,7 +129,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         url: x.url || null,
       })),
     ...congressTrades
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.stockSymbol))
+      .filter(x => x && portfolioSymbols.includes(String(x.stockSymbol || '').toUpperCase()))
       .sort((a, b) => String(b.transactionDate || b.date).localeCompare(String(a.transactionDate || a.date)))
       .slice(0, 3)
       .map(x => ({
@@ -155,7 +155,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       };
     }),
     ...politicalSignals
-      .filter(x => x && Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => PORTFOLIO_SYMBOLS.includes(String(symbol).toUpperCase())))
+      .filter(x => x && Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => portfolioSymbols.includes(String(symbol).toUpperCase())))
       .slice(0, 3)
       .map(x => ({
         kind: 'Political',
