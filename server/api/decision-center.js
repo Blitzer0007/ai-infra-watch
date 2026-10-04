@@ -91,60 +91,42 @@ function transactionNetCash(transaction) {
 }
 
 function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
-  const priceByDate = new Map((benchmarkHistory?.points || []).map(point => [point.date, Number(point.price)]));
-  let shares = 0;
-  let netDeposits = 0;
-  const ordered = [...transactions].sort(
-    (a, b) => String(a.trade_date).localeCompare(String(b.trade_date)) || Number(a.source_row || 0) - Number(b.source_row || 0),
-  );
-
-  for (const tx of ordered) {
-    const price = Number(previousOrSamePoint(benchmarkHistory?.points || [], tx.trade_date)?.price);
-    if (!(price > 0)) continue;
-
-    if (tx.transaction_type === 'BUY') {
-      const cash = transactionNetCash(tx);
-      shares += cash / price;
-      netDeposits += cash;
-    } else {
-      const cash = transactionNetCash(tx);
-      const sharesToSell = Math.min(shares, cash / price);
-      shares -= sharesToSell;
-      netDeposits -= cash;
-    }
+  const ordered=[...transactions].sort((a,b)=>String(a.trade_date).localeCompare(String(b.trade_date))||Number(a.source_row||0)-Number(b.source_row||0));
+  let shares=0; let netDeposits=0; let used=0; let fallbackTrades=0; const skipped=[];
+  for(const tx of ordered){
+    const matched=previousOrSamePoint(benchmarkHistory?.points||[],tx.trade_date);
+    const price=Number(matched?.price);
+    if(!(price>0)){skipped.push(String(tx.trade_date||'unknown'));continue;}
+    used++; if(String(matched.date)<String(tx.trade_date)) fallbackTrades++;
+    const cash=transactionNetCash(tx);
+    if(tx.transaction_type==='BUY'){shares+=cash/price;netDeposits+=cash;}
+    else{const sharesToSell=Math.min(shares,cash/price);shares-=sharesToSell;netDeposits-=cash;}
   }
-
-  const value = shares * benchmarkCurrent;
-  return {
-    value,
-    netDeposits,
-    pnl: value - netDeposits,
-    shares,
-  };
+  const current=Number(benchmarkCurrent);
+  const value=Number.isFinite(current)&&current>0?shares*current:null;
+  return {value,netDeposits,pnl:value==null?null:value-netDeposits,shares,coverage:{
+    totalTrades:ordered.length,tradesUsed:used,tradesSkipped:skipped.length,
+    coveragePct:ordered.length?used/ordered.length*100:100,fallbackTrades,skippedDates:skipped,status:skipped.length?'partial':'complete'
+  }};
 }
 
-function calculateActualPortfolio(holdings, transactionRows, quotes) {
-  const currentValue = holdings.reduce((sum, holding) => {
-    const q = quotes[holding.symbol];
-    return sum + (q?.price > 0 ? q.price * Number(holding.quantity) : 0);
-  }, 0);
-
-  let buyCash = 0;
-  let saleCash = 0;
-  for (const tx of transactionRows) {
-    if (tx.transaction_type === 'BUY') buyCash += transactionNetCash(tx);
-    else saleCash += transactionNetCash(tx);
+function calculateActualPortfolio(holdings, transactionRows, quotes, histories = {}) {
+  let currentValue=0; let liveQuotes=0; let staleFallbacks=0; let missingQuotes=0;
+  for(const holding of holdings){
+    const symbol=String(holding.symbol).toUpperCase();
+    const live=Number(quotes[symbol]?.price);
+    if(live>0){currentValue+=live*Number(holding.quantity);liveQuotes++;continue;}
+    const fallback=sortedHistoryPoints(histories[symbol]).at(-1);
+    if(Number(fallback?.price)>0){currentValue+=Number(fallback.price)*Number(holding.quantity);staleFallbacks++;} else missingQuotes++;
   }
-
-  const netContributed = buyCash - saleCash;
-  const pnl = currentValue - netContributed;
-  return {
-    currentValue,
-    buyCash,
-    saleCash,
-    netContributed,
-    pnl,
-  };
+  let buyCash=0; let saleCash=0;
+  for(const tx of transactionRows){if(tx.transaction_type==='BUY')buyCash+=transactionNetCash(tx);else saleCash+=transactionNetCash(tx);}
+  const netContributed=buyCash-saleCash;
+  return {currentValue,buyCash,saleCash,netContributed,pnl:currentValue-netContributed,quoteCoverage:{
+    totalHoldings:holdings.length,liveQuotes,staleFallbacks,missingQuotes,
+    coveragePct:holdings.length?(liveQuotes+staleFallbacks)/holdings.length*100:100,
+    status:missingQuotes?'partial':staleFallbacks?'stale-fallback':'complete'
+  }};
 }
 
 export function ruleDistance(holding, quote, history) {
@@ -152,105 +134,95 @@ export function ruleDistance(holding, quote, history) {
   if (!(price > 0)) return null;
 
   const rules = [];
-  const lossPct = Number(holding.loss_limit_pct);
-  if (Number.isFinite(lossPct) && lossPct > 0) {
-    const stop = Number(holding.average_cost) * (1 - lossPct / 100);
-    if (stop > 0) {
-      const distancePct = (price / stop - 1) * 100;
-      rules.push({
-        type: 'loss limit',
-        target: stop,
-        direction: 'below',
-        distancePct,
-        breached: price <= stop,
-      });
-    }
-  }
-
-  const alertPrices = Array.isArray(holding.broker_alert_prices)
-    ? holding.broker_alert_prices.map(Number).filter(v => v > 0)
-    : [];
   const averageCost = Number(holding.average_cost);
-  for (const target of alertPrices) {
-    const direction = Number.isFinite(averageCost) && target < averageCost ? 'below' : 'above';
-    const distancePct = direction === 'above' ? (target / price - 1) * 100 : (price / target - 1) * 100;
+  const lossPct = Number(holding.loss_limit_pct);
+
+  if (Number.isFinite(lossPct) && lossPct > 0 && Number.isFinite(averageCost) && averageCost > 0) {
+    const stop = averageCost * (1 - lossPct / 100);
+    rules.push({ type:'loss limit', target:stop, direction:'below', distancePct:(price / stop - 1) * 100, breached:price <= stop });
+  }
+
+  for (const alert of normalizeBrokerAlerts(holding)) {
+    const distancePct = alert.direction === 'above'
+      ? (alert.price / price - 1) * 100
+      : (price / alert.price - 1) * 100;
     rules.push({
-      type: direction === 'below' ? 'broker downside alert' : 'broker upside alert',
-      target,
-      direction,
+      type: alert.direction === 'below' ? 'broker downside alert' : 'broker upside alert',
+      target: alert.price,
+      direction: alert.direction,
+      label: alert.label,
       distancePct,
-      breached: direction === 'below' ? price <= target : price >= target,
+      breached: alert.direction === 'below' ? price <= alert.price : price >= alert.price,
     });
   }
 
-  const exitType = String(holding.exit_rule_type || '').toLowerCase();
-  const exitValue = Number(holding.exit_rule_value);
+  const stageEvaluation = evaluateStageState(holding, history);
+  if (stageEvaluation.stages.length) {
+    const baseDate = String(holding.purchase_date || sortedHistoryPoints(history)[0]?.date || '');
+    stageEvaluation.stages.forEach((stage, index) => {
+      const type = String(stage?.type || '').toLowerCase();
+      const pct = Number(stage?.pct);
+      const days = Number(stage?.days);
 
-  if (
-    exitType.includes('trailing') &&
-    Number.isFinite(exitValue) &&
-    exitValue > 0 &&
-    Array.isArray(history?.points) &&
-    history.points.length
-  ) {
-    const start = String(holding.purchase_date || history.points[0]?.date || '');
-    const since = history.points.filter(point => point.date >= start && Number(point.price) > 0);
-    const peak = since.reduce((max, point) => Math.max(max, Number(point.price)), 0);
-    const stop = peak * (1 - exitValue / 100);
-    if (stop > 0) {
-      const distancePct = (price / stop - 1) * 100;
-      rules.push({
-        type: 'trailing stop',
-        target: stop,
-        direction: 'below',
-        distancePct,
-        breached: price <= stop,
-      });
+      if (type === 'stop' && Number.isFinite(pct) && pct > 0 && Number.isFinite(averageCost) && averageCost > 0) {
+        const target = averageCost * (1 - pct / 100);
+        rules.push({ type:'staged stop', target, direction:'below', distancePct:(price / target - 1) * 100, breached:price <= target, stageIndex:index });
+      }
+      if (type === 'take_profit' && Number.isFinite(pct) && pct > 0 && Number.isFinite(averageCost) && averageCost > 0) {
+        const target = averageCost * (1 + pct / 100);
+        rules.push({
+          type:'take profit',
+          target,
+          direction:'above',
+          distancePct:(target / price - 1) * 100,
+          breached:price >= target,
+          fraction:Number.isFinite(Number(stage?.fraction)) ? Number(stage.fraction) : null,
+          stageIndex:index,
+        });
+      }
+      if (type === 'time_limit' && Number.isFinite(days) && days > 0 && baseDate) {
+        const heldDays = daysBetween(baseDate, dateOnly(new Date()));
+        rules.push({ type:'time limit', target:days, distancePct:days-heldDays, breached:heldDays>=days, unit:'days', stageIndex:index });
+      }
+      if (type.includes('trailing')) {
+        const state = stageEvaluation.state['stage_' + index];
+        if (state?.activatedDate && Number(state.peak) > 0 && Number.isFinite(pct) && pct > 0) {
+          const target = Number(state.peak) * (1 - pct / 100);
+          rules.push({ type:'trailing stop', target, direction:'below', distancePct:(price / target - 1) * 100, breached:price <= target, stageIndex:index, active:true, activatedDate:state.activatedDate });
+        }
+      }
+    });
+  } else {
+    const exitType=String(holding.exit_rule_type||'').toLowerCase();
+    const exitValue=Number(holding.exit_rule_value);
+    if (exitType.includes('trailing') && Number.isFinite(exitValue) && exitValue>0 && sortedHistoryPoints(history).length) {
+      const points=sortedHistoryPoints(history);
+      const start=String(holding.purchase_date||points[0]?.date||'');
+      const peak=points.filter(point=>point.date>=start).reduce((max,point)=>Math.max(max,Number(point.price)),0);
+      const stop=peak*(1-exitValue/100);
+      if(stop>0) rules.push({type:'trailing stop',target:stop,direction:'below',distancePct:(price/stop-1)*100,breached:price<=stop});
+    }
+    if (exitType.includes('time') && Number.isFinite(exitValue) && exitValue>0 && holding.purchase_date) {
+      const heldDays=daysBetween(holding.purchase_date,dateOnly(new Date()));
+      rules.push({type:'time limit',target:exitValue,distancePct:exitValue-heldDays,breached:heldDays>=exitValue,unit:'days'});
     }
   }
 
-  if (
-    exitType.includes('time') &&
-    Number.isFinite(exitValue) &&
-    exitValue > 0 &&
-    holding.purchase_date
-  ) {
-    const today = dateOnly(new Date());
-    const heldDays = daysBetween(holding.purchase_date, today);
-    const distanceDays = exitValue - heldDays;
-    rules.push({
-      type: 'time limit',
-      target: exitValue,
-      distancePct: distanceDays,
-      breached: heldDays >= exitValue,
-      unit: 'days',
-    });
-  }
+  if (!rules.length) return {state:'no-rule',rules:[],nearest:null,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
 
-  if (!rules.length) return { state: 'no-rule', rules: [], nearest: null };
+  const actionable=rules.filter(rule=>!rule.unit);
+  const nearest=actionable.length ? [...actionable].sort((a,b)=>Math.abs(a.distancePct)-Math.abs(b.distancePct))[0] : [...rules].sort((a,b)=>Math.abs(a.distancePct)-Math.abs(b.distancePct))[0];
 
-  const actionable = rules.filter(rule => !rule.unit);
-  const nearest = actionable.length
-    ? [...actionable].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0]
-    : [...rules].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0];
+  if (rules.some(rule=>rule.breached && rule.direction==='below')) return {state:'breached',rules,nearest,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
+  const targetReached=rules.find(rule=>rule.breached && rule.direction==='above');
+  if (targetReached) return {state:'target-reached',rules,nearest:targetReached,targetReached,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
+  if (rules.some(rule=>!rule.breached && !rule.unit && Number.isFinite(rule.distancePct) && rule.distancePct>=0 && rule.distancePct<=3)) return {state:'near',rules,nearest,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
 
-  if (rules.some(rule => rule.breached && rule.direction === 'below')) return { state: 'breached', rules, nearest };
-  const targetReached = rules.find(rule => rule.breached && rule.direction === 'above');
-  if (targetReached) return { state: 'target-reached', rules, nearest: targetReached, targetReached };
-  if (rules.some(rule => !rule.breached && !rule.unit && Number.isFinite(rule.distancePct) && rule.distancePct >= 0 && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
+  const timeRule=rules.find(rule=>rule.unit==='days');
+  if (timeRule?.breached) return {state:'breached',rules,nearest:timeRule,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
+  if (timeRule && Number.isFinite(timeRule.distancePct) && timeRule.distancePct>=0 && timeRule.distancePct<=3) return {state:'near',rules,nearest:timeRule,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
 
-  const timeRule = rules.find(rule => rule.unit === 'days');
-  if (timeRule?.breached) return { state: 'breached', rules, nearest: timeRule };
-  if (
-    timeRule &&
-    Number.isFinite(timeRule.distancePct) &&
-    timeRule.distancePct >= 0 &&
-    timeRule.distancePct <= 3
-  ) {
-    return { state: 'near', rules, nearest: timeRule };
-  }
-
-  return { state: 'clear', rules, nearest };
+  return {state:'clear',rules,nearest,stageState:stageEvaluation.state,stageStateDirty:stageEvaluation.dirty};
 }
 
 async function fetchSignalGate() {
@@ -341,7 +313,7 @@ export default async function handler(req, res) {
 
   try {
     const holdingRows = await supabase(
-      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,target_allocation_pct,max_allocation_pct&quantity=gt.0&order=symbol.asc',
+      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,broker_alerts,broker_alerts_review_required,rule_stages,rule_stage_state,target_allocation_pct,max_allocation_pct,risk_group,risk_beta,risk_leverage,scenario_shock_pct&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
       'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row&order=trade_date.asc,source_row.asc',
@@ -361,7 +333,7 @@ export default async function handler(req, res) {
     }, 0);
 
     const histories = {};
-    await Promise.all(symbols.map(async symbol => {
+    await Promise.all([...symbols, 'SPY', 'SOXX'].filter((symbol, index, list) => list.indexOf(symbol) === index).map(async symbol => {
       try { histories[symbol] = await routedHistory(symbol, '1y'); } catch {}
     }));
 
@@ -376,6 +348,15 @@ export default async function handler(req, res) {
         continue;
       }
       const rules = ruleDistance(holding, q, histories[symbol]);
+      if (rules?.stageStateDirty && holding.id) {
+        try {
+          await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(holding.id), {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ rule_stage_state: rules.stageState || {} }),
+          });
+        } catch {}
+      }
       ruleStates.push({
         symbol,
         state: rules.state,
@@ -411,16 +392,29 @@ export default async function handler(req, res) {
         currentAllocationPct != null &&
         hasTarget &&
         currentAllocationPct < targetAllocationPct &&
-        Number(q?.price) > Number(holding.average_cost) &&
-        Number(q?.changePct) > 0
+        String(holding.decision_thesis || '').trim() &&
+        rules.state === 'clear'
       ) {
-        actionItems.push({
-          severity: 'WATCH',
-          symbol,
-          title: 'Increase allocation review',
-          detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + targetAllocationPct.toFixed(1) + '% target while the position is profitable and up today. Review adding only if your thesis and evidence remain supportive.',
-          impact: null,
-        });
+        const holdingPoints = sortedHistoryPoints(histories[symbol]);
+        const recent = holdingPoints.slice(-20);
+        const recentHigh = recent.length ? Math.max(...recent.map(point => Number(point.price))) : null;
+        const pullbackPct = recentHigh && Number(q.price) > 0 ? (recentHigh / Number(q.price) - 1) * 100 : null;
+        const benchmarkSymbol = String(holding.risk_group || '').toLowerCase() === 'semiconductor' ? 'SOXX' : 'SPY';
+        const benchmarkRecent = sortedHistoryPoints(histories[benchmarkSymbol]).slice(-20);
+        const stockStart = recent.length > 1 ? Number(recent[0].price) : null;
+        const benchmarkStart = benchmarkRecent.length > 1 ? Number(benchmarkRecent[0].price) : null;
+        const stockReturn = stockStart > 0 ? (Number(q.price) / stockStart - 1) * 100 : null;
+        const benchmarkReturn = benchmarkStart > 0 ? (Number(q.price) / benchmarkStart - 1) * 100 : null;
+        const supportingEvidence = stockReturn != null && benchmarkReturn != null && stockReturn >= benchmarkReturn;
+        if ((pullbackPct != null && pullbackPct >= 3) || supportingEvidence) {
+          actionItems.push({
+            severity: 'WATCH',
+            symbol,
+            title: 'Increase allocation review',
+            detail: 'Recorded thesis is present and no rule is near/breached. Evidence: ' + (pullbackPct >= 3 ? '≥3% pullback from the recent high' : '20-point return is holding up versus ' + benchmarkSymbol) + '. Review only; this is not an automatic buy instruction.',
+            impact: null,
+          });
+        }
       }
 
       if (rules.state === 'breached') {
@@ -479,14 +473,15 @@ export default async function handler(req, res) {
 
     actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
 
-    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes);
-    let benchmark = null;
+    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes, histories);
+    const benchmark = {};
     for (const symbol of ['SPY', 'SOXX']) {
       try {
-        const [h, q] = await Promise.all([routedHistory(symbol, '5y'), routedQuote(symbol)]);
-        benchmark = benchmark || {};
-        benchmark[symbol] = simulateSameCash(transactionRows, h, q.price);
-      } catch {}
+        const q = await routedQuote(symbol);
+        benchmark[symbol] = simulateSameCash(transactionRows, histories[symbol], q.price);
+      } catch {
+        benchmark[symbol] = simulateSameCash(transactionRows, histories[symbol], null);
+      }
     }
 
     const topHoldings = holdingRows.map(holding => {
@@ -500,15 +495,27 @@ export default async function handler(req, res) {
     const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
     const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
 
-    const semiconductorValue = holdingRows.reduce((sum, holding) => {
+    const scenarioGroups = {};
+    for (const holding of holdingRows) {
       const symbol = String(holding.symbol).toUpperCase();
-      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
-      if (!isSemis) return sum;
-      const q = quotes[symbol];
-      const leverage = LEVERAGE[symbol] || 1;
-      return sum + (q?.price > 0 ? q.price * Number(holding.quantity) * leverage : 0);
-    }, 0);
-    const semiconductorShock = semiconductorValue > 0 ? -semiconductorValue * 0.15 : 0;
+      const historyLast = sortedHistoryPoints(histories[symbol]).at(-1);
+      const price = Number(quotes[symbol]?.price) > 0 ? Number(quotes[symbol].price) : Number(historyLast?.price);
+      const value = price > 0 ? price * Number(holding.quantity) : 0;
+      if (!(value > 0)) continue;
+      const group = String(holding.risk_group || 'unclassified').trim().toLowerCase() || 'unclassified';
+      const beta = Number.isFinite(Number(holding.risk_beta)) ? Math.max(0, Number(holding.risk_beta)) : 1;
+      const leverage = Number.isFinite(Number(holding.risk_leverage)) && Number(holding.risk_leverage) > 0 ? Number(holding.risk_leverage) : 1;
+      const shockPct = Number.isFinite(Number(holding.scenario_shock_pct)) ? Math.max(0, Number(holding.scenario_shock_pct)) : 15;
+      scenarioGroups[group] ||= { group, grossValue:0, stressValue:0, weightedShock:0, holdings:0 };
+      scenarioGroups[group].grossValue += value;
+      scenarioGroups[group].stressValue += value * beta * leverage;
+      scenarioGroups[group].weightedShock += value * beta * leverage * shockPct / 100;
+      scenarioGroups[group].holdings++;
+    }
+    const riskScenarios = Object.values(scenarioGroups)
+      .map(item => ({ ...item, shock: -item.weightedShock, effectiveShockPct: item.stressValue > 0 ? item.weightedShock / item.stressValue * 100 : null }))
+      .sort((a,b)=>b.weightedShock-a.weightedShock);
+    const totalScenarioShock = riskScenarios.reduce((sum,item)=>sum+item.shock,0);
 
     const portfolioRules = {
       total: ruleStates.length,
@@ -534,9 +541,12 @@ export default async function handler(req, res) {
         netContributed: money(actual.netContributed),
         cashFlowPnl: money(actual.pnl),
         concentrationTop3Pct: pct(concentrationPct),
-        semiconductorShock15Pct: money(semiconductorShock),
+        semiconductorShock15Pct: money(totalScenarioShock),
+        riskScenarios,
+        quoteCoverage: actual.quoteCoverage,
       },
       benchmark,
+      benchmarkCoverage: Object.fromEntries(Object.entries(benchmark).map(([symbol, item]) => [symbol, item.coverage || null])),
       earnings: earnings.slice(0, 7),
       earningsStatus: earningsResult.status,
       earningsError: earningsResult.reason || null,
