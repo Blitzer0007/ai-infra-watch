@@ -57,6 +57,7 @@ type Props = {
 
 const WATCHLIST = STOCK_UNIVERSE;
 
+// Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => {
     const value = new URLSearchParams(window.location.search).get('portfolio_tab');
