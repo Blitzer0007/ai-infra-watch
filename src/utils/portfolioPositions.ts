@@ -1,5 +1,5 @@
 import type { IntelligenceSnapshot, PricePoint } from './intelligence';
-import type { PortfolioPurchaseLot, StoredPortfolioHolding } from './portfolioApi';
+import type { PortfolioPurchaseLot, StoredPortfolioHolding, BrokerAlert, RuleStage } from './portfolioApi';
 import { STOCK_UNIVERSE } from './stockUniverse';
 
 export type PortfolioPosition = {
@@ -21,6 +21,14 @@ export type PortfolioPosition = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  brokerAlerts?: BrokerAlert[];
+  brokerAlertsReviewRequired?: boolean;
+  ruleStages?: RuleStage[];
+  ruleStageState?: Record<string, any>;
+  riskGroup?: string | null;
+  riskBeta?: number | null;
+  riskLeverage?: number;
+  scenarioShockPct?: number;
   targetAllocationPct?: number | null;
   maxAllocationPct?: number | null;
   id?: string;
@@ -95,6 +103,14 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     exitRuleText: holding.exitRuleText || '',
     practicalNotes: holding.practicalNotes || '',
     brokerAlertPrices: holding.brokerAlertPrices || [],
+    brokerAlerts: holding.brokerAlerts || [],
+    brokerAlertsReviewRequired: Boolean(holding.brokerAlertsReviewRequired),
+    ruleStages: holding.ruleStages || [],
+    ruleStageState: holding.ruleStageState || {},
+    riskGroup: holding.riskGroup ?? null,
+    riskBeta: holding.riskBeta ?? null,
+    riskLeverage: holding.riskLeverage ?? 1,
+    scenarioShockPct: holding.scenarioShockPct ?? 15,
     targetAllocationPct: holding.targetAllocationPct ?? null,
     maxAllocationPct: holding.maxAllocationPct ?? null,
     purchaseDate: firstPurchaseDate,
