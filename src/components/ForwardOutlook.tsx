@@ -684,7 +684,30 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     if (exitRuleValue != null && (!Number.isFinite(exitRuleValue) || exitRuleValue < 0 || exitRuleValue > 100)) {
       setDecisionMessage('Exit rule percentage must be between 0% and 100%.'); return;
     }
-    const brokerAlertPrices = decisionDraft.brokerAlerts.split(',').map(value => Number(value.trim())).filter(value => Number.isFinite(value) && value > 0);
+    const brokerAlerts = decisionDraft.brokerAlerts
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+      .map(entry => {
+        const match = entry.match(/^([^\s]+)\s+(below|above)$/i);
+        if (match) return { price: Number(match[1]), direction: match[2].toLowerCase() as 'below' | 'above', label: match[2].toLowerCase() === 'below' ? 'stop / downside review' : 'target / upside review' };
+        const price = Number(entry);
+        return Number.isFinite(price) && price > 0 ? { price, direction: price < Number(holding.averageCost) ? 'below' : 'above', label: 'review' } : null;
+      })
+      .filter((value): value is { price: number; direction: 'below' | 'above'; label: string } => Boolean(value && Number.isFinite(value.price) && value.price > 0));
+    if (decisionDraft.ruleStages.trim()) {
+      try {
+        const parsedStages = JSON.parse(decisionDraft.ruleStages);
+        if (!Array.isArray(parsedStages)) throw new Error('Rule stages must be a JSON array.');
+        decisionDraft.ruleStages = JSON.stringify(parsedStages);
+      } catch (error) {
+        setDecisionMessage('Rule stages must be valid JSON array.'); return;
+      }
+    }
+    const shockSensitivity = decisionDraft.shockSensitivity.trim() === '' ? 1 : Number(decisionDraft.shockSensitivity);
+    if (!Number.isFinite(shockSensitivity) || shockSensitivity <= 0 || shockSensitivity > 10) {
+      setDecisionMessage('Shock sensitivity must be between 0 and 10.'); return;
+    }
     setDecisionSaving(true); setDecisionMessage(null);
     try {
       const saved = await updatePortfolioHolding({
