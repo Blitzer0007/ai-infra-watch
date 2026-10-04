@@ -208,10 +208,10 @@ async function buildDigest() {
   const macroHigh = MACRO_RISKS.filter(item => item.level === 'HIGH').length;
   const macroMedium = MACRO_RISKS.filter(item => item.level === 'MEDIUM').length;
   const macroLoad = Math.min(30, macroHigh * 12 + macroMedium * 6);
+  const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const date = localDate;
 
   const decision = await fetchDecisionCenter();
-  const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   if (decision) {
     return {
