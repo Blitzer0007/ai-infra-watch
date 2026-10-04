@@ -245,3 +245,34 @@ export function transactionNetCash(transaction) {
   const brokerage = Number(transaction?.brokerage) || 0;
   return transaction?.transaction_type === 'SELL' ? Math.max(0, amount - brokerage) : amount + brokerage;
 }
+
+export function previousOrSamePoint(points, date) {
+  const ordered = (points || []).filter(point => point?.date && Number(point?.price) > 0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let selected = null;
+  for (const point of ordered) {
+    if (String(point.date) <= String(date)) selected = point;
+    else break;
+  }
+  return selected;
+}
+
+export function calculateActualPortfolio(holdings, transactionRows, quotes, histories = {}, today = new Date()) {
+  let freshQuotes=0, fallbackQuotes=0, unavailableQuotes=0;
+  const currentValue=(holdings||[]).reduce((sum,holding)=>{
+    const symbol=String(holding?.symbol||'').toUpperCase();
+    const q=quotes?.[symbol];
+    if(q?.price>0){freshQuotes++;return sum+q.price*Number(holding.quantity);}
+    const fallback=previousOrSamePoint(histories?.[symbol]?.points||[],localDate(today));
+    if(fallback?.price>0){fallbackQuotes++;return sum+Number(fallback.price)*Number(holding.quantity);}
+    unavailableQuotes++;
+    return sum;
+  },0);
+  let buyCash=0,saleCash=0;
+  for(const tx of transactionRows||[]){if(tx.transaction_type==='BUY')buyCash+=transactionNetCash(tx);else saleCash+=transactionNetCash(tx);}
+  const netContributed=buyCash-saleCash;
+  return {
+    currentValue,buyCash,saleCash,netContributed,pnl:currentValue-netContributed,
+    quoteCoveragePct:(holdings||[]).length?Number(((freshQuotes+fallbackQuotes)/(holdings||[]).length*100).toFixed(1)):100,
+    freshQuotes,fallbackQuotes,unavailableQuotes,status:unavailableQuotes?'partial':'complete',
+  };
+}
