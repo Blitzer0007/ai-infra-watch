@@ -2,6 +2,8 @@ name: Vercel Production Deploy
 run-name: Vercel Production Deploy • ${{ github.ref_name }}
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
