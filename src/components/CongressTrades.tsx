@@ -428,6 +428,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
         <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
         <div className="text-xs leading-relaxed">
           <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the disclosure/filing date when available. The transaction date remains a separate field and is not substituted for the disclosure timestamp.
+           {reactionSummary.matched < 30 ? <span className="block mt-1 text-amber-300">Historical reaction sample is low-confidence below 30 matched events.</span> : null}
+           {reactionSummary.matched > 0 ? <span className="block mt-1 text-white/45">Repeated transaction dates are correlated observations; do not treat them as fully independent tests.</span> : null}
         </div>
       </div>
 
