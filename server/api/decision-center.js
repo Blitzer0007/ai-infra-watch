@@ -163,17 +163,28 @@ function transactionNetCash(transaction) {
 }
 
 function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
-  const priceByDate = new Map((benchmarkHistory?.points || []).map(point => [point.date, Number(point.price)]));
+  const orderedPrices = [...(benchmarkHistory?.points || [])]
+    .filter(point => Number(point?.price) > 0 && point?.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const priceAtOrBefore = date => {
+    let selected = null;
+    for (const point of orderedPrices) {
+      if (String(point.date) <= String(date)) selected = point;
+      else break;
+    }
+    return selected ? Number(selected.price) : null;
+  };
   let shares = 0;
   let netDeposits = 0;
+  let transactionsUsed = 0;
   const ordered = [...transactions].sort(
     (a, b) => String(a.trade_date).localeCompare(String(b.trade_date)) || Number(a.source_row || 0) - Number(b.source_row || 0),
   );
 
   for (const tx of ordered) {
-    const price = priceByDate.get(tx.trade_date);
+    const price = priceAtOrBefore(tx.trade_date);
     if (!(price > 0)) continue;
-
+    transactionsUsed++;
     if (tx.transaction_type === 'BUY') {
       const cash = transactionNetCash(tx);
       shares += cash / price;
@@ -186,19 +197,38 @@ function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
     }
   }
 
-  const value = shares * benchmarkCurrent;
+  const value = shares * Number(benchmarkCurrent || 0);
+  const coveragePct = ordered.length ? transactionsUsed / ordered.length * 100 : 100;
   return {
     value,
     netDeposits,
     pnl: value - netDeposits,
     shares,
+    transactionsTotal: ordered.length,
+    transactionsUsed,
+    coveragePct: Number(coveragePct.toFixed(1)),
+    status: transactionsUsed === ordered.length ? 'complete' : 'partial',
   };
 }
 
-function calculateActualPortfolio(holdings, transactionRows, quotes) {
+function calculateActualPortfolio(holdings, transactionRows, quotes, histories = {}) {
+  let freshQuotes = 0;
+  let fallbackQuotes = 0;
+  let unavailableQuotes = 0;
   const currentValue = holdings.reduce((sum, holding) => {
-    const q = quotes[holding.symbol];
-    return sum + (q?.price > 0 ? q.price * Number(holding.quantity) : 0);
+    const symbol = String(holding.symbol).toUpperCase();
+    const q = quotes[symbol];
+    if (q?.price > 0) {
+      freshQuotes++;
+      return sum + q.price * Number(holding.quantity);
+    }
+    const fallback = previousOrSamePoint(histories[symbol]?.points || [], localDate());
+    if (fallback?.price > 0) {
+      fallbackQuotes++;
+      return sum + Number(fallback.price) * Number(holding.quantity);
+    }
+    unavailableQuotes++;
+    return sum;
   }, 0);
 
   let buyCash = 0;
@@ -210,12 +240,18 @@ function calculateActualPortfolio(holdings, transactionRows, quotes) {
 
   const netContributed = buyCash - saleCash;
   const pnl = currentValue - netContributed;
+  const total = holdings.length;
   return {
     currentValue,
     buyCash,
     saleCash,
     netContributed,
     pnl,
+    quoteCoveragePct: total ? Number(((freshQuotes + fallbackQuotes) / total * 100).toFixed(1)) : 100,
+    freshQuotes,
+    fallbackQuotes,
+    unavailableQuotes,
+    status: unavailableQuotes ? 'partial' : 'complete',
   };
 }
 
