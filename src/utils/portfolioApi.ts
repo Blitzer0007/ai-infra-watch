@@ -1,5 +1,20 @@
 import { authFetch, authHeaders } from './apiAuth';
 
+export type BrokerAlert = {
+  price: number;
+  direction: 'above' | 'below';
+  label?: string | null;
+};
+
+export type RuleStage = {
+  type: 'stop' | 'take_profit' | 'trailing' | 'time_limit' | string;
+  pct?: number;
+  days?: number;
+  action?: string;
+  fraction?: number;
+  activates_after?: string;
+};
+
 export type StoredPortfolioHolding = {
   id: string;
   symbol: string;
@@ -14,6 +29,14 @@ export type StoredPortfolioHolding = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  brokerAlerts?: BrokerAlert[];
+  brokerAlertsReviewRequired?: boolean;
+  ruleStages?: RuleStage[];
+  ruleStageState?: Record<string, any>;
+  riskGroup?: string | null;
+  riskBeta?: number | null;
+  riskLeverage?: number;
+  scenarioShockPct?: number;
   targetAllocationPct?: number | null;
   maxAllocationPct?: number | null;
   createdAt?: string;
