@@ -1369,8 +1369,8 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding since" value={h.purchaseDate || 'Not set'} />
+      <Info label="First broker purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
       <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
       <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
       <Info label="Average cost" value={h.averageCost.toFixed(2)} />
