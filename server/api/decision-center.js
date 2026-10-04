@@ -173,7 +173,7 @@ export function ruleDistance(holding, quote, history) {
   const averageCost = Number(holding.average_cost);
   for (const target of alertPrices) {
     const direction = Number.isFinite(averageCost) && target < averageCost ? 'below' : 'above';
-    const distancePct = direction === 'above' ? (target / price - 1) * 100 * -1 : (price / target - 1) * 100;
+    const distancePct = direction === 'above' ? (target / price - 1) * 100 : (price / target - 1) * 100;
     rules.push({
       type: direction === 'below' ? 'broker downside alert' : 'broker upside alert',
       target,
