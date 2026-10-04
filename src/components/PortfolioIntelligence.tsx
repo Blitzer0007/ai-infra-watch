@@ -1403,6 +1403,17 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Target allocation" value={h.targetAllocationPct == null ? 'Not set' : h.targetAllocationPct.toFixed(1) + '%'} />
       <Info label="Max / reduce-review" value={h.maxAllocationPct == null ? 'Not set' : h.maxAllocationPct.toFixed(1) + '%'} />
     </div>
+    <div className="mt-3 rounded-xl border border-amber-300/10 bg-amber-300/[0.025] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-widest text-amber-200/70">Decision rules</div>
+          <div className="text-[10px] text-white/40 mt-1">Set your thesis, loss limit, exit rule and broker alert prices. These rules drive review signals and Smart Alerts; they do not place trades.</div>
+        </div>
+        <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="shrink-0 rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-[8px] font-mono uppercase tracking-widest text-amber-100 hover:bg-amber-300/15">
+          Edit decision rules
+        </button>
+      </div>
+    </div>
     {(h.targetAllocationPct != null || h.maxAllocationPct != null) && (
       <div className="mt-3 rounded-xl border border-emerald-400/10 bg-emerald-400/[0.025] p-4">
         <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-300">Allocation plan</div>

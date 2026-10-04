@@ -405,7 +405,10 @@ function conditionedReturns(history: PricePoint[], horizon: number, currentMomen
 }
 
 export default function ForwardOutlook({ livePrices, macroRisks = [], contracts = [], news = [], politicalSignals = [] }: ForwardOutlookProps) {
-  const [selectedStock, setSelectedStock] = useState('NVDA');
+  const [selectedStock, setSelectedStock] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('symbol')?.trim().toUpperCase();
+    return requested || 'NVDA';
+  });
   const [tickerInput, setTickerInput] = useState('');
   const [history, setHistory] = useState<PricePoint[]>([]);
   const [loading, setLoading] = useState(false);
