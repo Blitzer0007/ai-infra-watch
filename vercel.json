@@ -37,6 +37,10 @@
       "destination": "/api/market?route=decision-center"
     },
     {
+      "source": "/api/decision-journal",
+      "destination": "/api/market?route=decision-journal"
+    },
+    {
       "source": "/api/autopilot-signals",
       "destination": "/api/market?route=autopilot-signals"
     },
