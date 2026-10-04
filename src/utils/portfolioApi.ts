@@ -14,6 +14,11 @@ export type StoredPortfolioHolding = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  brokerAlerts?: Array<{ price: number; direction: 'below' | 'above'; label?: string }>;
+  ruleStages?: Array<Record<string, any>>;
+  ruleStageState?: Record<string, any>;
+  riskGroup?: string | null;
+  shockSensitivity?: number | null;
   targetAllocationPct?: number | null;
   maxAllocationPct?: number | null;
   createdAt?: string;
