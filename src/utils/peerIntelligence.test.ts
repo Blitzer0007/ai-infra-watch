@@ -74,3 +74,45 @@ test('returns an explicit unavailable state when purchase date is missing', () =
   });
   assert.equal(result.status, 'peer-unavailable');
 });
+
+
+test('mirrors broker buy and sell cash flows in the peer counterfactual', () => {
+  const result = calculatePeerCounterfactual({
+    holding: {
+      symbol: 'DGXX',
+      quantity: 5,
+      investedValue: 50,
+      averageCost: 10,
+      purchaseDate: '2026-05-01',
+    },
+    peer: {
+      symbol: 'IREN',
+      name: 'IREN',
+      score: 100,
+      reasons: ['Configured direct peer'],
+      configuredRank: 1,
+      sameGroup: true,
+      sameTheme: true,
+      freshQuote: true,
+    },
+    peerHistory: [
+      { date: '2026-05-01', price: 10 },
+      { date: '2026-05-02', price: 12 },
+      { date: '2026-05-05', price: 20 },
+      { date: '2026-05-06', price: 25 },
+    ],
+    peerCurrentPrice: 25,
+    actualCurrentPrice: 11,
+    transactions: [
+      { id: '1', symbol: 'DGXX', transactionType: 'BUY', tradeDate: '2026-05-01', quantity: 5, amount: 50, source: 'test', sourceRow: 1, price: 10, brokerage: null },
+      { id: '2', symbol: 'DGXX', transactionType: 'BUY', tradeDate: '2026-05-05', quantity: 2, amount: 20, source: 'test', sourceRow: 2, price: 10, brokerage: null },
+      { id: '3', symbol: 'DGXX', transactionType: 'SELL', tradeDate: '2026-05-06', quantity: 2, amount: 22, source: 'test', sourceRow: 3, price: 11, brokerage: null },
+    ],
+  });
+  assert.equal(result.status, 'available');
+  assert.equal(result.basis, 'broker-transactions');
+  assert.equal(Number(result.hypotheticalValue?.toFixed(2)), 62.5);
+  assert.equal(Number(result.hypotheticalProfit?.toFixed(2)), 10.5);
+  assert.equal(Number(result.actualProfit?.toFixed(2)), 10.5);
+  assert.equal(Number(result.difference?.toFixed(2)), 0);
+});
