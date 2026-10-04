@@ -14,6 +14,8 @@ export type StoredPortfolioHolding = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
   createdAt?: string;
   updatedAt?: string;
   purchaseLots?: PortfolioPurchaseLot[];
