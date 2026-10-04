@@ -298,33 +298,28 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   );
 
   const summary = useMemo(() => {
-    const valid = rows
-      .map((row) => row.reaction)
-      .filter((value): value is Reaction => Boolean(value));
-
-    const t1Values = valid
-      .map((row) => row.t1)
-      .filter((value): value is number => value != null);
-
-    const relativeT1Values = valid
-      .map((row) => relative(row.t1, row.spyT1))
-      .filter((value): value is number => value != null);
-
+    const valid = rows.map((row) => row.reaction).filter((value): value is Reaction => Boolean(value));
+    const values = (key: 't1' | 'relativeT1' | 'abnormalT5' | 'beta60') => valid.map(row => {
+      if (key === 'relativeT1') return relative(row.t1, row.spyT1);
+      return row[key];
+    }).filter((value): value is number => value != null && Number.isFinite(value));
+    const t1 = summarizeSample(values('t1'));
+    const relativeT1 = summarizeSample(values('relativeT1'));
+    const abnormal = summarizeSample(values('abnormalT5'));
+    const betaValues = values('beta60');
     return {
       events: valid.length,
-      ...(() => {
-        const t1 = summarizeSample(t1Values);
-        const relativeT1 = summarizeSample(relativeT1Values);
-        return {
-          avgT1: t1.mean,
-          medianT1: t1.median,
-          n: t1.n,
-          quality: t1.quality,
-          avgRelativeT1: relativeT1.mean,
-          medianRelativeT1: relativeT1.median,
-          relativeN: relativeT1.n,
-        };
-      })(),
+      avgT1: t1.mean,
+      medianT1: t1.median,
+      n: t1.n,
+      quality: t1.quality,
+      avgRelativeT1: relativeT1.mean,
+      medianRelativeT1: relativeT1.median,
+      relativeN: relativeT1.n,
+      avgAbnormalT5: abnormal.mean,
+      medianAbnormalT5: abnormal.median,
+      abnormalN: abnormal.n,
+      avgBeta60: betaValues.length ? betaValues.reduce((a,b)=>a+b,0) / betaValues.length : null,
     };
   }, [rows]);
 
