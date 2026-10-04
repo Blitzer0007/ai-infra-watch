@@ -355,6 +355,10 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           average_next_trading_day_vs_spy_pct_points: summary.avgRelativeT1,
           median_next_trading_day_vs_spy_pct_points: summary.medianRelativeT1,
           vs_spy_sample_size: summary.relativeN,
+          average_5d_beta_adjusted_vs_soxx_pct_points: summary.avgAbnormalT5,
+          median_5d_beta_adjusted_vs_soxx_pct_points: summary.medianAbnormalT5,
+          beta_sample_size: summary.abnormalN,
+          average_pre_event_beta_60d: summary.avgBeta60,
           categories: categories.slice(0, 8),
           recent_events: events.slice(0, 8).map((event) => ({
             date: event.date,
