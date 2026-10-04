@@ -272,7 +272,7 @@ export default async function handler(req, res) {
 
   try {
     const holdingRows = await supabase(
-      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices&quantity=gt.0&order=symbol.asc',
+      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,target_allocation_pct,max_allocation_pct&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
       'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row&order=trade_date.asc,source_row.asc',
@@ -283,6 +283,13 @@ export default async function handler(req, res) {
       try { return [symbol, await routedQuote(symbol)]; } catch { return [symbol, null]; }
     }));
     const quotes = Object.fromEntries(quoteEntries);
+
+    const totalCurrentValue = symbols.reduce((sum, symbol) => {
+      const holding = holdingRows.find(row => String(row.symbol).toUpperCase() === symbol);
+      const price = Number(quotes[symbol]?.price);
+      const quantity = Number(holding?.quantity);
+      return sum + (price > 0 && quantity > 0 ? price * quantity : 0);
+    }, 0);
 
     const histories = {};
     await Promise.all(symbols.map(async symbol => {
@@ -313,6 +320,39 @@ export default async function handler(req, res) {
         } : null,
         holdingSince: holding.purchase_date || null,
       });
+
+      const currentAllocationPct = totalCurrentValue > 0 && Number(q?.price) > 0
+        ? (Number(q.price) * Number(holding.quantity) / totalCurrentValue) * 100
+        : null;
+      const targetAllocationPct = Number(holding.target_allocation_pct);
+      const maxAllocationPct = Number(holding.max_allocation_pct);
+      const hasTarget = Number.isFinite(targetAllocationPct) && targetAllocationPct >= 0;
+      const hasMax = Number.isFinite(maxAllocationPct) && maxAllocationPct >= 0;
+
+      if (currentAllocationPct != null && hasMax && currentAllocationPct >= maxAllocationPct) {
+        const excess = currentAllocationPct - maxAllocationPct;
+        actionItems.push({
+          severity: excess >= 2 ? 'ACT' : 'WATCH',
+          symbol,
+          title: 'Allocation above maximum',
+          detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + maxAllocationPct.toFixed(1) + '% maximum. Review reducing exposure; this is not an automatic sell instruction.',
+          impact: null,
+        });
+      } else if (
+        currentAllocationPct != null &&
+        hasTarget &&
+        currentAllocationPct < targetAllocationPct &&
+        Number(q?.price) > Number(holding.average_cost) &&
+        Number(q?.changePct) > 0
+      ) {
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Increase allocation review',
+          detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + targetAllocationPct.toFixed(1) + '% target while the position is profitable and up today. Review adding only if your thesis and evidence remain supportive.',
+          impact: null,
+        });
+      }
 
       if (rules.state === 'breached') {
         const hit = rules.rules.find(rule => rule.breached) || rules.nearest;
