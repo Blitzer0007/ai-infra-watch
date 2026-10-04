@@ -19,10 +19,45 @@ function headers() {
   return { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': 'application/json' };
 }
 
-async function supabase(path) {
-  const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, { headers: headers() });
+async function supabase(path, options = {}) {
+  const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...options,
+    headers: { ...headers(), ...(options.headers || {}) },
+  });
   if (!response.ok) throw new Error('Supabase portfolio request failed: HTTP ' + response.status);
   return response.json();
+}
+function digestSlotKey(req) {
+  const explicit=String(req.query?.slot||'').trim();
+  if (/^\d{4}-\d{2}-\d{2}-\d{2}$/.test(explicit)) return explicit;
+  const tz=process.env.PORTFOLIO_DIGEST_TIMEZONE||'Asia/Kolkata';
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const get=type=>parts.find(part=>part.type===type)?.value||'';
+  return get('year')+'-'+get('month')+'-'+get('day')+'-'+get('hour');
+}
+async function claimDigestSlot(slotKey) {
+  const existing=await supabase('portfolio_digest_runs?slot_key=eq.'+encodeURIComponent(slotKey)+'&select=status,started_at&limit=1');
+  const row=existing?.[0];
+  if(row?.status==='completed') return false;
+  if(row?.status==='running' && Date.parse(row.started_at||'') > Date.now()-15*60*1000) return false;
+  const payload={slot_key:slotKey,started_at:new Date().toISOString(),status:'running',completed_at:null,delivery:{},error:null};
+  if(row){
+    await supabase('portfolio_digest_runs?slot_key=eq.'+encodeURIComponent(slotKey),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(payload)});
+    return true;
+  }
+  try{
+    const created=await supabase('portfolio_digest_runs',{method:'POST',headers:{Prefer:'return=representation,resolution=ignore-duplicates'},body:JSON.stringify(payload)});
+    return Array.isArray(created)?created.length>0:true;
+  }catch{
+    const retry=await supabase('portfolio_digest_runs?slot_key=eq.'+encodeURIComponent(slotKey)+'&select=status&limit=1');
+    return retry?.[0]?.status!=='completed';
+  }
+}
+async function finishDigestSlot(slotKey,status,delivery,error) {
+  if(!slotKey) return;
+  try{
+    await supabase('portfolio_digest_runs?slot_key=eq.'+encodeURIComponent(slotKey),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status,completed_at:new Date().toISOString(),delivery:delivery||{},error:error||null})});
+  }catch(updateError){ console.error('portfolio digest run update failed:',updateError); }
 }
 
 async function quote(symbol) {
