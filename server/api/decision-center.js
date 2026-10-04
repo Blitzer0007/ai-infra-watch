@@ -214,7 +214,7 @@ async function fetchSignalGate() {
     experimental: families.filter(row => row.lifecycle === 'experimental' || row.lifecycle === 'under_review').length,
     retired: families.filter(row => row.lifecycle === 'retired').length,
     families,
-    note: 'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.',,
+    note: 'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.',
   };
 }
 
