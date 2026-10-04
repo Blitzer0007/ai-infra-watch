@@ -342,3 +342,13 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     page.get_by_text("Event Study", exact=True).click()
     page.get_by_text("5D benchmark context", exact=True).wait_for(state="visible", timeout=30000)
     assert "SOXX" in page.get_by_text("5D benchmark context", exact=True).locator("..").inner_text()
+
+
+def test_purchase_lot_sanity_check_is_visible(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Purchase history for NVDA").click()
+    portfolio.get_by_text("NO MARKET DATE", exact=True).wait_for(state="visible", timeout=30000)
