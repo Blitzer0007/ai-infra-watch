@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, Check, CircleHelp, X } from 'lucide-react';
 import { authFetch, authHeaders } from '../utils/apiAuth';
-import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
+import { fetchPortfolioHoldings, fetchPortfolioTransactions, type StoredPortfolioHolding, type PortfolioTransaction } from '../utils/portfolioApi';
 
 type Entry = {
   id:string; symbol:string; decision_date:string; decision:string; thesis:string; rule_text?:string|null;
@@ -9,9 +9,13 @@ type Entry = {
   review_target_date:string; review_status:'pending'|'outcome_ready'|'completed'; outcome_return_pct?:number|null;
   benchmark_return_pct?:number|null; excess_return_pct?:number|null; forecast_error_pct?:number|null;
   rule_followed?:boolean|null; review_notes?:string|null;
+  benchmark_symbol?:string;
+  decision_score_pct?:number|null;
+  action_taken?:string|null;
+  transaction_id?:string|null;
 };
 type Weekly = {
-  decisions:number; outcomes:number; beatsBenchmark:number; averageExcessReturnPct:number|null;
+  decisions:number; outcomes:number; beatsBenchmark:number; averageExcessReturnPct:number|null; averageDecisionScorePct?:number|null; sampleAdequate?:boolean; sampleLabel?:string;
   averageForecastErrorPct:number|null; ruleAdherencePct:number|null; openOutcomeReviews:number; reflection:string;
 };
 function pct(v:number|null|undefined){ return v==null||!Number.isFinite(v)?'—':(v>=0?'+':'−')+Math.abs(v).toFixed(2)+'%'; }
@@ -19,8 +23,8 @@ function label(v:string){ return v.replace(/_/g,' '); }
 function ruleFor(h:StoredPortfolioHolding){ const p=[]; if(h.lossLimitPct!=null)p.push('Loss limit '+h.lossLimitPct+'%'); if(h.exitRuleType)p.push(h.exitRuleType+(h.exitRuleValue!=null?' '+h.exitRuleValue:'')); if(h.brokerAlertPrices?.length)p.push('Broker alerts $'+h.brokerAlertPrices.join(' / $')); return p.join(' · '); }
 
 export default function DecisionJournalPanel(){
-  const [entries,setEntries]=useState<Entry[]>([]), [holdings,setHoldings]=useState<StoredPortfolioHolding[]>([]), [weekly,setWeekly]=useState<Weekly|null>(null);
-  const [open,setOpen]=useState(false), [holdingId,setHoldingId]=useState(''), [decision,setDecision]=useState('HOLD'), [thesis,setThesis]=useState(''), [ruleText,setRuleText]=useState('');
+  const [entries,setEntries]=useState<Entry[]>([]), [holdings,setHoldings]=useState<StoredPortfolioHolding[]>([]), [transactions,setTransactions]=useState<PortfolioTransaction[]>([]), [weekly,setWeekly]=useState<Weekly|null>(null);
+  const [open,setOpen]=useState(false), [holdingId,setHoldingId]=useState(''), [decision,setDecision]=useState('HOLD'), [thesis,setThesis]=useState(''), [ruleText,setRuleText]=useState(''), [benchmark,setBenchmark]=useState('SPY'), [actionTaken,setActionTaken]=useState('none'), [transactionId,setTransactionId]=useState('');
   const [notes,setNotes]=useState<Record<string,string>>({}), [busy,setBusy]=useState(false), [loading,setLoading]=useState(true), [error,setError]=useState('');
 
   const load=async()=>{ try{
@@ -30,9 +34,9 @@ export default function DecisionJournalPanel(){
     if(!holdingId&&p[0]){setHoldingId(p[0].id);setThesis(p[0].decisionThesis||p[0].notes||'');setRuleText(ruleFor(p[0]));}
   }catch(e){setError(e instanceof Error?e.message:'Decision journal unavailable');}finally{setLoading(false);} };
   useEffect(()=>{load();},[]);
-  const choose=(id:string)=>{const h=holdings.find(x=>x.id===id);setHoldingId(id);setThesis(h?.decisionThesis||h?.notes||'');setRuleText(h?ruleFor(h):'');};
+  const choose=(id:string)=>{const h=holdings.find(x=>x.id===id);setHoldingId(id);setThesis(h?.decisionThesis||h?.notes||'');setRuleText(h?ruleFor(h):'');setBenchmark(h?.group?.toLowerCase?.().includes?.('semiconductor')?'SOXX':'SPY');setTransactionId('');};
   const create=async()=>{if(!holdingId||!thesis.trim()){setError('Select a holding and record the thesis.');return;} setBusy(true);setError('');
-    try{const r=await authFetch('/api/decision-journal',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({holdingId,decision,thesis:thesis.trim(),ruleText:ruleText.trim()})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b?.error||'Unable to log decision');setOpen(false);await load();}catch(e){setError(e instanceof Error?e.message:'Unable to log decision');}finally{setBusy(false);}
+    try{const r=await authFetch('/api/decision-journal',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({holdingId,decision,thesis:thesis.trim(),ruleText:ruleText.trim(),benchmarkSymbol:benchmark,actionTaken,transactionId:transactionId||null})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b?.error||'Unable to log decision');setOpen(false);await load();}catch(e){setError(e instanceof Error?e.message:'Unable to log decision');}finally{setBusy(false);}
   };
   const mark=async(e:Entry,followed:boolean)=>{setBusy(true);setError('');
     try{const r=await authFetch('/api/decision-journal',{method:'PATCH',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({id:e.id,ruleFollowed:followed,reviewNotes:notes[e.id]||''})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b?.error||'Unable to update review');await load();}catch(x){setError(x instanceof Error?x.message:'Unable to update review');}finally{setBusy(false);}
