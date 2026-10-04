@@ -31,6 +31,8 @@ type TradeReaction = {
   excessNextPct: number | null;
   excessDay5Pct: number | null;
   excessDay20Pct: number | null;
+  ownBaselineDay5Pct: number | null;
+  ownBaselineGapDay5Pct: number | null;
 };
 
 type SourceStatus = {
@@ -59,6 +61,22 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   return historyCache[key];
 }
 
+function median(values: number[]): number | null {
+  const usable = values.filter(Number.isFinite).sort((a,b)=>a-b);
+  if (!usable.length) return null;
+  const mid = Math.floor(usable.length / 2);
+  return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
+}
+
+function stockBaseline5(history: HistoryPoint[]): number | null {
+  const values: number[] = [];
+  for (let i = 0; i + 5 < history.length; i++) {
+    const value = pct(history[i]?.price ?? null, history[i + 5]?.price ?? null);
+    if (value != null) values.push(value);
+  }
+  return median(values);
+}
+
 function pct(from: number | null, to: number | null): number | null {
   if (from == null || to == null || !Number.isFinite(from) || !Number.isFinite(to) || from === 0) {
     return null;
@@ -81,6 +99,7 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
   const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
   const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
 
+  const baseline5 = stockBaseline5(history);
   const nextPct = pct(event.price, next?.price ?? null);
   const day5Pct = pct(event.price, day5?.price ?? null);
   const day20Pct = pct(event.price, day20?.price ?? null);
@@ -104,6 +123,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
     excessNextPct: nextPct == null || benchmarkNextPct == null ? null : nextPct - benchmarkNextPct,
     excessDay5Pct: day5Pct == null || benchmarkDay5Pct == null ? null : day5Pct - benchmarkDay5Pct,
     excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
+    ownBaselineDay5Pct: baseline5,
+    ownBaselineGapDay5Pct: day5Pct == null || baseline5 == null ? null : day5Pct - baseline5,
   };
 }
 
