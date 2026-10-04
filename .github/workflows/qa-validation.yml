@@ -10,6 +10,7 @@ on:
       - "supabase/**"
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
+      - ".github/workflows/vercel-production-deploy.yml"
   workflow_dispatch:
   pull_request:
     paths:
