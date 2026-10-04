@@ -147,7 +147,7 @@ function calculateActualPortfolio(holdings, transactionRows, quotes) {
   };
 }
 
-function ruleDistance(holding, quote, history) {
+export function ruleDistance(holding, quote, history) {
   const price = quote?.price;
   if (!(price > 0)) return null;
 
@@ -160,13 +160,16 @@ function ruleDistance(holding, quote, history) {
       rules.push({
         type: 'loss limit',
         target: stop,
+        direction: 'below',
         distancePct,
         breached: price <= stop,
       });
     }
   }
 
-  const alertPrices = Array.isArray(holding.broker_alert_prices) ? holding.broker_alert_prices.map(Number).filter(v => v > 0) : [];
+  const alertPrices = Array.isArray(holding.broker_alert_prices)
+    ? holding.broker_alert_prices.map(Number).filter(v => v > 0)
+    : [];
   const averageCost = Number(holding.average_cost);
   for (const target of alertPrices) {
     const direction = Number.isFinite(averageCost) && target < averageCost ? 'below' : 'above';
@@ -180,7 +183,52 @@ function ruleDistance(holding, quote, history) {
     });
   }
 
-  const exitType = String(holding.exit_rule_type || '').toLowerCase(); return { state: 'no-rule', rules: [], nearest: null };
+  const exitType = String(holding.exit_rule_type || '').toLowerCase();
+  const exitValue = Number(holding.exit_rule_value);
+
+  if (
+    exitType.includes('trailing') &&
+    Number.isFinite(exitValue) &&
+    exitValue > 0 &&
+    Array.isArray(history?.points) &&
+    history.points.length
+  ) {
+    const start = String(holding.purchase_date || history.points[0]?.date || '');
+    const since = history.points.filter(point => point.date >= start && Number(point.price) > 0);
+    const peak = since.reduce((max, point) => Math.max(max, Number(point.price)), 0);
+    const stop = peak * (1 - exitValue / 100);
+    if (stop > 0) {
+      const distancePct = (price / stop - 1) * 100;
+      rules.push({
+        type: 'trailing stop',
+        target: stop,
+        direction: 'below',
+        distancePct,
+        breached: price <= stop,
+      });
+    }
+  }
+
+  if (
+    exitType.includes('time') &&
+    Number.isFinite(exitValue) &&
+    exitValue > 0 &&
+    holding.purchase_date
+  ) {
+    const today = dateOnly(new Date());
+    const heldDays = daysBetween(holding.purchase_date, today);
+    const distanceDays = exitValue - heldDays;
+    rules.push({
+      type: 'time limit',
+      target: exitValue,
+      distancePct: distanceDays,
+      breached: heldDays >= exitValue,
+      unit: 'days',
+    });
+  }
+
+  if (!rules.length) return { state: 'no-rule', rules: [], nearest: null };
+
   const actionable = rules.filter(rule => !rule.unit);
   const nearest = actionable.length
     ? [...actionable].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0]
@@ -190,6 +238,18 @@ function ruleDistance(holding, quote, history) {
   const targetReached = rules.find(rule => rule.breached && rule.direction === 'above');
   if (targetReached) return { state: 'target-reached', rules, nearest: targetReached, targetReached };
   if (rules.some(rule => !rule.breached && !rule.unit && Number.isFinite(rule.distancePct) && rule.distancePct >= 0 && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
+
+  const timeRule = rules.find(rule => rule.unit === 'days');
+  if (timeRule?.breached) return { state: 'breached', rules, nearest: timeRule };
+  if (
+    timeRule &&
+    Number.isFinite(timeRule.distancePct) &&
+    timeRule.distancePct >= 0 &&
+    timeRule.distancePct <= 3
+  ) {
+    return { state: 'near', rules, nearest: timeRule };
+  }
+
   return { state: 'clear', rules, nearest };
 }
 
@@ -364,14 +424,468 @@ export default async function handler(req, res) {
       }
 
       if (rules.state === 'breached') {
-        const hit = rules.rules.find(rule => rule.breached) || rules.nearest;
+        const hit = rules.rules.find(rule => rule.breached && rule.direction === 'below') || rules.rules.find(rule => rule.breached) || rules.nearest;
         actionItems.push({
           severity: 'ACT',
           symbol,
           title: 'Rule reached',
           detail: hit?.unit === 'days'
             ? 'Your ' + hit.type + ' has reached ' + hit.target + ' days.'
-            : 'Price $' + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of $' + hit.target.toFixed(2) + '.',
+            : 'Price 
+        const near = rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Close to your rule',
+          detail: near?.unit === 'days'
+            ? Math.max(0, Number(near.distance)) + ' days remain on your ' + near.type + '.'
+            : '$' + q.price.toFixed(2) + ' is ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + near.target.toFixed(2) + '.',
+          impact: null,
+        });
+      } else if (rules.state === 'no-rule') {
+        actionItems.push({
+          severity: 'SETUP',
+          symbol,
+          title: 'No active rule',
+          detail: 'Add a loss limit or exit rule so the dashboard can monitor this holding automatically.',
+          impact: null,
+        });
+      }
+    }
+
+    const earningsResult = await fetchEarnings(symbols);
+    const earnings = earningsResult.events;
+    for (const event of earnings.slice(0, 3)) {
+      actionItems.push({
+        severity: 'WATCH',
+        symbol: event.symbol,
+        title: event.daysUntil === 0 ? 'Earnings today' : 'Earnings in ' + event.daysUntil + ' day' + (event.daysUntil === 1 ? '' : 's'),
+        detail: event.date + (event.hour ? ' · ' + event.hour.toUpperCase() : ''),
+        impact: null,
+      });
+    }
+
+    actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
+
+    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes);
+    let benchmark = null;
+    for (const symbol of ['SPY', 'SOXX']) {
+      try {
+        const [h, q] = await Promise.all([routedHistory(symbol, '5y'), routedQuote(symbol)]);
+        benchmark = benchmark || {};
+        benchmark[symbol] = simulateSameCash(transactionRows, h, q.price);
+      } catch {}
+    }
+
+    const topHoldings = holdingRows.map(holding => {
+      const q = quotes[String(holding.symbol).toUpperCase()];
+      return {
+        symbol: String(holding.symbol).toUpperCase(),
+        value: q?.price > 0 ? q.price * Number(holding.quantity) : 0,
+      };
+    }).filter(row => row.value > 0).sort((a, b) => b.value - a.value);
+
+    const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+    const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
+
+    const semiconductorValue = holdingRows.reduce((sum, holding) => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
+      if (!isSemis) return sum;
+      const q = quotes[symbol];
+      const leverage = LEVERAGE[symbol] || 1;
+      return sum + (q?.price > 0 ? q.price * Number(holding.quantity) * leverage : 0);
+    }, 0);
+    const semiconductorShock = semiconductorValue > 0 ? -semiconductorValue * 0.15 : 0;
+
+    const portfolioRules = {
+      total: ruleStates.length,
+      breached: ruleStates.filter(row => row.state === 'breached').length,
+      targetReached: ruleStates.filter(row => row.state === 'target-reached').length,
+      near: ruleStates.filter(row => row.state === 'near').length,
+      noRule: ruleStates.filter(row => row.state === 'no-rule').length,
+      noData: ruleStates.filter(row => row.state === 'no-data').length,
+      states: ruleStates,
+    };
+
+    const forecast = await fetchForecastProgress();
+    const signalGate = await fetchSignalGate();
+
+    return res.status(200).json({
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
+      rules: portfolioRules,
+      portfolio: {
+        holdings: holdingRows.length,
+        currentValue: money(actual.currentValue),
+        netContributed: money(actual.netContributed),
+        cashFlowPnl: money(actual.pnl),
+        concentrationTop3Pct: pct(concentrationPct),
+        semiconductorShock15Pct: money(semiconductorShock),
+      },
+      benchmark,
+      earnings: earnings.slice(0, 7),
+      earningsStatus: earningsResult.status,
+      earningsError: earningsResult.reason || null,
+      forecast,
+      signalGate,
+      notes: [
+        'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
+        'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
+        'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
+        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
+      ],
+    });
+  } catch (error) {
+    console.error('decision center error:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Decision center unavailable.' });
+  }
+}
+ + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of 
+        const near = rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Close to your rule',
+          detail: near?.unit === 'days'
+            ? Math.max(0, Number(near.distance)) + ' days remain on your ' + near.type + '.'
+            : '$' + q.price.toFixed(2) + ' is ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + near.target.toFixed(2) + '.',
+          impact: null,
+        });
+      } else if (rules.state === 'no-rule') {
+        actionItems.push({
+          severity: 'SETUP',
+          symbol,
+          title: 'No active rule',
+          detail: 'Add a loss limit or exit rule so the dashboard can monitor this holding automatically.',
+          impact: null,
+        });
+      }
+    }
+
+    const earningsResult = await fetchEarnings(symbols);
+    const earnings = earningsResult.events;
+    for (const event of earnings.slice(0, 3)) {
+      actionItems.push({
+        severity: 'WATCH',
+        symbol: event.symbol,
+        title: event.daysUntil === 0 ? 'Earnings today' : 'Earnings in ' + event.daysUntil + ' day' + (event.daysUntil === 1 ? '' : 's'),
+        detail: event.date + (event.hour ? ' · ' + event.hour.toUpperCase() : ''),
+        impact: null,
+      });
+    }
+
+    actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
+
+    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes);
+    let benchmark = null;
+    for (const symbol of ['SPY', 'SOXX']) {
+      try {
+        const [h, q] = await Promise.all([routedHistory(symbol, '5y'), routedQuote(symbol)]);
+        benchmark = benchmark || {};
+        benchmark[symbol] = simulateSameCash(transactionRows, h, q.price);
+      } catch {}
+    }
+
+    const topHoldings = holdingRows.map(holding => {
+      const q = quotes[String(holding.symbol).toUpperCase()];
+      return {
+        symbol: String(holding.symbol).toUpperCase(),
+        value: q?.price > 0 ? q.price * Number(holding.quantity) : 0,
+      };
+    }).filter(row => row.value > 0).sort((a, b) => b.value - a.value);
+
+    const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+    const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
+
+    const semiconductorValue = holdingRows.reduce((sum, holding) => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
+      if (!isSemis) return sum;
+      const q = quotes[symbol];
+      const leverage = LEVERAGE[symbol] || 1;
+      return sum + (q?.price > 0 ? q.price * Number(holding.quantity) * leverage : 0);
+    }, 0);
+    const semiconductorShock = semiconductorValue > 0 ? -semiconductorValue * 0.15 : 0;
+
+    const portfolioRules = {
+      total: ruleStates.length,
+      breached: ruleStates.filter(row => row.state === 'breached').length,
+      near: ruleStates.filter(row => row.state === 'near').length,
+      noRule: ruleStates.filter(row => row.state === 'no-rule').length,
+      noData: ruleStates.filter(row => row.state === 'no-data').length,
+      states: ruleStates,
+    };
+
+    const forecast = await fetchForecastProgress();
+    const signalGate = await fetchSignalGate();
+
+    return res.status(200).json({
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
+      rules: portfolioRules,
+      portfolio: {
+        holdings: holdingRows.length,
+        currentValue: money(actual.currentValue),
+        netContributed: money(actual.netContributed),
+        cashFlowPnl: money(actual.pnl),
+        concentrationTop3Pct: pct(concentrationPct),
+        semiconductorShock15Pct: money(semiconductorShock),
+      },
+      benchmark,
+      earnings: earnings.slice(0, 7),
+      earningsStatus: earningsResult.status,
+      earningsError: earningsResult.reason || null,
+      forecast,
+      signalGate,
+      notes: [
+        'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
+        'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
+        'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
+        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
+      ],
+    });
+  } catch (error) {
+    console.error('decision center error:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Decision center unavailable.' });
+  }
+}
+ + hit.target.toFixed(2) + '.',
+          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+        });
+      } else if (rules.state === 'target-reached') {
+        const target = rules.targetReached || rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Target reached',
+          detail: 'Price 
+        const near = rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Close to your rule',
+          detail: near?.unit === 'days'
+            ? Math.max(0, Number(near.distance)) + ' days remain on your ' + near.type + '.'
+            : '$' + q.price.toFixed(2) + ' is ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + near.target.toFixed(2) + '.',
+          impact: null,
+        });
+      } else if (rules.state === 'no-rule') {
+        actionItems.push({
+          severity: 'SETUP',
+          symbol,
+          title: 'No active rule',
+          detail: 'Add a loss limit or exit rule so the dashboard can monitor this holding automatically.',
+          impact: null,
+        });
+      }
+    }
+
+    const earningsResult = await fetchEarnings(symbols);
+    const earnings = earningsResult.events;
+    for (const event of earnings.slice(0, 3)) {
+      actionItems.push({
+        severity: 'WATCH',
+        symbol: event.symbol,
+        title: event.daysUntil === 0 ? 'Earnings today' : 'Earnings in ' + event.daysUntil + ' day' + (event.daysUntil === 1 ? '' : 's'),
+        detail: event.date + (event.hour ? ' · ' + event.hour.toUpperCase() : ''),
+        impact: null,
+      });
+    }
+
+    actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
+
+    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes);
+    let benchmark = null;
+    for (const symbol of ['SPY', 'SOXX']) {
+      try {
+        const [h, q] = await Promise.all([routedHistory(symbol, '5y'), routedQuote(symbol)]);
+        benchmark = benchmark || {};
+        benchmark[symbol] = simulateSameCash(transactionRows, h, q.price);
+      } catch {}
+    }
+
+    const topHoldings = holdingRows.map(holding => {
+      const q = quotes[String(holding.symbol).toUpperCase()];
+      return {
+        symbol: String(holding.symbol).toUpperCase(),
+        value: q?.price > 0 ? q.price * Number(holding.quantity) : 0,
+      };
+    }).filter(row => row.value > 0).sort((a, b) => b.value - a.value);
+
+    const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+    const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
+
+    const semiconductorValue = holdingRows.reduce((sum, holding) => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
+      if (!isSemis) return sum;
+      const q = quotes[symbol];
+      const leverage = LEVERAGE[symbol] || 1;
+      return sum + (q?.price > 0 ? q.price * Number(holding.quantity) * leverage : 0);
+    }, 0);
+    const semiconductorShock = semiconductorValue > 0 ? -semiconductorValue * 0.15 : 0;
+
+    const portfolioRules = {
+      total: ruleStates.length,
+      breached: ruleStates.filter(row => row.state === 'breached').length,
+      near: ruleStates.filter(row => row.state === 'near').length,
+      noRule: ruleStates.filter(row => row.state === 'no-rule').length,
+      noData: ruleStates.filter(row => row.state === 'no-data').length,
+      states: ruleStates,
+    };
+
+    const forecast = await fetchForecastProgress();
+    const signalGate = await fetchSignalGate();
+
+    return res.status(200).json({
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
+      rules: portfolioRules,
+      portfolio: {
+        holdings: holdingRows.length,
+        currentValue: money(actual.currentValue),
+        netContributed: money(actual.netContributed),
+        cashFlowPnl: money(actual.pnl),
+        concentrationTop3Pct: pct(concentrationPct),
+        semiconductorShock15Pct: money(semiconductorShock),
+      },
+      benchmark,
+      earnings: earnings.slice(0, 7),
+      earningsStatus: earningsResult.status,
+      earningsError: earningsResult.reason || null,
+      forecast,
+      signalGate,
+      notes: [
+        'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
+        'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
+        'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
+        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
+      ],
+    });
+  } catch (error) {
+    console.error('decision center error:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Decision center unavailable.' });
+  }
+}
+ + q.price.toFixed(2) + ' is at/above your broker upside alert of 
+        const near = rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Close to your rule',
+          detail: near?.unit === 'days'
+            ? Math.max(0, Number(near.distance)) + ' days remain on your ' + near.type + '.'
+            : '$' + q.price.toFixed(2) + ' is ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + near.target.toFixed(2) + '.',
+          impact: null,
+        });
+      } else if (rules.state === 'no-rule') {
+        actionItems.push({
+          severity: 'SETUP',
+          symbol,
+          title: 'No active rule',
+          detail: 'Add a loss limit or exit rule so the dashboard can monitor this holding automatically.',
+          impact: null,
+        });
+      }
+    }
+
+    const earningsResult = await fetchEarnings(symbols);
+    const earnings = earningsResult.events;
+    for (const event of earnings.slice(0, 3)) {
+      actionItems.push({
+        severity: 'WATCH',
+        symbol: event.symbol,
+        title: event.daysUntil === 0 ? 'Earnings today' : 'Earnings in ' + event.daysUntil + ' day' + (event.daysUntil === 1 ? '' : 's'),
+        detail: event.date + (event.hour ? ' · ' + event.hour.toUpperCase() : ''),
+        impact: null,
+      });
+    }
+
+    actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
+
+    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes);
+    let benchmark = null;
+    for (const symbol of ['SPY', 'SOXX']) {
+      try {
+        const [h, q] = await Promise.all([routedHistory(symbol, '5y'), routedQuote(symbol)]);
+        benchmark = benchmark || {};
+        benchmark[symbol] = simulateSameCash(transactionRows, h, q.price);
+      } catch {}
+    }
+
+    const topHoldings = holdingRows.map(holding => {
+      const q = quotes[String(holding.symbol).toUpperCase()];
+      return {
+        symbol: String(holding.symbol).toUpperCase(),
+        value: q?.price > 0 ? q.price * Number(holding.quantity) : 0,
+      };
+    }).filter(row => row.value > 0).sort((a, b) => b.value - a.value);
+
+    const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+    const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
+
+    const semiconductorValue = holdingRows.reduce((sum, holding) => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
+      if (!isSemis) return sum;
+      const q = quotes[symbol];
+      const leverage = LEVERAGE[symbol] || 1;
+      return sum + (q?.price > 0 ? q.price * Number(holding.quantity) * leverage : 0);
+    }, 0);
+    const semiconductorShock = semiconductorValue > 0 ? -semiconductorValue * 0.15 : 0;
+
+    const portfolioRules = {
+      total: ruleStates.length,
+      breached: ruleStates.filter(row => row.state === 'breached').length,
+      near: ruleStates.filter(row => row.state === 'near').length,
+      noRule: ruleStates.filter(row => row.state === 'no-rule').length,
+      noData: ruleStates.filter(row => row.state === 'no-data').length,
+      states: ruleStates,
+    };
+
+    const forecast = await fetchForecastProgress();
+    const signalGate = await fetchSignalGate();
+
+    return res.status(200).json({
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
+      rules: portfolioRules,
+      portfolio: {
+        holdings: holdingRows.length,
+        currentValue: money(actual.currentValue),
+        netContributed: money(actual.netContributed),
+        cashFlowPnl: money(actual.pnl),
+        concentrationTop3Pct: pct(concentrationPct),
+        semiconductorShock15Pct: money(semiconductorShock),
+      },
+      benchmark,
+      earnings: earnings.slice(0, 7),
+      earningsStatus: earningsResult.status,
+      earningsError: earningsResult.reason || null,
+      forecast,
+      signalGate,
+      notes: [
+        'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
+        'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
+        'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
+        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
+      ],
+    });
+  } catch (error) {
+    console.error('decision center error:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Decision center unavailable.' });
+  }
+}
+ + target.target.toFixed(2) + '. Review your staged exit rule.',
           impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
         });
       } else if (rules.state === 'near') {
