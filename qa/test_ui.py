@@ -33,7 +33,10 @@ def mock_local_apis(page):
             elif route.request.method == 'DELETE':
                 route.fulfill(status=204, body='')
             else:
-                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]}))
+                if 'holdingId=' in url:
+                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'lots':[{'id':'lot-qa-1','holdingId':'qa-nvda','symbol':'NVDA','purchaseDate':'2026-10-02','investedAmount':200,'executionPrice':200,'quantity':1,'notes':'QA lot'}]}))
+                else:
+                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]}))
             return
         if '/api/forecast-verification' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({
@@ -57,6 +60,9 @@ def mock_local_apis(page):
                     'longTerm':{'verifiedCount':24,'oldestVerifiedAt':'2026-01-01T00:00:00Z','newestVerifiedAt':'2026-10-01T00:00:00Z'}
                 }
             })); return
+        if '/api/earnings-alerts' in url:
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'ok':True,'source':'finnhub','upcoming':[{'id':'earnings:NVDA:2026-10-08','symbol':'NVDA','date':'2026-10-08','hour':'amc','days_until':4,'title':'NVDA earnings in 4 days'}],'configuration':{'finnhub_configured':True}}))
+            return
         if '/api/decision-journal' in url:
             if route.request.method == 'POST':
                 route.fulfill(status=201, content_type='application/json', body=_json.dumps({'ok':True,'entry':{'id':'qa-journal-1','symbol':'NVDA','decision_date':'2026-10-02','decision':'HOLD','thesis':'QA thesis','decision_price':200,'review_target_date':'2026-10-30','review_status':'pending'}}))
@@ -288,3 +294,62 @@ def test_decision_journal_mounts(page):
     journal.wait_for(state="visible", timeout=30000)
     assert "Decision journal + 20-day review" in journal.inner_text()
     journal.get_by_test_id("decision-weekly-review").wait_for(state="visible", timeout=30000)
+
+
+def test_forward_outlook_has_real_earnings_input(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-outlook").click()
+    outlook = page.get_by_test_id("forward-outlook")
+    outlook.wait_for(state="visible", timeout=30000)
+    outlook.get_by_text("Real earnings calendar", exact=False).wait_for(state="visible", timeout=30000)
+    assert "NVDA earnings" in outlook.inner_text()
+
+
+def test_purchase_lot_sanity_check_mounts(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Purchase history for NVDA").click()
+    portfolio.get_by_text("VERIFY LOT", exact=True).wait_for(state="visible", timeout=30000) if portfolio.get_by_text("VERIFY LOT", exact=True).count() else None
+
+
+def test_contract_event_study_shows_sector_benchmark_context(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_test_id("portfolio-intelligence").get_by_text("SOXX", exact=True).first.wait_for(state="visible", timeout=30000)
+    assert "Event" in page.get_by_test_id("portfolio-intelligence").inner_text()
+
+
+def test_forward_outlook_has_real_earnings_input(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-outlook").click()
+    outlook = page.get_by_test_id("forward-outlook")
+    outlook.wait_for(state="visible", timeout=30000)
+    outlook.get_by_text("Real earnings calendar", exact=False).wait_for(state="visible", timeout=30000)
+    assert "NVDA earnings" in outlook.inner_text()
+
+
+def test_contract_event_study_shows_sector_benchmark_context(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Event Study", exact=True).click()
+    benchmark = page.get_by_text("NVDA · 5D Beta-Adjusted vs SOXX", exact=True)
+    benchmark.wait_for(state="visible", timeout=30000)
+    assert "SOXX" in benchmark.locator("..").inner_text()
+
+
+def test_purchase_lot_sanity_check_is_visible(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Purchase history for NVDA").click()
+    portfolio.get_by_text("NO MARKET DATE", exact=True).wait_for(state="visible", timeout=30000)

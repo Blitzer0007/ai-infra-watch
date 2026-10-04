@@ -1,10 +1,12 @@
 import { PORTFOLIO_POSITIONS, type PortfolioPosition } from './portfolioPositions';
 
 export type ExposureLevel = 'Direct' | 'Secondary' | 'Limited';
+export type ExposureAssessment = 'assessed' | 'not_assessed';
 export type MacroScenario = 'taiwan' | 'power' | 'export';
 
 export type ExposureEvidenceItem = {
   level: ExposureLevel;
+  assessment: ExposureAssessment;
   basis: string;
   sourceCounts: {
     profile: number;
@@ -131,6 +133,7 @@ export function deriveExposure(
 
   const score = Math.min(1, baselineScore * 0.72 + evidenceBonus);
   const level = toLevel(score);
+  const assessed = Boolean(BASELINE[symbolUpper]?.[scenario]) || uniqueHits.length > 0;
 
   const basis = uniqueHits.length
     ? uniqueHits.slice(0, 4).join(', ')
@@ -138,6 +141,7 @@ export function deriveExposure(
 
   return {
     level,
+    assessment: assessed ? 'assessed' : 'not_assessed',
     basis,
     sourceCounts: {
       profile: profileHits.length,

@@ -33,6 +33,9 @@ type Reaction = {
   spyT1: number | null;
   spyT5: number | null;
   spyT20: number | null;
+  soxxT5: number | null;
+  beta60: number | null;
+  abnormalT5: number | null;
 };
 
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
@@ -76,6 +79,7 @@ function firstOnOrAfter(history: HistoryPoint[], date: string): HistoryPoint | n
 function calculateReaction(
   history: HistoryPoint[],
   spy: HistoryPoint[],
+  soxx: HistoryPoint[],
   eventDate: string,
   acceptedDateTime?: string | null
 ): Reaction | null {
@@ -110,6 +114,9 @@ function calculateReaction(
     spyT1: spyEvent ? pct(spyEvent.price, spyForward(1)?.price ?? null) : null,
     spyT5: spyEvent ? pct(spyEvent.price, spyForward(5)?.price ?? null) : null,
     spyT20: spyEvent ? pct(spyEvent.price, spyForward(20)?.price ?? null) : null,
+    soxxT5: (() => { const e = firstOnOrAfter(soxx, referenceDate); const i = e ? soxx.findIndex(p => p.date === e.date) : -1; return i >= 0 ? pct(soxx[i]?.price ?? null, soxx[i + 5]?.price ?? null) : null; })(),
+    beta60: betaBeforeEvent(history, soxx, event.date),
+    abnormalT5: null,
   };
 }
 
@@ -131,10 +138,39 @@ function relative(stock: number | null, benchmark: number | null): number | null
   return stock == null || benchmark == null ? null : stock - benchmark;
 }
 
+function betaBeforeEvent(stock: HistoryPoint[], benchmark: HistoryPoint[], eventDate: string, lookback = 60): number | null {
+  const stockByDate = new Map(stock.map(point => [point.date, point.price]));
+  const benchByDate = new Map(benchmark.map(point => [point.date, point.price]));
+  const dates = [...new Set(benchmark.map(point => point.date))]
+    .filter(date => date < eventDate && stockByDate.has(date) && benchByDate.has(date))
+    .sort()
+    .slice(-(lookback + 1));
+  if (dates.length < 12) return null;
+  const stockReturns = [], benchReturns = [];
+  for (let i = 1; i < dates.length; i++) {
+    const sp = Number(stockByDate.get(dates[i - 1]));
+    const sn = Number(stockByDate.get(dates[i]));
+    const bp = Number(benchByDate.get(dates[i - 1]));
+    const bn = Number(benchByDate.get(dates[i]));
+    if (!(sp > 0 && sn > 0 && bp > 0 && bn > 0)) continue;
+    stockReturns.push(sn / sp - 1); benchReturns.push(bn / bp - 1);
+  }
+  if (stockReturns.length < 10) return null;
+  const meanS = stockReturns.reduce((a,b)=>a+b,0) / stockReturns.length;
+  const meanB = benchReturns.reduce((a,b)=>a+b,0) / benchReturns.length;
+  const variance = benchReturns.reduce((sum,v)=>sum + (v-meanB) ** 2, 0);
+  if (variance <= 0) return null;
+  const covariance = stockReturns.reduce((sum,v,i)=>sum + (v-meanS) * (benchReturns[i]-meanB), 0);
+  const beta = covariance / variance;
+  return Number.isFinite(beta) ? beta : null;
+}
+
+
 export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   const [events, setEvents] = useState<SecEvent[]>([]);
   const [stockHistory, setStockHistory] = useState<HistoryPoint[]>([]);
   const [spyHistory, setSpyHistory] = useState<HistoryPoint[]>([]);
+  const [soxxHistory, setSoxxHistory] = useState<HistoryPoint[]>([]);
   const [categoryFilter, setCategoryFilter] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('event_symbol') === symbol ? (params.get('event_category') || 'all') : 'all';
@@ -175,10 +211,11 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       setError(null);
 
       try {
-        const [sec, stock, spy] = await Promise.all([
+        const [sec, stock, spy, soxx] = await Promise.all([
           loadSecEvents(ticker),
           loadHistory(ticker),
           loadHistory('SPY'),
+          loadHistory('SOXX'),
         ]);
 
         if (cancelled) return;
@@ -186,6 +223,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
         setEvents(sec);
         setStockHistory(stock);
         setSpyHistory(spy);
+        setSoxxHistory(soxx);
 
         if (!stock.length) {
           setError('No verified market history was returned for this ticker.');
@@ -195,6 +233,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           setEvents([]);
           setStockHistory([]);
           setSpyHistory([]);
+          setSoxxHistory([]);
           setError(err instanceof Error ? err.message : 'Event study unavailable');
         }
       } finally {
@@ -212,9 +251,9 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
     () =>
       events.map((event) => ({
         event,
-        reaction: calculateReaction(stockHistory, spyHistory, event.date, event.acceptedDateTime),
+        reaction: (() => { const value = calculateReaction(stockHistory, spyHistory, soxxHistory, event.date, event.acceptedDateTime); if (!value) return null; return { ...value, abnormalT5: value.t5 != null && value.soxxT5 != null && value.beta60 != null ? value.t5 - value.beta60 * value.soxxT5 : null }; })(),
       })),
-    [events, stockHistory, spyHistory]
+    [events, stockHistory, spyHistory, soxxHistory]
   );
 
   const categories = useMemo(() => {
@@ -259,33 +298,28 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   );
 
   const summary = useMemo(() => {
-    const valid = rows
-      .map((row) => row.reaction)
-      .filter((value): value is Reaction => Boolean(value));
-
-    const t1Values = valid
-      .map((row) => row.t1)
-      .filter((value): value is number => value != null);
-
-    const relativeT1Values = valid
-      .map((row) => relative(row.t1, row.spyT1))
-      .filter((value): value is number => value != null);
-
+    const valid = rows.map((row) => row.reaction).filter((value): value is Reaction => Boolean(value));
+    const values = (key: 't1' | 'relativeT1' | 'abnormalT5' | 'beta60') => valid.map(row => {
+      if (key === 'relativeT1') return relative(row.t1, row.spyT1);
+      return row[key];
+    }).filter((value): value is number => value != null && Number.isFinite(value));
+    const t1 = summarizeSample(values('t1'));
+    const relativeT1 = summarizeSample(values('relativeT1'));
+    const abnormal = summarizeSample(values('abnormalT5'));
+    const betaValues = values('beta60');
     return {
       events: valid.length,
-      ...(() => {
-        const t1 = summarizeSample(t1Values);
-        const relativeT1 = summarizeSample(relativeT1Values);
-        return {
-          avgT1: t1.mean,
-          medianT1: t1.median,
-          n: t1.n,
-          quality: t1.quality,
-          avgRelativeT1: relativeT1.mean,
-          medianRelativeT1: relativeT1.median,
-          relativeN: relativeT1.n,
-        };
-      })(),
+      avgT1: t1.mean,
+      medianT1: t1.median,
+      n: t1.n,
+      quality: t1.quality,
+      avgRelativeT1: relativeT1.mean,
+      medianRelativeT1: relativeT1.median,
+      relativeN: relativeT1.n,
+      avgAbnormalT5: abnormal.mean,
+      medianAbnormalT5: abnormal.median,
+      abnormalN: abnormal.n,
+      avgBeta60: betaValues.length ? betaValues.reduce((a,b)=>a+b,0) / betaValues.length : null,
     };
   }, [rows]);
 
@@ -321,6 +355,10 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           average_next_trading_day_vs_spy_pct_points: summary.avgRelativeT1,
           median_next_trading_day_vs_spy_pct_points: summary.medianRelativeT1,
           vs_spy_sample_size: summary.relativeN,
+          average_5d_beta_adjusted_vs_soxx_pct_points: summary.avgAbnormalT5,
+          median_5d_beta_adjusted_vs_soxx_pct_points: summary.medianAbnormalT5,
+          beta_sample_size: summary.abnormalN,
+          average_pre_event_beta_60d: summary.avgBeta60,
           categories: categories.slice(0, 8),
           recent_events: events.slice(0, 8).map((event) => ({
             date: event.date,
@@ -363,6 +401,12 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           value={formatPct(summary.avgRelativeT1)}
           suffix={`pts vs SPY · n=${summary.relativeN} · median ${formatPct(summary.medianRelativeT1)}`}
           valueClass={tone(summary.avgRelativeT1)}
+        />
+        <Metric
+          label={symbol.toUpperCase() + ' · 5D Beta-Adjusted vs SOXX'}
+          value={formatPct(summary.avgAbnormalT5)}
+          suffix={'pts · n=' + summary.abnormalN + ' · beta ' + (summary.avgBeta60 == null ? '—' : summary.avgBeta60.toFixed(2))}
+          valueClass={tone(summary.avgAbnormalT5)}
         />
       </div>
 
@@ -426,7 +470,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
                 { key: 't1', header: 'Next Trading Day', accessor: row => row.reaction?.t1 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t1 ?? null)}>{formatPct(row.reaction?.t1 ?? null)}</span> },
                 { key: 't5', header: '5th Trading Day', accessor: row => row.reaction?.t5 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t5 ?? null)}>{formatPct(row.reaction?.t5 ?? null)}</span> },
                 { key: 't20', header: '20th Trading Day', accessor: row => row.reaction?.t20 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.t20 ?? null)}>{formatPct(row.reaction?.t20 ?? null)}</span> },
-                { key: 'relative', header: 'Next Day vs Market', accessor: row => row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null, type: 'percent', align: 'right', render: row => { const value = row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null; return <span className={'font-bold ' + tone(value)}>{formatPct(value)}</span>; } }
+                { key: 'relative', header: 'Next Day vs SPY', accessor: row => row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null, type: 'percent', align: 'right', render: row => { const value = row.reaction ? relative(row.reaction.t1, row.reaction.spyT1) : null; return <span className={'font-bold ' + tone(value)}>{formatPct(value)}</span>; } },
+                { key: 'abnormal', header: '5D Beta-Adj vs SOXX', accessor: row => row.reaction?.abnormalT5 ?? null, type: 'percent', align: 'right', render: row => <span className={'font-bold ' + tone(row.reaction?.abnormalT5 ?? null)}>{formatPct(row.reaction?.abnormalT5 ?? null)}</span> }
               ] satisfies DataTableColumn<(typeof visibleRows)[number]>[]}
             />
           </div>

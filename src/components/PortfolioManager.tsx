@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Save, Trash2, X, ShieldAlert } from 'lucide-react';
 import {
   addPortfolioPurchase,
   createPortfolioHolding,
@@ -26,6 +26,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase);
   const [purchaseBusy, setPurchaseBusy] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
+  const [lotChecks, setLotChecks] = useState<Record<string, { status: 'ok' | 'warn' | 'missing'; message: string }>>({});
 
   const edit = (h: StoredPortfolioHolding) => {
     setEditing(h);
@@ -39,7 +40,37 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
     setExpandedId(h.id);
     setPurchaseError('');
     try {
-      setLots(await fetchPortfolioPurchaseLots(h.id));
+      const loadedLots = await fetchPortfolioPurchaseLots(h.id);
+      setLots(loadedLots);
+      try {
+        const response = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(h.symbol) + '&range=1y', { cache: 'no-store' });
+        const body = await response.json().catch(() => ({}));
+        const points = Array.isArray(body?.points) ? body.points : [];
+        const checks: Record<string, { status: 'ok' | 'warn' | 'missing'; message: string }> = {};
+        for (const lot of loadedLots) {
+          if (!lot.purchaseDate) {
+            checks[lot.id] = { status: 'warn', message: 'Purchase date missing.' };
+            continue;
+          }
+          const weekday = new Date(lot.purchaseDate + 'T00:00:00Z').getUTCDay();
+          if (weekday === 0 || weekday === 6) {
+            checks[lot.id] = { status: 'warn', message: 'Purchase date falls on a weekend; verify the broker execution date.' };
+            continue;
+          }
+          const close = points.find((point: any) => point.date === lot.purchaseDate)?.price;
+          if (!(Number(close) > 0)) {
+            checks[lot.id] = { status: 'missing', message: 'No market close found for this purchase date.' };
+            continue;
+          }
+          const deviation = Math.abs(Number(lot.executionPrice) / Number(close) - 1) * 100;
+          checks[lot.id] = deviation > 20
+            ? { status: 'warn', message: 'Execution price is ' + deviation.toFixed(1) + '% from that day\'s close; verify price, currency or split handling.' }
+            : { status: 'ok', message: 'Execution price is within 20% of that day\'s close.' };
+        }
+        setLotChecks(checks);
+      } catch {
+        setLotChecks({});
+      }
     } catch (e) {
       setPurchaseError(e instanceof Error ? e.message : 'Unable to load purchase history.');
     }
@@ -164,7 +195,13 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
                 <div className="text-[10px] font-bold">{lot.purchaseDate || 'Date not set'} · ${lot.investedAmount.toFixed(2)} invested</div>
                 <div className="text-[9px] text-white/30 mt-0.5">{lot.quantity.toFixed(8)} shares @ ${lot.executionPrice.toFixed(2)}{lot.notes ? ' · '+lot.notes : ''}</div>
               </div>
-              <div className="text-[9px] font-mono text-emerald-300/70">{((lot.quantity * lot.executionPrice)).toFixed(2)} basis</div>
+              <div className="text-right">
+                <div className="text-[9px] font-mono text-emerald-300/70">{((lot.quantity * lot.executionPrice)).toFixed(2)} basis</div>
+                {lotChecks[lot.id] && <div className={'mt-1 inline-flex items-center gap-1 text-[8px] font-mono ' + (lotChecks[lot.id].status === 'warn' ? 'text-amber-200' : lotChecks[lot.id].status === 'missing' ? 'text-white/30' : 'text-emerald-200')} title={lotChecks[lot.id].message}>
+                  {lotChecks[lot.id].status !== 'ok' && <ShieldAlert className="w-3 h-3" />}
+                  {lotChecks[lot.id].status === 'ok' ? 'SANITY OK' : lotChecks[lot.id].status === 'warn' ? 'VERIFY LOT' : 'NO MARKET DATE'}
+                </div>}
+              </div>
             </div>)}
           </div>
         </div>}

@@ -98,9 +98,9 @@ function PortfolioScenarioSensitivity({
           columns={[
             { key: 'symbol', header: 'Holding', accessor: row => row.symbol },
             { key: 'weight', header: 'Portfolio wt.', accessor: row => row.portfolioWeight, type: 'percent', align: 'right', render: row => row.portfolioWeight.toFixed(1) + '%' },
-            { key: 'taiwan', header: 'TSMC', accessor: row => row.taiwan.level, align: 'center', render: row => <ExposurePill level={row.taiwan.level} basis={row.taiwan.basis} /> },
-            { key: 'power', header: 'Power', accessor: row => row.power.level, align: 'center', render: row => <ExposurePill level={row.power.level} basis={row.power.basis} /> },
-            { key: 'export', header: 'Export', accessor: row => row.export.level, align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
+            { key: 'taiwan', header: 'TSMC', accessor: row => row.taiwan.level, align: 'center', render: row => <ExposurePill level={row.taiwan.level} assessment={row.taiwan.assessment} basis={row.taiwan.basis} /> },
+            { key: 'power', header: 'Power', accessor: row => row.power.level, align: 'center', render: row => <ExposurePill level={row.power.level} assessment={row.power.assessment} basis={row.power.basis} /> },
+            { key: 'export', header: 'Export', accessor: row => row.export.level, align: 'center', render: row => <ExposurePill level={row.export.level} assessment={row.export.assessment} basis={row.export.basis} /> },
             { key: 'sensitivity', header: 'Sensitivity', accessor: row => row.sensitivity, type: 'number', align: 'right', render: row => row.sensitivity + '/100' },
             { key: 'contribution', header: 'Weighted contribution', accessor: row => row.weightedContribution, type: 'number', align: 'right', render: row => row.weightedContribution.toFixed(1) },
           ]}
@@ -108,19 +108,23 @@ function PortfolioScenarioSensitivity({
       </div>
 
       <div className="text-[9px] text-white/25 font-mono mt-3">
-        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Portfolio weighting uses invested capital.
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. "Not assessed" is used when no baseline or matching evidence exists. Portfolio weighting uses invested capital.
       </div>
     </div>
   );
 }
 
-function ExposurePill({ level, basis }: { level: ExposureLevel; basis?: string }) {
+function ExposurePill({ level, basis, assessment = 'assessed' }: { level: ExposureLevel; basis?: string; assessment?: 'assessed' | 'not_assessed' }) {
+  const displayLevel = assessment === 'not_assessed' ? 'Not assessed' : level;
+  const className = assessment === 'not_assessed'
+    ? 'bg-white/5 text-white/35 border-white/10'
+    : exposureClass(level);
   return (
     <span
       title={basis ? 'Evidence basis: ' + basis : undefined}
-      className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + exposureClass(level)}
+      className={'inline-flex px-2 py-1 rounded border text-[9px] uppercase font-bold ' + className}
     >
-      {level}
+      {displayLevel}
     </span>
   );
 }
