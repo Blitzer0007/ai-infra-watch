@@ -14,12 +14,12 @@ type EarningsRow = {
 
 type TimelineEvent = {
   id: string;
-  kind: 'SEC' | 'Contract' | 'Earnings' | 'Congress' | 'Macro' | 'News' | 'Political';
+  kind: 'SEC' | 'Contract' | 'Earnings' | 'Congress' | 'Macro' | 'News' | 'Political' | 'Autopilot';
   date: string;
   title: string;
   detail: string;
   source: string;
-  sourceLevel: 'PRIMARY' | 'PUBLIC DISCLOSURE' | 'RISK LEDGER' | 'NEWS' | 'POLICY COVERAGE';
+  sourceLevel: 'PRIMARY' | 'PUBLIC DISCLOSURE' | 'RISK LEDGER' | 'NEWS' | 'POLICY COVERAGE' | 'PLATFORM SOCIAL';
   url?: string | null;
 };
 
@@ -76,6 +76,33 @@ async function loadEarningsEvents(symbol: string): Promise<TimelineEvent[]> {
     }).filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
   } catch {
     return [];
+  }
+}
+
+async function loadAutopilotEvents(symbol: string): Promise<{ events: TimelineEvent[]; undated: number }> {
+  try {
+    const response = await fetch('/api/autopilot-signals?limit=12', { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return { events: [], undated: 0 };
+    const rows = Array.isArray(payload?.signals) ? payload.signals : [];
+    const ticker = symbol.toUpperCase();
+    const relevant = rows.filter((row: any) => Array.isArray(row?.tickers) && row.tickers.map((value: unknown) => String(value).toUpperCase()).includes(ticker));
+    const undated = relevant.filter((row: any) => !/^\d{4}-\d{2}-\d{2}/.test(String(row?.publishedAt || ''))).length;
+    const events = relevant
+      .map((row: any, index: number): TimelineEvent => ({
+        id: 'autopilot-' + String(row?.url || row?.title || index),
+        kind: 'Autopilot',
+        date: String(row?.publishedAt || '').slice(0, 10),
+        title: String(row?.title || 'Autopilot platform signal'),
+        detail: String(row?.snippet || 'Public Autopilot platform/social signal associated with the selected holding.'),
+        source: 'Autopilot / X',
+        sourceLevel: row?.official ? 'PLATFORM SOCIAL' : 'NEWS',
+        url: row?.url || null,
+      }))
+      .filter((item: TimelineEvent) => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
+    return { events, undated };
+  } catch {
+    return { events: [], undated: 0 };
   }
 }
 
@@ -145,6 +172,7 @@ function sourceLevel(kind: TimelineEvent['kind']): TimelineEvent['sourceLevel'] 
   if (kind === 'Congress') return 'PUBLIC DISCLOSURE';
   if (kind === 'Macro') return 'RISK LEDGER';
   if (kind === 'Political') return 'POLICY COVERAGE';
+  if (kind === 'Autopilot') return 'PLATFORM SOCIAL';
   return 'NEWS';
 }
 
@@ -188,6 +216,7 @@ function evidenceBadge(level: TimelineEvent['sourceLevel']): string {
   if (level === 'PUBLIC DISCLOSURE') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
   if (level === 'RISK LEDGER') return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
   if (level === 'POLICY COVERAGE') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
+  if (level === 'PLATFORM SOCIAL') return 'border-fuchsia-400/20 bg-fuchsia-400/5 text-fuchsia-300';
   return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
 }
 
@@ -195,7 +224,7 @@ function iconFor(kind: TimelineEvent['kind']) {
   if (kind === 'SEC' || kind === 'Earnings') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Contract') return <FileText className="w-3.5 h-3.5" />;
   if (kind === 'Congress') return <Landmark className="w-3.5 h-3.5" />;
-  if (kind === 'Macro' || kind === 'Political') return <Globe2 className="w-3.5 h-3.5" />;
+  if (kind === 'Macro' || kind === 'Political' || kind === 'Autopilot') return <Globe2 className="w-3.5 h-3.5" />;
   return <Newspaper className="w-3.5 h-3.5" />;
 }
 
@@ -206,6 +235,7 @@ export default function UnifiedEventTimeline({
   macroRisks = [],
   news = [],
   politicalSignals = [],
+  purchaseDate = null,
 }: {
   symbol: string;
   contracts?: any[];
@@ -213,13 +243,16 @@ export default function UnifiedEventTimeline({
   macroRisks?: any[];
   news?: any[];
   politicalSignals?: any[];
+  purchaseDate?: string | null;
 }) {
   const [secEvents, setSecEvents] = useState<TimelineEvent[]>([]);
   const [earningsEvents, setEarningsEvents] = useState<TimelineEvent[]>([]);
+  const [autopilotEvents, setAutopilotEvents] = useState<TimelineEvent[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [spy, setSpy] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [kindFilter, setKindFilter] = useState<'ALL' | TimelineEvent['kind']>('ALL');
+  const [autopilotUndated, setAutopilotUndated] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,13 +260,15 @@ export default function UnifiedEventTimeline({
     if (!ticker) return;
 
     setLoading(true);
-    Promise.all([loadSecEvents(ticker), loadEarningsEvents(ticker), loadHistory(ticker), loadHistory('SPY')])
-      .then(([sec, earnings, stock, benchmark]) => {
+    Promise.all([loadSecEvents(ticker), loadEarningsEvents(ticker), loadHistory(ticker), loadHistory('SPY'), loadAutopilotEvents(ticker)])
+      .then(([sec, earnings, stock, benchmark, autopilot]) => {
         if (cancelled) return;
         setSecEvents(sec);
         setEarningsEvents(earnings);
         setHistory(stock);
         setSpy(benchmark);
+        setAutopilotUndated(autopilot.undated);
+        setAutopilotEvents(autopilot.events);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -315,11 +350,11 @@ export default function UnifiedEventTimeline({
       }))
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
-    return [...secEvents, ...earningsEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents]
+    return [...secEvents, ...earningsEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents, ...autopilotEvents]
       .filter(event => event.date <= new Date().toISOString().slice(0, 10))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 16);
-  }, [symbol, secEvents, earningsEvents, contracts, congressTrades, macroRisks, news, politicalSignals]);
+  }, [symbol, secEvents, earningsEvents, contracts, congressTrades, macroRisks, news, politicalSignals, autopilotEvents]);
 
   const filteredEvents = useMemo(
     () => kindFilter === 'ALL' ? events : events.filter(event => event.kind === kindFilter),
@@ -346,7 +381,7 @@ export default function UnifiedEventTimeline({
     : null;
 
   const impactMatrix = useMemo(() => {
-    const kinds: TimelineEvent['kind'][] = ['Contract', 'SEC', 'Earnings', 'Political', 'Congress', 'Macro', 'News'];
+    const kinds: TimelineEvent['kind'][] = ['Contract', 'SEC', 'Earnings', 'Political', 'Congress', 'Macro', 'News', 'Autopilot'];
     return kinds
       .map(kind => {
         const kindRows = events
@@ -385,7 +420,7 @@ export default function UnifiedEventTimeline({
           </div>
           <h2 className="text-lg font-black mt-1">What happened → Evidence → What followed</h2>
           <p className="text-[10px] text-white/35 mt-1 max-w-3xl">
-            Aligns SEC events, contracts, earnings, political/policy signals, public transaction disclosures, macro indicators and matched news with next trading day / 5th-trading-day / 20th-trading-day reactions. These are descriptive post-event windows, not causal attribution.
+            Aligns dated SEC events, contracts, earnings, political/policy signals, public transaction disclosures, macro indicators, matched news and dated Autopilot platform signals with next trading day / 5th-trading-day / 20th-trading-day reactions. Analyst/executive snapshots remain research context unless they have a dated event; these windows are descriptive, not causal attribution.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 min-w-[230px]">
@@ -447,6 +482,12 @@ export default function UnifiedEventTimeline({
         )}
       </div>
 
+      {autopilotUndated > 0 && !loading && (
+        <div className="mb-3 rounded-lg border border-fuchsia-400/10 bg-fuchsia-400/[.025] px-3 py-2 text-[8px] font-mono text-white/35">
+          {autopilotUndated} relevant Autopilot signal{autopilotUndated === 1 ? '' : 's'} had no published date. They remain evidence context but are not assigned a historical price reaction window.
+        </div>
+      )}
+
       {loading && (
         <div className="text-[10px] font-mono text-white/35 py-4">Loading event history + market benchmark…</div>
       )}
@@ -503,7 +544,14 @@ export default function UnifiedEventTimeline({
                         )}
                       </div>
                     </td>
-                    <td className="p-3 whitespace-nowrap text-white/50">{event.date}</td>
+                    <td className="p-3 whitespace-nowrap text-white/50">
+                      <div>{event.date}</div>
+                      {purchaseDate && (
+                        <div className={'mt-1 text-[7px] font-mono uppercase ' + (event.date < purchaseDate ? 'text-white/20' : 'text-emerald-300/45')}>
+                          {event.date < purchaseDate ? 'Before first purchase' : 'After first purchase'}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-3 text-right text-white">
                       {reaction?.eventPrice == null ? '—' : '$' + reaction.eventPrice.toFixed(2)}
                     </td>

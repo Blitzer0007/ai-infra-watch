@@ -203,6 +203,89 @@ function returnMap(history: HistoricalPricePoint[]) {
   }
   return map;
 }
+export function buildPortfolioDailySeriesFromTransactions(
+  histories: Record<string, HistoricalPricePoint[]>,
+  transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
+  days = 30,
+): PortfolioDailyPoint[] {
+  const symbolFilter = new Set(Object.keys(histories).map(symbol => symbol.toUpperCase()));
+  const cleanHistories = Object.fromEntries(
+    Object.entries(histories).filter(([symbol]) => symbolFilter.has(symbol.toUpperCase())),
+  ) as Record<string, HistoricalPricePoint[]>;
+  const dates = [...new Set(Object.values(cleanHistories).flatMap(history => history.map(point => point.date)))].sort();
+  const activeDates = dates.slice(-Math.max(1, days + 1));
+  const priceMaps = Object.fromEntries(
+    Object.entries(cleanHistories).map(([symbol, history]) => [
+      symbol.toUpperCase(),
+      new Map(history.map(point => [point.date, Number(point.price)])),
+    ]),
+  ) as Record<string, Map<string, number>>;
+
+  const quantities: Record<string, number> = {};
+  const orderedTransactions = [...transactions].sort(
+    (a, b) => a.tradeDate.localeCompare(b.tradeDate) || Number(a.sourceRow || 0) - Number(b.sourceRow || 0),
+  );
+  let transactionIndex = 0;
+  const result: PortfolioDailyPoint[] = [];
+
+  for (let i = 0; i < activeDates.length; i++) {
+    const date = activeDates[i];
+    while (transactionIndex < orderedTransactions.length && orderedTransactions[transactionIndex].tradeDate < date) {
+      const row = orderedTransactions[transactionIndex++];
+      const symbol = String(row.symbol || '').toUpperCase();
+      const quantity = Number(row.quantity);
+      if (!symbolFilter.has(symbol) || !(quantity > 0)) continue;
+      quantities[symbol] = row.transactionType === 'SELL'
+        ? Math.max(0, (quantities[symbol] ?? 0) - quantity)
+        : (quantities[symbol] ?? 0) + quantity;
+    }
+
+    if (i > 0) {
+      const previousDate = activeDates[i - 1];
+      const rows = Object.entries(quantities)
+        .map(([symbol, quantity]) => {
+          const previousPrice = priceMaps[symbol]?.get(previousDate);
+          const currentPrice = priceMaps[symbol]?.get(date);
+          if (!(quantity > 0 && previousPrice > 0 && currentPrice > 0)) return null;
+          const value = quantity * previousPrice;
+          return { symbol, move: (currentPrice / previousPrice - 1) * 100, value };
+        })
+        .filter((row): row is { symbol: string; move: number; value: number } => row != null && Number.isFinite(row.move) && row.value > 0);
+      const totalValue = rows.reduce((sum, row) => sum + row.value, 0);
+      if (rows.length && totalValue > 0) {
+        const returnPct = rows.reduce((sum, row) => sum + row.move * (row.value / totalValue), 0);
+        const breadth = rows.reduce((sum, row) => sum + (row.move >= 0 ? row.value / totalValue : 0), 0);
+        const stressScore = Math.round(clamp((1 - breadth) * 40 + clamp((-returnPct / 5) * 30, 0, 30), 0, 100));
+        result.push({ date, returnPct, stressScore });
+      }
+    }
+
+    while (transactionIndex < orderedTransactions.length && orderedTransactions[transactionIndex].tradeDate === date) {
+      const row = orderedTransactions[transactionIndex++];
+      const symbol = String(row.symbol || '').toUpperCase();
+      const quantity = Number(row.quantity);
+      if (!symbolFilter.has(symbol) || !(quantity > 0)) continue;
+      quantities[symbol] = row.transactionType === 'SELL'
+        ? Math.max(0, (quantities[symbol] ?? 0) - quantity)
+        : (quantities[symbol] ?? 0) + quantity;
+    }
+  }
+  return result.slice(-Math.max(1, days));
+}
+
+export function buildPortfolioPerformanceIndexFromTransactions(
+  histories: Record<string, HistoricalPricePoint[]>,
+  transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
+): PortfolioHistoryValuePoint[] {
+  const daily = buildPortfolioDailySeriesFromTransactions(histories, transactions, 3650);
+  if (!daily.length) return [];
+  let indexed = 100;
+  return daily.map((row) => {
+    indexed *= 1 + row.returnPct / 100;
+    return { date: row.date, value: indexed, normalizedValue: indexed };
+  });
+}
+
 
 export function buildPortfolioDailySeries(
   histories: Record<string, HistoricalPricePoint[]>,

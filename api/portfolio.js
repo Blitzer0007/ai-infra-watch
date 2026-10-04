@@ -51,6 +51,27 @@ function normalizeLot(row) {
   };
 }
 
+function normalizeTransaction(row) {
+  return {
+    id: row.id,
+    symbol: String(row.symbol).toUpperCase(),
+    transactionType: row.transaction_type === 'SELL' ? 'SELL' : 'BUY',
+    orderType: row.order_type || null,
+    tradeDate: row.trade_date,
+    orderPlacedAt: row.order_placed_at || null,
+    orderExecutedAt: row.order_executed_at || null,
+    quantity: Number(row.quantity),
+    price: row.price == null ? null : Number(row.price),
+    amount: Number(row.amount),
+    brokerage: row.brokerage == null ? null : Number(row.brokerage),
+    source: row.source || 'broker_order_report',
+    sourceRow: Number(row.source_row),
+    quantityDerived: Boolean(row.quantity_derived),
+    priceDerived: Boolean(row.price_derived),
+    createdAt: row.created_at,
+  };
+}
+
 function normalize(row) {
   return {
     id: row.id,
@@ -80,6 +101,15 @@ export default async function handler(req, res) {
       }
       const rows = await supabase('portfolio_holdings?select=*&order=symbol.asc', { method: 'GET' });
       const holdings = rows.map(normalize).filter(holding => holding.quantity > 0);
+      if (String(req.query?.includeTransactions || '') === 'true') {
+        const transactionRows = await supabase('portfolio_transactions?select=*&order=trade_date.asc,source_row.asc', { method: 'GET' });
+        return res.status(200).json({
+          holdings,
+          transactions: transactionRows.map(normalizeTransaction),
+          persistent: true,
+          source: 'supabase',
+        });
+      }
       if (String(req.query?.includeLots || '') === 'true') {
         const lots = await supabase('portfolio_purchase_lots?select=*&order=purchase_date.asc,created_at.asc', { method: 'GET' });
         const byHolding = new Map();

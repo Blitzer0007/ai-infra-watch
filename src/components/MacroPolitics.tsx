@@ -6,6 +6,7 @@ import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/por
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
 import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
+import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 
 interface MacroPoliticsProps {
   liveRisks?: MacroRisk[];
@@ -455,6 +456,8 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
       />
 
       <PoliticalSignalsFeed signals={politicalSignals} />
+
+      <AutopilotSignalsPanel />
 
       <ExecutiveSignalsPanel />
 

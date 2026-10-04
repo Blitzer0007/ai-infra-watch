@@ -25,6 +25,7 @@ export type PortfolioPosition = {
   purchaseDate?: string | null;
   purchaseLotCount?: number;
   firstPurchaseDate?: string | null;
+  currentLotFirstPurchaseDate?: string | null;
   holdingPeriodDays?: number | null;
 };
 
@@ -63,10 +64,11 @@ export const PORTFOLIO_POSITIONS: PortfolioPosition[] = [];
 function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
   const meta = STOCK_UNIVERSE.find(item => item.symbol === holding.symbol);
   const lots: PortfolioPurchaseLot[] = Array.isArray(holding.purchaseLots) ? holding.purchaseLots : [];
-  const firstPurchaseDate = lots
+  const currentLotFirstPurchaseDate = lots
     .map(lot => lot.purchaseDate)
     .filter((value): value is string => Boolean(value))
-    .sort()[0] ?? holding.purchaseDate ?? null;
+    .sort()[0] ?? null;
+  const firstPurchaseDate = holding.purchaseDate ?? currentLotFirstPurchaseDate ?? null;
   const holdingPeriodDays = firstPurchaseDate
     ? Math.max(0, Math.floor((Date.now() - new Date(firstPurchaseDate + 'T00:00:00Z').getTime()) / 86400000))
     : null;
@@ -94,6 +96,7 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     purchaseDate: firstPurchaseDate,
     purchaseLotCount: lots.length,
     firstPurchaseDate,
+    currentLotFirstPurchaseDate,
     holdingPeriodDays,
   };
 }

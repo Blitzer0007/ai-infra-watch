@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Zap } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 import type { Contract, CongressTrade, MacroRisk } from '../types';
@@ -24,9 +24,10 @@ type Props = {
   macroRisks?: MacroRisk[];
   news?: NewsItem[];
   politicalSignals?: PoliticalSignal[];
+  heldSymbols?: string[];
 };
 
-const PORTFOLIO_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
+const PORTFOLIO_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS', 'RKLB'];
 
 const MACRO_HOLDINGS: Record<string, string[]> = {
   taiwan: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
@@ -34,8 +35,8 @@ const MACRO_HOLDINGS: Record<string, string[]> = {
   power: ['DGXX', 'NBIS', 'VIVO', 'META', 'NOW'],
 };
 
-function symbols(values: string[]) {
-  return [...new Set(values.filter(value => PORTFOLIO_SYMBOLS.includes(value)))];
+function symbols(values: string[], allowed = PORTFOLIO_SYMBOLS) {
+  return [...new Set(values.map(value => String(value).toUpperCase()).filter(value => allowed.includes(value)))];
 }
 
 function date(value?: string) {
@@ -60,6 +61,11 @@ function newsSymbols(title: string) {
 }
 
 function evidenceProfile(kind: string, source: string, sourceType?: string) {
+  if (kind === 'Autopilot') {
+    return sourceType === 'primary'
+      ? { level: 'PRIMARY', note: 'Official Autopilot public social source' }
+      : { level: 'NEWS', note: 'Secondary Autopilot-related coverage' };
+  }
   if (kind === 'Political') {
     return sourceType === 'primary'
       ? { level: 'PRIMARY', note: 'Primary official source' }
@@ -86,6 +92,7 @@ function evidenceBadge(level: string) {
 }
 
 function badge(kind: string) {
+  if (kind === 'Autopilot') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
   if (kind === 'Political') return 'border-violet-400/20 bg-violet-400/5 text-violet-300';
   if (kind === 'Contract') return 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300';
   if (kind === 'Congress') return 'border-amber-400/20 bg-amber-400/5 text-amber-300';
@@ -93,10 +100,23 @@ function badge(kind: string) {
   return 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300';
 }
 
-export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
+export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], heldSymbols = [] }: Props) {
+  const [autopilotSignals, setAutopilotSignals] = useState<any[]>([]);
+  const portfolioSymbols = heldSymbols.length ? heldSymbols.map(symbol => symbol.toUpperCase()) : PORTFOLIO_SYMBOLS;
+  useEffect(() => {
+    let cancelled = false;
+    authFetch('/api/autopilot-signals?limit=8', { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(body => {
+        if (!cancelled) setAutopilotSignals(Array.isArray(body?.signals) ? body.signals : []);
+      })
+      .catch(() => { if (!cancelled) setAutopilotSignals([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   const signals = [
     ...contracts
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.company))
+      .filter(x => x && portfolioSymbols.includes(String(x.company || '').toUpperCase()))
       .sort((a, b) => String(b.dateSigned).localeCompare(String(a.dateSigned)))
       .slice(0, 3)
       .map(x => ({
@@ -109,7 +129,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         url: x.url || null,
       })),
     ...congressTrades
-      .filter(x => x && PORTFOLIO_SYMBOLS.includes(x.stockSymbol))
+      .filter(x => x && portfolioSymbols.includes(String(x.stockSymbol || '').toUpperCase()))
       .sort((a, b) => String(b.transactionDate || b.date).localeCompare(String(a.transactionDate || a.date)))
       .slice(0, 3)
       .map(x => ({
@@ -135,7 +155,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       };
     }),
     ...politicalSignals
-      .filter(x => x && Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => PORTFOLIO_SYMBOLS.includes(String(symbol).toUpperCase())))
+      .filter(x => x && Array.isArray(x?.relatedSymbols) && x.relatedSymbols.some(symbol => portfolioSymbols.includes(String(symbol).toUpperCase())))
       .slice(0, 3)
       .map(x => ({
         kind: 'Political',
@@ -145,6 +165,23 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase())),
         source: x.source || 'GDELT',
         sourceType: x.sourceType || 'secondary',
+        url: x.url || null,
+      })),
+    ...autopilotSignals
+      .map(x => ({
+        ...x,
+        affected: symbols((x.tickers || []), portfolioSymbols),
+      }))
+      .filter(x => x.affected.length)
+      .slice(0, 3)
+      .map(x => ({
+        kind: 'Autopilot',
+        title: x.title || 'Autopilot platform signal',
+        detail: x.snippet || 'Public Autopilot platform/social signal linked to one or more held positions.',
+        when: x.publishedAt || undefined,
+        affected: x.affected,
+        source: 'Autopilot / X',
+        sourceType: x.official ? 'primary' : 'secondary',
         url: x.url || null,
       })),
     ...news
@@ -171,7 +208,9 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
     void Promise.allSettled(signals.map(signal => {
       const symbol = signal.affected[0];
       const signalPrice = symbol && prices[symbol] ? Number(prices[symbol].price) : null;
-      const confidence = signal.kind === 'Contract' && signal.source === 'SEC EDGAR'
+      const confidence = signal.kind === 'Autopilot' && (signal as any).sourceType === 'primary'
+        ? 0.75
+        : signal.kind === 'Contract' && signal.source === 'SEC EDGAR'
         ? 0.85
         : signal.kind === 'Political' && (signal as any).sourceType === 'primary'
           ? 0.80
@@ -203,7 +242,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
           </div>
           <h2 className="text-lg font-black mt-1">What changed → Why it matters → Which holdings are affected</h2>
           <p className="text-[10px] text-white/35 mt-1 max-w-3xl">
-            Combines recent SEC contract disclosures, public congressional transaction records, macro indicators and matched news. Each signal is labeled by evidence source; price moves are shown as context, not attributed to the signal.
+            Combines recent SEC contract disclosures, public congressional transaction records, macro indicators, matched news and public Autopilot platform signals. Autopilot evidence can affect which holdings are highlighted, but it does not change the numeric portfolio stress score.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 min-w-[240px]">
@@ -239,7 +278,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
             <div key={signal.kind + signal.title + index} className="rounded-xl border border-white/5 bg-white/[.02] p-3">
               <div className="flex flex-col lg:flex-row gap-3">
                 <div className={'inline-flex shrink-0 w-fit h-fit items-center gap-1 rounded border px-2 py-1 text-[8px] font-mono font-black uppercase ' + badge(signal.kind)}>
-                  {signal.kind === 'Contract' ? <FileText className="w-3 h-3" /> : signal.kind === 'Congress' ? <Landmark className="w-3 h-3" /> : signal.kind === 'Macro' ? <Globe2 className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+                  {signal.kind === 'Contract' ? <FileText className="w-3 h-3" /> : signal.kind === 'Congress' ? <Landmark className="w-3 h-3" /> : signal.kind === 'Macro' ? <Globe2 className="w-3 h-3" /> : signal.kind === 'Autopilot' ? <Zap className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
                   {signal.kind}
                 </div>
                 <div className="min-w-0 flex-1">

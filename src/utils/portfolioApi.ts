@@ -19,6 +19,25 @@ export type StoredPortfolioHolding = {
   purchaseLots?: PortfolioPurchaseLot[];
 };
 
+export type PortfolioTransaction = {
+  id: string;
+  symbol: string;
+  transactionType: 'BUY' | 'SELL';
+  orderType?: string | null;
+  tradeDate: string;
+  orderPlacedAt?: string | null;
+  orderExecutedAt?: string | null;
+  quantity: number;
+  price: number | null;
+  amount: number;
+  brokerage: number | null;
+  source: string;
+  sourceRow: number;
+  quantityDerived?: boolean;
+  priceDerived?: boolean;
+  createdAt?: string;
+};
+
 export type PortfolioPurchaseLot = {
   id: string;
   holdingId: string;
@@ -31,6 +50,14 @@ export type PortfolioPurchaseLot = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export async function fetchPortfolioTransactions(): Promise<PortfolioTransaction[]> {
+  const response = await authFetch('/api/portfolio?includeTransactions=true', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Transaction history service unavailable');
+  const data = await response.json();
+  if (!Array.isArray(data?.transactions)) throw new Error('Transaction history service returned invalid transactions');
+  return data.transactions;
+}
 
 export async function fetchPortfolioPurchaseLots(holdingId: string): Promise<PortfolioPurchaseLot[]> {
   const response = await authFetch('/api/portfolio?holdingId=' + encodeURIComponent(holdingId), { cache: 'no-store' });

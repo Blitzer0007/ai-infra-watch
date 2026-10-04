@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
-import { buildPositionAnalyses, mapStoredPortfolioHoldings, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
-import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
+import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
+import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
@@ -12,13 +12,12 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { buildPortfolioDailySeries, buildPortfolioHistoryValue, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import { buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
-import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 import ForecastValidationPanel from './ForecastValidationPanel';
 type Price = {
   price: number;
@@ -70,6 +69,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [holdingSort, setHoldingSort] = useState<'Symbol' | 'P&L %' | 'Daily Move' | 'Value'>('Symbol');
   const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
+  const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
@@ -120,8 +120,17 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   useEffect(() => {
     let cancelled = false;
     setPortfolioLoading(true);
-    fetchPortfolioHoldings()
-      .then(rows => { if (!cancelled) { setHoldings(rows); setPortfolioError(''); } })
+    Promise.all([
+      fetchPortfolioHoldings(),
+      fetchPortfolioTransactions().catch(() => []),
+    ])
+      .then(([rows, transactions]) => {
+        if (!cancelled) {
+          setHoldings(rows);
+          setPortfolioTransactions(transactions);
+          setPortfolioError('');
+        }
+      })
       .catch(error => { if (!cancelled) setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable'); })
       .finally(() => { if (!cancelled) setPortfolioLoading(false); });
     return () => { cancelled = true; };
@@ -288,7 +297,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)));
     });
     return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices]);
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
 
   useEffect(() => {
     let cancelled = false;
@@ -337,7 +346,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -387,13 +396,20 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const macroMediumCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
   const portfolioWeights = useMemo(() => Object.fromEntries(concentration.weights.map(item => [item.symbol, item.weight])), [concentration.weights]);
-  const portfolioHistoryValue = useMemo(() => buildPortfolioHistoryValue(
-    portfolioHistory.histories,
-    positions.map(item => ({ symbol: item.symbol, quantity: item.quantity, averageCost: item.averageCost })),
-  ), [portfolioHistory.histories, positions]);
+  const portfolioHistoryValue = useMemo(
+    () => buildPortfolioPerformanceIndexFromTransactions(
+      portfolioHistory.histories,
+      portfolioTransactions,
+    ),
+    [portfolioHistory.histories, portfolioTransactions],
+  );
   const correlationSymbols = analyses.slice().sort((a, b) => (b.portfolioWeight ?? 0) - (a.portfolioWeight ?? 0)).slice(0, 8).map(item => item.symbol);
   const portfolioCorrelation = useMemo(() => calculatePortfolioCorrelation(portfolioHistory.histories, correlationSymbols), [portfolioHistory.histories, correlationSymbols.join(',')]);
-  const stressTrend = useMemo(() => buildPortfolioDailySeries(Object.fromEntries(Object.entries(portfolioHistory.histories).filter(([symbol]) => !['SPY', 'QQQ', 'SOXX'].includes(symbol))) as Record<string, PortfolioHistoryPoint[]>, portfolioWeights, 30), [portfolioHistory.histories, portfolioWeights]);
+  const stressTrend = useMemo(() => buildPortfolioDailySeriesFromTransactions(
+    Object.fromEntries(Object.entries(portfolioHistory.histories).filter(([symbol]) => !['SPY', 'QQQ', 'SOXX'].includes(symbol))) as Record<string, PortfolioHistoryPoint[]>,
+    portfolioTransactions,
+    30,
+  ), [portfolioHistory.histories, portfolioTransactions]);
   const syntheticPortfolioHistory = useMemo(() => { if (!stressTrend.length) return []; let value = 100; const rows: PortfolioHistoryPoint[] = [{ date: stressTrend[0].date, price: value }]; stressTrend.slice(1).forEach(row => { value *= 1 + row.returnPct / 100; rows.push({ date: row.date, price: value }); }); return rows; }, [stressTrend]);
   const benchmarkComparisons = useMemo(() => comparePortfolioToBenchmarks(syntheticPortfolioHistory, Object.fromEntries(['SPY', 'QQQ', 'SOXX'].map(symbol => [symbol, portfolioHistory.histories[symbol] || []]))), [syntheticPortfolioHistory, portfolioHistory.histories]);
   const topConcentration = concentration.topHolding;
@@ -623,7 +639,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <Info label="Effective holdings (HHI)" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
-          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day constant-weight stress backcast</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using current portfolio weights across the historical window; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day transaction-aware stress backcast</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using the actual held quantities from the broker transaction history; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
             <div className="h-36 mt-2">{stressTrend.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={stressTrend}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} /><XAxis dataKey="date" hide /><YAxis domain={[0, 100]} hide /><Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(0), 'Stress']} /><Line type="monotone" dataKey="stressScore" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Need overlapping historical prices to build the trend.</div>}</div>
           </div>
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Concentration by group</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No valued holdings available.</div>}</div></div>
@@ -633,7 +649,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Portfolio history</div>
-                <div className="text-[9px] text-white/30 mt-1">Historical portfolio value using current recorded quantities against available market history. Transactions are not reconstructed.</div>
+                <div className="text-[9px] text-white/30 mt-1">Transaction-aware portfolio performance since your first active holding; broker buys and sells are reconstructed against historical market prices.</div>
               </div>
               <div className="text-right text-[9px] font-mono text-white/35">
                 {portfolioHistoryValue.length ? portfolioHistoryValue[0].date + ' → ' + portfolioHistoryValue.at(-1)!.date : 'No history'}
@@ -652,7 +668,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </ResponsiveContainer>
               ) : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Need overlapping holding history to build portfolio history.</div>}
             </div>
-            <div className="text-[8px] font-mono text-white/20 mt-1">Indexed to 100 at the first common available date; this is a historical reconstruction, not a forecast.</div>
+            <div className="text-[8px] font-mono text-white/20 mt-1">Indexed to 100 at the first date when the broker transaction history shows an active position; market performance is separated from new cash added by later purchases. This is historical reconstruction, not a forecast.</div>
           </div>
           <div className="rounded-xl border border-white/5 bg-black/10 p-3">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Holding correlation</div>
@@ -687,10 +703,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(liveUnrealized)) : '—'} suffix={(liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : '') + (stalePositions.length ? ' · snapshot fallback' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
         <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
-      </div>
-      <AutopilotSignalsPanel />
-
-      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
+      </div>      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
         {([['overview','Overview'],['research','Research'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
           <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
             {x[1]}
@@ -714,9 +727,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             </section>
             <section className="min-w-0">
-              <Panel title="Held portfolio universe" subtitle="Persistent positions · live quote state · select a holding to update the intelligence rendered below">
+              <Panel title="Held portfolio universe" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,1.4fr)_180px_170px_150px] gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                   <FilterInput
                     value={q}
                     onChange={e => setQ(e.target.value)}
@@ -767,7 +780,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
           <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
             <span className="font-mono text-white/65 uppercase mr-2">LEGACY SNAPSHOT</span>
-            {PORTFOLIO_AS_OF} · retained only as migration context; persistent holdings above are the source of truth.
+            Broker order history imported through 2026-10-04 · first purchase date is used for holding-period context; transaction history is used for cash-flow-aware peer comparisons.
           </div>
 
           <SignalScorecardPanel />
@@ -779,6 +792,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             macroRisks={macroRisks}
             news={news}
             politicalSignals={politicalSignals}
+            heldSymbols={analyses.map(item => item.symbol)}
           />
 
           <UnifiedEventTimeline
@@ -788,6 +802,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             macroRisks={macroRisks}
             news={news}
             politicalSignals={politicalSignals}
+            purchaseDate={selectedAnalysis?.purchaseDate || null}
           />
         </>
       )}
@@ -1293,8 +1308,8 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:PeerCounterfactua
   const difference = peerProfit - actualProfit;
   const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer counterfactual</h2><div className="text-[9px] text-white/35 mt-1">Same investment amounts and purchase dates where historical peer data is available. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><Info label="Actual profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer hypothetical" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer counterfactual</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer total profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
   </section>;
 }
 
@@ -1314,8 +1329,8 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
 function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
   return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer counterfactual</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical counterfactual · not a forecast</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Your return" value={h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}/><Info label="Peer return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Peer profit" value={comparison?.hypotheticalProfit == null ? '—' : comparison.hypotheticalProfit.toFixed(2)}/><Info label="Difference" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/><Info label="Peer entry" value={comparison?.peerEntryPrice == null ? '—' : comparison.peerEntryPrice.toFixed(2)}/></div>
-    <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer value if same trades' : 'Peer value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/><Info label="Value difference" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/></div>
+    <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.basis === 'broker-transactions' ? 'Mirrors your broker buy/sell cash flows in the peer using each transaction date. This compares historical total-return outcomes, not a forecast.' : comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
   </section>;
 }
 
@@ -1360,8 +1375,8 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-      <Info label="Purchase date" value={h.purchaseDate || 'Not set'} />
-      <Info label="First purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
+      <Info label="Holding since" value={h.purchaseDate || 'Not set'} />
+      <Info label="First broker purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
       <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
       <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
       <Info label="Average cost" value={h.averageCost.toFixed(2)} />

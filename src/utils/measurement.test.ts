@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration, summarizeValidationMatrix } from './measurement';
+import { buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration, summarizeValidationMatrix } from './measurement';
 
 describe('stress score', () => {
   it('returns zero stress for neutral inputs', () => {
@@ -121,5 +121,37 @@ describe('validation matrix summary', () => {
     assert.equal(result.calibration[1].n, 1);
     assert.equal(result.calibration[3].n, 1);
     assert.equal(result.calibration[4].n, 0);
+  });
+});
+
+
+describe('transaction-aware portfolio history', () => {
+  const histories = {
+    DGXX: [
+      { date: '2026-05-01', price: 10 },
+      { date: '2026-05-02', price: 12 },
+      { date: '2026-05-05', price: 15 },
+    ],
+    NVDA: [
+      { date: '2026-05-01', price: 100 },
+      { date: '2026-05-02', price: 105 },
+      { date: '2026-05-05', price: 110 },
+    ],
+  };
+  const transactions = [
+    { symbol: 'DGXX', transactionType: 'BUY' as const, tradeDate: '2026-05-02', quantity: 10, sourceRow: 1 },
+    { symbol: 'NVDA', transactionType: 'BUY' as const, tradeDate: '2026-05-05', quantity: 1, sourceRow: 2 },
+  ];
+
+  it('excludes dates before a holding was actually purchased', () => {
+    const rows = buildPortfolioDailySeriesFromTransactions(histories, transactions, 30);
+    assert.deepEqual(rows.map(row => row.date), ['2026-05-05']);
+    assert.equal(Number(rows[0].returnPct.toFixed(2)), 25);
+  });
+
+  it('builds a market-performance index without counting later cash additions as returns', () => {
+    const rows = buildPortfolioPerformanceIndexFromTransactions(histories, transactions);
+    assert.equal(rows[0].date, '2026-05-05');
+    assert.equal(Number(rows[0].normalizedValue.toFixed(2)), 125);
   });
 });

@@ -1,4 +1,5 @@
 import type { PricePoint } from './intelligence';
+import type { PortfolioTransaction } from './portfolioApi';
 import { STOCK_UNIVERSE, type StockUniverseEntry } from './stockUniverse';
 
 export type PeerCandidate = {
@@ -102,6 +103,7 @@ export type PeerCounterfactual = {
   actualReturnPct: number | null;
   difference: number | null;
   differencePctPoints: number | null;
+  basis: 'broker-transactions' | 'single-entry';
   status: 'available' | 'history-unavailable' | 'entry-unavailable' | 'peer-unavailable';
 };
 
@@ -137,14 +139,15 @@ export function calculatePeerCounterfactual(input: {
   peerHistory: Array<{ date: string; price: number }>;
   peerCurrentPrice: number | null;
   actualCurrentPrice: number | null;
+  transactions?: PortfolioTransaction[];
 }): PeerCounterfactual {
-  const { holding, peer, peerHistory, peerCurrentPrice, actualCurrentPrice } = input;
+  const { holding, peer, peerHistory, peerCurrentPrice, actualCurrentPrice, transactions = [] } = input;
   if (!peer) {
     return {
       peer: null, purchaseDate: holding.purchaseDate ?? null, peerEntryDate: null, peerEntryPrice: null,
       peerCurrentPrice, hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
       hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
-      differencePctPoints: null, status: 'peer-unavailable',
+      differencePctPoints: null, basis: transactions.length ? 'broker-transactions' : 'single-entry', status: 'peer-unavailable',
     };
   }
 
@@ -154,7 +157,8 @@ export function calculatePeerCounterfactual(input: {
       peer, purchaseDate, peerEntryDate: null, peerEntryPrice: null, peerCurrentPrice,
       hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
       hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
-      differencePctPoints: null, status: purchaseDate ? 'history-unavailable' : 'entry-unavailable',
+      differencePctPoints: null, basis: transactions.length ? 'broker-transactions' : 'single-entry',
+      status: purchaseDate ? 'history-unavailable' : 'entry-unavailable',
     };
   }
 
@@ -162,13 +166,78 @@ export function calculatePeerCounterfactual(input: {
     .filter(row => row && typeof row.date === 'string' && Number.isFinite(row.price) && row.price > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const entry = ordered.find(row => row.date >= purchaseDate) ?? ordered.at(-1);
+  const relevantTransactions = transactions
+    .filter(row => row.symbol.toUpperCase() === holding.symbol.toUpperCase() && row.tradeDate)
+    .sort((a, b) => a.tradeDate.localeCompare(b.tradeDate) || a.sourceRow - b.sourceRow);
+
+  const peerPriceAt = (date: string) => ordered.find(row => row.date >= date) ?? ordered.at(-1) ?? null;
+  const firstTransaction = relevantTransactions[0];
+  const entryDate = firstTransaction?.tradeDate || purchaseDate;
+  const entry = peerPriceAt(entryDate);
+
   if (!entry || peerCurrentPrice == null || !Number.isFinite(peerCurrentPrice) || peerCurrentPrice <= 0) {
     return {
-      peer, purchaseDate, peerEntryDate: entry?.date ?? null, peerEntryPrice: entry?.price ?? null,
-      peerCurrentPrice, hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
+      peer, purchaseDate, peerEntryDate: entry?.date ?? null, peerEntryPrice: entry?.price ?? null, peerCurrentPrice,
+      hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
       hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
-      differencePctPoints: null, status: entry ? 'entry-unavailable' : 'history-unavailable',
+      differencePctPoints: null, basis: relevantTransactions.length ? 'broker-transactions' : 'single-entry',
+      status: entry ? 'entry-unavailable' : 'history-unavailable',
+    };
+  }
+
+  if (relevantTransactions.length) {
+    let peerShares = 0;
+    let grossBuys = 0;
+    let grossSales = 0;
+
+    for (const transaction of relevantTransactions) {
+      const amount = Number(transaction.amount);
+      if (!(amount > 0)) continue;
+      const peerPoint = peerPriceAt(transaction.tradeDate);
+      if (!peerPoint || !(peerPoint.price > 0)) continue;
+
+      if (transaction.transactionType === 'BUY') {
+        peerShares += amount / peerPoint.price;
+        grossBuys += amount;
+      } else {
+        const desiredSaleShares = amount / peerPoint.price;
+        const saleShares = Math.min(peerShares, desiredSaleShares);
+        peerShares -= saleShares;
+        grossSales += saleShares * peerPoint.price;
+      }
+    }
+
+    const netInvested = grossBuys - grossSales;
+    const hypotheticalValue = peerShares * peerCurrentPrice;
+    const hypotheticalProfit = hypotheticalValue - netInvested;
+    const hypotheticalReturnPct = netInvested ? (hypotheticalProfit / netInvested) * 100 : null;
+
+    const actualValue = actualCurrentPrice != null && Number.isFinite(actualCurrentPrice)
+      ? actualCurrentPrice * holding.quantity
+      : null;
+    const actualProfit = actualValue != null ? actualValue - netInvested : null;
+    const actualReturnPct = actualProfit != null && netInvested ? (actualProfit / netInvested) * 100 : null;
+    const difference = actualProfit != null ? hypotheticalProfit - actualProfit : null;
+    const differencePctPoints = actualReturnPct != null && hypotheticalReturnPct != null
+      ? hypotheticalReturnPct - actualReturnPct
+      : null;
+
+    return {
+      peer,
+      purchaseDate,
+      peerEntryDate: entry.date,
+      peerEntryPrice: entry.price,
+      peerCurrentPrice,
+      hypotheticalShares: peerShares,
+      hypotheticalValue,
+      hypotheticalProfit,
+      hypotheticalReturnPct,
+      actualProfit,
+      actualReturnPct,
+      difference,
+      differencePctPoints,
+      basis: 'broker-transactions',
+      status: 'available',
     };
   }
 
@@ -201,6 +270,7 @@ export function calculatePeerCounterfactual(input: {
     actualReturnPct,
     difference,
     differencePctPoints,
+    basis: 'single-entry',
     status: 'available',
   };
 }

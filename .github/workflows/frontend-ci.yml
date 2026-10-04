@@ -1,4 +1,5 @@
 name: Frontend CI
+# Purchase-aware portfolio analytics are validated in the standard build.
 
 on:
   push:
