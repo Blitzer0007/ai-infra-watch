@@ -20,6 +20,7 @@ FRESHNESS_WINDOWS_HOURS: dict[str, tuple[float, float]] = {
     "congress": (24 * 30, 24 * 180),
     "macro": (24 * 7, 24 * 30),
     "executive": (48, 24 * 7),
+    "platform_social": (24, 24 * 7),
     "web_search": (72, 24 * 14),
     "default": (24 * 7, 24 * 30),
 }
@@ -130,6 +131,8 @@ def _family_from_tool(tool_name: str) -> str:
     name = tool_name.lower()
     if "get_executive_signals" in name or "executive" in name:
         return "executive"
+    if "get_platform_signals" in name or "platform_social" in name or "autopilot" in name:
+        return "platform_social"
     if "search_web" in name or name.startswith("web."):
         return "web_search"
     if name.startswith("news."):
