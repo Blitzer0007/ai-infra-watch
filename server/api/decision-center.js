@@ -147,7 +147,7 @@ function calculateActualPortfolio(holdings, transactionRows, quotes) {
   };
 }
 
-function ruleDistance(holding, quote, history) {
+export function ruleDistance(holding, quote, history) {
   const price = quote?.price;
   if (!(price > 0)) return null;
 
@@ -160,13 +160,16 @@ function ruleDistance(holding, quote, history) {
       rules.push({
         type: 'loss limit',
         target: stop,
+        direction: 'below',
         distancePct,
         breached: price <= stop,
       });
     }
   }
 
-  const alertPrices = Array.isArray(holding.broker_alert_prices) ? holding.broker_alert_prices.map(Number).filter(v => v > 0) : [];
+  const alertPrices = Array.isArray(holding.broker_alert_prices)
+    ? holding.broker_alert_prices.map(Number).filter(v => v > 0)
+    : [];
   const averageCost = Number(holding.average_cost);
   for (const target of alertPrices) {
     const direction = Number.isFinite(averageCost) && target < averageCost ? 'below' : 'above';
@@ -180,7 +183,52 @@ function ruleDistance(holding, quote, history) {
     });
   }
 
-  const exitType = String(holding.exit_rule_type || '').toLowerCase(); return { state: 'no-rule', rules: [], nearest: null };
+  const exitType = String(holding.exit_rule_type || '').toLowerCase();
+  const exitValue = Number(holding.exit_rule_value);
+
+  if (
+    exitType.includes('trailing') &&
+    Number.isFinite(exitValue) &&
+    exitValue > 0 &&
+    Array.isArray(history?.points) &&
+    history.points.length
+  ) {
+    const start = String(holding.purchase_date || history.points[0]?.date || '');
+    const since = history.points.filter(point => point.date >= start && Number(point.price) > 0);
+    const peak = since.reduce((max, point) => Math.max(max, Number(point.price)), 0);
+    const stop = peak * (1 - exitValue / 100);
+    if (stop > 0) {
+      const distancePct = (price / stop - 1) * 100;
+      rules.push({
+        type: 'trailing stop',
+        target: stop,
+        direction: 'below',
+        distancePct,
+        breached: price <= stop,
+      });
+    }
+  }
+
+  if (
+    exitType.includes('time') &&
+    Number.isFinite(exitValue) &&
+    exitValue > 0 &&
+    holding.purchase_date
+  ) {
+    const today = dateOnly(new Date());
+    const heldDays = daysBetween(holding.purchase_date, today);
+    const distanceDays = exitValue - heldDays;
+    rules.push({
+      type: 'time limit',
+      target: exitValue,
+      distancePct: distanceDays,
+      breached: heldDays >= exitValue,
+      unit: 'days',
+    });
+  }
+
+  if (!rules.length) return { state: 'no-rule', rules: [], nearest: null };
+
   const actionable = rules.filter(rule => !rule.unit);
   const nearest = actionable.length
     ? [...actionable].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0]
@@ -190,6 +238,18 @@ function ruleDistance(holding, quote, history) {
   const targetReached = rules.find(rule => rule.breached && rule.direction === 'above');
   if (targetReached) return { state: 'target-reached', rules, nearest: targetReached, targetReached };
   if (rules.some(rule => !rule.breached && !rule.unit && Number.isFinite(rule.distancePct) && rule.distancePct >= 0 && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
+
+  const timeRule = rules.find(rule => rule.unit === 'days');
+  if (timeRule?.breached) return { state: 'breached', rules, nearest: timeRule };
+  if (
+    timeRule &&
+    Number.isFinite(timeRule.distancePct) &&
+    timeRule.distancePct >= 0 &&
+    timeRule.distancePct <= 3
+  ) {
+    return { state: 'near', rules, nearest: timeRule };
+  }
+
   return { state: 'clear', rules, nearest };
 }
 
@@ -364,7 +424,7 @@ export default async function handler(req, res) {
       }
 
       if (rules.state === 'breached') {
-        const hit = rules.rules.find(rule => rule.breached) || rules.nearest;
+        const hit = rules.rules.find(rule => rule.breached && rule.direction === 'below') || rules.rules.find(rule => rule.breached) || rules.nearest;
         actionItems.push({
           severity: 'ACT',
           symbol,
@@ -372,6 +432,15 @@ export default async function handler(req, res) {
           detail: hit?.unit === 'days'
             ? 'Your ' + hit.type + ' has reached ' + hit.target + ' days.'
             : 'Price $' + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of $' + hit.target.toFixed(2) + '.',
+          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+        });
+      } else if (rules.state === 'target-reached') {
+        const target = rules.targetReached || rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Target reached',
+          detail: 'Price $' + q.price.toFixed(2) + ' is at/above your broker upside alert of $' + target.target.toFixed(2) + '. Review your staged exit rule.',
           impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
         });
       } else if (rules.state === 'near') {
@@ -444,6 +513,7 @@ export default async function handler(req, res) {
     const portfolioRules = {
       total: ruleStates.length,
       breached: ruleStates.filter(row => row.state === 'breached').length,
+      targetReached: ruleStates.filter(row => row.state === 'target-reached').length,
       near: ruleStates.filter(row => row.state === 'near').length,
       noRule: ruleStates.filter(row => row.state === 'no-rule').length,
       noData: ruleStates.filter(row => row.state === 'no-data').length,
