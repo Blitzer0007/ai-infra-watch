@@ -164,26 +164,48 @@ async function fetchDecisionCenter() {
   }
 }
 
-function buildDecisionFirstText(decision, fallbackDate, weekly) {
+function buildDecisionFirstText(decision, fallbackDate, weekly, decisionError = null) {
   const lines = [
     'AI Infra Watch · Daily Decision Brief',
     fallbackDate,
     '',
   ];
+
+  if (!decision) {
+    lines.push(
+      'DECISION LAYER UNAVAILABLE',
+      'Showing basic portfolio summary instead. Reason: ' + (decisionError || 'unknown error'),
+      'This is a data availability warning, not a clean bill of health.',
+      '',
+    );
+  } else if (decision?.earningsStatus && decision.earningsStatus !== 'ok') {
+    lines.push(
+      'DATA WARNING · EARNINGS CALENDAR ' + String(decision.earningsStatus).toUpperCase(),
+      decision.earningsError ? String(decision.earningsError) : 'The monitored earnings feed could not be verified.',
+      '',
+    );
+  }
+
   const actions = Array.isArray(decision?.actionItems) ? decision.actionItems.slice(0, 3) : [];
-  lines.push('ACTION NEEDED (' + actions.filter(item => item.severity === 'ACT').length + ')');
+  const actCount = actions.filter(item => item.severity === 'ACT').length;
+  const watchCount = actions.filter(item => item.severity === 'WATCH').length;
+  lines.push('ACTION NEEDED · ' + actCount + ' ACT · ' + watchCount + ' WATCH');
   if (actions.length) {
     actions.forEach((item, index) => {
-      const tag = item.severity === 'ACT' ? 'ACT' : item.severity === 'WATCH' ? 'WATCH' : 'SETUP';
+      const tag = item.severity === 'ACT' ? 'ACT' : 'WATCH';
       lines.push((index + 1) + '. [' + tag + '] ' + item.symbol + ' — ' + item.title + ': ' + item.detail);
     });
+  } else if (decision) {
+    lines.push('No breach, target, or near-rule action item detected in the available decision data.');
   } else {
-    lines.push('No rule breach or near-rule item detected.');
+    lines.push('Decision-layer actions unavailable because the decision endpoint failed.');
   }
 
   const earnings = Array.isArray(decision?.earnings) ? decision.earnings.slice(0, 3) : [];
   lines.push('', 'NEXT 7 DAYS');
-  if (earnings.length) {
+  if (decision?.earningsStatus && decision.earningsStatus !== 'ok') {
+    lines.push('Earnings calendar unavailable · status ' + decision.earningsStatus + (decision.earningsError ? ' · ' + decision.earningsError : ''));
+  } else if (earnings.length) {
     earnings.forEach(item => lines.push(item.symbol + ' earnings ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd') + ' · ' + item.date));
   } else {
     lines.push('No monitored earnings event in the next 7 days.');
@@ -192,29 +214,42 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
   const portfolio = decision?.portfolio || {};
   const spy = decision?.benchmark?.SPY;
   const soxx = decision?.benchmark?.SOXX;
-  const excessSpy = spy && Number.isFinite(portfolio.cashFlowPnl) ? portfolio.cashFlowPnl - spy.pnl : null;
-  const excessSoxx = soxx && Number.isFinite(portfolio.cashFlowPnl) ? portfolio.cashFlowPnl - soxx.pnl : null;
+  const excessSpy = spy && Number.isFinite(portfolio.cashFlowPnl) && spy.pnl != null && spy.coverage?.status !== 'partial'
+    ? portfolio.cashFlowPnl - spy.pnl
+    : null;
+  const excessSoxx = soxx && Number.isFinite(portfolio.cashFlowPnl) && soxx.pnl != null && soxx.coverage?.status !== 'partial'
+    ? portfolio.cashFlowPnl - soxx.pnl
+    : null;
+
   lines.push(
     '',
     'RESULT',
     'Cash-flow P&L: ' + signedMoney(Number(portfolio.cashFlowPnl || 0)),
-    'Same cash in SPY: ' + (spy ? signedMoney(Number(spy.pnl || 0)) : '—') + (excessSpy == null ? '' : ' · Edge ' + signedMoney(excessSpy)),
-    'Same cash in SOXX: ' + (soxx ? signedMoney(Number(soxx.pnl || 0)) : '—') + (excessSoxx == null ? '' : ' · Edge ' + signedMoney(excessSoxx)),
+    'Same cash in SPY: ' + (spy?.pnl == null ? 'unavailable' : signedMoney(Number(spy.pnl))) +
+      (spy?.coverage?.status === 'partial' ? ' · partial coverage' : '') +
+      (excessSpy == null ? '' : ' · Edge ' + signedMoney(excessSpy)),
+    'Same cash in SOXX: ' + (soxx?.pnl == null ? 'unavailable' : signedMoney(Number(soxx.pnl))) +
+      (soxx?.coverage?.status === 'partial' ? ' · partial coverage' : '') +
+      (excessSoxx == null ? '' : ' · Edge ' + signedMoney(excessSoxx)),
   );
 
   lines.push(
     '',
     'RISK',
     'Top 3 holdings: ' + (portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '% of value'),
-    'Semis −15% scenario: ' + signedMoney(Number(portfolio.semiconductorShock15Pct || 0)) + ' (SOXL at 3x)',
+    'Scenario stress total: ' + signedMoney(Number(portfolio.scenarioShockTotal ?? portfolio.semiconductorShock15Pct ?? 0)),
+    ...((portfolio.riskScenarios || []).slice(0, 3).map(item =>
+      '  ' + String(item.group).toUpperCase() + ': ' + signedMoney(Number(item.shock)) + ' · shock ' +
+        (item.effectiveShockPct == null ? '—' : Number(item.effectiveShockPct).toFixed(1) + '%')
+    )),
   );
 
   const forecast = decision?.forecast || {};
   lines.push(
     '',
     'FORECAST VALIDATION',
-    (forecast.verified ?? 0) + '/50 verified · ' + (forecast.pending ?? 0) + ' pending · ' + (forecast.remaining ?? 0) + ' still needed',
-    '50 is a minimum evidence gate, not 50 independent tests.',
+    (forecast.verified ?? 0) + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' independent · ' + (forecast.pending ?? 0) + ' pending',
+    'Independence window: ' + (forecast.independenceWindowBusinessDays ?? 20) + ' business days per ticker.',
   );
 
   if (weekly) {
@@ -222,7 +257,7 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
       '',
       'WEEKLY REVIEW',
       weekly.decisions + ' decisions · ' + weekly.outcomes + ' outcome reviews',
-      'Average excess vs SPY: ' + (weekly.averageExcessReturnPct == null ? '—' : signedPct(Number(weekly.averageExcessReturnPct))),
+      weekly.sampleLabel || ('Decision score: ' + (weekly.averageDecisionScorePct == null ? '—' : signedPct(Number(weekly.averageDecisionScorePct)))),
       'Rule adherence: ' + (weekly.ruleAdherencePct == null ? '—' : Number(weekly.ruleAdherencePct).toFixed(0) + '%'),
       'Forecast error: ' + (weekly.averageForecastErrorPct == null ? '—' : signedPct(Number(weekly.averageForecastErrorPct))),
       'Reflection: ' + weekly.reflection,
@@ -233,9 +268,13 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
   const quiet = [
     (rules.noRule ?? 0) + ' holdings without active rules',
     (rules.breached ?? 0) + ' rule breaches',
+    (rules.targetReached ?? 0) + ' targets reached',
     (rules.near ?? 0) + ' close-to-rule holdings',
   ];
   lines.push('', 'STATUS · ' + quiet.join(' · '));
+  if (decision?.quoteCoverage?.status === 'partial' || portfolio.quoteCoverage?.status === 'partial') {
+    lines.push('DATA QUALITY · quote coverage is partial; totals may include stale fallbacks.');
+  }
   lines.push('', 'Review layer only — no automatic trade instruction.');
   return lines.join('\n');
 }
@@ -315,7 +354,7 @@ async function buildDigest() {
   if (decision) {
     return {
       date: localDate,
-      text: buildDecisionFirstText(decision, localDate, weekly),
+      text: buildDecisionFirstText(decision, localDate, weekly, decisionResult.error),
       rows,
       totalValue,
       totalPnl,
@@ -333,6 +372,8 @@ async function buildDigest() {
       decisionFirst: true,
       decisionLayerStatus: decisionResult.error ? 'degraded' : 'available',
       decisionLayerError: decisionResult.error || null,
+      earningsStatus: decision?.earningsStatus || null,
+      earningsError: decision?.earningsError || null,
     };
   }
 
