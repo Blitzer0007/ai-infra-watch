@@ -421,9 +421,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [forecastAnalytics, setForecastAnalytics] = useState<ForecastAnalytics | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
-  const [historical testBusy, setBacktestBusy] = useState(false);
-  const [historical test, setBacktest] = useState<BacktestSummary | null>(null);
-  const [historical testMessage, setBacktestMessage] = useState<string | null>(null);
+  const [backtestBusy, setBacktestBusy] = useState(false);
+  const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
+  const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
   const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;calibration:CalibrationBucket[];details:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number}>} | null>(null);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
@@ -903,12 +903,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       setBacktest(result);
       setBacktestMessage(
         result.rows.length
-          ? 'Historical test complete. Each test date uses only market data available before that date.'
-          : 'Not enough historical observations to produce a historical test for this horizon.'
+          ? 'Backtest complete. Each test date uses only market data available before that date.'
+          : 'Not enough historical observations to produce a backtest for this horizon.'
       );
     } catch (err: any) {
       setBacktest(null);
-      setBacktestMessage(err?.message || 'Historical test failed.');
+      setBacktestMessage(err?.message || 'Backtest failed.');
     } finally {
       setBacktestBusy(false);
     }
@@ -930,7 +930,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       const summaryRows = histories.flatMap(item => HORIZONS.map(h => ({ ticker: item.ticker, horizon: h.days, summary: historicalBacktest(item.points, h.days) })));
       const summary = summarizeValidationMatrix(summaryRows);
       setMatrix(summary);
-      setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon historical tests.');
+      setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
     } catch (err: any) {
       setMatrixMessage(err?.message || 'Validation matrix failed.');
     } finally {
@@ -939,11 +939,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   };
 
   const runJevBacktestValidation = async () => {
-    if (!historical test || !historical test.rows.length || jevValidationBusy) return;
+    if (!backtest || !backtest.rows.length || jevValidationBusy) return;
     setJevValidationBusy(true);
     setJevValidationError(null);
     try {
-      const compactRows = historical test.rows.slice(-12).map(row => ({
+      const compactRows = backtest.rows.slice(-12).map(row => ({
         asOfDate: row.asOfDate,
         targetDate: row.targetDate,
         median: formatReturn(row.median),
@@ -956,8 +956,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       }));
       const prompt = [
         'Act as the JEV Validation Analyst for AI Infra Watch.',
-        'You are evaluating a deterministic historical test. Do not change, recalculate, invent, or override any supplied metric.',
-        'Treat the supplied historical test numbers as authoritative measurements.',
+        'You are evaluating a deterministic historical backtest. Do not change, recalculate, invent, or override any supplied metric.',
+        'Treat the supplied backtest numbers as authoritative measurements.',
         'Do not provide an investment recommendation, price target, trading instruction, election/political recommendation, or certainty claim.',
         'Assess evidence quality and limitations, identify possible model weaknesses, and recommend the next validation experiment.',
         'Clearly distinguish measured facts from hypotheses. If evidence is insufficient, say so.',
@@ -966,14 +966,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Ticker: ' + selectedStock,
         'Horizon: ' + (HORIZONS.find(h => h.days === horizon)?.label || horizon + 'D'),
         'Scenario: base / Current regime',
-        'Historical tests: ' + historical test.rows.length,
-        'Correct direction: ' + (historical test.directionalAccuracy * 100).toFixed(1) + '%',
-        'Typical prediction error: ' + historical test.medianAbsoluteError.toFixed(1) + ' percentage points',
-        'Typical historical range coverage: ' + (historical test.p25p75Coverage * 100).toFixed(1) + '%',
-        'Calibration buckets: ' + JSON.stringify(historical test.calibration),
-        'Wider historical range coverage: ' + (historical test.p10p90Coverage * 100).toFixed(1) + '%',
+        'Historical tests: ' + backtest.rows.length,
+        'Correct direction: ' + (backtest.directionalAccuracy * 100).toFixed(1) + '%',
+        'Typical prediction error: ' + backtest.medianAbsoluteError.toFixed(1) + ' percentage points',
+        'Typical historical range coverage: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
+        'Calibration buckets: ' + JSON.stringify(backtest.calibration),
+        'Wider historical range coverage: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
         'Recent test rows: ' + JSON.stringify(compactRows),
-        'Validation rule: this historical test uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
+        'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
       ].join('\n');
 
       const response = await fetch('/api/agent-ask', {
@@ -1045,9 +1045,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">20D momentum</div><div className="text-sm font-mono font-bold mt-1">{formatReturn(metrics.momentum)}</div></div>
-            <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">Typical volatility</div><div className="text-sm font-mono font-bold mt-1">{metrics.volatility.toFixed(1)}%</div></div>
+            <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">Annualized vol</div><div className="text-sm font-mono font-bold mt-1">{metrics.volatility.toFixed(1)}%</div></div>
             <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">1Y move</div><div className="text-sm font-mono font-bold mt-1">{formatReturn(metrics.oneYear)}</div></div>
-            <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">Macro risk</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
+            <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase text-white/30">Macro load</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
           </div>
         </div>
 
@@ -1158,7 +1158,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length}</div></div>
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Confidence</div><div className="text-sm font-mono font-bold mt-1">{analysis.confidence}</div></div>
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Current evidence</div><div className="text-sm font-mono font-bold mt-1">{evidenceCounts}</div></div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Macro risk</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Macro load</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
                 </div>
                 <p className="text-[9px] text-white/35 mt-3 leading-relaxed">Treat the historical distribution as less applicable if the current thesis changes, evidence conflicts materially, or near-term catalysts dominate the historical analogue. No exit rule is inferred by the system.</p>
               </div>
@@ -1358,16 +1358,16 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               <div className="flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Historical test</span></div>
               <p className="text-[10px] text-white/40 mt-1">Replay the same analogue method on past dates without using information from the future.</p>
             </div>
-            <button onClick={runBacktest} disabled={historical testBusy || loading || history.length < 220 + horizon} className="px-3 py-2 rounded border border-emerald-300/20 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{historical testBusy ? 'RUNNING…' : 'RUN HISTORICAL TEST'}</button>
+            <button onClick={runBacktest} disabled={backtestBusy || loading || history.length < 220 + horizon} className="px-3 py-2 rounded border border-emerald-300/20 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{backtestBusy ? 'RUNNING…' : 'RUN HISTORICAL TEST'}</button>
           </div>
-          {historical testMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{historical testMessage}</div>}
-          {historical test ? (
+          {backtestMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{backtestMessage}</div>}
+          {backtest ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-violet-300/20 bg-violet-300/5 p-3">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
                     <div className="text-[9px] font-mono uppercase tracking-widest text-violet-200/80">JEV validation analyst</div>
-                    <p className="text-[10px] text-white/45 mt-1">JEV interprets the measured historical test; it cannot change the numerical results. It identifies evidence gaps, caveats, and the next validation experiment.</p>
+                    <p className="text-[10px] text-white/45 mt-1">JEV interprets the measured backtest; it cannot change the numerical results. It identifies evidence gaps, caveats, and the next validation experiment.</p>
                   </div>
                   <button onClick={runJevBacktestValidation} disabled={jevValidationBusy} className="px-3 py-2 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{jevValidationBusy ? 'JEV ANALYZING…' : 'RUN JEV VALIDATION'}</button>
                 </div>
@@ -1382,22 +1382,22 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   </div>
                 </div>}
               </div>
-              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {historical test.rows.length} historical tests · base regime</div>
+              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
               <div className="text-[9px] font-mono text-violet-200/60 uppercase">Active forecast model: {modelVersion}{modelConfig?.validation_tests ? ' · validated on ' + modelConfig.validation_tests + ' tests' : ''}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct direction</div><div className="text-sm font-mono font-bold mt-1">{(historical test.directionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{historical test.medianAbsoluteError.toFixed(1)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Middle-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(historical test.p25p75Coverage*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Wider-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(historical test.p10p90Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Middle-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Wider-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct-direction rate</div><div className="text-sm font-mono font-bold mt-1">{(historical test.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Improvement in correct direction</div><div className="text-sm font-mono font-bold mt-1">{historical test.directionalLift >= 0 ? '+' : ''}{(historical test.directionalLift*100).toFixed(0)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Improvement in error</div><div className="text-sm font-mono font-bold mt-1">{historical test.errorLift >= 0 ? '+' : ''}{historical test.errorLift.toFixed(1)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Range calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(historical test.p25CalibrationGap*100).toFixed(0)} / {(historical test.p90CalibrationGap*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct-direction rate</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Improvement in correct direction</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Improvement in error</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Range calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                {historical test.rows.slice(-8).reverse().map(row => (
+                {backtest.rows.slice(-8).reverse().map(row => (
                   <div key={row.asOfDate} className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/5 px-2 py-1.5 text-[9px] font-mono text-white/45">
                     <span>{row.asOfDate} → {row.targetDate}</span>
                     <span>Typical expected move {formatReturn(row.median)}</span>
@@ -1415,7 +1415,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-200/80">Cross-ticker validation matrix</div>
-            <p className="text-[10px] text-white/45 mt-1">Runs the same historical test across 8 AI/technology tickers and all 5 horizons. This is a validation summary, not a ranking.</p>
+            <p className="text-[10px] text-white/45 mt-1">Runs the same backtest across 8 AI/technology tickers and all 5 horizons. This summarizes historical validation; it is not a ranking.</p>
           </div>
           <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
         </div>
@@ -1450,11 +1450,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         </div>}
       </div>
 
-      {historical test && historical test.calibration.length > 0 && (
+      {backtest && backtest.calibration.length > 0 && (
         <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4">
           <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/80">Forecast validation · calibration</div><div className="text-[10px] text-white/40 mt-1">Directional confidence is measured against realized positive outcomes. This describes historical calibration; it does not modify the forecast.</div></div></div>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-3">
-            {historical test.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[8px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
+            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[8px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
           </div>
         </div>
       )}
