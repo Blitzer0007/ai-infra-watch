@@ -388,21 +388,48 @@ async function deliver(digest, channels) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  if (!authorize(req, res)) return;
+  res.setHeader('Cache-Control','no-store');
+  if(!authorize(req,res)) return;
   try {
-    if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    if (isCron(req)) await reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
-    const digest = await buildDigest();
-    if (req.method === 'GET' && !isCron(req)) {
-      return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
+    if(req.method!=='POST'&&req.method!=='GET') return res.status(405).json({error:'Method not allowed'});
+
+    const cron=isCron(req);
+    const recovery=String(req.query?.recovery||'')==='1';
+    let slotKey=null;
+
+    if(cron&&!recovery){
+      slotKey=digestSlotKey(req);
+      if(!await claimDigestSlot(slotKey)){
+        return res.status(200).json({ok:true,skipped:true,reason:'digest slot already completed or running',slotKey});
+      }
     }
-    const requested = req.method === 'POST'
-      ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
-      : [];
-    const delivery = await deliver(digest, requested);
-    return res.status(delivery.errors.length && !delivery.delivered.length ? 502 : 200).json({ ok: true, ...digest, delivery });
-  } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Portfolio digest failed' });
+
+    if(cron) await reviewDueDecisionJournal().catch(error=>console.error('decision journal review failed:',error));
+
+    if(recovery){
+      const tz=process.env.PORTFOLIO_DIGEST_TIMEZONE||'Asia/Kolkata';
+      const day=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      const required=['06','12','18','22'];
+      const rows=await supabase('portfolio_digest_runs?slot_key=like.'+encodeURIComponent(day+'-*')+'&select=slot_key,status');
+      const missing=required.filter(hour=>!rows.some(row=>row.slot_key===day+'-'+hour&&row.status==='completed'));
+      if(!missing.length) return res.status(200).json({ok:true,recovery:true,skipped:true,reason:'all daily digest slots completed'});
+
+      const digest=await buildDigest();
+      digest.text='Scheduler recovery · missed digest slot(s): '+missing.map(hour=>hour+':05 IST').join(', ')+'\n\n'+digest.text;
+      const requested=req.method==='POST'?String(req.body?.channels||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean):[];
+      const delivery=await deliver(digest,requested);
+      return res.status(delivery.errors.length&&!delivery.delivered.length?502:200).json({ok:true,recovery:true,missedSlots:missing,delivery});
+    }
+
+    const digest=await buildDigest();
+    if(req.method==='GET'&&!cron) return res.status(200).json({...digest,delivery:{configured:false,previewOnly:true}});
+
+    const requested=req.method==='POST'?String(req.body?.channels||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean):[];
+    const delivery=await deliver(digest,requested);
+    const failed=delivery.errors.length&&!delivery.delivered.length;
+    await finishDigestSlot(slotKey,failed?'failed':'completed',delivery,delivery.errors.length?delivery.errors.join(' · '):null);
+    return res.status(failed?502:200).json({ok:true,...digest,delivery,slotKey});
+  }catch(error){
+    return res.status(500).json({error:error instanceof Error?error.message:'Portfolio digest failed'});
   }
 }
