@@ -1,4 +1,5 @@
 import { requireAccess } from '../../api/_access-auth.js';
+import { reviewDueDecisionJournal, getWeeklyDecisionReview } from './decision-journal.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -80,7 +81,7 @@ async function fetchDecisionCenter() {
   }
 }
 
-function buildDecisionFirstText(decision, fallbackDate) {
+function buildDecisionFirstText(decision, fallbackDate, weekly) {
   const lines = [
     'AI Infra Watch · Daily Decision Brief',
     fallbackDate,
@@ -132,6 +133,18 @@ function buildDecisionFirstText(decision, fallbackDate) {
     (forecast.verified ?? 0) + '/50 verified · ' + (forecast.pending ?? 0) + ' pending · ' + (forecast.remaining ?? 0) + ' still needed',
     '50 is a minimum evidence gate, not 50 independent tests.',
   );
+
+  if (weekly) {
+    lines.push(
+      '',
+      'WEEKLY REVIEW',
+      weekly.decisions + ' decisions · ' + weekly.outcomes + ' outcome reviews',
+      'Average excess vs SPY: ' + (weekly.averageExcessReturnPct == null ? '—' : signedPct(Number(weekly.averageExcessReturnPct))),
+      'Rule adherence: ' + (weekly.ruleAdherencePct == null ? '—' : Number(weekly.ruleAdherencePct).toFixed(0) + '%'),
+      'Forecast error: ' + (weekly.averageForecastErrorPct == null ? '—' : signedPct(Number(weekly.averageForecastErrorPct))),
+      'Reflection: ' + weekly.reflection,
+    );
+  }
 
   const rules = decision?.rules || {};
   const quiet = [
@@ -212,11 +225,13 @@ async function buildDigest() {
   const date = localDate;
 
   const decision = await fetchDecisionCenter();
+  const isSunday = new Intl.DateTimeFormat('en-US', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', weekday: 'short' }).format(new Date()) === 'Sun';
+  const weekly = isSunday ? await getWeeklyDecisionReview().catch(() => null) : null;
 
   if (decision) {
     return {
       date: localDate,
-      text: buildDecisionFirstText(decision, localDate),
+      text: buildDecisionFirstText(decision, localDate, weekly),
       rows,
       totalValue,
       totalPnl,
@@ -339,6 +354,7 @@ export default async function handler(req, res) {
   if (!authorize(req, res)) return;
   try {
     if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    if (isCron(req)) await reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
     const digest = await buildDigest();
     if (req.method === 'GET' && !isCron(req)) {
       return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
