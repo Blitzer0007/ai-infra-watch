@@ -640,6 +640,8 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
         families.append("web_search")
     if any(term in lower for term in ("ceo", "founder", "management", "executive", "musk", "volozh", "jensen huang", "lisa su", "satya nadella", "zuckerberg")):
         families.append("executive")
+    if any(term in lower for term in ("autopilot", "joinautopilot", "investment app", "portfolio marketplace")):
+        families.append("platform_social")
     if any(term in lower for term in ("congress", "senator", "representative", "official trade", "congressional trade")):
         families.append("congress")
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
