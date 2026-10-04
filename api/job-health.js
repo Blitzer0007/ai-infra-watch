@@ -81,6 +81,11 @@ export default async function handler(req, res) {
       const last = history[0] || null;
       const lastSuccess = successes[0] || null;
       const lastFailure = failures[0] || null;
+      const lastSuccessTime = lastSuccess ? Date.parse(lastSuccess.created_at || lastSuccess.updated_at || '') : NaN;
+      const failuresSinceLastSuccess = failures.filter(run => {
+        const failureTime = Date.parse(run.created_at || run.updated_at || '');
+        return !Number.isFinite(lastSuccessTime) || failureTime > lastSuccessTime;
+      });
       return {
         id: job.id,
         name: job.name,
@@ -90,7 +95,7 @@ export default async function handler(req, res) {
         lastRunAt: last?.created_at || null,
         lastSuccessAt: lastSuccess?.updated_at || lastSuccess?.created_at || null,
         lastFailureAt: lastFailure?.updated_at || lastFailure?.created_at || null,
-        recentFailureCount: failures.length,
+        recentFailureCount: failuresSinceLastSuccess.length,
         nextRunAt: nextScheduledRun(job.id),
         recentRuns: history.slice(0, 5).map(run => ({
           number: run.run_number,
