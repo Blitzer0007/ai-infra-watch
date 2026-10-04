@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:unit": "tsx --test src/utils/*.test.ts",
+    "test:unit": "tsx --test src/utils/*.test.ts server/utils/*.test.js",
     "security:audit": "node scripts/security-audit.mjs"
   },
   "dependencies": {
