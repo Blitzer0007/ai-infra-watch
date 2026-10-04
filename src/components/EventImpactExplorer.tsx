@@ -33,6 +33,9 @@ type Reaction = {
   spyT1: number | null;
   spyT5: number | null;
   spyT20: number | null;
+  soxxT5: number | null;
+  beta60: number | null;
+  abnormalT5: number | null;
 };
 
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
@@ -76,6 +79,7 @@ function firstOnOrAfter(history: HistoryPoint[], date: string): HistoryPoint | n
 function calculateReaction(
   history: HistoryPoint[],
   spy: HistoryPoint[],
+  soxx: HistoryPoint[],
   eventDate: string,
   acceptedDateTime?: string | null
 ): Reaction | null {
@@ -110,6 +114,9 @@ function calculateReaction(
     spyT1: spyEvent ? pct(spyEvent.price, spyForward(1)?.price ?? null) : null,
     spyT5: spyEvent ? pct(spyEvent.price, spyForward(5)?.price ?? null) : null,
     spyT20: spyEvent ? pct(spyEvent.price, spyForward(20)?.price ?? null) : null,
+    soxxT5: (() => { const e = firstOnOrAfter(soxx, referenceDate); const i = e ? soxx.findIndex(p => p.date === e.date) : -1; return i >= 0 ? pct(soxx[i]?.price ?? null, soxx[i + 5]?.price ?? null) : null; })(),
+    beta60: betaBeforeEvent(history, soxx, event.date),
+    abnormalT5: null,
   };
 }
 
@@ -131,10 +138,39 @@ function relative(stock: number | null, benchmark: number | null): number | null
   return stock == null || benchmark == null ? null : stock - benchmark;
 }
 
+function betaBeforeEvent(stock: HistoryPoint[], benchmark: HistoryPoint[], eventDate: string, lookback = 60): number | null {
+  const stockByDate = new Map(stock.map(point => [point.date, point.price]));
+  const benchByDate = new Map(benchmark.map(point => [point.date, point.price]));
+  const dates = [...new Set(benchmark.map(point => point.date))]
+    .filter(date => date < eventDate && stockByDate.has(date) && benchByDate.has(date))
+    .sort()
+    .slice(-(lookback + 1));
+  if (dates.length < 12) return null;
+  const stockReturns = [], benchReturns = [];
+  for (let i = 1; i < dates.length; i++) {
+    const sp = Number(stockByDate.get(dates[i - 1]));
+    const sn = Number(stockByDate.get(dates[i]));
+    const bp = Number(benchByDate.get(dates[i - 1]));
+    const bn = Number(benchByDate.get(dates[i]));
+    if (!(sp > 0 && sn > 0 && bp > 0 && bn > 0)) continue;
+    stockReturns.push(sn / sp - 1); benchReturns.push(bn / bp - 1);
+  }
+  if (stockReturns.length < 10) return null;
+  const meanS = stockReturns.reduce((a,b)=>a+b,0) / stockReturns.length;
+  const meanB = benchReturns.reduce((a,b)=>a+b,0) / benchReturns.length;
+  const variance = benchReturns.reduce((sum,v)=>sum + (v-meanB) ** 2, 0);
+  if (variance <= 0) return null;
+  const covariance = stockReturns.reduce((sum,v,i)=>sum + (v-meanS) * (benchReturns[i]-meanB), 0);
+  const beta = covariance / variance;
+  return Number.isFinite(beta) ? beta : null;
+}
+
+
 export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   const [events, setEvents] = useState<SecEvent[]>([]);
   const [stockHistory, setStockHistory] = useState<HistoryPoint[]>([]);
   const [spyHistory, setSpyHistory] = useState<HistoryPoint[]>([]);
+  const [soxxHistory, setSoxxHistory] = useState<HistoryPoint[]>([]);
   const [categoryFilter, setCategoryFilter] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('event_symbol') === symbol ? (params.get('event_category') || 'all') : 'all';
@@ -175,10 +211,11 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
       setError(null);
 
       try {
-        const [sec, stock, spy] = await Promise.all([
+        const [sec, stock, spy, soxx] = await Promise.all([
           loadSecEvents(ticker),
           loadHistory(ticker),
           loadHistory('SPY'),
+          loadHistory('SOXX'),
         ]);
 
         if (cancelled) return;
@@ -186,6 +223,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
         setEvents(sec);
         setStockHistory(stock);
         setSpyHistory(spy);
+        setSoxxHistory(soxx);
 
         if (!stock.length) {
           setError('No verified market history was returned for this ticker.');
@@ -195,6 +233,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           setEvents([]);
           setStockHistory([]);
           setSpyHistory([]);
+          setSoxxHistory([]);
           setError(err instanceof Error ? err.message : 'Event study unavailable');
         }
       } finally {
@@ -212,9 +251,9 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
     () =>
       events.map((event) => ({
         event,
-        reaction: calculateReaction(stockHistory, spyHistory, event.date, event.acceptedDateTime),
+        reaction: (() => { const value = calculateReaction(stockHistory, spyHistory, soxxHistory, event.date, event.acceptedDateTime); if (!value) return null; return { ...value, abnormalT5: value.t5 != null && value.soxxT5 != null && value.beta60 != null ? value.t5 - value.beta60 * value.soxxT5 : null }; })(),
       })),
-    [events, stockHistory, spyHistory]
+    [events, stockHistory, spyHistory, soxxHistory]
   );
 
   const categories = useMemo(() => {
