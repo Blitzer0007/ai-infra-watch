@@ -431,7 +431,19 @@ export default async function handler(req, res) {
           title: 'Rule reached',
           detail: hit?.unit === 'days'
             ? 'Your ' + hit.type + ' has reached ' + hit.target + ' days.'
-            : 'Price 
+            : 'Price $' + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of $' + hit.target.toFixed(2) + '.',
+          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+        });
+      } else if (rules.state === 'target-reached') {
+        const target = rules.targetReached || rules.nearest;
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: 'Target reached',
+          detail: 'Price $' + q.price.toFixed(2) + ' is at/above your broker upside alert of $' + target.target.toFixed(2) + '. Review your staged exit rule.',
+          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+        });
+      } else if (rules.state === 'near') {
         const near = rules.nearest;
         actionItems.push({
           severity: 'WATCH',
