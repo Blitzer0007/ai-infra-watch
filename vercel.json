@@ -33,6 +33,10 @@
       "destination": "/api/market?route=alert-notify"
     },
     {
+      "source": "/api/decision-center",
+      "destination": "/api/market?route=decision-center"
+    },
+    {
       "source": "/api/autopilot-signals",
       "destination": "/api/market?route=autopilot-signals"
     },
