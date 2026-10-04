@@ -112,7 +112,7 @@ function relatedSignals(contract: Contract, counterparty: string | null): string
   if (!out.size) {
     out.add('Revenue/backlog visibility and execution');
     out.add('Capital spending required to fulfill the agreement');
-    out.add('Customer concentration / counterparty dependency');
+    out.add('Reliance on one customer or partner');
   }
   return Array.from(out).slice(0, 3);
 }
@@ -182,7 +182,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
           </span>
         </div>
         <span className="text-[8px] font-mono uppercase text-white/25">
-          Exposure map · not a return forecast
+          Business impact map · not a return forecast
         </span>
       </div>
 
@@ -319,7 +319,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
 
       {analysis.annualized != null && (
         <div className="text-[8px] font-mono text-white/25">
-          Annualization is arithmetic only; it is not an estimate of recognized revenue, cash flow, margin, or stock-price impact.
+          Annual run-rate is arithmetic only; it is not an estimate of reported revenue, cash flow, margin, or stock-price impact.
         </div>
       )}
     </div>
