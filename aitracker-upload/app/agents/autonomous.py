@@ -185,6 +185,7 @@ JEV_ROUTE_PATTERNS: dict[str, tuple[str, ...]] = {
     "rotation": (".get_rotation",),
     "analyst_consensus": ("get_analyst_expectations", ".price_target", ".recommendation"),
     "executive": ("get_executive_signals",),
+    "platform_social": ("get_platform_signals",),
     "web_search": ("search_web",),
     "issuer_primary": ("get_issuer_official", "investor_relations", "company_official"),
     "portfolio": ("get_portfolio_context",),
@@ -203,6 +204,7 @@ JEV_ROUTE_CRITERIA = {
     "rotation": "Relative rotation, peer basket, hardware/application or sector rotation",
     "analyst_consensus": "Analyst ratings, price targets, consensus estimates or estimate revisions",
     "executive": "Public executive or founder statements from official X, LinkedIn, issuer websites or corroborating coverage",
+    "platform_social": "Public investment-platform signals from official social accounts and linked portfolio pages",
     "web_search": "Current web evidence requiring broader discovery beyond the configured structured data feeds",
     "issuer_primary": "Company or issuer official information, investor-relations material and official-domain announcements",
     "portfolio": "Stored portfolio holdings, current portfolio context or position state",
@@ -560,6 +562,18 @@ def _portfolio_research_plan(
             "reason": "portfolio research: collect recent news across the held universe",
         }
 
+    platform = next(
+        (t for t in tools if t.qualified_name.lower() == "stocks.get_platform_signals"),
+        None,
+    )
+    if platform is not None and not successful(lambda c: c.tool.lower() == "stocks.get_platform_signals"):
+        return {
+            "action": "tool",
+            "tool": platform.qualified_name,
+            "arguments": {"platform": "Autopilot", "days": 7, "limit": 12},
+            "reason": "portfolio research: check current Autopilot platform/social signals for portfolio-linked activity",
+        }
+
     macro = next(
         (
             t for t in tools
@@ -626,6 +640,8 @@ def _required_evidence_families(question: str) -> tuple[str, ...]:
         families.append("web_search")
     if any(term in lower for term in ("ceo", "founder", "management", "executive", "musk", "volozh", "jensen huang", "lisa su", "satya nadella", "zuckerberg")):
         families.append("executive")
+    if any(term in lower for term in ("autopilot", "joinautopilot", "investment app", "portfolio marketplace")):
+        families.append("platform_social")
     if any(term in lower for term in ("congress", "senator", "representative", "official trade", "congressional trade")):
         families.append("congress")
     if any(term in lower for term in ("macro", "geopolit", "taiwan", "export", "power", "grid")):
@@ -667,6 +683,7 @@ def _evidence_availability(question: str, calls: list[ToolCallRecord]) -> dict[s
     known_families = (
         "market",
         "executive",
+        "platform_social",
         "web_search",
         "news",
         "issuer_primary",
@@ -954,6 +971,8 @@ def _evidence_family(tool_name: str) -> str:
     name = tool_name.lower()
     if "get_executive_signals" in name or "executive" in name:
         return "executive"
+    if "get_platform_signals" in name or "platform_social" in name or "autopilot" in name:
+        return "platform_social"
     if "search_web" in name or name.startswith("web."):
         return "web_search"
     if name.startswith("news."):
@@ -1021,7 +1040,7 @@ def _question_evidence_priorities(question: str) -> tuple[str, ...]:
         priorities.extend(["market", "news", "issuer_primary", "analyst_consensus", "regulatory_primary", "event_study"])
     priorities.extend([
         "market", "news", "issuer_primary", "regulatory_primary",
-        "analyst_consensus", "executive", "web_search", "earnings", "event_study", "macro", "congress",
+        "analyst_consensus", "executive", "platform_social", "web_search", "earnings", "event_study", "macro", "congress",
         "portfolio", "forecast", "quality",
     ])
     return tuple(dict.fromkeys(priorities))
@@ -1032,6 +1051,8 @@ def _channel_tool_usable(family: str, name: str) -> bool:
     lower = name.lower()
     if family == "executive":
         return "get_executive_signals" in lower
+    if family == "platform_social":
+        return "get_platform_signals" in lower
     if family == "web_search":
         return "search_web" in lower or lower.startswith("web.")
     if family == "news":

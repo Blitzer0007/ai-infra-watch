@@ -32,7 +32,7 @@ from .providers import QuoteError
 from .schemas import QuoteBatch, ServerHealth
 from .research_sources import AnalystService, IssuerOfficialService
 from .service import StockService, from_env as _from_env
-from .social_research import WebSearchService, ExecutiveSignalsService
+from .social_research import WebSearchService, ExecutiveSignalsService, PlatformSignalsService
 
 
 def build_server(service: StockService | None = None) -> MCPServer:
@@ -130,6 +130,13 @@ def build_server(service: StockService | None = None) -> MCPServer:
     )
     def get_executive_signals(executive: str | None = None, organization: str | None = None, days: int = 7, limit: int = 12) -> dict:
         return ExecutiveSignalsService().get(executive=executive, organization=organization, days=days, limit=limit)
+
+    @server.tool(
+        name="get_platform_signals",
+        description="Discover recent public investment-platform signals, including the official Autopilot X account and linked portfolio pages.",
+    )
+    def get_platform_signals(platform: str = "Autopilot", days: int = 7, limit: int = 12) -> dict:
+        return PlatformSignalsService().get(platform=platform, days=days, limit=limit)
 
     @server.tool(
         name="get_relationships",

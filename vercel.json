@@ -33,6 +33,10 @@
       "destination": "/api/market?route=alert-notify"
     },
     {
+      "source": "/api/autopilot-signals",
+      "destination": "/api/market?route=autopilot-signals"
+    },
+    {
       "source": "/api/forecast-validation",
       "destination": "/api/market?route=forecast-validation"
     },
@@ -47,6 +51,10 @@
     {
       "source": "/api/forecast-verification",
       "destination": "/api/cron?route=forecast-verification"
+    },
+    {
+      "source": "/api/forecast-auto-track",
+      "destination": "/api/cron?route=forecast-auto-track"
     },
     {
       "source": "/api/portfolio-digest",

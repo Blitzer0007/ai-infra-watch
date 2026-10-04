@@ -38,6 +38,7 @@ EXPECTED_TOOLS = {
     "get_issuer_official",
     "search_web",
     "get_executive_signals",
+    "get_platform_signals",
     "get_relationships",
     "list_watchlist",
     "health",

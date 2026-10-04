@@ -51,7 +51,7 @@ const HORIZONS: { days: Horizon; label: string }[] = [
 const SCENARIOS: Scenario[] = [
   { id: 'base', label: 'Current regime', description: 'Historical analogues closest to today\'s observed momentum and volatility.', adjustment: 0 },
   { id: 'bull', label: 'AI demand strengthens', description: 'Stronger AI-infrastructure demand and supportive business/policy signals.', adjustment: 0.45 },
-  { id: 'bear', label: 'Macro / policy shock', description: 'Higher macro or policy stress with weaker market breadth.', adjustment: -0.45 },
+  { id: 'bear', label: 'Macro / policy shock', description: 'Higher macro or policy stress with fewer stocks moving up.', adjustment: -0.45 },
 ];
 
 function addBusinessDays(start: Date, days: number): string {

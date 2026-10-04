@@ -74,6 +74,11 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
         </div>
       )}
 
+      <div className="mt-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-3 py-2 text-[8px] leading-4 text-white/35">
+        Auto tracking is on: each weekday AI Infra Watch records one new <b className="text-cyan-200/70">20D forecast</b> for each held stock when there is no pending forecast already waiting to mature.
+        A forecast only counts toward the <b className="text-white/60">50 verified sample</b> after its target date is reached and the actual market result is recorded. You do not need to add these manually.
+      </div>
+
       {summary && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">

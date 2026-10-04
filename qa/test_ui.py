@@ -57,6 +57,18 @@ def mock_local_apis(page):
                     'longTerm':{'verifiedCount':24,'oldestVerifiedAt':'2026-01-01T00:00:00Z','newestVerifiedAt':'2026-10-01T00:00:00Z'}
                 }
             })); return
+        if '/api/autopilot-signals' in url:
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({
+                'ok': True,
+                'account': {'name': 'Autopilot', 'username': 'joinautopilot', 'xUrl': 'https://x.com/joinautopilot', 'platformUrl': 'https://joinautopilot.com'},
+                'provider': 'qa',
+                'degraded': False,
+                'signals': [{'title': 'See the $NVDA portfolio', 'snippet': 'Holdings are linked to a public portfolio.', 'url': 'https://x.com/joinautopilot/status/123', 'publishedAt': '2026-10-04T00:00:00Z', 'official': True, 'sourceType': 'official-x', 'tickers': ['NVDA']}],
+                'tickers': ['NVDA'],
+                'portfolioLinks': ['https://joinautopilot.com/landing/1/1343'],
+                'officialCoverage': 1,
+                'fetchedAt': '2026-10-04T00:00:00Z'
+            })); return
         if '/api/ai-quality' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'runs':[],'analytics':{'aggregates':{},'latest':None,'previous':None,'regression':{'passed':True,'regressionCount':0,'regressions':[],'observed':[]}}})); return
         route.fulfill(status=200, content_type='application/json', body='{}')
@@ -223,3 +235,13 @@ def test_held_portfolio_filters_and_sort_mount(page):
     portfolio.wait_for(state="attached", timeout=30000)
     portfolio.get_by_label("Filter held portfolio universe by state").wait_for(state="visible", timeout=30000)
     portfolio.get_by_label("Sort held portfolio universe").wait_for(state="visible", timeout=30000)
+
+
+def test_autopilot_signals_panel_mounts(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    panel = page.get_by_test_id("autopilot-signals")
+    panel.wait_for(state="visible", timeout=30000)
+    assert "AUTOPILOT / X SIGNALS" in panel.inner_text()
+    assert "joinautopilot" in panel.inner_text()

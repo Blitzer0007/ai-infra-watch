@@ -1,7 +1,8 @@
 import forecastHandler from '../server/api/forecast-verification.js';
 import digestHandler from '../server/api/portfolio-digest.js';
+import forecastAutoTrackHandler from '../server/api/forecast-auto-track.js';
 
-const routes = { 'forecast-verification': forecastHandler, 'portfolio-digest': digestHandler };
+const routes = { 'forecast-verification': forecastHandler, 'portfolio-digest': digestHandler, 'forecast-auto-track': forecastAutoTrackHandler };
 
 export default async function handler(req, res) {
   const route = String(req.query?.route || '').trim().toLowerCase();
