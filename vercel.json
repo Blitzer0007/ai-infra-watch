@@ -33,6 +33,10 @@
       "destination": "/api/market?route=alert-notify"
     },
     {
+      "source": "/api/autopilot-signals",
+      "destination": "/api/autopilot-signals"
+    },
+    {
       "source": "/api/forecast-validation",
       "destination": "/api/market?route=forecast-validation"
     },
