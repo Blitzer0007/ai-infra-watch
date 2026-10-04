@@ -266,7 +266,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   // Prepare chart data by merging stock history with milestone flags
   const chartData = chartHistory.map((pt) => {
     // Find milestone at matching month/date
-    const m = stockMilestones.find((mil) => matchesDate(mil.date, pt.date));
+    const m = stockMilestones.find((mil) => matchesDate(mil.date, pt.date) && /^\d{4}-\d{2}-\d{2}$/.test(mil.date));
     return {
       ...pt,
       milestone: m ? m.title : null,
@@ -274,6 +274,8 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       milestonePrice: m ? getAccuratePrice(m) : null
     };
   });
+
+  const monthOnlyMilestones = stockMilestones.filter(m => !/^\d{4}-\d{2}-\d{2}$/.test(m.date));
 
   // Custom tool tip for chart
   const CustomTooltip = ({ active, payload }: any) => {
