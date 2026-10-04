@@ -161,7 +161,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                   {item?.count != null ? item.count + ' evidence items' : ''}
                   {item?.source ? ' · ' + item.source : ''}
                   {item?.provider ? ' · provider: ' + item.provider : ''}
-                  {freshness(item) ? ' · retrieved ' + freshness(item) : ''}
+                  {freshness(item) ? ' · last retrieved ' + freshness(item) : ''}
                   {item?.refreshIntervalSeconds ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
                   {item?.fallback ? ' · fallback' : ''}
                   {item?.upstreamError ? ' · upstream issue' : ''}
