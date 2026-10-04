@@ -60,6 +60,9 @@ export type PortfolioTransaction = {
   sourceRow: number;
   quantityDerived?: boolean;
   priceDerived?: boolean;
+  currency?: string;
+  dataQuality?: 'ok' | 'review';
+  dataQualityWarnings?: string[];
   createdAt?: string;
 };
 
