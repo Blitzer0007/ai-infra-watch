@@ -786,6 +786,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             macroRisks={macroRisks}
             news={news}
             politicalSignals={politicalSignals}
+            heldSymbols={analyses.map(item => item.symbol)}
           />
 
           <UnifiedEventTimeline
@@ -795,6 +796,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             macroRisks={macroRisks}
             news={news}
             politicalSignals={politicalSignals}
+            purchaseDate={selectedAnalysis?.purchaseDate || null}
           />
         </>
       )}
