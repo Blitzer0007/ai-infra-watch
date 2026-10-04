@@ -186,6 +186,9 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.pending ?? 0) + ' pending · ' + (data.forecast?.distinctTickerDates ?? 0) + ' distinct ticker/date outcomes'} />
       </div>
 
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio price coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
+      {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; edge values are withheld when trades could not be matched.</div>}
+      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">
