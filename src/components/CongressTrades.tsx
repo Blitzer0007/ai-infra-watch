@@ -399,6 +399,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
       excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
       excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
       excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
+       ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
+       ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
@@ -559,7 +561,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
           </div>
-          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Positive excess means the selected ticker moved more than SPY.</div>
+          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
+          <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Same-date trades remain correlated.</div>
           <div className={`mt-1 text-[9px] font-mono ${reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}`}>
             {reactionSummary.matched < 30 ? 'LOW CONFIDENCE · n<30 matched reactions' : 'Sample size ≥30 matched reactions'}
           </div>
