@@ -84,7 +84,7 @@ const ITEMS: GuideItem[] = [
     id: 'sensitivity',
     title: 'Scenario impact',
     question: 'What if a risk becomes worse?',
-    meaning: 'Scenario impact is a modeled exposure index, not a price forecast. It shows which holdings are more sensitive to the assumptions you enter.',
+    meaning: 'Scenario impact is a modeled sensitivity score, not a price forecast. It shows which holdings are more sensitive to the assumptions you enter.',
     example: 'Taiwan disruption + power stress + export-control assumptions produce a sensitivity score. It does not mean the portfolio will fall by that score.',
     screenshot: 'Screenshot reference: Macro & Politics / Scenario impact',
     view: 'macro',
@@ -115,7 +115,7 @@ const ITEMS: GuideItem[] = [
     title: 'Forward Outlook & Forecast Verification',
     question: 'How do I test whether the historical forecast actually works?',
     meaning: 'Forward Outlook uses historical market regimes to build return distributions for 5D, 20D, 60D, 6M and 12M horizons. It is scenario analysis and historical evidence, not a guaranteed price prediction. Forecast Verification stores a forecast and later compares it with the observed market return.',
-    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. P25–P75 is the middle historical range. After the target date, actual return and median error show what happened.',
+    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. Middle historical range is the middle historical range. After the target date, actual return and median error show what happened.',
     screenshot: 'Screenshot reference: Forward Outlook / forecast verification / validation matrix',
     view: 'outlook',
     icon: TrendingUp
