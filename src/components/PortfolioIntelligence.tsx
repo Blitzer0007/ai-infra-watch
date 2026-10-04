@@ -120,8 +120,17 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   useEffect(() => {
     let cancelled = false;
     setPortfolioLoading(true);
-    fetchPortfolioHoldings()
-      .then(rows => { if (!cancelled) { setHoldings(rows); setPortfolioError(''); } })
+    Promise.all([
+      fetchPortfolioHoldings(),
+      fetchPortfolioTransactions().catch(() => []),
+    ])
+      .then(([rows, transactions]) => {
+        if (!cancelled) {
+          setHoldings(rows);
+          setPortfolioTransactions(transactions);
+          setPortfolioError('');
+        }
+      })
       .catch(error => { if (!cancelled) setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable'); })
       .finally(() => { if (!cancelled) setPortfolioLoading(false); });
     return () => { cancelled = true; };
