@@ -743,6 +743,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Contracts evidence: ' + JSON.stringify(compact(contracts, ['title','company','date','status','summary'])),
         'News evidence: ' + JSON.stringify(compact(news, ['title','source','publishedAt','summary'])),
         'Political/policy evidence: ' + JSON.stringify(compact(politicalSignals, ['title','source','date','summary','impactRating'])),
+        'Real earnings calendar input: ' + JSON.stringify(earnings.slice(0, 5)),
         'Macro risks: ' + JSON.stringify(compact(macroRisks, ['title','description','impactRating']))
       ].join('\n');
 
@@ -1324,6 +1325,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 (f.evidenceSnapshot.counts?.macro || 0)
               } event/context items · captured {f.evidenceSnapshot.capturedAt ? new Date(f.evidenceSnapshot.capturedAt).toLocaleString() : 'unknown time'}
             </div>}
+            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Legacy forecast — creation-time evidence snapshot was not captured.</div>}
             {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
