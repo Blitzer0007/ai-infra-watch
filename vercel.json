@@ -53,6 +53,10 @@
       "destination": "/api/cron?route=forecast-verification"
     },
     {
+      "source": "/api/forecast-auto-track",
+      "destination": "/api/cron?route=forecast-auto-track"
+    },
+    {
       "source": "/api/portfolio-digest",
       "destination": "/api/cron?route=portfolio-digest"
     },
