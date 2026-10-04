@@ -276,3 +276,9 @@ export function calculateActualPortfolio(holdings, transactionRows, quotes, hist
     freshQuotes,fallbackQuotes,unavailableQuotes,status:unavailableQuotes?'partial':'complete',
   };
 }
+
+
+export function scoreDecision(decision, excessReturn) {
+  if (!Number.isFinite(excessReturn)) return null;
+  return ['REDUCE_REVIEW', 'EXIT_REVIEW'].includes(String(decision).toUpperCase()) ? -excessReturn : excessReturn;
+}
