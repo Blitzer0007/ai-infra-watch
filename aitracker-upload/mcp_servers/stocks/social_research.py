@@ -173,6 +173,82 @@ class WebSearchService:
             }
 
 
+AUTOPILOT_PROFILES = (
+    {
+        "id": "autopilot",
+        "name": "Autopilot",
+        "organizations": ["Autopilot", "Pelosi Tracker"],
+        "x_username": "joinautopilot",
+        "official_domains": ["joinautopilot.com", "marketplace.joinautopilot.com"],
+    },
+)
+
+
+class PlatformSignalsService:
+    """Discover public investment-platform signals, starting with Autopilot's X account."""
+
+    def __init__(self, search: WebSearchService | None = None) -> None:
+        self.search = search or WebSearchService()
+
+    def get(self, platform: str = "Autopilot", days: int = 7, limit: int = 12) -> dict[str, Any]:
+        requested = str(platform or "Autopilot").strip().lower()
+        profiles = [p for p in AUTOPILOT_PROFILES if requested in p["name"].lower() or requested in p["id"]]
+        if not profiles:
+            profiles = list(AUTOPILOT_PROFILES)
+
+        rows: list[dict[str, Any]] = []
+        notes: list[str] = []
+        for profile in profiles:
+            username = profile["x_username"]
+            queries = [
+                (f'site:x.com/{username} (portfolio OR holdings OR invested OR tracker OR positions OR "$")', ["x.com"]),
+                (f'site:joinautopilot.com/landing "{profile["name"]}" portfolio', ["joinautopilot.com"]),
+            ]
+            for query, domains in queries:
+                result = self.search.search(query, domains=domains, days=days, limit=limit)
+                if result.get("error"):
+                    notes.append(str(result["error"]))
+                for item in result.get("results") or []:
+                    url = str(item.get("url") or "")
+                    host = _host(url)
+                    official_x = host == "x.com" and url.lower().startswith("https://x.com/" + username.lower())
+                    official_site = any(host == d or host.endswith("." + d) for d in profile["official_domains"])
+                    text_blob = " ".join(str(item.get(key) or "") for key in ("title", "snippet", "summary")).strip()
+                    tickers = sorted(set(re.findall(r'\$([A-Z]{1,6})(?:\b|$)', text_blob)))
+                    portfolio_links = [token.rstrip(".,)") for token in re.findall(r'https?://(?:www\.)?(?:marketplace\.)?joinautopilot\.com/[^\s)]+', text_blob)]
+                    rows.append({
+                        **item,
+                        "platform": profile["name"],
+                        "xUsername": username,
+                        "official": official_x or official_site,
+                        "sourceType": "official-x" if official_x else "official-platform" if official_site else "secondary",
+                        "signalType": "platform_social_signal" if official_x else "platform_coverage",
+                        "tickers": tickers,
+                        "portfolioLinks": portfolio_links,
+                    })
+
+        deduped = {}
+        for row in rows:
+            key = str(row.get("url") or row.get("title") or "").strip().lower()
+            if key:
+                deduped.setdefault(key, row)
+        out = list(deduped.values())
+        out.sort(key=lambda row: str(row.get("published_at") or ""), reverse=True)
+        return {
+            "source": "platform-signal-discovery",
+            "platform": profiles[0]["name"],
+            "xUsername": profiles[0]["x_username"],
+            "xUrl": "https://x.com/" + profiles[0]["x_username"],
+            "provider": "mixed-web-search",
+            "signals": out[:limit],
+            "tickers": sorted({ticker for row in out for ticker in row.get("tickers") or []}),
+            "portfolioLinks": sorted({link for row in out for link in row.get("portfolioLinks") or []}),
+            "officialCoverage": sum(1 for row in out if row.get("official")),
+            "degraded": bool(notes),
+            "providerNotes": sorted(set(notes))[:5],
+        }
+
+
 class ExecutiveSignalsService:
     def __init__(self, search: WebSearchService | None = None) -> None:
         self.search = search or WebSearchService()
