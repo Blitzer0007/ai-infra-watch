@@ -57,23 +57,34 @@ async function getLatestForecast(symbol) {
   const rows = await supabase('forecast_snapshots?ticker=eq.' + encodeURIComponent(symbol) + '&horizon=eq.20&select=id,ticker,target_date,entry_price,median,p25,p75,created_at&order=created_at.desc&limit=1', { method: 'GET' });
   return rows[0] || null;
 }
+function decisionScore(decision, excessReturn) {
+  if (!Number.isFinite(Number(excessReturn))) return null;
+  const normalized = String(decision || '').toUpperCase();
+  return ['REDUCE_REVIEW','EXIT_REVIEW'].includes(normalized)
+    ? -Number(excessReturn)
+    : Number(excessReturn);
+}
+
 export async function reviewDueDecisionJournal() {
   const today = localDate();
   const rows = await supabase('decision_journal_entries?review_status=eq.pending&review_target_date=lte.' + encodeURIComponent(today) + '&select=*&order=review_target_date.asc&limit=100', { method: 'GET' });
   let outcomesReady = 0;
   for (const row of rows) {
     try {
-      const [series, spySeries] = await Promise.all([
+      const benchmarkSymbol = String(row.benchmark_symbol || 'SPY').toUpperCase() === 'SOXX' ? 'SOXX' : 'SPY';
+      const [series, benchmarkSeries] = await Promise.all([
         routedHistory(String(row.symbol).toUpperCase(), '1y'),
-        routedHistory('SPY', '1y'),
+        routedHistory(benchmarkSymbol, '1y'),
       ]);
       const target = twentiethSessionAfter(series.points || [], String(row.decision_date));
       if (!target || !(Number(row.decision_price) > 0) || !(Number(row.benchmark_entry_price) > 0)) continue;
-      const benchmarkTarget = sameOrPreviousPoint(spySeries.points || [], target.date);
+      const benchmarkTarget = sameOrPreviousPoint(benchmarkSeries.points || [], target.date);
       if (!benchmarkTarget) continue;
       const outcomeReturn = (Number(target.price) / Number(row.decision_price) - 1) * 100;
       const benchmarkReturn = (Number(benchmarkTarget.price) / Number(row.benchmark_entry_price) - 1) * 100;
+      const excessReturn = outcomeReturn - benchmarkReturn;
       const forecastError = row.forecast_median == null ? null : outcomeReturn - Number(row.forecast_median);
+      const score = decisionScore(row.decision, excessReturn);
       await supabase('decision_journal_entries?id=eq.' + encodeURIComponent(row.id), {
         method: 'PATCH',
         body: JSON.stringify({
@@ -82,7 +93,8 @@ export async function reviewDueDecisionJournal() {
           outcome_price: Number(target.price),
           outcome_return_pct: outcomeReturn,
           benchmark_return_pct: benchmarkReturn,
-          excess_return_pct: outcomeReturn - benchmarkReturn,
+          excess_return_pct: excessReturn,
+          decision_score_pct: score,
           forecast_error_pct: forecastError,
         }),
         headers: { Prefer: 'return=minimal' },
@@ -97,9 +109,12 @@ export async function reviewDueDecisionJournal() {
 export async function getWeeklyDecisionReview() {
   const today = localDate();
   const start = addDays(today, -6);
-  const rows = await supabase('decision_journal_entries?select=decision_date,review_status,outcome_return_pct,benchmark_return_pct,excess_return_pct,forecast_error_pct,rule_followed&order=decision_date.desc&limit=500', { method: 'GET' });
+  const rows = await supabase('decision_journal_entries?select=decision_date,decision,review_status,outcome_return_pct,benchmark_return_pct,excess_return_pct,decision_score_pct,forecast_error_pct,rule_followed&order=decision_date.desc&limit=500', { method: 'GET' });
   const week = rows.filter(r => String(r.decision_date) >= start && String(r.decision_date) <= today);
   const outcomes = week.filter(r => Number.isFinite(Number(r.excess_return_pct)));
+  const scored = outcomes.map(r => Number.isFinite(Number(r.decision_score_pct))
+    ? Number(r.decision_score_pct)
+    : decisionScore(r.decision, r.excess_return_pct)).filter(Number.isFinite);
   const ruleRows = week.filter(r => r.review_status === 'completed' && typeof r.rule_followed === 'boolean');
   const average = key => {
     const values = outcomes.map(r => Number(r[key])).filter(Number.isFinite);
@@ -107,22 +122,30 @@ export async function getWeeklyDecisionReview() {
   };
   const adherence = ruleRows.length ? ruleRows.filter(r => r.rule_followed).length / ruleRows.length * 100 : null;
   const avgExcess = average('excess_return_pct');
+  const avgScore = scored.length ? scored.reduce((a,b)=>a+b,0)/scored.length : null;
+  const sampleAdequate = scored.length >= 10;
   const reflection = outcomes.length === 0
     ? 'No completed outcomes this week yet — make sure the next due review gets a rule-adherence decision.'
-    : adherence != null && adherence < 100
-      ? 'Which decision was hardest to follow, and what made the original rule unclear or inconvenient?'
-      : avgExcess != null && avgExcess < 0
-        ? 'Which decision underperformed SPY, and what evidence would have changed the original decision?'
-        : 'Which thesis or evidence was most useful in explaining the outcome, and should it change your next rule?';
+    : !sampleAdequate
+      ? 'Small sample this week — use the outcomes as learning signals, not a performance conclusion.'
+      : adherence != null && adherence < 100
+        ? 'Which decision was hardest to follow, and what made the original rule unclear or inconvenient?'
+        : avgScore != null && avgScore < 0
+          ? 'Which decision score was weakest, and what evidence would have changed the original decision?'
+          : 'Which thesis or evidence was most useful in explaining the outcome, and should it change your next rule?';
   return {
     period: { start, end: today },
     decisions: week.length,
     outcomes: outcomes.length,
-    beatsBenchmark: outcomes.filter(r => Number(r.excess_return_pct) > 0).length,
+    scoredOutcomes: scored.length,
+    beatsBenchmark: scored.filter(v => v > 0).length,
     averageExcessReturnPct: avgExcess,
+    averageDecisionScorePct: avgScore,
     averageForecastErrorPct: average('forecast_error_pct'),
     ruleAdherencePct: adherence,
     openOutcomeReviews: rows.filter(r => r.review_status === 'outcome_ready').length,
+    sampleAdequate,
+    sampleLabel: sampleAdequate ? 'Decision score is directional; n=' + scored.length : 'INSUFFICIENT SAMPLE · n=' + scored.length + ' < 10',
     reflection,
   };
 }
@@ -145,10 +168,11 @@ export default async function handler(req, res) {
       const holding = await getHolding(holdingId);
       if (!holding) return res.status(404).json({ error: 'Held portfolio position not found.' });
       const symbol = String(holding.symbol).toUpperCase();
-      const [series, spySeries, forecast] = await Promise.all([routedHistory(symbol, '1y'), routedHistory('SPY', '1y'), getLatestForecast(symbol)]);
+      const benchmarkSymbol = String(body.benchmarkSymbol || 'SPY').toUpperCase() === 'SOXX' ? 'SOXX' : 'SPY';
+      const [series, benchmarkSeries, forecast] = await Promise.all([routedHistory(symbol, '1y'), routedHistory(benchmarkSymbol, '1y'), getLatestForecast(symbol)]);
       const points = series.points || [];
       const latest = points.filter(p => Number(p.price) > 0).at(-1);
-      const benchmarkEntry = sameOrPreviousPoint(spySeries.points || [], latest?.date || '');
+      const benchmarkEntry = sameOrPreviousPoint(benchmarkSeries.points || [], latest?.date || '');
       if (!latest || !benchmarkEntry) return res.status(503).json({ error: 'Market close or benchmark price is unavailable for this decision.' });
       const reviewTarget = twentiethSessionAfter(points, latest.date);
       const targetReviewDate = reviewTarget?.date || addDays(latest.date, 28);
