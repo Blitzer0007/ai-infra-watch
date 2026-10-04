@@ -164,7 +164,7 @@ async function fetchDecisionCenter() {
   }
 }
 
-function buildDecisionFirstText(decision, fallbackDate, weekly, decisionError = null) {
+export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionError = null) {
   const lines = [
     'AI Infra Watch · Daily Decision Brief',
     fallbackDate,
