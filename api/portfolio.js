@@ -53,7 +53,32 @@ function normalizeLot(row) {
   };
 }
 
+function transactionQuality(row) {
+  const warnings = [];
+  if (!row.trade_date || Number.isNaN(Date.parse(String(row.trade_date)))) warnings.push('invalid trade date');
+  const quantity = Number(row.quantity);
+  const amount = Number(row.amount);
+  const price = row.price == null ? null : Number(row.price);
+  if (!(quantity > 0)) warnings.push('non-positive quantity');
+  if (!(amount > 0)) warnings.push('non-positive amount');
+  if (price != null && Number.isFinite(price) && price > 0 && quantity > 0 && amount > 0) {
+    const implied = quantity * price;
+    const tolerance = Math.max(0.05, Math.abs(amount) * 0.01);
+    if (Math.abs(implied - amount) > tolerance) warnings.push('price × quantity differs from amount');
+  }
+  if (row.quantity_derived) warnings.push('quantity derived');
+  if (row.price_derived) warnings.push('price derived');
+  const currency = String(row.currency || 'USD').toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) warnings.push('invalid currency');
+  return {
+    status: warnings.length ? 'review' : 'ok',
+    warnings,
+    currency,
+  };
+}
+
 function normalizeTransaction(row) {
+  const quality = transactionQuality(row);
   return {
     id: row.id,
     symbol: String(row.symbol).toUpperCase(),
@@ -70,6 +95,9 @@ function normalizeTransaction(row) {
     sourceRow: Number(row.source_row),
     quantityDerived: Boolean(row.quantity_derived),
     priceDerived: Boolean(row.price_derived),
+    currency: quality.currency,
+    dataQuality: quality.status,
+    dataQualityWarnings: quality.warnings,
     createdAt: row.created_at,
   };
 }
@@ -114,9 +142,17 @@ export default async function handler(req, res) {
       const holdings = rows.map(normalize).filter(holding => holding.quantity > 0);
       if (String(req.query?.includeTransactions || '') === 'true') {
         const transactionRows = await supabase('portfolio_transactions?select=*&order=trade_date.asc,source_row.asc', { method: 'GET' });
+        const normalizedTransactions = transactionRows.map(normalizeTransaction);
+        const transactionQuality = {
+          total: normalizedTransactions.length,
+          review: normalizedTransactions.filter(row => row.dataQuality === 'review').length,
+          derived: normalizedTransactions.filter(row => row.quantityDerived || row.priceDerived).length,
+          currencies: [...new Set(normalizedTransactions.map(row => row.currency))],
+        };
         return res.status(200).json({
           holdings,
-          transactions: transactionRows.map(normalizeTransaction),
+          transactions: normalizedTransactions,
+          transactionQuality,
           persistent: true,
           source: 'supabase',
         });
