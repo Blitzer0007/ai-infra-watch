@@ -539,6 +539,9 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
           </div>
           <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Positive excess means the selected ticker moved more than SPY.</div>
+          <div className={`mt-1 text-[9px] font-mono ${reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}`}>
+            {reactionSummary.matched < 30 ? 'LOW CONFIDENCE · n<30 matched reactions' : 'Sample size ≥30 matched reactions'}
+          </div>
 
           {historyLoading && (
             <div className="text-[9px] font-mono text-white/30 mt-3">Loading 5-year market history…</div>
