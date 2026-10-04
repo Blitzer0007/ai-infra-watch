@@ -442,7 +442,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [earningsLoading, setEarningsLoading] = useState(false);
   const [earningsError, setEarningsError] = useState<string | null>(null);
   const [decisionDraft, setDecisionDraft] = useState({
-    thesis: '', lossLimitPct: '', exitRuleType: 'trailing_stop', exitRuleValue: '', exitRuleText: '', practicalNotes: '', brokerAlerts: '',
+    thesis: '', lossLimitPct: '', exitRuleType: 'trailing_stop', exitRuleValue: '', exitRuleText: '', practicalNotes: '', brokerAlerts: '', ruleStages: '[]', riskGroup: '', shockSensitivity: '1',
   });
 
   const verificationDrift = useMemo(
@@ -699,7 +699,6 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       try {
         const parsedStages = JSON.parse(decisionDraft.ruleStages);
         if (!Array.isArray(parsedStages)) throw new Error('Rule stages must be a JSON array.');
-        decisionDraft.ruleStages = JSON.stringify(parsedStages);
       } catch (error) {
         setDecisionMessage('Rule stages must be valid JSON array.'); return;
       }
