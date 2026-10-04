@@ -323,3 +323,22 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     page.get_by_text("Event Study", exact=True).click()
     page.get_by_text("5D benchmark context", exact=True).wait_for(state="visible", timeout=30000)
     assert "SOXX" in page.get_by_text("5D benchmark context", exact=True).locator("..").inner_text()
+
+
+def test_forward_outlook_has_real_earnings_input(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-outlook").click()
+    outlook = page.get_by_test_id("forward-outlook")
+    outlook.wait_for(state="visible", timeout=30000)
+    outlook.get_by_text("Real earnings calendar", exact=False).wait_for(state="visible", timeout=30000)
+    assert "NVDA earnings" in outlook.inner_text()
+
+
+def test_contract_event_study_shows_sector_benchmark_context(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("5D benchmark context", exact=True).wait_for(state="visible", timeout=30000)
+    assert "SOXX" in page.get_by_text("5D benchmark context", exact=True).locator("..").inner_text()
