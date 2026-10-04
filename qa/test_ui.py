@@ -268,5 +268,6 @@ def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
     center.wait_for(state="visible", timeout=30000)
     assert "What matters for you now" in center.inner_text()
     assert "Same cash-flow benchmark" in center.inner_text()
-    assert "20D verified" in center.inner_text()
+    assert "verified" in center.inner_text()
+    assert "/50" in center.inner_text()
     assert "NVDA" in center.inner_text()
