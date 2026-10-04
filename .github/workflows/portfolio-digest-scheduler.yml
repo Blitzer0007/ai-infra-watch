@@ -4,14 +4,12 @@ run-name: Portfolio Digest • ${{ github.event.schedule || 'manual' }}
 on:
   schedule:
     # Five minutes past each requested hour to reduce top-of-hour scheduling congestion.
-    - cron: '5 6 * * *'
-      timezone: "Asia/Kolkata"
-    - cron: '5 12 * * *'
-      timezone: "Asia/Kolkata"
-    - cron: '5 18 * * *'
-      timezone: "Asia/Kolkata"
-    - cron: '5 22 * * *'
-      timezone: "Asia/Kolkata"
+    # GitHub Actions cron is evaluated in UTC. These correspond to
+    # 06:05, 12:05, 18:05 and 22:05 Asia/Kolkata.
+    - cron: '35 0 * * *'
+    - cron: '35 6 * * *'
+    - cron: '35 12 * * *'
+    - cron: '35 16 * * *'
   workflow_dispatch:
 
 concurrency:
