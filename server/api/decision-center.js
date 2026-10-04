@@ -64,83 +64,66 @@ function transactionNetCash(transaction) {
 
 async function fetchSignalGate() {
   const rows = await supabase(
-    'portfolio_signal_family_scorecard?select=signal_type,evaluated_samples,mean_20d_excess_return_pct,lifecycle_status&order=signal_type.asc',
+    'portfolio_signal_family_scorecard?select=signal_type,evaluated_samples,mean_20d_excess_return_pct,median_20d_excess_return_pct,win_rate_20d,lifecycle_status&order=signal_type.asc',
   );
   const families = rows.map(row => ({
     signalType: String(row.signal_type || 'unknown'),
     samples: Number(row.evaluated_samples || 0),
     meanExcessPct: row.mean_20d_excess_return_pct == null ? null : Number(row.mean_20d_excess_return_pct),
+    medianExcessPct: row.median_20d_excess_return_pct == null ? null : Number(row.median_20d_excess_return_pct),
+    winRatePct: row.win_rate_20d == null ? null : Number(row.win_rate_20d) * 100,
     lifecycle: String(row.lifecycle_status || 'experimental'),
     decisionEligible: String(row.lifecycle_status) === 'active'
-      && Number(row.evaluated_samples) >= 10
-      && Number(row.mean_20d_excess_return_pct) > 0,
+      && Number(row.evaluated_samples) >= 30
+      && Number(row.median_20d_excess_return_pct) > 0
+      && Number(row.win_rate_20d) > 0.5,
   }));
   return {
     eligible: families.filter(row => row.decisionEligible).length,
     experimental: families.filter(row => row.lifecycle === 'experimental' || row.lifecycle === 'under_review').length,
     retired: families.filter(row => row.lifecycle === 'retired').length,
     families,
-    note: 'Only active signal families with 10+ independent ticker/date samples and positive 20D excess return may drive the decision layer.',
+    note: 'Decision-driving signals require 30+ ticker/date samples, positive median 20D excess return, and win rate above 50%.',
   };
 }
 
 async function fetchEarnings(symbols) {
-  const key = String(process.env.FINNHUB_API_KEY || '').trim();
-  if (!key || !symbols.length) return [];
-  const today = dateOnly(new Date());
-  const to = addDays(today, 7);
+  const key=String(process.env.FINNHUB_API_KEY||'').trim();
+  if(!symbols.length) return {status:'ok',events:[]};
+  if(!key) return {status:'no_key',events:[]};
+  const today=localDate(), to=addDays(today,7);
   try {
-    const url = new URL('https://finnhub.io/api/v1/calendar/earnings');
-    url.searchParams.set('from', today);
-    url.searchParams.set('to', to);
-    url.searchParams.set('international', 'false');
-    url.searchParams.set('token', key);
-    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
-    if (!response.ok) return [];
-    const body = await response.json();
-    const wanted = new Set(symbols.map(s => s.toUpperCase()));
-    return (Array.isArray(body?.earningsCalendar) ? body.earningsCalendar : [])
-      .filter(row => wanted.has(String(row?.symbol || '').toUpperCase()))
-      .map(row => ({
-        symbol: String(row.symbol).toUpperCase(),
-        date: String(row.date),
-        daysUntil: daysBetween(today, String(row.date)),
-        hour: row.hour || null,
-      }))
-      .filter(row => row.daysUntil >= 0 && row.daysUntil <= 7)
-      .sort((a, b) => a.daysUntil - b.daysUntil || a.symbol.localeCompare(b.symbol));
-  } catch {
-    return [];
-  }
+    const url=new URL('https://finnhub.io/api/v1/calendar/earnings');
+    url.searchParams.set('from',today); url.searchParams.set('to',to); url.searchParams.set('international','false'); url.searchParams.set('token',key);
+    const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(10000)});
+    if(!response.ok) return {status:'unavailable',events:[],reason:'HTTP '+response.status};
+    const body=await response.json(), wanted=new Set(symbols.map(s=>s.toUpperCase()));
+    const events=(Array.isArray(body?.earningsCalendar)?body.earningsCalendar:[])
+      .filter(row=>wanted.has(String(row?.symbol||'').toUpperCase()))
+      .map(row=>({symbol:String(row.symbol).toUpperCase(),date:String(row.date),daysUntil:daysBetween(today,String(row.date)),hour:row.hour||null}))
+      .filter(row=>row.daysUntil>=0&&row.daysUntil<=7)
+      .sort((a,b)=>a.daysUntil-b.daysUntil||a.symbol.localeCompare(b.symbol));
+    return {status:'ok',events};
+  } catch(error){ return {status:'unavailable',events:[],reason:error instanceof Error?error.message:'earnings fetch failed'}; }
 }
 
 async function fetchForecastProgress() {
-  const rows = await supabase(
-    'forecast_snapshots?select=ticker,horizon,status,target_date,verified_at&horizon=eq.20&order=created_at.desc&limit=2000',
-  );
-  const today = dateOnly(new Date());
-  const verified = rows.filter(row => row.status === 'verified');
-  const pending = rows.filter(row => row.status === 'pending');
-  const due = pending
-    .filter(row => row.target_date && row.target_date <= today)
-    .sort((a, b) => String(a.target_date).localeCompare(String(b.target_date)));
-
-  const verifiedTickers = new Set(verified.map(row => String(row.ticker).toUpperCase()));
-  const verifiedDates = new Set(verified.map(row => String(row.verified_at || '').slice(0, 10)).filter(Boolean));
-  const independentHint = Math.min(
-    verified.length,
-    new Set(verified.map(row => String(row.ticker).toUpperCase() + ':' + String(row.verified_at || '').slice(0, 10))).size,
-  );
-
+  const rows=await supabase('forecast_snapshots?select=ticker,horizon,status,target_date,verified_at,created_at&horizon=eq.20&order=created_at.desc&limit=2000');
+  const today=localDate();
+  const verified=rows.filter(row=>row.status==='verified');
+  const pending=rows.filter(row=>row.status==='pending');
+  const due=pending.filter(row=>row.target_date&&row.target_date<=today).sort((a,b)=>String(a.target_date).localeCompare(String(b.target_date)));
   return {
-    verified: verified.length,
-    pending: pending.length,
-    due: due.length,
-    remaining: Math.max(0, 50 - verified.length),
-    tickers: verifiedTickers.size,
-    dates: verifiedDates.size,
-    distinctTickerDates: independentHint,
-    gate: verified.length >= 50 ? 'established' : 'building',
+    verified:verified.length,
+    independentVerified:countIndependentForecasts(verified),
+    pending:pending.length,
+    due:due.length,
+    remaining:Math.max(0,50-verified.length),
+    tickers:new Set(verified.map(row=>String(row.ticker).toUpperCase())).size,
+    dates:new Set(verified.map(row=>String(row.verified_at||'').slice(0,10)).filter(Boolean)).size,
+    distinctTickerDates:new Set(verified.map(row=>String(row.ticker).toUpperCase()+':'+String(row.verified_at||'').slice(0,10))).size,
+    gate:verified.length>=50?'established':'building',
+    horizons:[20],
   };
 }
 
@@ -151,7 +134,7 @@ export default async function handler(req, res) {
 
   try {
     const holdingRows = await supabase(
-      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,target_allocation_pct,max_allocation_pct&quantity=gt.0&order=symbol.asc',
+      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,broker_alerts,rule_stages,rule_stage_state,target_allocation_pct,max_allocation_pct,risk_group,shock_sensitivity&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
       'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row&order=trade_date.asc,source_row.asc',
