@@ -514,14 +514,14 @@ export default async function handler(req, res) {
       }
 
       if (rules.state === 'breached') {
-        const hit = rules.rules.find(rule => rule.breached) || rules.nearest;
+        const hit = rules.rules.find(rule => rule.breached && rule.direction === 'below') || rules.nearest;
         actionItems.push({
           severity: 'ACT',
           symbol,
           title: 'Downside rule breached',
           detail: hit?.unit === 'days'
             ? 'Your ' + hit.type + ' has reached ' + hit.target + ' days.'
-            : 'Price 
+            : 'Price $' + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of $' + Number(hit.target).toFixed(2) + '. Review your stored rule and evidence; no trade is automatic.',
           impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
         });
       } else if (rules.state === 'target-reached') {
@@ -530,16 +530,20 @@ export default async function handler(req, res) {
           severity: 'WATCH',
           symbol,
           title: 'Target reached — review next step',
-          detail: '
+          detail: '$' + q.price.toFixed(2) + ' has reached your upside review level of $' + Number(hit?.target || rules.nearest?.target || 0).toFixed(2) + '. Review the staged exit/hold plan; no trade is automatic.',
+          impact: null,
+        });
+      } else if (rules.state === 'near') {
         const near = rules.nearest;
         actionItems.push({
           severity: 'WATCH',
           symbol,
           title: 'Close to your rule',
           detail: near?.unit === 'days'
-            ? Math.max(0, Number(near.distance)) + ' days remain on your ' + near.type + '.'
+            ? Math.max(0, Number(near.distancePct)) + ' days remain on your ' + near.type + '.'
             : near?.direction === 'above'
-              ? '
+              ? '$' + q.price.toFixed(2) + ' is within ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% of your upside level at $' + Number(near.target).toFixed(2) + '.'
+              : '$' + q.price.toFixed(2) + ' is within ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + Number(near.target).toFixed(2) + '.',
           impact: null,
         });
       } else if (rules.state === 'no-rule') {
@@ -552,7 +556,6 @@ export default async function handler(req, res) {
         });
       }
     }
-
     const earningsResult = await fetchEarnings(symbols);
     const earnings = earningsResult.events;
     for (const event of earnings.slice(0, 3)) {
