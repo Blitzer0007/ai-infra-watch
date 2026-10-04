@@ -101,6 +101,7 @@ export type PeerCounterfactual = {
   hypotheticalReturnPct: number | null;
   actualProfit: number | null;
   actualReturnPct: number | null;
+  actualCostBasis: number | null;
   difference: number | null;
   differencePctPoints: number | null;
   basis: 'broker-transactions' | 'single-entry';
@@ -146,7 +147,7 @@ export function calculatePeerCounterfactual(input: {
     return {
       peer: null, purchaseDate: holding.purchaseDate ?? null, peerEntryDate: null, peerEntryPrice: null,
       peerCurrentPrice, hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
-      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
+      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, actualCostBasis: null, difference: null,
       differencePctPoints: null, basis: transactions.length ? 'broker-transactions' : 'single-entry', status: 'peer-unavailable',
     };
   }
@@ -156,7 +157,7 @@ export function calculatePeerCounterfactual(input: {
     return {
       peer, purchaseDate, peerEntryDate: null, peerEntryPrice: null, peerCurrentPrice,
       hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
-      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
+      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, actualCostBasis: null, difference: null,
       differencePctPoints: null, basis: transactions.length ? 'broker-transactions' : 'single-entry',
       status: purchaseDate ? 'history-unavailable' : 'entry-unavailable',
     };
@@ -179,7 +180,7 @@ export function calculatePeerCounterfactual(input: {
     return {
       peer, purchaseDate, peerEntryDate: entry?.date ?? null, peerEntryPrice: entry?.price ?? null, peerCurrentPrice,
       hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null,
-      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, difference: null,
+      hypotheticalReturnPct: null, actualProfit: null, actualReturnPct: null, actualCostBasis: null, difference: null,
       differencePctPoints: null, basis: relevantTransactions.length ? 'broker-transactions' : 'single-entry',
       status: entry ? 'entry-unavailable' : 'history-unavailable',
     };
@@ -234,6 +235,7 @@ export function calculatePeerCounterfactual(input: {
       hypotheticalReturnPct,
       actualProfit,
       actualReturnPct,
+      actualCostBasis: netInvested,
       difference,
       differencePctPoints,
       basis: 'broker-transactions',
@@ -268,6 +270,7 @@ export function calculatePeerCounterfactual(input: {
     hypotheticalReturnPct,
     actualProfit,
     actualReturnPct,
+    actualCostBasis: holding.investedValue,
     difference,
     differencePctPoints,
     basis: 'single-entry',

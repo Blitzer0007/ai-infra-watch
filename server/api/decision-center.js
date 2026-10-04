@@ -43,6 +43,42 @@ function daysBetween(from, to) {
   const b = new Date(to + 'T00:00:00Z').getTime();
   return Math.round((b - a) / 86400000);
 }
+function previousOrSamePoint(points, date) {
+  const ordered = (points || []).filter(point => point?.date && Number(point?.price) > 0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let selected = null;
+  for (const point of ordered) {
+    if (String(point.date) <= String(date)) selected = point;
+    else break;
+  }
+  return selected;
+}
+function businessDaysBetween(from, to) {
+  const start = new Date(String(from) + 'T00:00:00Z');
+  const end = new Date(String(to) + 'T00:00:00Z');
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor < end) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const day = cursor.getUTCDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
+}
+function independentForecastCount(rows) {
+  const byTicker = new Map();
+  const ordered = [...rows].filter(row => row?.status === 'verified')
+    .sort((a,b)=>String(a.created_at || a.verified_at || a.target_date || '').localeCompare(String(b.created_at || b.verified_at || b.target_date || '')));
+  for (const row of ordered) {
+    const ticker = String(row.ticker || '').toUpperCase();
+    const anchor = String(row.created_at || row.verified_at || row.target_date || '').slice(0,10);
+    if (!ticker || !anchor) continue;
+    const list = byTicker.get(ticker) || [];
+    if (!list.length || businessDaysBetween(list[list.length-1], anchor) >= 20) list.push(anchor);
+    byTicker.set(ticker, list);
+  }
+  return [...byTicker.values()].reduce((sum,list)=>sum+list.length,0);
+}
 
 function signed(value) {
   return (value >= 0 ? '+' : '') + value.toFixed(2);
@@ -63,7 +99,7 @@ function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
   );
 
   for (const tx of ordered) {
-    const price = priceByDate.get(tx.trade_date);
+    const price = Number(previousOrSamePoint(benchmarkHistory?.points || [], tx.trade_date)?.price);
     if (!(price > 0)) continue;
 
     if (tx.transaction_type === 'BUY') {
@@ -131,83 +167,61 @@ function ruleDistance(holding, quote, history) {
   }
 
   const alertPrices = Array.isArray(holding.broker_alert_prices) ? holding.broker_alert_prices.map(Number).filter(v => v > 0) : [];
+  const averageCost = Number(holding.average_cost);
   for (const target of alertPrices) {
-    const distancePct = (price / target - 1) * 100;
+    const direction = Number.isFinite(averageCost) && target < averageCost ? 'below' : 'above';
+    const distancePct = direction === 'above' ? (target / price - 1) * 100 : (price / target - 1) * 100;
     rules.push({
-      type: 'broker alert',
+      type: direction === 'below' ? 'broker downside alert' : 'broker upside alert',
       target,
+      direction,
       distancePct,
-      breached: price <= target,
+      breached: direction === 'below' ? price <= target : price >= target,
     });
   }
 
-  const exitType = String(holding.exit_rule_type || '').toLowerCase();
-  const exitValue = Number(holding.exit_rule_value);
-  if (exitType.includes('trailing') && Number.isFinite(exitValue) && exitValue > 0 && Array.isArray(history?.points) && history.points.length) {
-    const start = String(holding.purchase_date || history.points[0]?.date || '');
-    const since = history.points.filter(point => point.date >= start && Number(point.price) > 0);
-    const peak = since.reduce((max, point) => Math.max(max, Number(point.price)), 0);
-    const stop = peak * (1 - exitValue / 100);
-    if (stop > 0) {
-      const distancePct = (price / stop - 1) * 100;
-      rules.push({
-        type: 'trailing stop',
-        target: stop,
-        distancePct,
-        breached: price <= stop,
-      });
-    }
-  }
-
-  if (exitType.includes('time') && Number.isFinite(exitValue) && exitValue > 0 && holding.purchase_date) {
-    const today = dateOnly(new Date());
-    const heldDays = daysBetween(holding.purchase_date, today);
-    const distanceDays = exitValue - heldDays;
-    rules.push({
-      type: 'time limit',
-      target: exitValue,
-      distancePct: distanceDays,
-      breached: heldDays >= exitValue,
-      unit: 'days',
-    });
-  }
-
-  if (!rules.length) return { state: 'no-rule', rules: [], nearest: null };
+  const exitType = String(holding.exit_rule_type || '').toLowerCase(); return { state: 'no-rule', rules: [], nearest: null };
   const actionable = rules.filter(rule => !rule.unit);
   const nearest = actionable.length
     ? [...actionable].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0]
     : [...rules].sort((a, b) => Math.abs(a.distancePct) - Math.abs(b.distancePct))[0];
 
-  if (rules.some(rule => rule.breached)) return { state: 'breached', rules, nearest };
-  if (rules.some(rule => !rule.unit && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
+  if (rules.some(rule => rule.breached && rule.direction === 'below')) return { state: 'breached', rules, nearest };
+  const targetReached = rules.find(rule => rule.breached && rule.direction === 'above');
+  if (targetReached) return { state: 'target-reached', rules, nearest: targetReached, targetReached };
+  if (rules.some(rule => !rule.breached && !rule.unit && Number.isFinite(rule.distancePct) && rule.distancePct >= 0 && rule.distancePct <= 3)) return { state: 'near', rules, nearest };
   return { state: 'clear', rules, nearest };
 }
 
 async function fetchSignalGate() {
   const rows = await supabase(
-    'portfolio_signal_family_scorecard?select=signal_type,evaluated_samples,mean_20d_excess_return_pct,lifecycle_status&order=signal_type.asc',
+    'portfolio_signal_family_scorecard?select=signal_type,evaluated_samples,mean_20d_excess_return_pct,median_20d_excess_return_pct,win_rate_20d,lifecycle_status&order=signal_type.asc',
   );
   const families = rows.map(row => ({
     signalType: String(row.signal_type || 'unknown'),
     samples: Number(row.evaluated_samples || 0),
     meanExcessPct: row.mean_20d_excess_return_pct == null ? null : Number(row.mean_20d_excess_return_pct),
+    medianExcessPct: row.median_20d_excess_return_pct == null ? null : Number(row.median_20d_excess_return_pct),
+    winRatePct: row.win_rate_20d == null ? null : Number(row.win_rate_20d) * 100,
     lifecycle: String(row.lifecycle_status || 'experimental'),
     decisionEligible: String(row.lifecycle_status) === 'active'
-      && Number(row.evaluated_samples) >= 10
-      && Number(row.mean_20d_excess_return_pct) > 0,
+      && Number(row.evaluated_samples) >= 30
+      && Number(row.median_20d_excess_return_pct) > 0
+      && Number(row.win_rate_20d) > 0.5,
   }));
   return {
     eligible: families.filter(row => row.decisionEligible).length,
     experimental: families.filter(row => row.lifecycle === 'experimental' || row.lifecycle === 'under_review').length,
     retired: families.filter(row => row.lifecycle === 'retired').length,
     families,
-    note: 'Only active signal families with 10+ independent ticker/date samples and positive 20D excess return may drive the decision layer.',
+    note: 'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.',
   };
 }
 
 async function fetchEarnings(symbols) {
   const key = String(process.env.FINNHUB_API_KEY || '').trim();
-  if (!key || !symbols.length) return [];
+  if (!symbols.length) return { status: 'ok', events: [] };
+  if (!key) return { status: 'no_key', events: [] };
   const today = dateOnly(new Date());
   const to = addDays(today, 7);
   try {
@@ -217,22 +231,16 @@ async function fetchEarnings(symbols) {
     url.searchParams.set('international', 'false');
     url.searchParams.set('token', key);
     const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
-    if (!response.ok) return [];
+    if (!response.ok) return { status: 'unavailable', events: [], reason: 'HTTP ' + response.status };
     const body = await response.json();
     const wanted = new Set(symbols.map(s => s.toUpperCase()));
-    return (Array.isArray(body?.earningsCalendar) ? body.earningsCalendar : [])
+    const events = (Array.isArray(body?.earningsCalendar) ? body.earningsCalendar : [])
       .filter(row => wanted.has(String(row?.symbol || '').toUpperCase()))
-      .map(row => ({
-        symbol: String(row.symbol).toUpperCase(),
-        date: String(row.date),
-        daysUntil: daysBetween(today, String(row.date)),
-        hour: row.hour || null,
-      }))
+      .map(row => ({ symbol:String(row.symbol).toUpperCase(), date:String(row.date), daysUntil:daysBetween(today,String(row.date)), hour:row.hour||null }))
       .filter(row => row.daysUntil >= 0 && row.daysUntil <= 7)
-      .sort((a, b) => a.daysUntil - b.daysUntil || a.symbol.localeCompare(b.symbol));
-  } catch {
-    return [];
-  }
+      .sort((a,b)=>a.daysUntil-b.daysUntil||a.symbol.localeCompare(b.symbol));
+    return { status:'ok', events };
+  } catch(error){ return {status:'unavailable',events:[],reason:error instanceof Error?error.message:'Earnings request failed'}; }
 }
 
 async function fetchForecastProgress() {
@@ -254,15 +262,16 @@ async function fetchForecastProgress() {
   );
 
   return {
-    verified: verified.length,
-    pending: pending.length,
-    due: due.length,
-    remaining: Math.max(0, 50 - verified.length),
-    tickers: verifiedTickers.size,
-    dates: verifiedDates.size,
-    distinctTickerDates: independentHint,
-    gate: verified.length >= 50 ? 'established' : 'building',
-  };
+      verified: verified.length,
+      independentVerified: independentForecastCount(verified),
+      pending: pending.length,
+      due: due.length,
+      remaining: Math.max(0, 50 - verified.length),
+      tickers: verifiedTickers.size,
+      dates: verifiedDates.size,
+      distinctTickerDates: independentHint,
+      gate: verified.length >= 50 ? 'established' : 'building',
+    };
 }
 
 export default async function handler(req, res) {
@@ -387,7 +396,8 @@ export default async function handler(req, res) {
       }
     }
 
-    const earnings = await fetchEarnings(symbols);
+    const earningsResult = await fetchEarnings(symbols);
+    const earnings = earningsResult.events;
     for (const event of earnings.slice(0, 3)) {
       actionItems.push({
         severity: 'WATCH',
@@ -446,7 +456,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       checkedAt: new Date().toISOString(),
-      actionItems: actionItems.slice(0, 5),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
       rules: portfolioRules,
       portfolio: {
         holdings: holdingRows.length,
@@ -458,14 +468,16 @@ export default async function handler(req, res) {
       },
       benchmark,
       earnings: earnings.slice(0, 7),
+      earningsStatus: earningsResult.status,
+      earningsError: earningsResult.reason || null,
       forecast,
       signalGate,
       notes: [
         'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
         'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
         'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
-        '50 verified forecasts is a minimum validation gate; it does not imply 50 independent tests.',
-        'Unproven signal families remain experimental and are excluded from decision-driving status until the independent-sample gate is met.',
+        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
       ],
     });
   } catch (error) {

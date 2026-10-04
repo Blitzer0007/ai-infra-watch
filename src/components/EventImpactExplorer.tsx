@@ -338,6 +338,8 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           <div className="text-right text-[9px] font-mono text-white/30">
             <div>EVENTS {events.length}</div>
             <div className="mt-1">MATCHED REACTIONS {summary.events}</div>
+            {summary.events < 30 ? <div className="mt-1 text-[9px] font-mono text-amber-300">LOW CONFIDENCE · n&lt;30</div> : <div className="mt-1 text-[9px] font-mono text-emerald-300">SAMPLE SIZE ≥30</div>}
+             {summary.events < 30 ? <div className="mt-1 text-[9px] font-mono text-amber-300">LOW CONFIDENCE · n&lt;30</div> : <div className="mt-1 text-[9px] font-mono text-emerald-300">SAMPLE SIZE ≥30</div>}
           </div>
         </div>
       </div>

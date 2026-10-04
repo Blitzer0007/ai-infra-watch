@@ -3,13 +3,10 @@ run-name: Portfolio Digest • ${{ github.event.schedule || 'manual' }}
 
 on:
   schedule:
-    # Five minutes past each requested hour to reduce top-of-hour scheduling congestion.
-    # GitHub Actions cron is evaluated in UTC. These correspond to
-    # 06:05, 12:05, 18:05 and 22:05 Asia/Kolkata.
-    - cron: '35 0 * * *'
-    - cron: '35 6 * * *'
-    - cron: '35 12 * * *'
-    - cron: '35 16 * * *'
+    # Five minutes after the requested hours; consolidated cron syntax also
+    # forces GitHub to register the schedule definition as a changed workflow.
+    # UTC → 06:05, 12:05, 18:05 and 22:05 Asia/Kolkata.
+    - cron: '35 0,6,12,16 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -32,14 +29,9 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body --silent --show-error \
-            --request GET \
-            --header "Authorization: Bearer $AIW_CRON_SECRET" \
-            --header "User-Agent: ai-infra-watch-github-actions/1.0" \
-            --retry 3 \
-            --retry-all-errors \
-            --retry-delay 3 \
-            "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest"
+          SLOT=$(TZ=Asia/Kolkata date '+%Y-%m-%d-%H')
+
+          curl --fail-with-body --silent --show-error             --request GET             --header "Authorization: Bearer $AIW_CRON_SECRET"             --header "User-Agent: ai-infra-watch-github-actions/2.0"             --retry 3             --retry-all-errors             --retry-delay 3             "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$SLOT"
 
       - name: Record completion
         run: echo "Portfolio digest scheduler completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
