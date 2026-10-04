@@ -321,8 +321,8 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
     page.get_by_text("Event Study", exact=True).click()
-    page.get_by_text("5D benchmark context", exact=True).wait_for(state="visible", timeout=30000)
-    assert "SOXX" in page.get_by_text("5D benchmark context", exact=True).locator("..").inner_text()
+    page.get_by_text("5D Beta-Adjusted vs SOXX", exact=True).wait_for(state="visible", timeout=30000)
+    assert "SOXX" in page.get_by_text("5D Beta-Adjusted vs SOXX", exact=True).locator("..").inner_text()
 
 
 def test_forward_outlook_has_real_earnings_input(page):
