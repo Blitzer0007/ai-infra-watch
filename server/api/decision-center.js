@@ -498,20 +498,29 @@ export default async function handler(req, res) {
           detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + maxAllocationPct.toFixed(1) + '% maximum. Review reducing exposure; this is not an automatic sell instruction.',
           impact: null,
         });
-      } else if (
-        currentAllocationPct != null &&
-        hasTarget &&
-        currentAllocationPct < targetAllocationPct &&
-        Number(q?.price) > Number(holding.average_cost) &&
-        Number(q?.changePct) > 0
-      ) {
-        actionItems.push({
-          severity: 'WATCH',
-          symbol,
-          title: 'Increase allocation review',
-          detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + targetAllocationPct.toFixed(1) + '% target while the position is profitable and up today. Review adding only if your thesis and evidence remain supportive.',
-          impact: null,
-        });
+      } else {
+        const recentPoints = (histories[symbol]?.points || []).filter(point => Number(point?.price) > 0).slice(-20);
+        const recentHigh = recentPoints.reduce((max, point) => Math.max(max, Number(point.price)), 0);
+        const pullbackPct = recentHigh > 0 ? (1 - Number(q.price) / recentHigh) * 100 : 0;
+        const thesisRecorded = String(holding.decision_thesis || '').trim().length > 0;
+        if (
+          currentAllocationPct != null &&
+          hasTarget &&
+          currentAllocationPct < targetAllocationPct &&
+          Number(q?.price) > Number(holding.average_cost) &&
+          thesisRecorded &&
+          rules.state === 'clear' &&
+          pullbackPct >= 3
+        ) {
+          actionItems.push({
+            severity: 'WATCH',
+            symbol,
+            title: 'Increase allocation review',
+            detail: 'Current weight is ' + currentAllocationPct.toFixed(1) + '% vs your ' + targetAllocationPct.toFixed(1) + '% target after a ' + pullbackPct.toFixed(1) + '% pullback from the recent high. Review adding only if the recorded thesis and supporting evidence remain intact.',
+            impact: null,
+            distancePct: pullbackPct,
+          });
+        }
       }
 
       if (rules.state === 'breached') {
@@ -533,6 +542,7 @@ export default async function handler(req, res) {
           title: 'Target reached — review next step',
           detail: '$' + q.price.toFixed(2) + ' has reached your upside review level of $' + Number(hit?.target || rules.nearest?.target || 0).toFixed(2) + '. Review the staged exit/hold plan; no trade is automatic.',
           impact: null,
+          distancePct: 0,
         });
       } else if (rules.state === 'near') {
         const near = rules.nearest;
@@ -546,6 +556,7 @@ export default async function handler(req, res) {
               ? '$' + q.price.toFixed(2) + ' is within ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% of your upside level at $' + Number(near.target).toFixed(2) + '.'
               : '$' + q.price.toFixed(2) + ' is within ' + Math.max(0, near?.distancePct ?? 0).toFixed(1) + '% above your ' + near?.type + ' at $' + Number(near.target).toFixed(2) + '.',
           impact: null,
+          distancePct: Math.abs(near?.distancePct ?? 9999),
         });
       } else if (rules.state === 'no-rule') {
         actionItems.push({
