@@ -428,6 +428,11 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
           No saved portfolio holdings were returned, so portfolio impact is not inferred.
         </div>
       )}
+      {activeRisks.length === 0 && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/[.03] px-4 py-3 text-[9px] font-mono text-amber-200/70">
+          Macro evidence: NOT ASSESSED · no live risk records were returned. The scenario sliders below are user-defined stress inputs, not observed probabilities.
+        </div>
+      )}
       <PortfolioExposureMatrix contracts={contracts} news={news} positions={portfolioPositions} />
 
       <PortfolioScenarioSensitivity
@@ -524,8 +529,9 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
               <h3 className="text-xs font-black uppercase tracking-widest text-white">Geopolitical Risk Stress Tool</h3>
             </div>
 
+            <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[8px] font-mono uppercase tracking-wider text-amber-200/70">SIMULATED SCENARIO · not observed likelihood</div>
             <p className="text-xs text-white/60 leading-relaxed">
-              Slide variables representing estimated likelihoods to evaluate simulated cumulative supply chain impacts on neocloud networks.
+              Slide variables representing user-defined scenario inputs to evaluate simulated cumulative supply-chain impacts on neocloud networks.
             </p>
 
             <div className="space-y-4 pt-2 font-mono text-xs">
