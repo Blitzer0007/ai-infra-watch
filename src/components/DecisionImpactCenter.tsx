@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, ShieldAlert, Target } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
+import DecisionJournalPanel from './DecisionJournalPanel';
 
 type ActionItem = {
   severity: 'ACT' | 'WATCH' | 'SETUP';
@@ -40,6 +41,13 @@ type DecisionData = {
     dates: number;
     distinctTickerDates: number;
     gate: string;
+  };
+  signalGate?: {
+    eligible: number;
+    experimental: number;
+    retired: number;
+    families: Array<{ signalType: string; samples: number; meanExcessPct: number | null; lifecycle: string; decisionEligible: boolean }>;
+    note: string;
   };
   notes?: string[];
   error?: string;
@@ -171,11 +179,14 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+        <RiskCard title="Signal gate" value={(data.signalGate?.eligible ?? 0) + ' eligible'} detail={(data.signalGate?.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
         <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.pending ?? 0) + ' pending · ' + (data.forecast?.distinctTickerDates ?? 0) + ' distinct ticker/date outcomes'} />
       </div>
+
+      <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">
         Last checked {data.checkedAt ? new Date(data.checkedAt).toLocaleTimeString() : '—'} · {watch.length} watch items · {rules.noRule} holdings without active rules · 50 verified forecasts is a minimum evidence gate, not 50 independent tests.

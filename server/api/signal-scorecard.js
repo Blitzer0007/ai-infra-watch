@@ -119,20 +119,31 @@ async function evaluateDue() {
   }
 
   const completed = await supabase(
-    'portfolio_signal_scorecard?target_20_status=eq.scored&select=signal_type,target_20_excess_return_pct',
+    'portfolio_signal_scorecard?target_20_status=eq.scored&select=signal_type,symbol,observed_at,target_20_excess_return_pct&order=observed_at.asc',
     { method: 'GET' }
   );
+  // Prevent repeated signals for the same ticker on the same observation date from inflating the evidence.
   const families = new Map();
   for (const row of completed) {
     const key = row.signal_type || 'unknown';
-    const bucket = families.get(key) || [];
-    if (Number.isFinite(Number(row.target_20_excess_return_pct))) bucket.push(Number(row.target_20_excess_return_pct));
+    const bucket = families.get(key) || new Map();
+    const sampleKey = String(row.symbol || 'unknown').toUpperCase() + ':' + String(row.observed_at || '').slice(0, 10);
+    if (!bucket.has(sampleKey) && Number.isFinite(Number(row.target_20_excess_return_pct))) {
+      bucket.set(sampleKey, Number(row.target_20_excess_return_pct));
+    }
     families.set(key, bucket);
   }
-  for (const [signalType, values] of families) {
+  for (const [signalType, sampleMap] of families) {
+    const values = [...sampleMap.values()];
     const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
     const wins = values.filter(v => v > 0).length;
-    const lifecycle = values.length >= 10 && mean != null && mean <= 0 ? 'retired' : values.length >= 5 && mean != null && mean <= 0 ? 'under_review' : 'active';
+    const lifecycle = values.length >= 10 && mean != null && mean > 0
+      ? 'active'
+      : values.length >= 10
+        ? 'retired'
+        : values.length >= 5 && mean != null && mean <= 0
+          ? 'under_review'
+          : 'experimental';
     await supabase('portfolio_signal_family_scorecard', {
       method: 'POST',
       body: JSON.stringify({
@@ -182,7 +193,13 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, ...evaluated });
       }
       const result = await supabase('portfolio_signal_family_scorecard?select=*&order=signal_type.asc', { method: 'GET' });
-      return res.status(200).json({ families: result });
+      const families = result.map(row => ({
+        ...row,
+        decision_eligible: row.lifecycle_status === 'active'
+          && Number(row.evaluated_samples) >= 10
+          && Number(row.mean_20d_excess_return_pct) > 0,
+      }));
+      return res.status(200).json({ families });
     }
 
     if (req.method === 'PUT') {

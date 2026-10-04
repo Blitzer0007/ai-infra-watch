@@ -183,6 +183,28 @@ function ruleDistance(holding, quote, history) {
   return { state: 'clear', rules, nearest };
 }
 
+async function fetchSignalGate() {
+  const rows = await supabase(
+    'portfolio_signal_family_scorecard?select=signal_type,evaluated_samples,mean_20d_excess_return_pct,lifecycle_status&order=signal_type.asc',
+  );
+  const families = rows.map(row => ({
+    signalType: String(row.signal_type || 'unknown'),
+    samples: Number(row.evaluated_samples || 0),
+    meanExcessPct: row.mean_20d_excess_return_pct == null ? null : Number(row.mean_20d_excess_return_pct),
+    lifecycle: String(row.lifecycle_status || 'experimental'),
+    decisionEligible: String(row.lifecycle_status) === 'active'
+      && Number(row.evaluated_samples) >= 10
+      && Number(row.mean_20d_excess_return_pct) > 0,
+  }));
+  return {
+    eligible: families.filter(row => row.decisionEligible).length,
+    experimental: families.filter(row => row.lifecycle === 'experimental' || row.lifecycle === 'under_review').length,
+    retired: families.filter(row => row.lifecycle === 'retired').length,
+    families,
+    note: 'Only active signal families with 10+ independent ticker/date samples and positive 20D excess return may drive the decision layer.',
+  };
+}
+
 async function fetchEarnings(symbols) {
   const key = String(process.env.FINNHUB_API_KEY || '').trim();
   if (!key || !symbols.length) return [];
@@ -379,6 +401,7 @@ export default async function handler(req, res) {
     };
 
     const forecast = await fetchForecastProgress();
+    const signalGate = await fetchSignalGate();
 
     return res.status(200).json({
       ok: true,
@@ -396,11 +419,13 @@ export default async function handler(req, res) {
       benchmark,
       earnings: earnings.slice(0, 7),
       forecast,
+      signalGate,
       notes: [
         'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
         'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
         'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
         '50 verified forecasts is a minimum validation gate; it does not imply 50 independent tests.',
+        'Unproven signal families remain experimental and are excluded from decision-driving status until the independent-sample gate is met.',
       ],
     });
   } catch (error) {
