@@ -326,7 +326,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   return (
     <Panel
       title={'Historical event impact · ' + symbol}
-      subtitle="SEC filing chronology linked to verified price history; SPY is used as market context, not causal proof."
+      subtitle="SEC filing chronology linked to verified price history; SOXX and pre-event beta provide market context, not causal proof."
     >
       <div className="mb-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[.04] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
