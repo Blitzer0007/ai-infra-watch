@@ -165,7 +165,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-[8px] font-mono text-white/30">
                 <span>Last success: {job.lastSuccessAt ? new Date(job.lastSuccessAt).toLocaleString() : 'none recorded'}</span>
-                <span>Failures in returned history: {job.recentFailureCount ?? 0}</span>
+                <span>Failures since last success: {job.recentFailureCount ?? 0}</span>
                 <span>Next expected: {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'not calculated'}</span>
               </div>
               <div className="mt-1 text-[7px] font-mono text-white/20">Cadence: {job.cadence}</div>

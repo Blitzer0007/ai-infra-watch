@@ -11,24 +11,47 @@ concurrency:
   group: earnings-alert-scheduler
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   check-earnings:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
-      - name: Run T-1 earnings alert check
+      - name: Request GitHub OIDC token
+        id: oidc
         env:
-          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+          OIDC_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          OIDC_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "$AIW_CRON_SECRET" ]; then
-            echo "::error::Missing AIW_CRON_SECRET repository secret."
+          if [ -z "$OIDC_REQUEST_URL" ] || [ -z "$OIDC_REQUEST_TOKEN" ]; then
+            echo "::error::GitHub Actions OIDC token endpoint is unavailable."
             exit 1
           fi
 
+          response="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer $OIDC_REQUEST_TOKEN" \
+            --header "Accept: application/json; api-version=2.0" \
+            "$OIDC_REQUEST_URL&audience=ai-infra-watch")"
+
+          token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          if [ -z "$token" ]; then
+            echo "::error::GitHub OIDC token was empty."
+            exit 1
+          fi
+          printf '%s' "$token" > "$RUNNER_TEMP/aiw-oidc-token"
+
+      - name: Run T-1 earnings alert check
+        run: |
+          set -euo pipefail
+          token="$(cat "$RUNNER_TEMP/aiw-oidc-token")"
+
           curl --fail-with-body --silent --show-error \
             --request GET \
-            --header "Authorization: Bearer $AIW_CRON_SECRET" \
+            --header "Authorization: Bearer $token" \
             --header "User-Agent: ai-infra-watch-github-actions/1.0" \
             --retry 3 \
             --retry-all-errors \
