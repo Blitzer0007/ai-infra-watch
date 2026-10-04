@@ -57,6 +57,14 @@ def mock_local_apis(page):
                     'longTerm':{'verifiedCount':24,'oldestVerifiedAt':'2026-01-01T00:00:00Z','newestVerifiedAt':'2026-10-01T00:00:00Z'}
                 }
             })); return
+        if '/api/decision-journal' in url:
+            if route.request.method == 'POST':
+                route.fulfill(status=201, content_type='application/json', body=_json.dumps({'ok':True,'entry':{'id':'qa-journal-1','symbol':'NVDA','decision_date':'2026-10-02','decision':'HOLD','thesis':'QA thesis','decision_price':200,'review_target_date':'2026-10-30','review_status':'pending'}}))
+            elif route.request.method == 'PATCH':
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'ok':True,'entry':{'id':'qa-journal-1','symbol':'NVDA','review_status':'completed','rule_followed':True}}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'ok':True,'entries':[{'id':'qa-journal-1','symbol':'NVDA','decision_date':'2026-10-02','decision':'HOLD','thesis':'QA thesis','decision_price':200,'review_target_date':'2026-10-30','review_status':'pending','forecast_median':3.0}], 'weekly':{'period':{'start':'2026-09-28','end':'2026-10-04'},'decisions':1,'outcomes':0,'beatsBenchmark':0,'averageExcessReturnPct':None,'averageForecastErrorPct':None,'ruleAdherencePct':None,'openOutcomeReviews':0,'reflection':'No completed outcomes this week yet.'}}))
+            return
         if '/api/decision-center' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({
                 'ok': True,
@@ -271,3 +279,12 @@ def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
     assert "verified" in center.inner_text()
     assert "/50" in center.inner_text()
     assert "NVDA" in center.inner_text()
+
+
+def test_decision_journal_mounts(page):
+    mock_local_apis(page)
+    goto_app(page)
+    journal = page.get_by_test_id("decision-journal")
+    journal.wait_for(state="visible", timeout=30000)
+    assert "Decision journal + 20-day review" in journal.inner_text()
+    assert "This week's decision review" in journal.inner_text()
