@@ -18,6 +18,7 @@ import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
+import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 import ForecastValidationPanel from './ForecastValidationPanel';
 type Price = {
   price: number;
@@ -551,7 +552,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="text-xs text-white/45 mt-1">Broker snapshot · live market feed · peers · rotation · catalysts · event study</div>
         </div>
         <div className="flex flex-wrap gap-2 text-[10px] font-mono text-white/40">
-          <span className="px-2 py-1 rounded-full border border-white/10">BREADTH {breadthPositive}/{breadthCoverage}</span>
+          <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">ADD REVIEWS {addReviews}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">RISK REVIEWS {riskReviews}</span>
         </div>
@@ -573,7 +574,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
               </div>
               <div className="text-[10px] text-white/35 mt-0.5">
-                Breadth + average daily move + macro risk load · {stressFreshCount}/{analyses.length} holdings with fresh quotes{stressStaleCount ? ' · ' + stressStaleCount + ' stale' : ''}
+                Share up today + average daily move + macro risk load · {stressFreshCount}/{analyses.length} holdings with fresh quotes{stressStaleCount ? ' · ' + stressStaleCount + ' stale' : ''}
               </div>
             </div>
           </div>
@@ -590,7 +591,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <div className="flex items-center justify-end gap-2 mb-2"><span className="text-[10px] font-mono uppercase text-white/55">Display currency</span>{(['USD', 'INR'] as const).map(code => <button key={code} type="button" aria-pressed={currency === code} onClick={() => setCurrency(code)} className={"px-2 py-1 rounded border text-[10px] font-mono " + (currency === code ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-200" : "border-white/10 text-white/55")}>{code}</button>)}</div>
        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Breadth</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25" >Up today</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.breadth == null ? '—' : Math.round(stress.breadth * 100) + '% positive'}</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
@@ -687,6 +688,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
         <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
       </div>
+      <AutopilotSignalsPanel />
 
       <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
         {([['overview','Overview'],['research','Research'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
@@ -853,7 +855,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <Info label="Group breadth" value={groupInfo ? Math.round(groupInfo.breadth * 100) + '%' : '—'} />
+                  <Info label="Group participation" value={groupInfo ? Math.round(groupInfo.breadth * 100) + '%' : '—'} />
                   <Info label="Group vs universe" value={universeVs == null ? '—' : (universeVs >= 0 ? '+' : '') + universeVs.toFixed(2) + ' pts'} />
                   <Info label="Peers" value={watch.peers.join(' · ') || 'No peers configured'} />
                 </div>
@@ -865,7 +867,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                       ? 'Waiting for a live quote before calculating peer-relative performance.'
                       : peerAverage == null
                         ? 'Live price is available, but no peer quotes are currently available for a peer-relative comparison.'
-                        : 'Current daily move is compared with the configured peer basket; group signal combines daily return, breadth, and performance versus the tracked universe.'}
+                        : 'Current daily move is compared with the configured peer basket; group signal combines daily return, how many names are up, and performance versus the tracked universe.'}
                   </div>
                 </div>
 
@@ -1272,7 +1274,7 @@ function DecisionGateSummary({h}:{h:PositionAnalysis}) {
   const gates = [
     ['Below average cost', h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
     ['Group score', h.groupScore != null && h.groupScore >= groupThreshold],
-    ['Group breadth', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
+    ['Group participation', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
     ['Group vs universe', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
     ['Peer relative', h.vsPeers != null && h.vsPeers >= 0],
   ] as const;
@@ -1341,7 +1343,7 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
   const checks = [
     { label: 'Below average cost', passed: canCalculateExitScenarios && h.livePrice != null && h.livePrice < h.averageCost, detail: canCalculateExitScenarios && h.livePrice != null ? '$' + h.livePrice.toFixed(2) + ' vs $' + h.averageCost.toFixed(2) : 'Fresh quote required' },
     { label: 'Group score', passed: h.groupScore != null && h.groupScore >= addGroupThreshold, detail: h.groupScore == null ? 'No group score' : Math.round(h.groupScore) + '/100 · need ≥' + addGroupThreshold },
-    { label: 'Group breadth', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No breadth' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
+    { label: 'Group participation', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No group participation' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
     { label: 'Group vs universe', passed: h.relativeToUniverse != null && h.relativeToUniverse >= 0, detail: h.relativeToUniverse == null ? 'No relative-strength reading' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts' },
     { label: 'Vs tracked peers', passed: h.vsPeers != null && h.vsPeers >= 0, detail: h.vsPeers == null ? 'Peer quote required' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts' },
   ];
@@ -1353,7 +1355,7 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="P&L" value={h.livePrice == null ? '—' : (h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + ' (' + h.pnlPct.toFixed(2) + '%)'}/>
       <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
       <Info label="Group score" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
-      <Info label="Group breadth" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '%'}/>
+      <Info label="Group participation" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '% up'}/>
       <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
