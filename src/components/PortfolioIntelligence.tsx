@@ -291,6 +291,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           peerHistory: [],
           peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
           actualCurrentPrice: analysis.livePrice,
+          transactions: portfolioTransactions,
         });
       }
     });
@@ -334,6 +335,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           peerHistory: history,
           peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
           actualCurrentPrice: selectedAnalysis.livePrice,
+          transactions: portfolioTransactions,
         }));
       })
       .catch(() => {
