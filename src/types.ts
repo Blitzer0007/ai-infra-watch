@@ -5,6 +5,7 @@ export interface Milestone {
   title: string;
   description: string;
   priceAtTime?: number;
+  sourceUrl?: string;
   status: 'done' | 'active' | 'planned';
 }
 

@@ -31,6 +31,8 @@ type TradeReaction = {
   excessNextPct: number | null;
   excessDay5Pct: number | null;
   excessDay20Pct: number | null;
+  ownBaselineDay5Pct: number | null;
+  ownBaselineGapDay5Pct: number | null;
 };
 
 type SourceStatus = {
@@ -59,6 +61,22 @@ function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   return historyCache[key];
 }
 
+function median(values: number[]): number | null {
+  const usable = values.filter(Number.isFinite).sort((a,b)=>a-b);
+  if (!usable.length) return null;
+  const mid = Math.floor(usable.length / 2);
+  return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
+}
+
+function stockBaseline5(history: HistoryPoint[]): number | null {
+  const values: number[] = [];
+  for (let i = 0; i + 5 < history.length; i++) {
+    const value = pct(history[i]?.price ?? null, history[i + 5]?.price ?? null);
+    if (value != null) values.push(value);
+  }
+  return median(values);
+}
+
 function pct(from: number | null, to: number | null): number | null {
   if (from == null || to == null || !Number.isFinite(from) || !Number.isFinite(to) || from === 0) {
     return null;
@@ -81,6 +99,7 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
   const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
   const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
 
+  const baseline5 = stockBaseline5(history);
   const nextPct = pct(event.price, next?.price ?? null);
   const day5Pct = pct(event.price, day5?.price ?? null);
   const day20Pct = pct(event.price, day20?.price ?? null);
@@ -104,6 +123,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
     excessNextPct: nextPct == null || benchmarkNextPct == null ? null : nextPct - benchmarkNextPct,
     excessDay5Pct: day5Pct == null || benchmarkDay5Pct == null ? null : day5Pct - benchmarkDay5Pct,
     excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
+    ownBaselineDay5Pct: baseline5,
+    ownBaselineGapDay5Pct: day5Pct == null || baseline5 == null ? null : day5Pct - baseline5,
   };
 }
 
@@ -378,6 +399,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
       excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
       excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
       excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
+       ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
+       ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
@@ -538,7 +561,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
           </div>
-          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Positive excess means the selected ticker moved more than SPY.</div>
+          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
+          <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Same-date trades remain correlated.</div>
           <div className={`mt-1 text-[9px] font-mono ${reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}`}>
             {reactionSummary.matched < 30 ? 'LOW CONFIDENCE · n<30 matched reactions' : 'Sample size ≥30 matched reactions'}
           </div>

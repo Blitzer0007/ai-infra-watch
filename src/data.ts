@@ -30,7 +30,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
   { id: 'm2_nbis', stockSymbol: 'NBIS', date: 'Dec 2025', title: 'Original Meta AI compute agreement', description: 'Signs a $3.0B, 5-year GPU infrastructure hosting agreement, focusing on high-density data cluster development.', status: 'done' },
   { id: 'm3_nbis', stockSymbol: 'NBIS', date: 'Mar 2026', title: 'NVIDIA strategic investment closes', description: 'Direct equity backing of $2B from NVIDIA secures priority silicon pipeline allocations for next-gen products.', status: 'done' },
   { id: 'm4_nbis', stockSymbol: 'NBIS', date: 'May 2026', title: 'Meta contract expanded to $27.0B', description: 'Gigantic expansion incorporating dedicated Vera Rubin GPU capacity. Day of announcement sees stock rally heavily (+14%).', status: 'done' },
-  { id: 'm5_nbis', stockSymbol: 'NBIS', date: 'Jun 2026', title: 'Connected capacity reaches 170MW', description: 'Current connected capacity reaches 170MW, tracking towards the company\'s ambitious 800MW-1GW year-end target.', status: 'active' },
+  { id: 'm5_nbis', stockSymbol: 'NBIS', date: 'Jun 2026', title: 'Connected capacity reaches 170MW', description: 'Recorded portfolio milestone: connected capacity reaches 170MW, tracking toward the company\'s ambitious 800MW-1GW year-end target.', priceAtTime: 260.07, status: 'active' },
 
   // Digi Power X (DGXX)
   { id: 'm1_dgxx', stockSymbol: 'DGXX', date: 'Mar 2025', title: 'Pivot from Bitcoin mining & corporate re-brand', description: 'Renamed from Digihost Technology to Digi Power X, shifting focus to high-performance AI hosting and power procurement.', status: 'done' },

@@ -326,7 +326,7 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
   return (
     <Panel
       title={'Historical event impact · ' + symbol}
-      subtitle="SEC filing chronology linked to verified price history; SPY is used as market context, not causal proof."
+      subtitle="SEC filing chronology linked to verified price history; SOXX and pre-event beta provide market context, not causal proof."
     >
       <div className="mb-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[.04] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -339,7 +339,6 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
             <div>EVENTS {events.length}</div>
             <div className="mt-1">MATCHED REACTIONS {summary.events}</div>
             {summary.events < 30 ? <div className="mt-1 text-[9px] font-mono text-amber-300">LOW CONFIDENCE · n&lt;30</div> : <div className="mt-1 text-[9px] font-mono text-emerald-300">SAMPLE SIZE ≥30</div>}
-             {summary.events < 30 ? <div className="mt-1 text-[9px] font-mono text-amber-300">LOW CONFIDENCE · n&lt;30</div> : <div className="mt-1 text-[9px] font-mono text-emerald-300">SAMPLE SIZE ≥30</div>}
           </div>
         </div>
       </div>

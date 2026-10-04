@@ -29,8 +29,12 @@ type DecisionData = {
     cashFlowPnl: number | null;
     concentrationTop3Pct: number | null;
     semiconductorShock15Pct: number | null;
+    scenarioShockTotal?: number | null;
+    quoteCoverage?: { status: string; coveragePct: number; liveQuotes: number; staleFallbacks: number; missingQuotes: number };
+    riskScenarios?: Array<{ group: string; shock: number; effectiveShockPct: number | null; holdings: number }>;
   };
-  benchmark?: Record<string, { value: number; netDeposits: number; pnl: number; shares: number }>;
+  benchmark?: Record<string, { value: number | null; netDeposits: number; pnl: number | null; shares: number; coverage?: { status: string; coveragePct: number; tradesUsed: number; totalTrades: number } }>;
+  benchmarkCoverage?: Record<string, { status?: string; coveragePct?: number } | null>;
   earnings?: Array<{ symbol: string; date: string; daysUntil: number; hour?: string | null }>;
   forecast?: {
     verified: number;
@@ -40,6 +44,8 @@ type DecisionData = {
     tickers: number;
     dates: number;
     distinctTickerDates: number;
+    independentVerified?: number;
+    independenceWindowBusinessDays?: number;
     gate: string;
   };
   signalGate?: {
@@ -107,8 +113,8 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
   const portfolio = data.portfolio!;
   const spy = data.benchmark?.SPY;
   const soxx = data.benchmark?.SOXX;
-  const excessSpy = spy && portfolio.cashFlowPnl != null ? portfolio.cashFlowPnl - spy.pnl : null;
-  const excessSoxx = soxx && portfolio.cashFlowPnl != null ? portfolio.cashFlowPnl - soxx.pnl : null;
+  const excessSpy = spy && portfolio.cashFlowPnl != null && spy.pnl != null && spy.coverage?.status !== 'partial' ? portfolio.cashFlowPnl - spy.pnl : null;
+  const excessSoxx = soxx && portfolio.cashFlowPnl != null && soxx.pnl != null && soxx.coverage?.status !== 'partial' ? portfolio.cashFlowPnl - soxx.pnl : null;
 
   return (
     <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4 md:p-5 space-y-4" data-testid="decision-impact-center">
@@ -183,9 +189,15 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <RiskCard title="Signal gate" value={(data.signalGate?.eligible ?? 0) + ' eligible'} detail={(data.signalGate?.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
-        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.pending ?? 0) + ' pending · ' + (data.forecast?.distinctTickerDates ?? 0) + ' distinct ticker/date outcomes'} />
+        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independentVerified ?? 0) + ' independent · ' + (data.forecast?.pending ?? 0) + ' pending · ' + (data.forecast?.independenceWindowBusinessDays ?? 20) + '-business-day window'} />
       </div>
 
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio price coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
+      {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; edge values are withheld when trades could not be matched.</div>}
+      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio valuation coverage: {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% · status {portfolio.quoteCoverage.status}.</div>}
+      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
+      {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
       <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">

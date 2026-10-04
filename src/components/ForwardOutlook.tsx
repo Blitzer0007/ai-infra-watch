@@ -443,6 +443,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [earningsError, setEarningsError] = useState<string | null>(null);
   const [decisionDraft, setDecisionDraft] = useState({
     thesis: '', lossLimitPct: '', exitRuleType: 'trailing_stop', exitRuleValue: '', exitRuleText: '', practicalNotes: '', brokerAlerts: '',
+    stagedExits: false, stageStopPct: '', takeProfitPct: '', takeProfitFraction: '50', trailingPct: '', riskGroup: '', riskBeta: '1', riskLeverage: '1', scenarioShockPct: '15',
   });
 
   const verificationDrift = useMemo(
@@ -452,6 +453,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
   useEffect(() => {
     const holding = portfolioPositions.find(position => position.symbol === selectedStock);
+    const stages = holding?.ruleStages || [];
+    const stopStage = stages.find(stage => String(stage.type).toLowerCase() === 'stop');
+    const tpStage = stages.find(stage => String(stage.type).toLowerCase() === 'take_profit');
+    const trailStage = stages.find(stage => String(stage.type).toLowerCase().includes('trailing'));
+    const explicitAlerts = (holding?.brokerAlerts || []).map(alert => alert.price + ' ' + alert.direction + (alert.label ? ' ' + alert.label : '')).join(', ');
+    const legacyAlerts = (holding?.brokerAlertPrices || []).join(', ');
     setDecisionDraft({
       thesis: holding?.decisionThesis || holding?.notes || '',
       lossLimitPct: holding?.lossLimitPct == null ? '' : String(holding.lossLimitPct),
@@ -459,7 +466,16 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       exitRuleValue: holding?.exitRuleValue == null ? '' : String(holding.exitRuleValue),
       exitRuleText: holding?.exitRuleText || '',
       practicalNotes: holding?.practicalNotes || '',
-      brokerAlerts: (holding?.brokerAlertPrices || []).join(', '),
+      brokerAlerts: explicitAlerts || legacyAlerts,
+      stagedExits: stages.length > 0,
+      stageStopPct: stopStage?.pct == null ? '' : String(stopStage.pct),
+      takeProfitPct: tpStage?.pct == null ? '' : String(tpStage.pct),
+      takeProfitFraction: tpStage?.fraction == null ? '50' : String(Number(tpStage.fraction) * 100),
+      trailingPct: trailStage?.pct == null ? '' : String(trailStage.pct),
+      riskGroup: holding?.riskGroup || '',
+      riskBeta: holding?.riskBeta == null ? '1' : String(holding.riskBeta),
+      riskLeverage: holding?.riskLeverage == null ? '1' : String(holding.riskLeverage),
+      scenarioShockPct: holding?.scenarioShockPct == null ? '15' : String(holding.scenarioShockPct),
     });
     setDecisionEditing(false);
     setDecisionMessage(null);
@@ -678,13 +694,53 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     if (!holding?.id) return;
     const lossLimitPct = decisionDraft.lossLimitPct.trim() === '' ? null : Number(decisionDraft.lossLimitPct);
     const exitRuleValue = decisionDraft.exitRuleValue.trim() === '' ? null : Number(decisionDraft.exitRuleValue);
+    const riskBeta = Number(decisionDraft.riskBeta);
+    const riskLeverage = Number(decisionDraft.riskLeverage);
+    const scenarioShockPct = Number(decisionDraft.scenarioShockPct);
+
     if (lossLimitPct != null && (!Number.isFinite(lossLimitPct) || lossLimitPct < 0 || lossLimitPct > 100)) {
       setDecisionMessage('Loss limit must be between 0% and 100%.'); return;
     }
     if (exitRuleValue != null && (!Number.isFinite(exitRuleValue) || exitRuleValue < 0 || exitRuleValue > 100)) {
       setDecisionMessage('Exit rule percentage must be between 0% and 100%.'); return;
     }
-    const brokerAlertPrices = decisionDraft.brokerAlerts.split(',').map(value => Number(value.trim())).filter(value => Number.isFinite(value) && value > 0);
+    if (!Number.isFinite(riskBeta) || riskBeta < 0 || !Number.isFinite(riskLeverage) || riskLeverage <= 0 || !Number.isFinite(scenarioShockPct) || scenarioShockPct < 0 || scenarioShockPct > 100) {
+      setDecisionMessage('Check risk beta, leverage and scenario shock values.'); return;
+    }
+
+    const brokerAlerts = [];
+    let brokerAlertsReviewRequired = false;
+    for (const raw of decisionDraft.brokerAlerts.split(',').map(value => value.trim()).filter(Boolean)) {
+      const match = raw.match(/^\$?([0-9]+(?:\.[0-9]+)?)\s*(above|below)?(?:\s+(.+))?$/i);
+      if (!match) {
+        setDecisionMessage('Broker alerts must look like 56.46 below, 84.68 above.'); return;
+      }
+      const price = Number(match[1]);
+      const explicitDirection = match[2]?.toLowerCase();
+      const direction = explicitDirection === 'below' || explicitDirection === 'above'
+        ? explicitDirection
+        : (price < holding.averageCost ? 'below' : 'above');
+      if (!explicitDirection) brokerAlertsReviewRequired = true;
+      brokerAlerts.push({ price, direction, label: match[3]?.trim() || (direction === 'below' ? 'stop' : 'target') });
+    }
+
+    const brokerAlertPrices = brokerAlerts.map(alert => alert.price);
+    let ruleStages = [];
+    if (decisionDraft.stagedExits) {
+      const stopPct = Number(decisionDraft.stageStopPct);
+      const takeProfitPct = Number(decisionDraft.takeProfitPct);
+      const fractionPct = Number(decisionDraft.takeProfitFraction);
+      const trailingPct = Number(decisionDraft.trailingPct);
+      if (![stopPct, takeProfitPct, fractionPct, trailingPct].every(Number.isFinite) || stopPct <= 0 || takeProfitPct <= 0 || fractionPct <= 0 || fractionPct > 100 || trailingPct <= 0) {
+        setDecisionMessage('Complete staged stop, take-profit, sell fraction and trailing values.'); return;
+      }
+      ruleStages = [
+        { type: 'stop', pct: stopPct, action: 'exit_all' },
+        { type: 'take_profit', pct: takeProfitPct, action: 'sell_fraction', fraction: fractionPct / 100 },
+        { type: 'trailing', pct: trailingPct, activates_after: 'take_profit', action: 'review_exit_remaining' },
+      ];
+    }
+
     setDecisionSaving(true); setDecisionMessage(null);
     try {
       const saved = await updatePortfolioHolding({
@@ -701,6 +757,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         exitRuleText: decisionDraft.exitRuleText.trim(),
         practicalNotes: decisionDraft.practicalNotes.trim(),
         brokerAlertPrices,
+        brokerAlerts,
+        brokerAlertsReviewRequired,
+        ruleStages,
+        ruleStageState: {},
+        riskGroup: decisionDraft.riskGroup.trim() || null,
+        riskBeta,
+        riskLeverage,
+        scenarioShockPct,
         purchaseLots: [],
       });
       setPortfolioPositions(prev => prev.map(position => position.id === saved.id ? mapStoredPortfolioHoldings([saved])[0] : position));
@@ -1159,14 +1223,33 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <label className="block text-[8px] text-white/30 uppercase font-mono">Reason to own / thesis<textarea value={decisionDraft.thesis} onChange={e => setDecisionDraft(d => ({ ...d, thesis: e.target.value }))} rows={2} placeholder="Write the reason you own this holding." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block text-[8px] text-white/30 uppercase font-mono">Loss limit %<input value={decisionDraft.lossLimitPct} onChange={e => setDecisionDraft(d => ({ ...d, lossLimitPct: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
-                    <label className="block text-[8px] text-white/30 uppercase font-mono">Exit rule<select value={decisionDraft.exitRuleType} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleType: e.target.value }))} className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none"><option value="trailing_stop">Trailing stop</option><option value="price_stop">Price stop</option><option value="thesis_break">Thesis break</option><option value="time_limit">Time limit</option><option value="custom">Custom</option></select></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Legacy exit rule<select value={decisionDraft.exitRuleType} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleType: e.target.value }))} className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none"><option value="trailing_stop">Trailing stop</option><option value="price_stop">Price stop</option><option value="thesis_break">Thesis break</option><option value="time_limit">Time limit</option><option value="custom">Custom</option></select></label>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-[8px] text-white/30 uppercase font-mono">Rule %<input value={decisionDraft.exitRuleValue} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleValue: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 15 or 20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
-                    <label className="block text-[8px] text-white/30 uppercase font-mono">Broker alert prices<input value={decisionDraft.brokerAlerts} onChange={e => setDecisionDraft(d => ({ ...d, brokerAlerts: e.target.value }))} placeholder="56.46, 84.68" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Legacy rule %<input value={decisionDraft.exitRuleValue} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleValue: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 15" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Broker alerts + direction<input value={decisionDraft.brokerAlerts} onChange={e => setDecisionDraft(d => ({ ...d, brokerAlerts: e.target.value }))} placeholder="56.46 below, 84.68 above" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   </div>
-                  <label className="block text-[8px] text-white/30 uppercase font-mono">Exit rule / invalidation notes<textarea value={decisionDraft.exitRuleText} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleText: e.target.value }))} rows={2} placeholder="Use closing price; gaps can skip the stop; document what invalidates the thesis." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
-                  <label className="block text-[8px] text-white/30 uppercase font-mono">Practical notes<textarea value={decisionDraft.practicalNotes} onChange={e => setDecisionDraft(d => ({ ...d, practicalNotes: e.target.value }))} rows={3} placeholder="Broker alerts, fractional-share limitations, review date, etc." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                  <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[.025] p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div><div className="text-[8px] font-mono uppercase tracking-widest text-emerald-200/70">Staged exit plan</div><div className="text-[9px] text-white/30 mt-1">For plans like stop → take profit → trailing remainder. Trailing activates only after the take-profit stage is reached.</div></div>
+                      <label className="flex items-center gap-2 text-[8px] font-mono uppercase text-white/50"><input type="checkbox" checked={decisionDraft.stagedExits} onChange={e => setDecisionDraft(d => ({ ...d, stagedExits: e.target.checked }))} /> Enable</label>
+                    </div>
+                    {decisionDraft.stagedExits && <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <label className="text-[8px] font-mono uppercase text-white/30">Stop %<input value={decisionDraft.stageStopPct} onChange={e => setDecisionDraft(d => ({...d,stageStopPct:e.target.value}))} type="number" min="0.1" max="100" step="0.1" placeholder="20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Take profit %<input value={decisionDraft.takeProfitPct} onChange={e => setDecisionDraft(d => ({...d,takeProfitPct:e.target.value}))} type="number" min="0.1" max="100" step="0.1" placeholder="20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Sell fraction %<input value={decisionDraft.takeProfitFraction} onChange={e => setDecisionDraft(d => ({...d,takeProfitFraction:e.target.value}))} type="number" min="1" max="100" step="1" placeholder="50" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Trailing %<input value={decisionDraft.trailingPct} onChange={e => setDecisionDraft(d => ({...d,trailingPct:e.target.value}))} type="number" min="0.1" max="100" step="0.1" placeholder="15" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    </div>}
+                  </div>
+                  <div className="rounded-xl border border-violet-400/10 bg-violet-400/[.025] p-3 space-y-2">
+                    <div className="text-[8px] font-mono uppercase tracking-widest text-violet-200/70">Risk scenario controls</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <label className="text-[8px] font-mono uppercase text-white/30">Risk group<input value={decisionDraft.riskGroup} onChange={e=>setDecisionDraft(d=>({...d,riskGroup:e.target.value}))} placeholder="semiconductor" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Beta / sensitivity<input value={decisionDraft.riskBeta} onChange={e=>setDecisionDraft(d=>({...d,riskBeta:e.target.value}))} type="number" min="0" step="0.1" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Leverage<input value={decisionDraft.riskLeverage} onChange={e=>setDecisionDraft(d=>({...d,riskLeverage:e.target.value}))} type="number" min="0.1" step="0.1" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                      <label className="text-[8px] font-mono uppercase text-white/30">Shock %<input value={decisionDraft.scenarioShockPct} onChange={e=>setDecisionDraft(d=>({...d,scenarioShockPct:e.target.value}))} type="number" min="0" max="100" step="1" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    </div>
+                  </div>
                   <div className="flex items-center justify-between gap-2"><button disabled={decisionSaving} onClick={saveDecisionContext} className="rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-[8px] font-mono uppercase tracking-widest text-amber-100 disabled:opacity-40">{decisionSaving ? 'Saving…' : 'Save rules'}</button>{decisionMessage && <span className="text-[8px] font-mono text-white/45">{decisionMessage}</span>}</div>
                 </div>
               }

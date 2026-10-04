@@ -1,3 +1,4 @@
+import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -29,6 +30,63 @@ async function supabase(path, options = {}) {
   return data;
 }
 
+function normalizeBrokerAlerts(row) {
+  if (Array.isArray(row?.broker_alerts)) {
+    return row.broker_alerts
+      .map(item => ({
+        price: Number(item?.price),
+        direction: item?.direction === 'below' ? 'below' : item?.direction === 'above' ? 'above' : null,
+        label: String(item?.label || '').trim() || null,
+      }))
+      .filter(item => Number.isFinite(item.price) && item.price > 0 && item.direction);
+  }
+  const averageCost = Number(row?.average_cost);
+  return Array.isArray(row?.broker_alert_prices)
+    ? row.broker_alert_prices.map(Number).filter(v => v > 0).map(price => ({
+        price,
+        direction: Number.isFinite(averageCost) && price < averageCost ? 'below' : 'above',
+        label: Number.isFinite(averageCost) && price < averageCost ? 'stop (inferred)' : 'target (inferred)',
+      }))
+    : [];
+}
+
+function isWeekend(date) {
+  const value = new Date(String(date || '') + 'T00:00:00Z');
+  const day = value.getUTCDay();
+  return Number.isNaN(value.getTime()) ? false : day === 0 || day === 6;
+}
+
+function previousOrSamePoint(points, date) {
+  const ordered = [...(points || [])].filter(point => point?.date && Number(point?.price) > 0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let match = null;
+  for (const point of ordered) {
+    if (String(point.date) <= String(date)) match = point;
+    else break;
+  }
+  return match;
+}
+
+async function applyMarketQuality(rows, symbolField, dateField, priceField) {
+  const symbols = [...new Set(rows.map(row => String(row?.[symbolField] || '').toUpperCase()).filter(Boolean))];
+  const histories = {};
+  await Promise.all(symbols.map(async symbol => {
+    try { histories[symbol] = await routedHistory(symbol, '1y'); } catch {}
+  }));
+  return rows.map(row => {
+    const warnings = [...(row.__qualityWarnings || [])];
+    const date = String(row?.[dateField] || '');
+    const symbol = String(row?.[symbolField] || '').toUpperCase();
+    if (date && isWeekend(date)) warnings.push('trade date falls on weekend; review against prior market close');
+    const enteredPrice = Number(row?.[priceField]);
+    const market = previousOrSamePoint(histories[symbol]?.points || [], date);
+    const marketPrice = Number(market?.price);
+    if (enteredPrice > 0 && marketPrice > 0 && Math.abs(enteredPrice - marketPrice) > Math.max(0.05, Math.abs(marketPrice) * 0.05)) {
+      warnings.push('entered price differs >5% from market close (' + market.date + ')');
+    }
+    return { ...row, __marketClose: market ? { date: market.date, price: marketPrice } : null, __qualityWarnings: [...new Set(warnings)] };
+  });
+}
+
 function normalizeLot(row) {
   return {
     id: row.id,
@@ -49,6 +107,17 @@ function normalizeLot(row) {
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
+    brokerAlerts: normalizeBrokerAlerts(row),
+    brokerAlertsReviewRequired: Boolean(row.broker_alerts_review_required),
+    ruleStages: Array.isArray(row.rule_stages) ? row.rule_stages : [],
+    ruleStageState: row.rule_stage_state && typeof row.rule_stage_state === 'object' ? row.rule_stage_state : {},
+    riskGroup: row.risk_group || null,
+    riskBeta: row.risk_beta == null ? null : Number(row.risk_beta),
+    riskLeverage: row.risk_leverage == null ? 1 : Number(row.risk_leverage),
+    scenarioShockPct: row.scenario_shock_pct == null ? 15 : Number(row.scenario_shock_pct),
+    dataQuality: row.__qualityWarnings?.length ? 'review' : 'ok',
+    dataQualityWarnings: row.__qualityWarnings || [],
+    marketClose: row.__marketClose || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -99,6 +168,7 @@ function normalizeTransaction(row) {
     currency: quality.currency,
     dataQuality: quality.status,
     dataQualityWarnings: quality.warnings,
+    marketClose: row.__marketClose || null,
     createdAt: row.created_at,
   };
 }
@@ -138,37 +208,77 @@ export default async function handler(req, res) {
           '&select=*&order=purchase_date.asc,created_at.asc',
           { method: 'GET' }
         );
-        return res.status(200).json({ lots: rows.map(normalizeLot), persistent: true, source: 'supabase' });
+        const checkedLots = await applyMarketQuality(
+          rows.map(row => ({ ...row, __qualityWarnings: transactionQuality({
+            trade_date: row.purchase_date,
+            quantity: row.quantity,
+            amount: row.invested_amount,
+            price: row.execution_price,
+            currency: row.currency,
+          }).warnings })),
+          'symbol',
+          'purchase_date',
+          'execution_price',
+        );
+        return res.status(200).json({ lots: checkedLots.map(normalizeLot), persistent: true, source: 'supabase' });
       }
       const rows = await supabase('portfolio_holdings?select=*&order=symbol.asc', { method: 'GET' });
       const holdings = rows.map(normalize).filter(holding => holding.quantity > 0);
       if (String(req.query?.includeTransactions || '') === 'true') {
         const transactionRows = await supabase('portfolio_transactions?select=*&order=trade_date.asc,source_row.asc', { method: 'GET' });
-        const normalizedTransactions = transactionRows.map(normalizeTransaction);
-        const transactionQuality = {
+        const checkedTransactions = await applyMarketQuality(
+          transactionRows.map(row => ({ ...row, __qualityWarnings: transactionQuality(row).warnings })),
+          'symbol',
+          'trade_date',
+          'price',
+        );
+        const normalizedTransactions = checkedTransactions.map(normalizeTransaction);
+        const transactionQualitySummary = {
           total: normalizedTransactions.length,
           review: normalizedTransactions.filter(row => row.dataQuality === 'review').length,
           derived: normalizedTransactions.filter(row => row.quantityDerived || row.priceDerived).length,
+          weekendDates: normalizedTransactions.filter(row => (row.dataQualityWarnings || []).some(w => w.startsWith('trade date falls on weekend'))).length,
+          priceVsMarketClose: normalizedTransactions.filter(row => (row.dataQualityWarnings || []).some(w => w.startsWith('entered price differs'))).length,
           currencies: [...new Set(normalizedTransactions.map(row => row.currency))],
         };
         return res.status(200).json({
           holdings,
           transactions: normalizedTransactions,
-          transactionQuality,
+          transactionQuality: transactionQualitySummary,
           persistent: true,
           source: 'supabase',
         });
       }
       if (String(req.query?.includeLots || '') === 'true') {
         const lots = await supabase('portfolio_purchase_lots?select=*&order=purchase_date.asc,created_at.asc', { method: 'GET' });
+        const checkedLots = await applyMarketQuality(
+          lots.map(row => ({ ...row, __qualityWarnings: transactionQuality({
+            trade_date: row.purchase_date,
+            quantity: row.quantity,
+            amount: row.invested_amount,
+            price: row.execution_price,
+            currency: row.currency,
+          }).warnings })),
+          'symbol',
+          'purchase_date',
+          'execution_price',
+        );
+        const normalizedLots = checkedLots.map(normalizeLot);
         const byHolding = new Map();
-        for (const lot of lots) {
-          const list = byHolding.get(lot.holding_id) || [];
-          list.push(normalizeLot(lot));
-          byHolding.set(lot.holding_id, list);
+        for (const lot of normalizedLots) {
+          const list = byHolding.get(lot.holdingId) || [];
+          list.push(lot);
+          byHolding.set(lot.holdingId, list);
         }
+        const lotQuality = {
+          total: normalizedLots.length,
+          review: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).length).length,
+          weekendDates: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).some(w => w.startsWith('trade date falls on weekend'))).length,
+          priceVsMarketClose: normalizedLots.filter(lot => (lot.dataQualityWarnings || []).some(w => w.startsWith('entered price differs'))).length,
+        };
         return res.status(200).json({
           holdings: holdings.map(h => ({ ...h, purchaseLots: byHolding.get(h.id) || [] })),
+          lotQuality,
           persistent: true,
           source: 'supabase',
         });
@@ -223,6 +333,24 @@ export default async function handler(req, res) {
       });
       let createdHolding = rpc?.holding;
       const allocationPayload = {};
+      const qualityPayload = {};
+      if (body.decisionThesis !== undefined) qualityPayload.decision_thesis = body.decisionThesis || null;
+      if (body.lossLimitPct !== undefined) qualityPayload.loss_limit_pct = body.lossLimitPct == null || body.lossLimitPct === '' ? null : Number(body.lossLimitPct);
+      if (body.exitRuleType !== undefined) qualityPayload.exit_rule_type = body.exitRuleType || null;
+      if (body.exitRuleValue !== undefined) qualityPayload.exit_rule_value = body.exitRuleValue == null || body.exitRuleValue === '' ? null : Number(body.exitRuleValue);
+      if (body.exitRuleText !== undefined) qualityPayload.exit_rule_text = body.exitRuleText || null;
+      if (body.practicalNotes !== undefined) qualityPayload.practical_notes = body.practicalNotes || null;
+      if (body.brokerAlertPrices !== undefined) qualityPayload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
+      if (body.brokerAlerts !== undefined) qualityPayload.broker_alerts = Array.isArray(body.brokerAlerts) ? body.brokerAlerts : [];
+      if (body.brokerAlertsReviewRequired !== undefined) qualityPayload.broker_alerts_review_required = Boolean(body.brokerAlertsReviewRequired);
+      if (body.ruleStages !== undefined) qualityPayload.rule_stages = Array.isArray(body.ruleStages) ? body.ruleStages : [];
+      if (body.ruleStageState !== undefined) qualityPayload.rule_stage_state = body.ruleStageState && typeof body.ruleStageState === 'object' ? body.ruleStageState : {};
+      if (body.riskGroup !== undefined) qualityPayload.risk_group = String(body.riskGroup || '').trim() || null;
+      if (body.riskBeta !== undefined) qualityPayload.risk_beta = body.riskBeta == null || body.riskBeta === '' ? null : Number(body.riskBeta);
+      if (body.riskLeverage !== undefined) qualityPayload.risk_leverage = body.riskLeverage == null || body.riskLeverage === '' ? 1 : Number(body.riskLeverage);
+      if (body.scenarioShockPct !== undefined) qualityPayload.scenario_shock_pct = body.scenarioShockPct == null || body.scenarioShockPct === '' ? 15 : Number(body.scenarioShockPct);
+      Object.assign(allocationPayload, qualityPayload);
+
       if (body.targetAllocationPct != null && body.targetAllocationPct !== '') allocationPayload.target_allocation_pct = Number(body.targetAllocationPct);
       if (body.maxAllocationPct != null && body.maxAllocationPct !== '') allocationPayload.max_allocation_pct = Number(body.maxAllocationPct);
       if (Object.keys(allocationPayload).length) {
@@ -260,10 +388,21 @@ export default async function handler(req, res) {
       if (body.brokerAlertPrices !== undefined) payload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
       if (body.targetAllocationPct !== undefined) payload.target_allocation_pct = body.targetAllocationPct == null || body.targetAllocationPct === '' ? null : Number(body.targetAllocationPct);
       if (body.maxAllocationPct !== undefined) payload.max_allocation_pct = body.maxAllocationPct == null || body.maxAllocationPct === '' ? null : Number(body.maxAllocationPct);
+      if (body.brokerAlerts !== undefined) payload.broker_alerts = Array.isArray(body.brokerAlerts) ? body.brokerAlerts : [];
+      if (body.brokerAlertsReviewRequired !== undefined) payload.broker_alerts_review_required = Boolean(body.brokerAlertsReviewRequired);
+      if (body.ruleStages !== undefined) payload.rule_stages = Array.isArray(body.ruleStages) ? body.ruleStages : [];
+      if (body.ruleStageState !== undefined) payload.rule_stage_state = body.ruleStageState && typeof body.ruleStageState === 'object' ? body.ruleStageState : {};
+      if (body.riskGroup !== undefined) payload.risk_group = String(body.riskGroup || '').trim() || null;
+      if (body.riskBeta !== undefined) payload.risk_beta = body.riskBeta == null || body.riskBeta === '' ? null : Number(body.riskBeta);
+      if (body.riskLeverage !== undefined) payload.risk_leverage = body.riskLeverage == null || body.riskLeverage === '' ? 1 : Number(body.riskLeverage);
+      if (body.scenarioShockPct !== undefined) payload.scenario_shock_pct = body.scenarioShockPct == null || body.scenarioShockPct === '' ? 15 : Number(body.scenarioShockPct);
       if (payload.quantity != null && (!Number.isFinite(payload.quantity) || payload.quantity <= 0)) return res.status(400).json({ error: 'quantity must be positive' });
       if (payload.average_cost != null && (!Number.isFinite(payload.average_cost) || payload.average_cost < 0)) return res.status(400).json({ error: 'averageCost must be non-negative' });
       if (payload.target_allocation_pct != null && (!Number.isFinite(payload.target_allocation_pct) || payload.target_allocation_pct < 0 || payload.target_allocation_pct > 100)) return res.status(400).json({ error: 'targetAllocationPct must be between 0 and 100' });
       if (payload.max_allocation_pct != null && (!Number.isFinite(payload.max_allocation_pct) || payload.max_allocation_pct < 0 || payload.max_allocation_pct > 100)) return res.status(400).json({ error: 'maxAllocationPct must be between 0 and 100' });
+      if (payload.risk_beta != null && (!Number.isFinite(payload.risk_beta) || payload.risk_beta < 0)) return res.status(400).json({ error: 'riskBeta must be non-negative' });
+      if (payload.risk_leverage != null && (!Number.isFinite(payload.risk_leverage) || payload.risk_leverage <= 0)) return res.status(400).json({ error: 'riskLeverage must be positive' });
+      if (payload.scenario_shock_pct != null && (!Number.isFinite(payload.scenario_shock_pct) || payload.scenario_shock_pct < 0 || payload.scenario_shock_pct > 100)) return res.status(400).json({ error: 'scenarioShockPct must be between 0 and 100' });
       if (payload.target_allocation_pct != null && payload.max_allocation_pct != null && payload.target_allocation_pct > payload.max_allocation_pct) return res.status(400).json({ error: 'targetAllocationPct cannot exceed maxAllocationPct' });
       const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(id), {
         method: 'PATCH',
