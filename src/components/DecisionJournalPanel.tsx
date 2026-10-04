@@ -48,17 +48,16 @@ export default function DecisionJournalPanel(){
 
   const load=async()=>{
     try{
-      const [jr,p,t]=await Promise.all([
+      const [jr,p]=await Promise.all([
         authFetch('/api/decision-journal',{cache:'no-store'}),
         fetchPortfolioHoldings(),
-        fetchPortfolioTransactions(),
       ]);
       const body=await jr.json().catch(()=>({}));
       if(!jr.ok)throw new Error(body?.error||'Decision journal unavailable');
       setEntries(Array.isArray(body?.entries)?body.entries:[]);
       setWeekly(body?.weekly||null);
       setHoldings(p);
-      setTransactions(t);
+      try { setTransactions(await fetchPortfolioTransactions()); } catch { setTransactions([]); }
       if(!holdingId&&p[0]){
         setHoldingId(p[0].id);
         setThesis(p[0].decisionThesis||p[0].notes||'');
