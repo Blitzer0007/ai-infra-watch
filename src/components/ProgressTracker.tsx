@@ -534,7 +534,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
             <span className="text-[10px] font-mono text-white/60 flex items-center space-x-1.5">
               <Award className="w-4 h-4 text-emerald-400" />
-              <span>Current Evaluation: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
+              <span>Current price: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
             </span>
           </div>
         </div>
