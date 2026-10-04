@@ -34,7 +34,7 @@
     },
     {
       "source": "/api/autopilot-signals",
-      "destination": "/api/autopilot-signals"
+      "destination": "/api/market?route=autopilot-signals"
     },
     {
       "source": "/api/forecast-validation",
