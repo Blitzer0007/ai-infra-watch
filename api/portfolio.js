@@ -46,6 +46,8 @@ function normalizeLot(row) {
     exitRuleText: row.exit_rule_text || '',
     practicalNotes: row.practical_notes || '',
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
+    maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -82,6 +84,15 @@ function normalize(row) {
     notes: row.notes || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    decisionThesis: row.decision_thesis || '',
+    lossLimitPct: row.loss_limit_pct == null ? null : Number(row.loss_limit_pct),
+    exitRuleType: row.exit_rule_type || null,
+    exitRuleValue: row.exit_rule_value == null ? null : Number(row.exit_rule_value),
+    exitRuleText: row.exit_rule_text || '',
+    practicalNotes: row.practical_notes || '',
+    brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
+    maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
   };
 }
 
@@ -172,9 +183,23 @@ export default async function handler(req, res) {
           p_notes: body.notes || null,
         }),
       });
+      let createdHolding = rpc?.holding;
+      const allocationPayload = {};
+      if (body.targetAllocationPct != null && body.targetAllocationPct !== '') allocationPayload.target_allocation_pct = Number(body.targetAllocationPct);
+      if (body.maxAllocationPct != null && body.maxAllocationPct !== '') allocationPayload.max_allocation_pct = Number(body.maxAllocationPct);
+      if (Object.keys(allocationPayload).length) {
+        if (allocationPayload.target_allocation_pct != null && (!Number.isFinite(allocationPayload.target_allocation_pct) || allocationPayload.target_allocation_pct < 0 || allocationPayload.target_allocation_pct > 100)) return res.status(400).json({ error: 'targetAllocationPct must be between 0 and 100' });
+        if (allocationPayload.max_allocation_pct != null && (!Number.isFinite(allocationPayload.max_allocation_pct) || allocationPayload.max_allocation_pct < 0 || allocationPayload.max_allocation_pct > 100)) return res.status(400).json({ error: 'maxAllocationPct must be between 0 and 100' });
+        if (allocationPayload.target_allocation_pct != null && allocationPayload.max_allocation_pct != null && allocationPayload.target_allocation_pct > allocationPayload.max_allocation_pct) return res.status(400).json({ error: 'targetAllocationPct cannot exceed maxAllocationPct' });
+        const updated = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(createdHolding.id), {
+          method: 'PATCH',
+          body: JSON.stringify(allocationPayload),
+        });
+        if (updated.length) createdHolding = updated[0];
+      }
       return res.status(201).json({
         lot: normalizeLot(rpc?.lot),
-        holding: normalize(rpc?.holding),
+        holding: normalize(createdHolding),
       });
     }
 
@@ -195,8 +220,13 @@ export default async function handler(req, res) {
       if (body.exitRuleText !== undefined) payload.exit_rule_text = body.exitRuleText || null;
       if (body.practicalNotes !== undefined) payload.practical_notes = body.practicalNotes || null;
       if (body.brokerAlertPrices !== undefined) payload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
+      if (body.targetAllocationPct !== undefined) payload.target_allocation_pct = body.targetAllocationPct == null || body.targetAllocationPct === '' ? null : Number(body.targetAllocationPct);
+      if (body.maxAllocationPct !== undefined) payload.max_allocation_pct = body.maxAllocationPct == null || body.maxAllocationPct === '' ? null : Number(body.maxAllocationPct);
       if (payload.quantity != null && (!Number.isFinite(payload.quantity) || payload.quantity <= 0)) return res.status(400).json({ error: 'quantity must be positive' });
       if (payload.average_cost != null && (!Number.isFinite(payload.average_cost) || payload.average_cost < 0)) return res.status(400).json({ error: 'averageCost must be non-negative' });
+      if (payload.target_allocation_pct != null && (!Number.isFinite(payload.target_allocation_pct) || payload.target_allocation_pct < 0 || payload.target_allocation_pct > 100)) return res.status(400).json({ error: 'targetAllocationPct must be between 0 and 100' });
+      if (payload.max_allocation_pct != null && (!Number.isFinite(payload.max_allocation_pct) || payload.max_allocation_pct < 0 || payload.max_allocation_pct > 100)) return res.status(400).json({ error: 'maxAllocationPct must be between 0 and 100' });
+      if (payload.target_allocation_pct != null && payload.max_allocation_pct != null && payload.target_allocation_pct > payload.max_allocation_pct) return res.status(400).json({ error: 'targetAllocationPct cannot exceed maxAllocationPct' });
       const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(id), {
         method: 'PATCH',
         body: JSON.stringify(payload),

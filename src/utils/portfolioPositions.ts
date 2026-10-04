@@ -21,6 +21,8 @@ export type PortfolioPosition = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
   id?: string;
   purchaseDate?: string | null;
   purchaseLotCount?: number;
@@ -93,6 +95,8 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     exitRuleText: holding.exitRuleText || '',
     practicalNotes: holding.practicalNotes || '',
     brokerAlertPrices: holding.brokerAlertPrices || [],
+    targetAllocationPct: holding.targetAllocationPct ?? null,
+    maxAllocationPct: holding.maxAllocationPct ?? null,
     purchaseDate: firstPurchaseDate,
     purchaseLotCount: lots.length,
     firstPurchaseDate,

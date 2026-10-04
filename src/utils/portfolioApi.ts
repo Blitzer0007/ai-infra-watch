@@ -14,6 +14,8 @@ export type StoredPortfolioHolding = {
   exitRuleText?: string;
   practicalNotes?: string;
   brokerAlertPrices?: number[];
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
   createdAt?: string;
   updatedAt?: string;
   purchaseLots?: PortfolioPurchaseLot[];
@@ -101,6 +103,8 @@ export async function createPortfolioHolding(input: {
   averageCost: number;
   purchaseDate?: string | null;
   notes?: string;
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
 }) {
   const response = await authFetch('/api/portfolio', {
     method: 'POST',

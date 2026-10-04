@@ -1399,7 +1399,31 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Average cost" value={h.averageCost.toFixed(2)} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
       <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
+      <Info label="Current allocation" value={h.portfolioWeight == null ? '—' : (h.portfolioWeight * 100).toFixed(1) + '%'} />
+      <Info label="Target allocation" value={h.targetAllocationPct == null ? 'Not set' : h.targetAllocationPct.toFixed(1) + '%'} />
+      <Info label="Max / reduce-review" value={h.maxAllocationPct == null ? 'Not set' : h.maxAllocationPct.toFixed(1) + '%'} />
     </div>
+    {(h.targetAllocationPct != null || h.maxAllocationPct != null) && (
+      <div className="mt-3 rounded-xl border border-emerald-400/10 bg-emerald-400/[0.025] p-4">
+        <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-300">Allocation plan</div>
+        <div className="text-[10px] text-white/35 mt-1">Target and maximum portfolio weights turn strong performance into a structured allocation review instead of an automatic buy or sell.</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+          <Info label="Current weight" value={h.portfolioWeight == null ? '—' : (h.portfolioWeight * 100).toFixed(1) + '%'} />
+          <Info label="Target" value={h.targetAllocationPct == null ? '—' : h.targetAllocationPct.toFixed(1) + '%'} />
+          <Info label="Max" value={h.maxAllocationPct == null ? '—' : h.maxAllocationPct.toFixed(1) + '%'} />
+          <Info label="Drift" value={h.portfolioWeight == null || h.targetAllocationPct == null ? '—' : ((h.portfolioWeight * 100) - h.targetAllocationPct >= 0 ? '+' : '') + ((h.portfolioWeight * 100) - h.targetAllocationPct).toFixed(1) + ' pts'} />
+        </div>
+        <div className="mt-3 text-[10px] text-white/45">
+          {h.maxAllocationPct != null && h.portfolioWeight != null && h.portfolioWeight * 100 >= h.maxAllocationPct
+            ? '🔴 Above your maximum allocation — review reducing exposure.'
+            : h.targetAllocationPct != null && h.portfolioWeight != null && h.portfolioWeight * 100 < h.targetAllocationPct && h.pnlPct > 0 && h.dailyChangePct != null && h.dailyChangePct > 0
+              ? '🟢 Below target while the position is performing positively — review whether increasing toward target is justified by your thesis and evidence.'
+              : h.targetAllocationPct != null && h.portfolioWeight != null && h.portfolioWeight * 100 < h.targetAllocationPct
+                ? '🟡 Below target — review an increase only when your thesis and evidence support it.'
+                : '🟢 Within your allocation plan — continue monitoring thesis, evidence and concentration.'}
+        </div>
+      </div>
+    )}
     <AnalystExpectationsPanel symbol={h.symbol} currentPrice={h.livePrice} />
     <ForecastValidationPanel symbol={h.symbol} horizon={20} />
     <div className="mt-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4">

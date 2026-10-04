@@ -11,7 +11,7 @@ import {
 } from '../utils/portfolioApi';
 
 type Props = { holdings: StoredPortfolioHolding[]; onChanged: (holdings: StoredPortfolioHolding[]) => void };
-const emptyForm = { symbol: '', quantity: '', averageCost: '', purchaseDate: '', notes: '' };
+const emptyForm = { symbol: '', quantity: '', averageCost: '', purchaseDate: '', notes: '', targetAllocationPct: '', maxAllocationPct: '' };
 const emptyPurchase = { investedAmount: '', executionPrice: '', purchaseDate: '', notes: '' };
 
 export default function PortfolioManager({ holdings, onChanged }: Props) {
@@ -30,7 +30,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
 
   const edit = (h: StoredPortfolioHolding) => {
     setEditing(h);
-    setForm({ symbol:h.symbol, quantity:String(h.quantity), averageCost:String(h.averageCost), purchaseDate:h.purchaseDate || '', notes:h.notes || '' });
+    setForm({ symbol:h.symbol, quantity:String(h.quantity), averageCost:String(h.averageCost), purchaseDate:h.purchaseDate || '', notes:h.notes || '', targetAllocationPct:h.targetAllocationPct == null ? '' : String(h.targetAllocationPct), maxAllocationPct:h.maxAllocationPct == null ? '' : String(h.maxAllocationPct) });
     setError(''); setOpen(true);
   };
   const add = () => { setEditing(null); setForm(emptyForm); setError(''); setOpen(true); };
@@ -114,18 +114,21 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
   };
 
   const save = async () => {
-    const quantity=Number(form.quantity), averageCost=Number(form.averageCost);
+    const quantity=Number(form.quantity), averageCost=Number(form.averageCost), targetAllocationPct=form.targetAllocationPct === '' ? null : Number(form.targetAllocationPct), maxAllocationPct=form.maxAllocationPct === '' ? null : Number(form.maxAllocationPct);
     if (!form.symbol.trim() || !Number.isFinite(quantity) || quantity<=0 || !Number.isFinite(averageCost) || averageCost<0) {
       setError('Enter a ticker, positive quantity and valid average buy price.'); return;
     }
     setBusy(true); setError('');
     try {
+      if ((targetAllocationPct != null && (!Number.isFinite(targetAllocationPct) || targetAllocationPct < 0 || targetAllocationPct > 100)) || (maxAllocationPct != null && (!Number.isFinite(maxAllocationPct) || maxAllocationPct < 0 || maxAllocationPct > 100)) || (targetAllocationPct != null && maxAllocationPct != null && targetAllocationPct > maxAllocationPct)) {
+        setError('Allocation target/max must be 0–100%, and target cannot exceed max.'); return;
+      }
       if (editing) {
-        const saved=await updatePortfolioHolding({...editing,symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim()});
+        const saved=await updatePortfolioHolding({...editing,symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim(),targetAllocationPct,maxAllocationPct});
         onChanged(holdings.map(x=>x.id===saved.id?saved:x));
         window.dispatchEvent(new Event('portfolio-holdings-changed'));
       } else {
-        const saved=await createPortfolioHolding({symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim()});
+        const saved=await createPortfolioHolding({symbol:form.symbol.trim().toUpperCase(),quantity,averageCost,purchaseDate:form.purchaseDate||null,notes:form.notes.trim(),targetAllocationPct,maxAllocationPct});
         onChanged([...holdings,saved].sort((a,b)=>a.symbol.localeCompare(b.symbol)));
         window.dispatchEvent(new Event('portfolio-holdings-changed'));
       }
@@ -211,11 +214,13 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
 
     {open && <div className="mt-4 rounded-xl border border-white/10 bg-[#0F1115] p-4">
       <div className="flex items-center justify-between"><div className="text-xs font-bold">{editing?'Edit holding':'Add holding'}</div><button type="button" aria-label="Close holding editor" onClick={()=>setOpen(false)} className="text-white/45 hover:text-white"><X className="w-4 h-4"/></button></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-2 mt-3">
         <Field testId="portfolio-field-ticker" label="Ticker" value={form.symbol} onChange={v=>setForm({...form,symbol:v})} placeholder="NVDA"/>
         <Field testId="portfolio-field-quantity" label="Quantity" value={form.quantity} onChange={v=>setForm({...form,quantity:v})} placeholder="10" type="number"/>
         <Field testId="portfolio-field-average-cost" label="Average buy price" value={form.averageCost} onChange={v=>setForm({...form,averageCost:v})} placeholder="100" type="number"/>
         <Field testId="portfolio-field-purchase-date" label="Purchase date" value={form.purchaseDate} onChange={v=>setForm({...form,purchaseDate:v})} type="date"/>
+        <Field testId="portfolio-field-target-allocation" label="Target allocation %" value={form.targetAllocationPct} onChange={v=>setForm({...form,targetAllocationPct:v})} placeholder="15" type="number"/>
+        <Field testId="portfolio-field-max-allocation" label="Reduce / sell-review above %" value={form.maxAllocationPct} onChange={v=>setForm({...form,maxAllocationPct:v})} placeholder="20" type="number"/>
         <Field testId="portfolio-field-notes" label="Notes" value={form.notes} onChange={v=>setForm({...form,notes:v})} placeholder="Original thesis"/>
       </div>
       {error && <div className="mt-2 text-[10px] text-rose-300">{error}</div>}

@@ -27,16 +27,16 @@ def mock_local_apis(page):
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'stockPrices':{'NVDA':{'price':200,'changePct':1}},'contracts':[],'congressTrades':[],'macroRisks':[],'marketSentiment':'QA mocked'})); return
         if '/api/portfolio' in url:
             if route.request.method == 'POST':
-                route.fulfill(status=201, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-new','symbol':'AMD','quantity':2,'averageCost':100,'purchaseDate':'2026-01-02','notes':'QA holding'}}))
+                route.fulfill(status=201, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-new','symbol':'AMD','quantity':2,'averageCost':100,'purchaseDate':'2026-01-02','notes':'QA holding','targetAllocationPct':15,'maxAllocationPct':20}}))
             elif route.request.method == 'PUT':
-                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':'updated'}}))
+                route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holding':{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':'updated','targetAllocationPct':15,'maxAllocationPct':20}}))
             elif route.request.method == 'DELETE':
                 route.fulfill(status=204, body='')
             else:
                 if 'holdingId=' in url:
                     route.fulfill(status=200, content_type='application/json', body=_json.dumps({'lots':[{'id':'lot-qa-1','holdingId':'qa-nvda','symbol':'NVDA','purchaseDate':'2026-10-02','investedAmount':200,'executionPrice':200,'quantity':1,'notes':'QA lot'}]}))
                 else:
-                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':''}]}))
+                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':'','targetAllocationPct':15,'maxAllocationPct':20}]}))
             return
         if '/api/forecast-verification' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({
@@ -175,6 +175,8 @@ def test_portfolio_manager_create_flow(page):
     page.get_by_test_id("portfolio-field-quantity").fill("2")
     page.get_by_test_id("portfolio-field-average-cost").fill("100")
     page.get_by_test_id("portfolio-field-purchase-date").fill("2026-01-02")
+    page.get_by_test_id("portfolio-field-target-allocation").fill("15")
+    page.get_by_test_id("portfolio-field-max-allocation").fill("20")
     page.get_by_test_id("portfolio-field-notes").fill("QA holding")
     with page.expect_request(lambda request: "/api/portfolio" in request.url and request.method == "POST", timeout=30000) as request_info:
         page.get_by_test_id("portfolio-save-holding").click()
@@ -183,6 +185,8 @@ def test_portfolio_manager_create_flow(page):
     assert payload["symbol"] == "AMD"
     assert float(payload["quantity"]) == 2
     assert float(payload["averageCost"]) == 100
+    assert float(payload["targetAllocationPct"]) == 15
+    assert float(payload["maxAllocationPct"]) == 20
     page.get_by_test_id("portfolio-save-holding").wait_for(state="detached", timeout=30000)
 
 
