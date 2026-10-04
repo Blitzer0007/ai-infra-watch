@@ -131,9 +131,9 @@ function PortfolioExposureMatrix({ contracts = [], news = [], positions = [] }: 
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
         <div>
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Risk & Sensitivity Map</h3>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Risk & Sensitivity</h3>
           <p className="text-[10px] text-white/35 mt-1 font-mono">
-            Evidence-adjusted sensitivity from portfolio metadata plus matching contract/news evidence. Missing live evidence does not create direct sensitivity.
+            Source-supported sensitivity from portfolio metadata plus matching contract/news evidence. Missing live evidence does not create direct sensitivity.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
