@@ -3,7 +3,6 @@ import { history as routedHistory, quote as routedQuote } from '../../api/_marke
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const LEVERAGE = { SOXL: 3 };
 
 function sbHeaders() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service configuration is missing');
@@ -277,7 +276,7 @@ async function fetchEarnings(symbols) {
 
 async function fetchForecastProgress() {
   const rows = await supabase(
-    'forecast_snapshots?select=ticker,horizon,status,target_date,verified_at&horizon=eq.20&order=created_at.desc&limit=2000',
+    'forecast_snapshots?select=ticker,horizon,status,target_date,verified_at,created_at&horizon=eq.20&order=created_at.desc&limit=2000',
   );
   const today = dateOnly(new Date());
   const verified = rows.filter(row => row.status === 'verified');
@@ -296,6 +295,7 @@ async function fetchForecastProgress() {
   return {
       verified: verified.length,
       independentVerified: independentForecastCount(verified),
+      independenceWindowBusinessDays: 20,
       pending: pending.length,
       due: due.length,
       remaining: Math.max(0, 50 - verified.length),
@@ -404,7 +404,8 @@ export default async function handler(req, res) {
         const stockStart = recent.length > 1 ? Number(recent[0].price) : null;
         const benchmarkStart = benchmarkRecent.length > 1 ? Number(benchmarkRecent[0].price) : null;
         const stockReturn = stockStart > 0 ? (Number(q.price) / stockStart - 1) * 100 : null;
-        const benchmarkReturn = benchmarkStart > 0 ? (Number(q.price) / benchmarkStart - 1) * 100 : null;
+        const benchmarkPrice = benchmarkRecent.length > 1 ? Number(benchmarkRecent.at(-1).price) : null;
+        const benchmarkReturn = benchmarkStart > 0 && benchmarkPrice > 0 ? (benchmarkPrice / benchmarkStart - 1) * 100 : null;
         const supportingEvidence = stockReturn != null && benchmarkReturn != null && stockReturn >= benchmarkReturn;
         if ((pullbackPct != null && pullbackPct >= 3) || supportingEvidence) {
           actionItems.push({
@@ -542,6 +543,7 @@ export default async function handler(req, res) {
         cashFlowPnl: money(actual.pnl),
         concentrationTop3Pct: pct(concentrationPct),
         semiconductorShock15Pct: money(totalScenarioShock),
+        scenarioShockTotal: money(totalScenarioShock),
         riskScenarios,
         quoteCoverage: actual.quoteCoverage,
       },
