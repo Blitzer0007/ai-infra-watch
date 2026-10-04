@@ -57,7 +57,10 @@ export default function DecisionJournalPanel(){
       setEntries(Array.isArray(body?.entries)?body.entries:[]);
       setWeekly(body?.weekly||null);
       setHoldings(p);
-      try { setTransactions(await fetchPortfolioTransactions()); } catch { setTransactions([]); }
+      setTransactions([]);
+      setLoading(false);
+      fetchPortfolioTransactions().then(setTransactions).catch(() => setTransactions([]));
+      return;
       if(!holdingId&&p[0]){
         setHoldingId(p[0].id);
         setThesis(p[0].decisionThesis||p[0].notes||'');
