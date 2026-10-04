@@ -2,12 +2,6 @@ name: Vercel Production Deploy
 run-name: Vercel Production Deploy • ${{ github.ref_name }}
 
 on:
-  # Temporary one-time production deploy trigger for the validated Batch 36 changes.
-  # Removed immediately after the deployment so normal production deploys remain manual.
-  push:
-    branches: [main]
-    paths:
-      - "src/components/PortfolioIntelligence.tsx"
   workflow_dispatch:
 
 permissions:
