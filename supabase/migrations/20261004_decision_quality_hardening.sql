@@ -13,13 +13,13 @@ set broker_alerts = (
   select coalesce(jsonb_agg(
     jsonb_build_object(
       'price', x.price,
-      'direction', case when x.price < h.average_cost then 'below' else 'above' end,
-      'label', case when x.price < h.average_cost then 'stop' else 'target' end
+      'direction', case when x.price < portfolio_holdings.average_cost then 'below' else 'above' end,
+      'label', case when x.price < portfolio_holdings.average_cost then 'stop' else 'target' end
     )
   ), '[]'::jsonb)
   from (
     select value::numeric as price
-    from jsonb_array_elements_text(coalesce(h.broker_alert_prices, '[]'::jsonb))
+    from jsonb_array_elements_text(coalesce(portfolio_holdings.broker_alert_prices, '[]'::jsonb))
     where value ~ '^[0-9]+(\.[0-9]+)?$' and value::numeric > 0
   ) x
 )
