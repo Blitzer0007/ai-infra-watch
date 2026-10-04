@@ -235,6 +235,7 @@ export default function UnifiedEventTimeline({
   macroRisks = [],
   news = [],
   politicalSignals = [],
+  purchaseDate = null,
 }: {
   symbol: string;
   contracts?: any[];
@@ -242,6 +243,7 @@ export default function UnifiedEventTimeline({
   macroRisks?: any[];
   news?: any[];
   politicalSignals?: any[];
+  purchaseDate?: string | null;
 }) {
   const [secEvents, setSecEvents] = useState<TimelineEvent[]>([]);
   const [earningsEvents, setEarningsEvents] = useState<TimelineEvent[]>([]);
@@ -544,7 +546,11 @@ export default function UnifiedEventTimeline({
                     </td>
                     <td className="p-3 whitespace-nowrap text-white/50">
                       <div>{event.date}</div>
-                      
+                      {purchaseDate && (
+                        <div className={'mt-1 text-[7px] font-mono uppercase ' + (event.date < purchaseDate ? 'text-white/20' : 'text-emerald-300/45')}>
+                          {event.date < purchaseDate ? 'Before first purchase' : 'After first purchase'}
+                        </div>
+                      )}
                     </td>
                     <td className="p-3 text-right text-white">
                       {reaction?.eventPrice == null ? '—' : '$' + reaction.eventPrice.toFixed(2)}
