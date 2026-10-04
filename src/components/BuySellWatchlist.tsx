@@ -4,11 +4,14 @@ import { STOCK_METADATA } from '../data';
 import { Bell, BellOff, Trash2, Plus, Star, Zap, ShieldCheck } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 import { loadAlertEvents, notifyTelegram, requestBrowserNotifications, isTelegramEnabled, setTelegramEnabled } from '../utils/alertEngine';
+import { fetchPortfolioHoldings, StoredPortfolioHolding } from '../utils/portfolioApi';
 import EarningsAlerts from './EarningsAlerts';
 
 export default function BuySellWatchlist() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, number>>({});
+  const [portfolioRules, setPortfolioRules] = useState<StoredPortfolioHolding[]>([]);
+  const [portfolioRulesError, setPortfolioRulesError] = useState('');
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [newSymbol, setNewSymbol] = useState('NBIS');
   const [newTargetPrice, setNewTargetPrice] = useState('');
@@ -28,6 +31,19 @@ export default function BuySellWatchlist() {
     setAlertEvents(loadAlertEvents());
 
     let cancelled = false;
+    const loadRules = async () => {
+      try {
+        const holdings = await fetchPortfolioHoldings();
+        if (!cancelled) {
+          setPortfolioRules(holdings);
+          setPortfolioRulesError('');
+        }
+      } catch (error) {
+        if (!cancelled) setPortfolioRulesError(error instanceof Error ? error.message : 'Portfolio rules unavailable');
+      }
+    };
+    void loadRules();
+
     const checkTelegram = async () => {
       setTelegramChecking(true);
       try {
@@ -209,6 +225,60 @@ export default function BuySellWatchlist() {
       </div>
 
       <EarningsAlerts />
+
+      <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.025] p-4 md:p-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-amber-200">Portfolio Rules Matrix</div>
+            <h2 className="text-lg font-black uppercase tracking-tight text-white mt-1">All holdings · decision &amp; allocation rules</h2>
+            <p className="text-[10px] text-white/40 mt-1">One place to review every holding's thesis, risk limit, exit rule, allocation boundaries and broker review prices. These are review/alert points, not automatic trades.</p>
+          </div>
+          <div className="shrink-0 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.04] px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-emerald-200">
+            {portfolioRules.length} / 11 rules loaded
+          </div>
+        </div>
+
+        {portfolioRulesError ? (
+          <div className="mt-4 rounded-lg border border-rose-400/15 bg-rose-400/[0.04] px-3 py-2 text-[10px] text-rose-200">{portfolioRulesError}</div>
+        ) : portfolioRules.length === 0 ? (
+          <div className="mt-4 rounded-lg border border-white/10 bg-black/10 px-3 py-5 text-center text-[10px] text-white/35">Loading portfolio rules…</div>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
+            <table className="min-w-[1050px] w-full text-left">
+              <thead className="bg-black/20">
+                <tr className="text-[8px] font-mono uppercase tracking-widest text-white/35">
+                  <th className="px-3 py-2.5">Stock</th>
+                  <th className="px-3 py-2.5">Target</th>
+                  <th className="px-3 py-2.5">Max</th>
+                  <th className="px-3 py-2.5">Loss limit</th>
+                  <th className="px-3 py-2.5">Exit rule</th>
+                  <th className="px-3 py-2.5">Broker alerts</th>
+                  <th className="px-3 py-2.5">Thesis</th>
+                  <th className="px-3 py-2.5">Edit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {portfolioRules.map(h => (
+                  <tr key={h.symbol} className="text-[10px] text-white/65 hover:bg-white/[0.02]">
+                    <td className="px-3 py-3 align-top">
+                      <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="font-mono font-black text-white hover:text-amber-200">{h.symbol}</button>
+                    </td>
+                    <td className="px-3 py-3 align-top font-mono">{h.targetAllocationPct == null ? '—' : h.targetAllocationPct + '%'}</td>
+                    <td className="px-3 py-3 align-top font-mono">{h.maxAllocationPct == null ? '—' : h.maxAllocationPct + '%'}</td>
+                    <td className="px-3 py-3 align-top font-mono">{h.lossLimitPct == null ? '—' : h.lossLimitPct + '%'}</td>
+                    <td className="px-3 py-3 align-top font-mono uppercase">{h.exitRuleType ? (h.exitRuleType === 'trailing_stop' ? 'Trailing' : h.exitRuleType.replaceAll('_', ' ')) + (h.exitRuleValue == null ? '' : ' · ' + h.exitRuleValue + '%') : '—'}</td>
+                    <td className="px-3 py-3 align-top font-mono text-amber-100">{h.brokerAlertPrices?.length ? h.brokerAlertPrices.map(price => '$' + formatPrice(price)).join(' / ') : 'Not set'}</td>
+                    <td className="px-3 py-3 align-top max-w-[360px] text-white/45">{h.decisionThesis || 'Not recorded'}</td>
+                    <td className="px-3 py-3 align-top">
+                      <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-mono uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white">Edit</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
