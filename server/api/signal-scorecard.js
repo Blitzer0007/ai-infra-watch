@@ -136,12 +136,16 @@ async function evaluateDue() {
   for (const [signalType, sampleMap] of families) {
     const values = [...sampleMap.values()];
     const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    const median = !sorted.length ? null : sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
     const wins = values.filter(v => v > 0).length;
-    const lifecycle = values.length >= 10 && mean != null && mean > 0
+    const winRate = values.length ? wins / values.length : null;
+    const lifecycle = values.length >= 30 && median != null && median > 0 && winRate != null && winRate > 0.5
       ? 'active'
-      : values.length >= 10
+      : values.length >= 30
         ? 'retired'
-        : values.length >= 5 && mean != null && mean <= 0
+        : values.length >= 10
           ? 'under_review'
           : 'experimental';
     await supabase('portfolio_signal_family_scorecard', {
@@ -150,7 +154,8 @@ async function evaluateDue() {
         signal_type: signalType,
         evaluated_samples: values.length,
         mean_20d_excess_return_pct: mean,
-        win_rate_20d: values.length ? wins / values.length : null,
+        median_20d_excess_return_pct: median,
+        win_rate_20d: winRate,
         lifecycle_status: lifecycle,
         last_evaluated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -196,8 +201,9 @@ export default async function handler(req, res) {
       const families = result.map(row => ({
         ...row,
         decision_eligible: row.lifecycle_status === 'active'
-          && Number(row.evaluated_samples) >= 10
-          && Number(row.mean_20d_excess_return_pct) > 0,
+          && Number(row.evaluated_samples) >= 30
+          && Number(row.median_20d_excess_return_pct) > 0
+          && Number(row.win_rate_20d) > 0.5,
       }));
       return res.status(200).json({ families });
     }
