@@ -1,4 +1,3 @@
-// One-time production deployment marker; no runtime behavior.
 import { useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, Radio, ShieldCheck } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
