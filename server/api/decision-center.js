@@ -294,7 +294,7 @@ export default async function handler(req, res) {
 
   try {
     const holdingRows = await supabase(
-      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,target_allocation_pct,max_allocation_pct&quantity=gt.0&order=symbol.asc',
+      'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,broker_alerts,rule_stages,rule_stage_state,target_allocation_pct,max_allocation_pct,risk_group,shock_sensitivity&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
       'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row&order=trade_date.asc,source_row.asc',
@@ -306,18 +306,20 @@ export default async function handler(req, res) {
     }));
     const quotes = Object.fromEntries(quoteEntries);
 
-    const totalCurrentValue = symbols.reduce((sum, symbol) => {
-      const holding = holdingRows.find(row => String(row.symbol).toUpperCase() === symbol);
-      const price = Number(quotes[symbol]?.price);
-      const quantity = Number(holding?.quantity);
-      return sum + (price > 0 && quantity > 0 ? price * quantity : 0);
-    }, 0);
-
     const histories = {};
     await Promise.all(symbols.map(async symbol => {
       try { histories[symbol] = await routedHistory(symbol, '1y'); } catch {}
     }));
 
+    const totalCurrentValue = holdingRows.reduce((sum, holding) => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const q = quotes[symbol];
+      const fallback = previousOrSamePoint(histories[symbol]?.points || [], localDate());
+      const price = q?.price > 0 ? q.price : (fallback?.price > 0 ? Number(fallback.price) : null);
+      return sum + (price > 0 ? price * Number(holding.quantity) : 0);
+    }, 0);
+
+    const stageUpdates = [];
     const actionItems = [];
     const ruleStates = [];
 
