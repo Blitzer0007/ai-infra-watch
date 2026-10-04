@@ -118,7 +118,9 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
     '',
   ];
   const actions = Array.isArray(decision?.actionItems) ? decision.actionItems.slice(0, 3) : [];
-  lines.push('ACTION NEEDED (' + actions.filter(item => item.severity === 'ACT').length + ')');
+  const actCount=actions.filter(item=>item.severity==='ACT').length;
+  const watchCount=actions.filter(item=>item.severity==='WATCH').length;
+  lines.push('ACTION ITEMS ('+actions.length+') · ACT '+actCount+' · WATCH '+watchCount);
   if (actions.length) {
     actions.forEach((item, index) => {
       const tag = item.severity === 'ACT' ? 'ACT' : item.severity === 'WATCH' ? 'WATCH' : 'SETUP';
@@ -133,7 +135,9 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
   if (earnings.length) {
     earnings.forEach(item => lines.push(item.symbol + ' earnings ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd') + ' · ' + item.date));
   } else {
-    lines.push('No monitored earnings event in the next 7 days.');
+    lines.push(decision?.earningsStatus && decision.earningsStatus !== 'ok'
+      ? 'Earnings calendar unavailable ('+decision.earningsStatus+').'
+      : 'No monitored earnings event in the next 7 days.');
   }
 
   const portfolio = decision?.portfolio || {};
@@ -160,8 +164,8 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
   lines.push(
     '',
     'FORECAST VALIDATION',
-    (forecast.verified ?? 0) + '/50 verified · ' + (forecast.pending ?? 0) + ' pending · ' + (forecast.remaining ?? 0) + ' still needed',
-    '50 is a minimum evidence gate, not 50 independent tests.',
+    (forecast.verified ?? 0) + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' non-overlapping · ' + (forecast.pending ?? 0) + ' pending · ' + (forecast.remaining ?? 0) + ' still needed',
+    'Non-overlapping count requires at least 20 business days between validation anchors for the same ticker.',
   );
 
   if (weekly) {
@@ -169,7 +173,9 @@ function buildDecisionFirstText(decision, fallbackDate, weekly) {
       '',
       'WEEKLY REVIEW',
       weekly.decisions + ' decisions · ' + weekly.outcomes + ' outcome reviews',
-      'Average excess vs SPY: ' + (weekly.averageExcessReturnPct == null ? '—' : signedPct(Number(weekly.averageExcessReturnPct))),
+      'Average decision score: ' + (weekly.averageDecisionScorePct == null ? '—' : signedPct(Number(weekly.averageDecisionScorePct))),
+      'Average excess vs benchmark: ' + (weekly.averageExcessReturnPct == null ? '—' : signedPct(Number(weekly.averageExcessReturnPct))),
+      'Sample: ' + (weekly.sampleStatus || 'unknown'),
       'Rule adherence: ' + (weekly.ruleAdherencePct == null ? '—' : Number(weekly.ruleAdherencePct).toFixed(0) + '%'),
       'Forecast error: ' + (weekly.averageForecastErrorPct == null ? '—' : signedPct(Number(weekly.averageForecastErrorPct))),
       'Reflection: ' + weekly.reflection,
