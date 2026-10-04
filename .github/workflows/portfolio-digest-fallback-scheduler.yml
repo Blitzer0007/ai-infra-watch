@@ -1,0 +1,34 @@
+name: Portfolio Digest Fallback Scheduler
+run-name: Portfolio Digest Fallback • ${{ github.event.schedule || 'manual' }}
+
+on:
+  schedule:
+    # Ten minutes after the primary scheduler. Idempotent slot claiming prevents
+    # duplicate Telegram/email delivery when both schedulers run successfully.
+    - cron: '45 0,6,12,16 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-digest-fallback-scheduler
+  cancel-in-progress: false
+
+jobs:
+  send-digest:
+    name: Send fallback Telegram portfolio digest
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Run portfolio digest fallback
+        env:
+          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AIW_CRON_SECRET" ]; then
+            echo "::error::Missing AIW_CRON_SECRET repository secret."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error             --request GET             --header "Authorization: Bearer $AIW_CRON_SECRET"             --header "User-Agent: ai-infra-watch-github-actions-fallback/1.0"             --retry 3             --retry-all-errors             --retry-delay 3             "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$(TZ=Asia/Kolkata date '+%Y-%m-%d-%H')"
+
+      - name: Record completion
+        run: echo "Portfolio digest fallback completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
