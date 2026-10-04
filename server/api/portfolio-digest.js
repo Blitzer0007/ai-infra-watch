@@ -61,6 +61,89 @@ function signedPct(value) {
   return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
 }
 
+async function fetchDecisionCenter() {
+  const secret = String(process.env.CRON_SECRET || '').trim();
+  if (!secret) return null;
+  try {
+    const response = await fetch('https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center', {
+      headers: {
+        Authorization: 'Bearer ' + secret,
+        'User-Agent': 'ai-infra-watch-daily-digest/2.0',
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    return body?.ok ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildDecisionFirstText(decision, fallbackDate) {
+  const lines = [
+    'AI Infra Watch · Daily Decision Brief',
+    fallbackDate,
+    '',
+  ];
+  const actions = Array.isArray(decision?.actionItems) ? decision.actionItems.slice(0, 3) : [];
+  lines.push('ACTION NEEDED (' + actions.filter(item => item.severity === 'ACT').length + ')');
+  if (actions.length) {
+    actions.forEach((item, index) => {
+      const tag = item.severity === 'ACT' ? 'ACT' : item.severity === 'WATCH' ? 'WATCH' : 'SETUP';
+      lines.push((index + 1) + '. [' + tag + '] ' + item.symbol + ' — ' + item.title + ': ' + item.detail);
+    });
+  } else {
+    lines.push('No rule breach or near-rule item detected.');
+  }
+
+  const earnings = Array.isArray(decision?.earnings) ? decision.earnings.slice(0, 3) : [];
+  lines.push('', 'NEXT 7 DAYS');
+  if (earnings.length) {
+    earnings.forEach(item => lines.push(item.symbol + ' earnings ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd') + ' · ' + item.date));
+  } else {
+    lines.push('No monitored earnings event in the next 7 days.');
+  }
+
+  const portfolio = decision?.portfolio || {};
+  const spy = decision?.benchmark?.SPY;
+  const soxx = decision?.benchmark?.SOXX;
+  const excessSpy = spy && Number.isFinite(portfolio.cashFlowPnl) ? portfolio.cashFlowPnl - spy.pnl : null;
+  const excessSoxx = soxx && Number.isFinite(portfolio.cashFlowPnl) ? portfolio.cashFlowPnl - soxx.pnl : null;
+  lines.push(
+    '',
+    'RESULT',
+    'Cash-flow P&L: ' + signedMoney(Number(portfolio.cashFlowPnl || 0)),
+    'Same cash in SPY: ' + (spy ? signedMoney(Number(spy.pnl || 0)) : '—') + (excessSpy == null ? '' : ' · Edge ' + signedMoney(excessSpy)),
+    'Same cash in SOXX: ' + (soxx ? signedMoney(Number(soxx.pnl || 0)) : '—') + (excessSoxx == null ? '' : ' · Edge ' + signedMoney(excessSoxx)),
+  );
+
+  lines.push(
+    '',
+    'RISK',
+    'Top 3 holdings: ' + (portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '% of value'),
+    'Semis −15% scenario: ' + signedMoney(Number(portfolio.semiconductorShock15Pct || 0)) + ' (SOXL at 3x)',
+  );
+
+  const forecast = decision?.forecast || {};
+  lines.push(
+    '',
+    'FORECAST VALIDATION',
+    (forecast.verified ?? 0) + '/50 verified · ' + (forecast.pending ?? 0) + ' pending · ' + (forecast.remaining ?? 0) + ' still needed',
+    '50 is a minimum evidence gate, not 50 independent tests.',
+  );
+
+  const rules = decision?.rules || {};
+  const quiet = [
+    (rules.noRule ?? 0) + ' holdings without active rules',
+    (rules.breached ?? 0) + ' rule breaches',
+    (rules.near ?? 0) + ' close-to-rule holdings',
+  ];
+  lines.push('', 'STATUS · ' + quiet.join(' · '));
+  lines.push('', 'Review layer only — no automatic trade instruction.');
+  return lines.join('\n');
+}
+
 async function buildDigest() {
   const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
   const rows = await Promise.all(holdings.map(async holding => {
@@ -126,6 +209,31 @@ async function buildDigest() {
   const macroMedium = MACRO_RISKS.filter(item => item.level === 'MEDIUM').length;
   const macroLoad = Math.min(30, macroHigh * 12 + macroMedium * 6);
   const date = new Date().toISOString().slice(0, 10);
+
+  const decision = await fetchDecisionCenter();
+  const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+  if (decision) {
+    return {
+      date: localDate,
+      text: buildDecisionFirstText(decision, localDate),
+      rows,
+      totalValue,
+      totalPnl,
+      totalPnlPct,
+      breadthPct,
+      avgDailyMove,
+      largestHolding: largest?.symbol || null,
+      top3ConcentrationPct: top3Pct,
+      effectiveHoldings,
+      macroLoad,
+      macroHigh,
+      macroMedium,
+      attention: (decision.actionItems || []).slice(0, 3).map(item => item.symbol),
+      quoteCoverage: { fresh: valid.length, total: rows.length, unavailable: unavailable.length },
+      decisionFirst: true,
+    };
+  }
 
   const lines = [
     'AI Infra Watch — Daily Intelligence Brief',
