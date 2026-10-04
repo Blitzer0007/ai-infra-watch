@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, ShieldAlert, Target } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 
@@ -184,7 +184,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
   );
 }
 
-function DecisionMetric({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: 'danger'|'good'|'warn'|'neutral' }) {
+function DecisionMetric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: 'danger'|'good'|'warn'|'neutral' }) {
   const toneClass = tone === 'danger' ? 'text-rose-300' : tone === 'good' ? 'text-emerald-300' : tone === 'warn' ? 'text-amber-300' : 'text-white/70';
   return <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className={toneClass}>{icon}</div><div className="text-[8px] font-mono uppercase text-white/25 mt-2">{label}</div><div className={'text-sm font-black font-mono mt-1 ' + toneClass}>{value}</div></div>;
 }
