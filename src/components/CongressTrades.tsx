@@ -25,6 +25,12 @@ type TradeReaction = {
   nextPct: number | null;
   day5Pct: number | null;
   day20Pct: number | null;
+  benchmarkNextPct: number | null;
+  benchmarkDay5Pct: number | null;
+  benchmarkDay20Pct: number | null;
+  excessNextPct: number | null;
+  excessDay5Pct: number | null;
+  excessDay20Pct: number | null;
 };
 
 type SourceStatus = {
@@ -37,6 +43,7 @@ type SourceStatus = {
 
 const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
+const benchmarkHistoryCache: Record<string, Promise<HistoryPoint[]>> = {};
 
 function loadHistory(symbol: string): Promise<HistoryPoint[]> {
   const key = symbol.trim().toUpperCase();
@@ -59,7 +66,7 @@ function pct(from: number | null, to: number | null): number | null {
   return ((to - from) / from) * 100;
 }
 
-function reactionFor(history: HistoryPoint[], tradeDate: string): TradeReaction | null {
+function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], tradeDate: string): TradeReaction | null {
   if (!history.length || !tradeDate) return null;
   const eventIndex = history.findIndex((point) => point.date >= tradeDate);
   if (eventIndex < 0) return null;
@@ -68,6 +75,18 @@ function reactionFor(history: HistoryPoint[], tradeDate: string): TradeReaction 
   const next = history[eventIndex + 1] || null;
   const day5 = history[eventIndex + 5] || null;
   const day20 = history[eventIndex + 20] || null;
+  const benchmarkIndex = benchmarkHistory.findIndex((point) => point.date >= event.date);
+  const benchmarkEvent = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex] : null;
+  const benchmarkNext = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 1] : null;
+  const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
+  const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
+
+  const nextPct = pct(event.price, next?.price ?? null);
+  const day5Pct = pct(event.price, day5?.price ?? null);
+  const day20Pct = pct(event.price, day20?.price ?? null);
+  const benchmarkNextPct = pct(benchmarkEvent?.price ?? null, benchmarkNext?.price ?? null);
+  const benchmarkDay5Pct = pct(benchmarkEvent?.price ?? null, benchmarkDay5?.price ?? null);
+  const benchmarkDay20Pct = pct(benchmarkEvent?.price ?? null, benchmarkDay20?.price ?? null);
 
   return {
     eventDate: event.date,
@@ -76,9 +95,15 @@ function reactionFor(history: HistoryPoint[], tradeDate: string): TradeReaction 
     nextPrice: next?.price || null,
     day5: day5?.price || null,
     day20: day20?.price || null,
-    nextPct: pct(event.price, next?.price ?? null),
-    day5Pct: pct(event.price, day5?.price ?? null),
-    day20Pct: pct(event.price, day20?.price ?? null),
+    nextPct,
+    day5Pct,
+    day20Pct,
+    benchmarkNextPct,
+    benchmarkDay5Pct,
+    benchmarkDay20Pct,
+    excessNextPct: nextPct == null || benchmarkNextPct == null ? null : nextPct - benchmarkNextPct,
+    excessDay5Pct: day5Pct == null || benchmarkDay5Pct == null ? null : day5Pct - benchmarkDay5Pct,
+    excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
   };
 }
 
@@ -137,6 +162,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [globalLoading, setGlobalLoading] = useState(false);
   const [searchTrades, setSearchTrades] = useState<CongressTrade[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [benchmarkHistory, setBenchmarkHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -284,8 +310,19 @@ export default function CongressTrades(_props: CongressTradesProps) {
     let cancelled = false;
     setHistoryLoading(true);
 
-    loadHistory(symbolFilter).then((points) => {
-      if (!cancelled) setHistory(points);
+    Promise.all([
+      loadHistory(symbolFilter),
+      (benchmarkHistoryCache.SPY || (benchmarkHistoryCache.SPY = fetch('/api/company-scale?action=history&symbol=SPY&range=5y')
+        .then(async (res) => {
+          if (!res.ok) throw new Error('SPY history unavailable');
+          const data = await res.json();
+          return Array.isArray(data?.points) ? data.points : [];
+        })
+        .catch(() => []))),
+    ]).then(([points, spyPoints]) => {
+      if (cancelled) return;
+      setHistory(points);
+      setBenchmarkHistory(spyPoints);
     }).finally(() => {
       if (!cancelled) setHistoryLoading(false);
     });
@@ -323,22 +360,28 @@ export default function CongressTrades(_props: CongressTradesProps) {
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, trade.filingDate || trade.date || trade.transactionDate),
+        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.date || trade.transactionDate),
       }))
       .filter((row) => row.reaction);
-  }, [filtered, history, symbolFilter]);
+  }, [filtered, history, benchmarkHistory, symbolFilter]);
 
   const reactionSummary = useMemo(() => {
-    const next = reactions.map((row) => row.reaction?.nextPct).filter((v): v is number => v != null);
-    const day5 = reactions.map((row) => row.reaction?.day5Pct).filter((v): v is number => v != null);
-    const day20 = reactions.map((row) => row.reaction?.day20Pct).filter((v): v is number => v != null);
-
-    return {
-      matched: reactions.length,
-      next: next.length ? next.reduce((a, b) => a + b, 0) / next.length : null,
-      day5: day5.length ? day5.reduce((a, b) => a + b, 0) / day5.length : null,
-      day20: day20.length ? day20.reduce((a, b) => a + b, 0) / day20.length : null,
+    const avg = (values: Array<number | null | undefined>) => {
+      const usable = values.filter((v): v is number => v != null && Number.isFinite(v));
+      return usable.length ? usable.reduce((a, b) => a + b, 0) / usable.length : null;
     };
+    const summarize = (rows: typeof reactions) => ({
+      matched: rows.length,
+      next: avg(rows.map(row => row.reaction?.nextPct)),
+      day5: avg(rows.map(row => row.reaction?.day5Pct)),
+      day20: avg(rows.map(row => row.reaction?.day20Pct)),
+      excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
+      excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
+      excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
+    });
+    const buys = reactions.filter(row => row.trade.transactionType === 'buy');
+    const sells = reactions.filter(row => row.trade.transactionType === 'sell');
+    return { all: summarize(reactions), buy: summarize(buys), sell: summarize(sells) };
   }, [reactions]);
 
   const reactionById = useMemo(() => {
@@ -481,12 +524,21 @@ export default function CongressTrades(_props: CongressTradesProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <SummaryMetric label="Trades matched to history" value={String(reactionSummary.matched)} tone="text-white" />
-            <SummaryMetric label="Average next-day move" value={formatPct(reactionSummary.next)} tone={reactionTone(reactionSummary.next)} />
-            <SummaryMetric label="Average 5-day move" value={formatPct(reactionSummary.day5)} tone={reactionTone(reactionSummary.day5)} />
-            <SummaryMetric label="Average 20-day move" value={formatPct(reactionSummary.day20)} tone={reactionTone(reactionSummary.day20)} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <SummaryMetric label="All matched" value={String(reactionSummary.all.matched)} tone="text-white" />
+            <SummaryMetric label="Buy 5D vs SPY" value={formatPct(reactionSummary.buy.excessDay5)} tone={reactionTone(reactionSummary.buy.excessDay5)} />
+            <SummaryMetric label="Sell 5D vs SPY" value={formatPct(reactionSummary.sell.excessDay5)} tone={reactionTone(reactionSummary.sell.excessDay5)} />
+            <SummaryMetric label="All 20D vs SPY" value={formatPct(reactionSummary.all.excessDay20)} tone={reactionTone(reactionSummary.all.excessDay20)} />
           </div>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-2">
+            <SummaryMetric label="Buy next" value={formatPct(reactionSummary.buy.next)} tone={reactionTone(reactionSummary.buy.next)} />
+            <SummaryMetric label="Buy 5D" value={formatPct(reactionSummary.buy.day5)} tone={reactionTone(reactionSummary.buy.day5)} />
+            <SummaryMetric label="Buy 20D" value={formatPct(reactionSummary.buy.day20)} tone={reactionTone(reactionSummary.buy.day20)} />
+            <SummaryMetric label="Sell next" value={formatPct(reactionSummary.sell.next)} tone={reactionTone(reactionSummary.sell.next)} />
+            <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
+            <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
+          </div>
+          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Positive excess means the selected ticker moved more than SPY.</div>
 
           {historyLoading && (
             <div className="text-[9px] font-mono text-white/30 mt-3">Loading 5-year market history…</div>
@@ -579,7 +631,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
               { key: 'tradeDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
               { key: 'filed', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
               { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '$' + formatPrice(reaction.eventPrice) : '—'; } },
-              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div>Next day {formatPct(reaction?.nextPct ?? null)}</div><div className="text-[9px] mt-1">5 days {formatPct(reaction?.day5Pct ?? null)}</div><div className="text-[9px] mt-1">20 days {formatPct(reaction?.day20Pct ?? null)}</div></div>; } },
+              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div>Next {formatPct(reaction?.nextPct ?? null)}</div><div className="text-[9px] mt-1">5D {formatPct(reaction?.day5Pct ?? null)}</div><div className="text-[9px] mt-1">20D {formatPct(reaction?.day20Pct ?? null)}</div><div className="text-[8px] mt-1 text-cyan-200/60">5D vs SPY {formatPct(reaction?.excessDay5Pct ?? null)}</div></div>; } },
             ]}
           />
         </div>
