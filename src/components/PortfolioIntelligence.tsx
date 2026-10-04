@@ -18,7 +18,6 @@ import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
-import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 import ForecastValidationPanel from './ForecastValidationPanel';
 type Price = {
   price: number;
