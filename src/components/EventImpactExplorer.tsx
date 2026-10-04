@@ -402,6 +402,12 @@ export default function EventImpactExplorer({ symbol }: { symbol: string }) {
           suffix={`pts vs SPY · n=${summary.relativeN} · median ${formatPct(summary.medianRelativeT1)}`}
           valueClass={tone(summary.avgRelativeT1)}
         />
+        <Metric
+          label={symbol.toUpperCase() + ' · 5D Beta-Adjusted vs SOXX'}
+          value={formatPct(summary.avgAbnormalT5)}
+          suffix={'pts · n=' + summary.abnormalN + ' · beta ' + (summary.avgBeta60 == null ? '—' : summary.avgBeta60.toFixed(2))}
+          valueClass={tone(summary.avgAbnormalT5)}
+        />
       </div>
 
       {loading && (
