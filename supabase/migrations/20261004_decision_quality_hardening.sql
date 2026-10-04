@@ -41,7 +41,7 @@ where risk_group is null;
 
 update public.portfolio_holdings
 set risk_beta = case
-  when upper(symbol) = 'SOXL' then 3
+  when upper(symbol) = 'SOXL' then 1
   when upper(symbol) in ('NVDA','MU','SNDK','AMD') then 1
   else coalesce(risk_beta, 1)
 end
