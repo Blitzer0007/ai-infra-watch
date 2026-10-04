@@ -361,7 +361,7 @@ export default async function handler(req, res) {
 
     const semiconductorValue = holdingRows.reduce((sum, holding) => {
       const symbol = String(holding.symbol).toUpperCase();
-      const isSemis = symbol === 'SOXL' || ['DRAM'].includes(symbol);
+      const isSemis = ['SOXL', 'NVDA', 'DRAM'].includes(symbol);
       if (!isSemis) return sum;
       const q = quotes[symbol];
       const leverage = LEVERAGE[symbol] || 1;
