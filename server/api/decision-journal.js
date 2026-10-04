@@ -54,8 +54,6 @@ function ruleTextFromHolding(h) {
   if (Number(h.loss_limit_pct) > 0) parts.push('Loss limit ' + Number(h.loss_limit_pct).toFixed(1) + '%');
   if (h.exit_rule_type) parts.push(String(h.exit_rule_type) + (h.exit_rule_value != null ? ' ' + Number(h.exit_rule_value).toFixed(1) : ''));
   if (Array.isArray(h.broker_alerts) && h.broker_alerts.length) parts.push('Broker review levels ' + h.broker_alerts.map(alert => '
-  return parts.join(' · ');
-}
 async function getHolding(holdingId) {
   const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(holdingId) + '&quantity=gt.0&select=*&limit=1', { method: 'GET' });
   return rows[0] || null;
@@ -122,16 +120,18 @@ export async function getWeeklyDecisionReview() {
     ? 'No completed outcomes this week yet — make sure the next due review gets a rule-adherence decision.'
     : adherence != null && adherence < 100
       ? 'Which decision was hardest to follow, and what made the original rule unclear or inconvenient?'
-      : avgExcess != null && avgExcess < 0
-        ? 'Which decision underperformed SPY, and what evidence would have changed the original decision?'
+      : avgDecisionScore != null && avgDecisionScore < 0
+        ? 'Which decision was least effective after accounting for its intent and benchmark, and what evidence would have changed it?'
         : 'Which thesis or evidence was most useful in explaining the outcome, and should it change your next rule?';
   return {
     period: { start, end: today },
     decisions: week.length,
     outcomes: outcomes.length,
     beatsBenchmark: outcomes.filter(r => Number(r.excess_return_pct) > 0).length,
-    averageExcessReturnPct: avgExcess,
-    averageForecastErrorPct: average('forecast_error_pct'),
+    averageExcessReturnPct: outcomes.length >= 10 ? avgExcess : null,
+    averageDecisionScorePct: outcomes.length >= 10 ? avgDecisionScore : null,
+    averageForecastErrorPct: outcomes.length >= 10 ? average('forecast_error_pct') : null,
+    sampleStatus: outcomes.length >= 10 ? 'adequate' : 'insufficient sample (n < 10)',
     ruleAdherencePct: adherence,
     openOutcomeReviews: rows.filter(r => r.review_status === 'outcome_ready').length,
     reflection,
@@ -221,8 +221,6 @@ export default async function handler(req, res) {
 }
  + Number(alert?.price).toFixed(2) + ' ' + (alert?.direction || 'review')).join(' / '));
   else if (Array.isArray(h.broker_alert_prices) && h.broker_alert_prices.length) parts.push('Broker alerts 
-  return parts.join(' · ');
-}
 async function getHolding(holdingId) {
   const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(holdingId) + '&quantity=gt.0&select=*&limit=1', { method: 'GET' });
   return rows[0] || null;
@@ -376,8 +374,6 @@ export default async function handler(req, res) {
   }
 }
  + h.broker_alert_prices.map(Number).filter(v => v > 0).map(v => v.toFixed(2)).join(' / 
-  return parts.join(' · ');
-}
 async function getHolding(holdingId) {
   const rows = await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(holdingId) + '&quantity=gt.0&select=*&limit=1', { method: 'GET' });
   return rows[0] || null;
