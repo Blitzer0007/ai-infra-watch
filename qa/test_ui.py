@@ -189,3 +189,36 @@ def test_event_study_identifies_selected_ticker(page):
     assert page.get_by_text(
         "Every metric and event below is calculated for this ticker only. SPY is the comparison market."
     ).count() == 1
+
+
+def test_money_rotation_semantic_colors_mount(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    page.get_by_text("Money Rotation", exact=True).click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="attached", timeout=30000)
+    for label in ("Strengthening", "Weakening", "Mixed", "Insufficient"):
+        portfolio.get_by_text(label, exact=True).wait_for(state="visible", timeout=30000)
+
+
+def test_exit_profit_scenarios_identify_selected_ticker(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="attached", timeout=30000)
+    page.get_by_text("Exit / Profit Scenarios", exact=True).wait_for(state="visible", timeout=30000)
+    section = page.get_by_text("Exit / Profit Scenarios", exact=True).locator("..")
+    assert "NVDA" in section.inner_text()
+    assert "Stock symbol" in section.inner_text()
+
+
+def test_held_portfolio_filters_and_sort_mount(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="attached", timeout=30000)
+    portfolio.get_by_label("Filter held portfolio universe by state").wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Sort held portfolio universe").wait_for(state="visible", timeout=30000)
