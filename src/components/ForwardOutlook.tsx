@@ -459,7 +459,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       exitRuleValue: holding?.exitRuleValue == null ? '' : String(holding.exitRuleValue),
       exitRuleText: holding?.exitRuleText || '',
       practicalNotes: holding?.practicalNotes || '',
-      brokerAlerts: (holding?.brokerAlertPrices || []).join(', '),
+       brokerAlerts: (holding?.brokerAlerts?.length
+         ? holding.brokerAlerts.map(alert => alert.price + ' ' + alert.direction).join(', ')
+         : (holding?.brokerAlertPrices || []).join(', ')),
+       ruleStages: JSON.stringify(holding?.ruleStages || [], null, 2),
+       riskGroup: holding?.riskGroup || '',
+       shockSensitivity: holding?.shockSensitivity == null ? '1' : String(holding.shockSensitivity),
     });
     setDecisionEditing(false);
     setDecisionMessage(null);
@@ -722,8 +727,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         exitRuleValue,
         exitRuleText: decisionDraft.exitRuleText.trim(),
         practicalNotes: decisionDraft.practicalNotes.trim(),
-        brokerAlertPrices,
-        purchaseLots: [],
+        brokerAlertPrices: brokerAlerts.map(alert => alert.price),
+         brokerAlerts,
+         ruleStages: decisionDraft.ruleStages.trim() ? JSON.parse(decisionDraft.ruleStages) : [],
+         riskGroup: decisionDraft.riskGroup.trim() || null,
+         shockSensitivity,
+         purchaseLots: [],
       });
       setPortfolioPositions(prev => prev.map(position => position.id === saved.id ? mapStoredPortfolioHoldings([saved])[0] : position));
       setDecisionEditing(false);
@@ -1185,7 +1194,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block text-[8px] text-white/30 uppercase font-mono">Rule %<input value={decisionDraft.exitRuleValue} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleValue: e.target.value }))} type="number" min="0" max="100" step="0.1" placeholder="e.g. 15 or 20" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
-                    <label className="block text-[8px] text-white/30 uppercase font-mono">Broker alert prices<input value={decisionDraft.brokerAlerts} onChange={e => setDecisionDraft(d => ({ ...d, brokerAlerts: e.target.value }))} placeholder="56.46, 84.68" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
+                    <label className="block text-[8px] text-white/30 uppercase font-mono">Broker review levels<input value={decisionDraft.brokerAlerts} onChange={e => setDecisionDraft(d => ({ ...d, brokerAlerts: e.target.value }))} placeholder="56.46 below, 84.68 above" className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   </div>
                   <label className="block text-[8px] text-white/30 uppercase font-mono">Exit rule / invalidation notes<textarea value={decisionDraft.exitRuleText} onChange={e => setDecisionDraft(d => ({ ...d, exitRuleText: e.target.value }))} rows={2} placeholder="Use closing price; gaps can skip the stop; document what invalidates the thesis." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
                   <label className="block text-[8px] text-white/30 uppercase font-mono">Practical notes<textarea value={decisionDraft.practicalNotes} onChange={e => setDecisionDraft(d => ({ ...d, practicalNotes: e.target.value }))} rows={3} placeholder="Broker alerts, fractional-share limitations, review date, etc." className="mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-[10px] text-white/70 outline-none" /></label>
@@ -1200,7 +1209,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.lossLimitPct == null ? 'Not recorded' : portfolioContext.holding.lossLimitPct + '%'}</div></div>
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? ((portfolioContext.holding.exitRuleType.replace('_', ' ')) + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div></div>
                   </div>
-                  {portfolioContext.holding?.brokerAlerts?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker review levels: {portfolioContext.holding.brokerAlerts.map(alert => '
+                  {portfolioContext.holding?.brokerAlerts?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker review levels: {portfolioContext.holding.brokerAlerts.map(alert => '$' + formatPrice(alert.price) + ' ' + alert.direction).join(' / ')}</div> : null}
+                   {portfolioContext.holding?.ruleStages?.length ? <div className="text-[8px] font-mono text-white/35 mt-2">Stages: {portfolioContext.holding.ruleStages.map(stage => String(stage?.type || 'rule')).join(' → ')}</div> : null}
+                   {portfolioContext.holding?.riskGroup ? <div className="text-[8px] font-mono text-white/35 mt-2">Risk group: {portfolioContext.holding.riskGroup} · shock ×{portfolioContext.holding.shockSensitivity ?? 1}</div> : null}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
               }
