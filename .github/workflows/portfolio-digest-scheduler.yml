@@ -6,10 +6,9 @@ on:
     # Five minutes past each requested hour to reduce top-of-hour scheduling congestion.
     # GitHub Actions cron is evaluated in UTC. These correspond to
     # 06:05, 12:05, 18:05 and 22:05 Asia/Kolkata.
-    - cron: '35 0 * * *'
-    - cron: '35 6 * * *'
-    - cron: '35 12 * * *'
-    - cron: '35 16 * * *'
+    # Consolidated hour-list syntax keeps the same four daily slots and changes
+    # the cron definition so GitHub can reactivate a previously deactivated schedule.
+    - cron: '35 0,6,12,16 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -39,7 +38,7 @@ jobs:
             --retry 3 \
             --retry-all-errors \
             --retry-delay 3 \
-            "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest"
+            "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$(TZ=Asia/Kolkata date '+%Y-%m-%d-%H')"
 
       - name: Record completion
         run: echo "Portfolio digest scheduler completed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
