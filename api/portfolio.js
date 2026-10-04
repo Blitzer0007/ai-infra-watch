@@ -29,6 +29,25 @@ async function supabase(path, options = {}) {
   return data;
 }
 
+function normalizeBrokerAlerts(row) {
+  if (Array.isArray(row?.broker_alerts)) {
+    return row.broker_alerts
+      .map(item => ({
+        price: Number(item?.price),
+        direction: item?.direction === 'below' ? 'below' : item?.direction === 'above' ? 'above' : null,
+        label: String(item?.label || '').trim() || null,
+      }))
+      .filter(item => Number.isFinite(item.price) && item.price > 0 && item.direction);
+  }
+  const averageCost = Number(row?.average_cost);
+  if (!Array.isArray(row?.broker_alert_prices)) return [];
+  return row.broker_alert_prices.map(value => Number(value)).filter(v => v > 0).map(price => ({
+    price,
+    direction: Number.isFinite(averageCost) && price < averageCost ? 'below' : 'above',
+    label: Number.isFinite(averageCost) && price < averageCost ? 'stop (inferred)' : 'target (inferred)',
+  }));
+}
+
 function normalizeLot(row) {
   return {
     id: row.id,
@@ -47,6 +66,14 @@ function normalizeLot(row) {
     practicalNotes: row.practical_notes || '',
     currency: String(row.currency || 'USD').toUpperCase(),
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    brokerAlerts: normalizeBrokerAlerts(row),
+    brokerAlertsReviewRequired: Boolean(row.broker_alerts_review_required),
+    ruleStages: Array.isArray(row.rule_stages) ? row.rule_stages : [],
+    ruleStageState: row.rule_stage_state && typeof row.rule_stage_state === 'object' ? row.rule_stage_state : {},
+    riskGroup: row.risk_group || null,
+    riskBeta: row.risk_beta == null ? null : Number(row.risk_beta),
+    riskLeverage: row.risk_leverage == null ? 1 : Number(row.risk_leverage),
+    scenarioShockPct: row.scenario_shock_pct == null ? 15 : Number(row.scenario_shock_pct),
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
     createdAt: row.created_at,
@@ -121,6 +148,14 @@ function normalize(row) {
     practicalNotes: row.practical_notes || '',
     currency: String(row.currency || 'USD').toUpperCase(),
     brokerAlertPrices: Array.isArray(row.broker_alert_prices) ? row.broker_alert_prices.map(Number).filter(Number.isFinite) : [],
+    brokerAlerts: normalizeBrokerAlerts(row),
+    brokerAlertsReviewRequired: Boolean(row.broker_alerts_review_required),
+    ruleStages: Array.isArray(row.rule_stages) ? row.rule_stages : [],
+    ruleStageState: row.rule_stage_state && typeof row.rule_stage_state === 'object' ? row.rule_stage_state : {},
+    riskGroup: row.risk_group || null,
+    riskBeta: row.risk_beta == null ? null : Number(row.risk_beta),
+    riskLeverage: row.risk_leverage == null ? 1 : Number(row.risk_leverage),
+    scenarioShockPct: row.scenario_shock_pct == null ? 15 : Number(row.scenario_shock_pct),
     targetAllocationPct: row.target_allocation_pct == null ? null : Number(row.target_allocation_pct),
     maxAllocationPct: row.max_allocation_pct == null ? null : Number(row.max_allocation_pct),
   };
@@ -223,8 +258,26 @@ export default async function handler(req, res) {
       });
       let createdHolding = rpc?.holding;
       const allocationPayload = {};
+      const qualityPayload = {};
+      if (body.decisionThesis !== undefined) qualityPayload.decision_thesis = body.decisionThesis || null;
+      if (body.lossLimitPct !== undefined) qualityPayload.loss_limit_pct = body.lossLimitPct == null || body.lossLimitPct === '' ? null : Number(body.lossLimitPct);
+      if (body.exitRuleType !== undefined) qualityPayload.exit_rule_type = body.exitRuleType || null;
+      if (body.exitRuleValue !== undefined) qualityPayload.exit_rule_value = body.exitRuleValue == null || body.exitRuleValue === '' ? null : Number(body.exitRuleValue);
+      if (body.exitRuleText !== undefined) qualityPayload.exit_rule_text = body.exitRuleText || null;
+      if (body.practicalNotes !== undefined) qualityPayload.practical_notes = body.practicalNotes || null;
+      if (body.brokerAlertPrices !== undefined) qualityPayload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
+      if (body.brokerAlerts !== undefined) qualityPayload.broker_alerts = Array.isArray(body.brokerAlerts) ? body.brokerAlerts : [];
+      if (body.brokerAlertsReviewRequired !== undefined) qualityPayload.broker_alerts_review_required = Boolean(body.brokerAlertsReviewRequired);
+      if (body.ruleStages !== undefined) qualityPayload.rule_stages = Array.isArray(body.ruleStages) ? body.ruleStages : [];
+      if (body.ruleStageState !== undefined) qualityPayload.rule_stage_state = body.ruleStageState && typeof body.ruleStageState === 'object' ? body.ruleStageState : {};
+      if (body.riskGroup !== undefined) qualityPayload.risk_group = String(body.riskGroup || '').trim() || null;
+      if (body.riskBeta !== undefined) qualityPayload.risk_beta = body.riskBeta == null || body.riskBeta === '' ? null : Number(body.riskBeta);
+      if (body.riskLeverage !== undefined) qualityPayload.risk_leverage = body.riskLeverage == null || body.riskLeverage === '' ? 1 : Number(body.riskLeverage);
+      if (body.scenarioShockPct !== undefined) qualityPayload.scenario_shock_pct = body.scenarioShockPct == null || body.scenarioShockPct === '' ? 15 : Number(body.scenarioShockPct);
+
       if (body.targetAllocationPct != null && body.targetAllocationPct !== '') allocationPayload.target_allocation_pct = Number(body.targetAllocationPct);
       if (body.maxAllocationPct != null && body.maxAllocationPct !== '') allocationPayload.max_allocation_pct = Number(body.maxAllocationPct);
+      Object.assign(allocationPayload, qualityPayload);
       if (Object.keys(allocationPayload).length) {
         if (allocationPayload.target_allocation_pct != null && (!Number.isFinite(allocationPayload.target_allocation_pct) || allocationPayload.target_allocation_pct < 0 || allocationPayload.target_allocation_pct > 100)) return res.status(400).json({ error: 'targetAllocationPct must be between 0 and 100' });
         if (allocationPayload.max_allocation_pct != null && (!Number.isFinite(allocationPayload.max_allocation_pct) || allocationPayload.max_allocation_pct < 0 || allocationPayload.max_allocation_pct > 100)) return res.status(400).json({ error: 'maxAllocationPct must be between 0 and 100' });
@@ -258,6 +311,14 @@ export default async function handler(req, res) {
       if (body.exitRuleText !== undefined) payload.exit_rule_text = body.exitRuleText || null;
       if (body.practicalNotes !== undefined) payload.practical_notes = body.practicalNotes || null;
       if (body.brokerAlertPrices !== undefined) payload.broker_alert_prices = Array.isArray(body.brokerAlertPrices) ? body.brokerAlertPrices.map(Number).filter(Number.isFinite) : [];
+      if (body.brokerAlerts !== undefined) payload.broker_alerts = Array.isArray(body.brokerAlerts) ? body.brokerAlerts : [];
+      if (body.brokerAlertsReviewRequired !== undefined) payload.broker_alerts_review_required = Boolean(body.brokerAlertsReviewRequired);
+      if (body.ruleStages !== undefined) payload.rule_stages = Array.isArray(body.ruleStages) ? body.ruleStages : [];
+      if (body.ruleStageState !== undefined) payload.rule_stage_state = body.ruleStageState && typeof body.ruleStageState === 'object' ? body.ruleStageState : {};
+      if (body.riskGroup !== undefined) payload.risk_group = String(body.riskGroup || '').trim() || null;
+      if (body.riskBeta !== undefined) payload.risk_beta = body.riskBeta == null || body.riskBeta === '' ? null : Number(body.riskBeta);
+      if (body.riskLeverage !== undefined) payload.risk_leverage = body.riskLeverage == null || body.riskLeverage === '' ? 1 : Number(body.riskLeverage);
+      if (body.scenarioShockPct !== undefined) payload.scenario_shock_pct = body.scenarioShockPct == null || body.scenarioShockPct === '' ? 15 : Number(body.scenarioShockPct);
       if (body.targetAllocationPct !== undefined) payload.target_allocation_pct = body.targetAllocationPct == null || body.targetAllocationPct === '' ? null : Number(body.targetAllocationPct);
       if (body.maxAllocationPct !== undefined) payload.max_allocation_pct = body.maxAllocationPct == null || body.maxAllocationPct === '' ? null : Number(body.maxAllocationPct);
       if (payload.quantity != null && (!Number.isFinite(payload.quantity) || payload.quantity <= 0)) return res.status(400).json({ error: 'quantity must be positive' });
