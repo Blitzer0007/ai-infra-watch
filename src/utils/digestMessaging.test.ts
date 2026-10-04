@@ -34,6 +34,6 @@ testFn('digest reports target reached separately from breaches', () => {
     rules: { noRule: 0, breached: 0, targetReached: 1, near: 0 },
     forecast: { verified: 0, independentVerified: 0, pending: 0, independenceWindowBusinessDays: 20 },
   }, '2026-10-04', null);
-  assert.match(text, /TARGET REACHED/);
-  assert.match(text, /1 target level reached/);
+  assert.match(text, /Target reached/);
+  assert.match(text, /1 targets reached/);
 });
