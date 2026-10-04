@@ -82,6 +82,10 @@
       "schedule": "30 22 * * *"
     },
     {
+      "path": "/api/portfolio-digest-recovery",
+      "schedule": "0 23 * * *"
+    },
+    {
       "path": "/api/signal-scorecard",
       "schedule": "30 23 * * *"
     }
