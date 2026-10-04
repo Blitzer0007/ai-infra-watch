@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Cpu, Server, Activity, ArrowRight, ShieldAlert, BadgeInfo } from 'lucide-react';
 import { AppConfig, formatPrice, formatPct, fetchLiveQuote } from '../utils';
+import DecisionImpactCenter from './DecisionImpactCenter';
 import { STOCK_METADATA } from '../data';
 
 interface OverviewProps {
@@ -288,6 +289,9 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
           Powered by custom client-side configurations.
         </p>
       </div>
+
+      {/* Decision-first landing layer: reduce the dashboard to the few items worth reviewing today. */}
+      <DecisionImpactCenter onNavigate={onNavigate} />
 
       {/* Daily landing summary: the first thing users see is what changed since the prior close. */}
       <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4" aria-labelledby="daily-summary-heading">
