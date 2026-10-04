@@ -1183,6 +1183,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
                 <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
+                <div className="mb-3 rounded-lg border border-emerald-400/10 bg-emerald-400/[.025] p-3">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-emerald-200/70">Real earnings calendar · {selectedStock}</div>
+                  {earningsLoading ? <div className="mt-2 text-[9px] font-mono text-white/30">Loading earnings calendar…</div> : earnings.length ? <div className="mt-2 space-y-1.5">{earnings.slice(0, 5).map((event, index) => <div key={event.symbol + event.date + index} className="flex flex-wrap gap-2 text-[9px] font-mono"><span className="text-white/65">{event.date}</span><span className="text-white/45">{event.hour ? event.hour.toUpperCase() : 'timing not specified'}</span><span className="text-emerald-200">{event.title || 'Earnings report'}</span></div>)}</div> : <div className="mt-2 text-[9px] text-white/35">No confirmed earnings event returned in the next 30 days.</div>}
+                  {earningsError && <div className="mt-2 text-[8px] text-amber-200/70">{earningsError}</div>}
+                </div>
                 {portfolioContext.upcoming.length ? <div className="space-y-2">{portfolioContext.upcoming.map((event, index) => <div key={event.date + event.title + index} className="flex gap-3 rounded-lg border border-white/5 bg-black/10 p-2 text-[9px] font-mono"><span className="text-white/30 shrink-0">{event.date}</span><span className="text-white/60">{event.title}</span></div>)}</div> : <div className="text-[9px] text-white/35">No dated contract, news, or policy events in the next 20 calendar days were found in the supplied evidence feeds.</div>}
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
