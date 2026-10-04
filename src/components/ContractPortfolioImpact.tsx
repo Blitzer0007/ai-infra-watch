@@ -112,7 +112,7 @@ function relatedSignals(contract: Contract, counterparty: string | null): string
   if (!out.size) {
     out.add('Revenue/backlog visibility and execution');
     out.add('Capital spending required to fulfill the agreement');
-    out.add('Customer concentration / counterparty dependency');
+    out.add('Reliance on one customer or partner');
   }
   return Array.from(out).slice(0, 3);
 }
@@ -182,7 +182,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
           </span>
         </div>
         <span className="text-[8px] font-mono uppercase text-white/25">
-          Exposure map · not a return forecast
+          Business impact map · not a return forecast
         </span>
       </div>
 
@@ -214,7 +214,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
         <Metric icon={<Gauge className="w-3.5 h-3.5" />} label="Disclosed value" value={contract.value} />
         <Metric
           icon={<BriefcaseBusiness className="w-3.5 h-3.5" />}
-          label="Mechanical annualization"
+          label="Simple annual run-rate"
           value={analysis.annualized == null ? '—' : formatMoney(analysis.annualized) + '/yr'}
         />
         <Metric
@@ -303,7 +303,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
             {analysis.issuerDirect && analysis.counterpartyHeld
               ? contract.company + ' and ' + analysis.counterparty + ' are both portfolio holdings, so the agreement is relevant to both sides of the tracked relationship.'
               : analysis.issuerDirect
-                ? contract.company + ' is a direct holding; the contract is mapped first to the issuer\'s business exposure.'
+                ? contract.company + ' is a direct holding; the contract is mapped first to the issuer\'s business sensitivity.'
                 : analysis.counterpartyHeld
                   ? analysis.counterparty + ' is a tracked counterparty; the issuer itself is outside the held portfolio.'
                   : 'No direct holding or mapped portfolio counterparty was identified from the contract record.'}
@@ -313,13 +313,13 @@ export default function ContractPortfolioImpact({ contract }: Props) {
 
       {analysis.amount != null && analysis.qualifier && (
         <div className="text-[8px] font-mono text-white/25">
-          Value qualifier: {analysis.qualifier} · mechanical annualization assumes an even allocation across the stated term.
+          Value qualifier: {analysis.qualifier} · simple annual run-rate assumes an even allocation across the stated term.
         </div>
       )}
 
       {analysis.annualized != null && (
         <div className="text-[8px] font-mono text-white/25">
-          Annualization is arithmetic only; it is not an estimate of recognized revenue, cash flow, margin, or stock-price impact.
+          Annual run-rate is arithmetic only; it is not an estimate of reported revenue, cash flow, margin, or stock-price impact.
         </div>
       )}
     </div>

@@ -615,12 +615,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.avgMove == null ? '—' : (stress.avgMove >= 0 ? '+' : '') + stress.avgMove.toFixed(2) + '%'}</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro risk</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
             <div className="text-[8px] font-mono text-white/25 mt-1">{macroHighCount} high · {macroMediumCount} medium · capped at 30</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Source coverage</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.freshCount}/{analyses.length} fresh</div>
           </div>
         </div>
@@ -628,21 +628,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
         <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
-          <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Exposure, attribution & benchmark context</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
+          <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio measurement layer</div><h2 className="text-lg font-black mt-1">Portfolio mix, P&L & benchmarks</h2><p className="text-[10px] text-white/35 mt-1">Portfolio shares use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use matching market dates.</p></div>
           <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
-          <Info label="Weighted stress" value={weightedStress.score + '/100'} />
+          <Info label="Portfolio stress" value={weightedStress.score + '/100'} />
           <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
-          <Info label="Top 3 concentration" value={top3ConcentrationPct.toFixed(1) + '%'} />
+          <Info label="Top 3 share" value={top3ConcentrationPct.toFixed(1) + '%'} />
           <Info label="Held positions" value={String(analyses.length)} />
-          <Info label="Effective holdings (HHI)" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
+          <Info label="Diversification level" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
-          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day transaction-aware stress backcast</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using the actual held quantities from the broker transaction history; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day stress history</div><div className="text-[9px] text-white/30 mt-1">Observed market movement using your actual broker-held quantities; current macro risk is shown separately.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
             <div className="h-36 mt-2">{stressTrend.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={stressTrend}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} /><XAxis dataKey="date" hide /><YAxis domain={[0, 100]} hide /><Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(0), 'Stress']} /><Line type="monotone" dataKey="stressScore" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Need overlapping historical prices to build the trend.</div>}</div>
           </div>
-          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Concentration by group</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No valued holdings available.</div>}</div></div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Holdings by group</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No valued holdings available.</div>}</div></div>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr] gap-3 mt-3">
           <div className="rounded-xl border border-white/5 bg-black/10 p-3">
@@ -692,10 +692,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
-          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">P&L contribution by holding</div><div className="space-y-2 mt-3">{attribution.map(item => <div key={item.symbol} className="flex items-center gap-3"><span className="w-12 text-[9px] font-mono font-bold text-white/65">{item.symbol}</span><div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className={item.pnlContribution >= 0 ? 'h-full bg-emerald-400/60' : 'h-full bg-rose-400/60'} style={{ width: Math.min(100, Math.abs(item.pnlContribution) / Math.max(1, Math.abs(attribution[0]?.pnlContribution || 1)) * 100) + '%' }} /></div><span className={'w-24 text-right text-[9px] font-mono ' + (item.pnlContribution >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.pnlContribution >= 0 ? '+' : ''}${item.pnlContribution.toFixed(2)}</span></div>)}{!attribution.length && <div className="text-[9px] font-mono text-white/25">No P&L attribution available.</div>}</div></div>
+          <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">P&L contribution by holding</div><div className="space-y-2 mt-3">{attribution.map(item => <div key={item.symbol} className="flex items-center gap-3"><span className="w-12 text-[9px] font-mono font-bold text-white/65">{item.symbol}</span><div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className={item.pnlContribution >= 0 ? 'h-full bg-emerald-400/60' : 'h-full bg-rose-400/60'} style={{ width: Math.min(100, Math.abs(item.pnlContribution) / Math.max(1, Math.abs(attribution[0]?.pnlContribution || 1)) * 100) + '%' }} /></div><span className={'w-24 text-right text-[9px] font-mono ' + (item.pnlContribution >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.pnlContribution >= 0 ? '+' : ''}${item.pnlContribution.toFixed(2)}</span></div>)}{!attribution.length && <div className="text-[9px] font-mono text-white/25">No P&L breakdown available.</div>}</div></div>
           <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Matched benchmark window</div><div className="space-y-2 mt-3">{benchmarkComparisons.map(item => <div key={item.benchmark} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-black">{item.benchmark}</div><div className="text-[8px] font-mono text-white/25">{item.sampleDays ? item.startDate + ' → ' + item.endDate + ' · ' + item.sampleDays + ' sessions' : 'No overlapping history'}</div></div><div className="text-right"><div className="text-[9px] font-mono text-white/45">Portfolio {item.portfolioReturnPct == null ? '—' : (item.portfolioReturnPct >= 0 ? '+' : '') + item.portfolioReturnPct.toFixed(2) + '%'}</div><div className="text-[9px] font-mono text-white/45">{item.benchmark} {item.benchmarkReturnPct == null ? '—' : (item.benchmarkReturnPct >= 0 ? '+' : '') + item.benchmarkReturnPct.toFixed(2) + '%'}</div><div className={'text-[9px] font-mono font-bold ' + (item.relativeReturnPct == null ? 'text-white/25' : item.relativeReturnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{item.relativeReturnPct == null ? 'Relative —' : 'Relative ' + (item.relativeReturnPct >= 0 ? '+' : '') + item.relativeReturnPct.toFixed(2) + ' pts'}</div></div></div>)}</div></div>
         </div>
-        <div className="mt-3 text-[8px] font-mono text-white/20">Weighted stress measures observed moves and exposure concentration, not a forecast. P&L attribution is descriptive. Benchmark comparisons are descriptive matched-window measurements.</div>
+        <div className="mt-3 text-[8px] font-mono text-white/20">Portfolio stress summarizes observed price movement and how much of the portfolio is concentrated in larger positions; it is not a forecast. P&L shows which holdings added or reduced value. Benchmark comparisons use matching historical periods.</div>
       </section>
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
         <Metric label="Invest amount" value={formatPortfolioMoney(investedTotal)} suffix={currency === 'INR' ? 'home currency · USD basis' : 'position cost'} tone="neutral" icon={<WalletCards/>}/>
@@ -727,34 +727,34 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             </section>
             <section className="min-w-0">
-              <Panel title="Held portfolio universe" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
+              <Panel title="Held all tracked stocks" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                   <FilterInput
                     value={q}
                     onChange={e => setQ(e.target.value)}
                     placeholder="Search ticker, name or theme"
-                    label="Search held portfolio universe by ticker, name, or theme"
+                    label="Search held all tracked stocks by ticker, name, or theme"
                     icon={<Search className="w-3.5 h-3.5" />}
                   />
                   <FilterSelect
                     value={group}
                     onChange={e => setGroup(e.target.value)}
-                    label="Filter held portfolio universe by group"
+                    label="Filter held all tracked stocks by group"
                   >
                     {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
                   </FilterSelect>
                   <FilterSelect
                     value={holdingFilter}
                     onChange={e => setHoldingFilter(e.target.value as typeof holdingFilter)}
-                    label="Filter held portfolio universe by state"
+                    label="Filter held all tracked stocks by state"
                   >
                     {['All', 'Positive Today', 'Negative Today', 'Below Cost', 'Needs Review'].map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
                   <FilterSelect
                     value={holdingSort}
                     onChange={e => setHoldingSort(e.target.value as typeof holdingSort)}
-                    label="Sort held portfolio universe"
+                    label="Sort held all tracked stocks"
                   >
                     {['Symbol', 'P&L %', 'Daily Move', 'Value'].map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
@@ -808,7 +808,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'watchlist' && (
-        <Panel title="Watchlist intelligence universe" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
+        <Panel title="Watchlist intelligence" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {WATCHLIST.map(w => {
               const quote = livePrices[w.symbol];
@@ -902,14 +902,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
             <Insight title="Memory cluster" body="SK Hynix · Micron · SanDisk · DRAM" icon={<BarChart3/>}/>
             <Insight title="Compute cluster" body="NVDA · AMD · TSM · QCOM · INTC · CBRS" icon={<Network/>}/>
-            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware breadth" icon={<TrendingUp/>}/>
+            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware performance" icon={<TrendingUp/>}/>
           </div>
         </Panel>
       )}
 
       {tab === 'rotation' && (
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-4">
-          <Panel title="Money rotation engine" subtitle="Multi-timeframe relative-strength and breadth proxy across infrastructure, compute, memory and software">
+          <Panel title="Money rotation engine" subtitle="Compare performance across time periods and market groups">
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {(['1D','5D','20D','60D','3M','6M'] as RotationHorizon[]).map(h => <button key={h} onClick={() => setRotationHorizon(h)} aria-pressed={rotationHorizon === h} className={'px-2.5 py-1.5 rounded border text-[9px] font-mono font-bold ' + (rotationHorizon === h ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-white/35')}>{h}</button>)}
               <select value={rotationGroup} onChange={e => setRotationGroup(e.target.value)} aria-label="Filter money rotation group" className="ml-auto bg-[#15181E] border border-white/10 rounded px-2 py-1.5 text-[9px] font-mono text-white/55"><option value="All">All groups</option>{rotation.groups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}</select>
@@ -933,7 +933,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             })}</div>
             <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
           </Panel>
-          <Panel title="Pair monitor" subtitle="Relative-strength spread history and current transition state">
+          <Panel title="Peer comparison" subtitle="Performance gap history and current change">
             <div className="space-y-2">{rotation.pairs.map(x => {
               const spreadClass = x.spread == null ? 'text-white/35' : x.spread >= 0 ? 'text-emerald-300' : 'text-rose-300';
               const trendClass = x.trend === 'widening' ? 'text-emerald-300' : x.trend === 'narrowing' ? 'text-rose-300' : x.trend === 'stable' ? 'text-amber-300' : 'text-white/35';
@@ -950,7 +950,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'events' && selectedAnalysis && (
         <div className="space-y-3">
-          <Panel title="Event study universe" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
+          <Panel title="Event study stocks" subtitle="Choose any held portfolio position. Each ticker is evaluated independently against its SEC filing chronology and SPY market context.">
             <div className="flex flex-wrap gap-2">
               {analyses.map((position) => (
                 <button
@@ -976,7 +976,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'network' && (
-        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        <Panel title="Stock relationship network" subtitle="Live first-order peer relationships from the all tracked stocks — select a holding to inspect its connected names">
         {selectedAnalysis ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
@@ -995,8 +995,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
-                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer universe</div>
-                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from the full configured universe using transparent comparability signals.</div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer set</div>
+                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from the tracked stocks using transparent similarity checks.</div>
                 <div className="mt-3 space-y-2">
                   {selectedPeerSet.primary && (() => {
                     const peerSymbol = selectedPeerSet.primary.symbol;
@@ -1025,9 +1025,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </div>
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from the universe.'} icon={<Network/>}/>
+              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from all tracked stocks.'} icon={<Network/>}/>
               <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
-              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
+              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → how many group stocks are up / performance vs peers. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
             </div>
           </>
         ) : (
@@ -1080,7 +1080,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <div className="text-right shrink-0">
         <div className="font-black text-base">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
         <div className={'text-[10px] font-mono font-bold ' + dailyClass}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</div>
-        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'STALE QUOTE' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
+        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'QUOTE NEEDS REFRESH' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
       </div>
     </div>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/5">
@@ -1090,7 +1090,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <MiniMetric label="Value" value={'$' + value.toFixed(2)} valueClass="text-white/85" />
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-[8px] font-mono text-white/25">
-      <span>Portfolio weight {weight.toFixed(1)}%</span>
+      <span>Portfolio share {weight.toFixed(1)}%</span>
       <span>{h.purchaseDate ? 'Bought ' + h.purchaseDate : 'Purchase date not set'}</span>
     </div>
   </button>;
@@ -1248,7 +1248,7 @@ function PortfolioEvidenceCoverage({
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
+        <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Source coverage</div>
         <h2 className="text-base font-black mt-1">{status}</h2>
         <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
       </div>
@@ -1290,11 +1290,11 @@ function DecisionGateSummary({h}:{h:PositionAnalysis}) {
     ['Below average cost', h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
     ['Group score', h.groupScore != null && h.groupScore >= groupThreshold],
     ['Group participation', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
-    ['Group vs universe', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
+    ['Group vs all tracked', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
     ['Peer relative', h.vsPeers != null && h.vsPeers >= 0],
   ] as const;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/55 p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision gates</div><h2 className="text-base font-black mt-1">Current evidence gate for {h.symbol}</h2></div><StatePill state={h.state}/></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-emerald-300">Decision checks</div><h2 className="text-base font-black mt-1">Current evidence check for {h.symbol}</h2></div><StatePill state={h.state}/></div>
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
       {gates.map(([label,passed]) => <div key={label} className={'rounded-lg border p-2 ' + (passed ? 'border-emerald-400/15 bg-emerald-400/[.03]' : 'border-amber-400/15 bg-amber-400/[.02]')}><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase text-white/45">{label}</span><span className={'text-[8px] font-mono font-bold ' + (passed ? 'text-emerald-300' : 'text-amber-300')}>{passed ? 'PASS' : 'WAIT'}</span></div></div>)}
     </div>
@@ -1308,7 +1308,7 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:PeerCounterfactua
   const difference = peerProfit - actualProfit;
   const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer counterfactual</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer comparison</div><h2 className="text-base font-black mt-1">Your portfolio vs a peer comparison</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer total profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
   </section>;
 }
@@ -1318,7 +1318,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
-      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'STALE QUOTE' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'QUOTE NEEDS REFRESH' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
     <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
@@ -1328,7 +1328,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
 
 function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
   return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer counterfactual</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical counterfactual · not a forecast</div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">What-if peer comparison</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Same-investment historical comparison using configured peer metadata.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical comparison · not a forecast</div></div>
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer value if same trades' : 'Peer value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/><Info label="Value difference" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/></div>
     <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.basis === 'broker-transactions' ? 'Mirrors your broker buy/sell cash flows in the peer using each transaction date. This compares historical total-return outcomes, not a forecast.' : comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
   </section>;
@@ -1371,7 +1371,7 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
       <Info label="Group strength" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
       <Info label="Group participation" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '% up'}/>
-      <Info label="Group vs universe" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
+      <Info label="Group vs all tracked" value={h.relativeToUniverse == null ? '—' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts'}/>
       <Info label="Vs tracked peers" value={h.vsPeers == null ? '—' : (h.vsPeers >= 0 ? '+' : '') + h.vsPeers.toFixed(2) + ' pts'}/>
     </div>
     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -1445,12 +1445,12 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     </div>
     <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
-      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence checks remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence checks.'}</div>
       <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
     </div>
     <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
-      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence checks.'}</div>
       <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : 'Use the gate breakdown below to see which conditions are currently preventing an average-in review.'}</div>
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
         {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}

@@ -34,7 +34,7 @@ const ITEMS: GuideItem[] = [
     id: 'portfolio-triage',
     title: 'Portfolio Triage',
     question: 'What should I look at first?',
-    meaning: 'Triage is a review-priority signal. ADD REVIEW, RISK REVIEW and INSUFFICIENT DATA tell you where to investigate, not what trade to make.',
+    meaning: 'Triage shows what deserves your attention first. ADD REVIEW, RISK REVIEW and INSUFFICIENT DATA tell you where to investigate, not what trade to make.',
     example: 'RISK REVIEW = investigate relevant downside evidence. ADD REVIEW = investigate supporting evidence. INSUFFICIENT DATA = do not force a conclusion.',
     screenshot: 'Screenshot reference: Portfolio Intelligence / review-state badges',
     view: 'portfolio',
@@ -74,19 +74,19 @@ const ITEMS: GuideItem[] = [
     id: 'macro',
     title: 'Macro & Politics',
     question: 'What external risks can affect my holdings?',
-    meaning: 'This area tracks geopolitical, policy, semiconductor, power and regulatory risks and maps evidence-backed exposure to your holdings.',
+    meaning: 'This area tracks geopolitical, policy, semiconductor, power and regulatory risks and maps source-backed sensitivity to your holdings.',
     example: 'Direct = evidence indicates a direct connection. Secondary = indirect connection. Limited = current evidence shows limited connection.',
-    screenshot: 'Screenshot reference: Macro & Politics / exposure matrix',
+    screenshot: 'Screenshot reference: Macro & Politics / risk & sensitivity map',
     view: 'macro',
     icon: ShieldAlert
   },
   {
     id: 'sensitivity',
-    title: 'Scenario Sensitivity',
+    title: 'Scenario impact',
     question: 'What if a risk becomes worse?',
-    meaning: 'Scenario Sensitivity is a modeled exposure index, not a price forecast. It shows which holdings are more sensitive to the assumptions you enter.',
+    meaning: 'Scenario impact is a modeled sensitivity score, not a price forecast. It shows which holdings are more sensitive to the assumptions you enter.',
     example: 'Taiwan disruption + power stress + export-control assumptions produce a sensitivity score. It does not mean the portfolio will fall by that score.',
-    screenshot: 'Screenshot reference: Macro & Politics / Scenario Sensitivity',
+    screenshot: 'Screenshot reference: Macro & Politics / Scenario impact',
     view: 'macro',
     icon: Gauge
   },
@@ -114,8 +114,8 @@ const ITEMS: GuideItem[] = [
     id: 'forward-outlook',
     title: 'Forward Outlook & Forecast Verification',
     question: 'How do I test whether the historical forecast actually works?',
-    meaning: 'Forward Outlook uses historical market regimes to build return distributions for 5D, 20D, 60D, 6M and 12M horizons. It is scenario analysis and historical evidence, not a guaranteed price prediction. Forecast Verification stores a forecast and later compares it with the observed market return.',
-    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. P25–P75 is the middle historical range. After the target date, actual return and median error show what happened.',
+    meaning: 'Forward Outlook uses historical market regimes to build return distributions for 5D, 20D, 60D, 6M and 12M forecast periods. It is scenario analysis and historical evidence, not a guaranteed price prediction. Forecast Verification stores a forecast and later compares it with the observed market return.',
+    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. Middle historical range is the middle historical range. After the target date, actual return and median error show what happened.',
     screenshot: 'Screenshot reference: Forward Outlook / forecast verification / validation matrix',
     view: 'outlook',
     icon: TrendingUp
@@ -204,7 +204,7 @@ export default function HelpGuide({ onNavigate }: Props) {
           <div>
             <div className="text-xs font-black uppercase tracking-wider text-emerald-300">The core mental model</div>
             <div className="text-sm md:text-base font-black text-white mt-1">
-              Market Data + Business Events + Evidence + History + Macro Risk + Portfolio Exposure → Research Priorities
+              Market Data + Business Events + Sources + History + Macro Risk + Portfolio Holdings → Research Priorities
             </div>
             <p className="text-[10px] md:text-xs text-white/45 mt-2">
               A signal tells you where to look. Evidence tells you why. Your own review determines what it means for your portfolio.
@@ -282,11 +282,11 @@ export default function HelpGuide({ onNavigate }: Props) {
                 <div className="mt-2 space-y-2 text-xs text-white/60 leading-relaxed">
                   <p><span className="text-white/80 font-bold">Directional accuracy</span> = how often the forecast median had the same sign as the observed return.</p>
                   <p><span className="text-white/80 font-bold">Median absolute error</span> = typical distance between forecast median and actual return, measured in percentage points.</p>
-                  <p><span className="text-white/80 font-bold">P25–P75 coverage</span> = the share of actual outcomes inside the middle historical range. Low coverage means the range is too narrow for the observed outcomes.</p>
-                  <p><span className="text-white/80 font-bold">Baseline / lift</span> compares the analogue method with a simple unconditional historical baseline. Positive lift is descriptive evidence for that backtest—not proof of future performance.</p>
-                  <p><span className="text-white/80 font-bold">JEV validation</span> interprets the measured backtest and identifies evidence gaps or the next experiment. JEV does not change the numerical forecast.</p>
+                  <p><span className="text-white/80 font-bold">Middle historical range coverage</span> = the share of actual outcomes inside the middle historical range. Low coverage means the range is too narrow for the observed outcomes.</p>
+                  <p><span className="text-white/80 font-bold">Baseline / improvement</span> compares the analogue method with a simple historical baseline. Positive lift is descriptive evidence for that historical test—not proof of future performance.</p>
+                  <p><span className="text-white/80 font-bold">JEV review</span> interprets the measured historical test and identifies evidence gaps or the next experiment. JEV does not change the numerical forecast.</p>
                   <p><span className="text-white/80 font-bold">Automatic model selection</span> periodically compares analogue-v1 with analogue-v2 using walk-forward historical validation. A model is changed only when the validation evidence clears the conservative selection rule; otherwise the current model remains active.</p>
-                  <p><span className="text-white/80 font-bold">Forecast verification</span> records the model version with each forecast so later accuracy measurements remain reproducible. Duplicate pending forecasts with the same ticker, horizon, scenario, and model are blocked.</p>
+                  <p><span className="text-white/80 font-bold">Forecast verification</span> records the model version with each forecast so later accuracy measurements remain reproducible. Duplicate pending forecasts with the same ticker, forecast period, scenario, and model are blocked.</p>
                 </div>
               </section>
             )}
@@ -311,7 +311,7 @@ export default function HelpGuide({ onNavigate }: Props) {
                   {(jevMeta?.route || jevMeta?.gate) && (
                     <div className="mt-2 flex flex-wrap gap-2 text-[9px] font-mono text-white/30">
                       {jevMeta.route && <span>JEV route: {jevMeta.route}</span>}
-                      {jevMeta.gate && <span>Evidence gate: {jevMeta.gate}</span>}
+                      {jevMeta.gate && <span>Evidence check: {jevMeta.gate}</span>}
                     </div>
                   )}
                 </div>
@@ -322,7 +322,7 @@ export default function HelpGuide({ onNavigate }: Props) {
               <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">How to use it</div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {(active.id === 'forward-outlook'
-                  ? ['Select ticker + horizon', 'Review historical distribution', 'Run backtest', 'Compare baseline + calibration', 'Track and verify later']
+                  ? ['Select ticker + forecast period', 'Review historical distribution', 'Run historical test', 'Compare baseline + calibration', 'Track and verify later']
                   : ['Read the signal', 'Open the evidence', 'Check the source/date', 'Compare history', 'Review exposure']).map((step, index) => (
                   <div key={step} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[.02] px-2.5 py-2">
                     <span className="w-5 h-5 rounded-full bg-white/5 text-white/60 text-[9px] font-mono flex items-center justify-center">{index + 1}</span>

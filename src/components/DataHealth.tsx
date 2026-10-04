@@ -35,7 +35,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
     const status = String(item?.status || 'NOT_FOUND');
     if (status === 'NOT_FOUND') return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
     if (status === 'PENDING') return { label: 'PENDING', tone: 'text-sky-300 border-sky-400/20 bg-sky-400/5' };
-    if (item?.stale || status === 'STALE') return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+    if (item?.stale || status === 'STALE') return { label: 'Needs refresh', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
     if (!item?.retrievedAt) return { label: status === 'AVAILABLE' ? 'HEALTHY' : status, tone: status === 'AVAILABLE' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]' };
 
     const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
@@ -44,7 +44,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
     const ageSeconds = ageMs / 1000;
     const cadence = Number(item?.refreshIntervalSeconds) > 0 ? Number(item.refreshIntervalSeconds) : null;
     if (cadence && ageSeconds > cadence * 5) {
-      return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+      return { label: 'Needs refresh', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
     }
     if (cadence && ageSeconds > cadence * 2) {
       return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
@@ -112,7 +112,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3" aria-label="Data health summary">
         <Metric label="Healthy" value={healthy} icon={<ShieldCheck className="w-4 h-4"/>}/>
         <Metric label="Aging" value={aging} icon={<Activity className="w-4 h-4"/>}/>
-        <Metric label="Stale" value={stale} icon={<Activity className="w-4 h-4"/>}/>
+        <Metric label="Needs refresh" value={stale} icon={<Activity className="w-4 h-4"/>}/>
         <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
         <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
         <Metric label="Fallbacks" value={fallback} icon={<RefreshCw className="w-4 h-4"/>}/>
@@ -161,7 +161,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                   {item?.count != null ? item.count + ' evidence items' : ''}
                   {item?.source ? ' · ' + item.source : ''}
                   {item?.provider ? ' · provider: ' + item.provider : ''}
-                  {freshness(item) ? ' · retrieved ' + freshness(item) : ''}
+                  {freshness(item) ? ' · last retrieved ' + freshness(item) : ''}
                   {item?.refreshIntervalSeconds ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
                   {item?.fallback ? ' · fallback' : ''}
                   {item?.upstreamError ? ' · upstream issue' : ''}

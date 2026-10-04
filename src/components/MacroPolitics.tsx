@@ -80,7 +80,7 @@ function PortfolioScenarioSensitivity({
             <h3 className="text-xs font-black uppercase tracking-widest text-white">Stock-Specific Scenario Sensitivity</h3>
           </div>
           <p className="text-[10px] text-white/35 mt-1 font-mono max-w-3xl">
-            Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
+            Maps your current scenario inputs onto the risk & sensitivity map and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
           </p>
         </div>
         <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3">
@@ -93,7 +93,7 @@ function PortfolioScenarioSensitivity({
         <DataTable
           rows={portfolioRows}
           rowKey={(row) => row.symbol}
-          empty="No portfolio exposure rows available."
+          empty="No portfolio risk rows available."
           initialSort={{ key: 'symbol', direction: 'asc' }}
           columns={[
             { key: 'symbol', header: 'Holding', accessor: row => row.symbol },
@@ -102,7 +102,7 @@ function PortfolioScenarioSensitivity({
             { key: 'power', header: 'Power', accessor: row => row.power.level, align: 'center', render: row => <ExposurePill level={row.power.level} basis={row.power.basis} /> },
             { key: 'export', header: 'Export', accessor: row => row.export.level, align: 'center', render: row => <ExposurePill level={row.export.level} basis={row.export.basis} /> },
             { key: 'sensitivity', header: 'Sensitivity', accessor: row => row.sensitivity, type: 'number', align: 'right', render: row => row.sensitivity + '/100' },
-            { key: 'contribution', header: 'Weighted contribution', accessor: row => row.weightedContribution, type: 'number', align: 'right', render: row => row.weightedContribution.toFixed(1) },
+            { key: 'contribution', header: 'Portfolio impact', accessor: row => row.weightedContribution, type: 'number', align: 'right', render: row => row.weightedContribution.toFixed(1) },
           ]}
         />
       </div>
@@ -131,9 +131,9 @@ function PortfolioExposureMatrix({ contracts = [], news = [], positions = [] }: 
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
         <div>
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Exposure Matrix</h3>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white">Portfolio Risk & Sensitivity</h3>
           <p className="text-[10px] text-white/35 mt-1 font-mono">
-            Evidence-adjusted exposure from portfolio metadata plus matching contract/news evidence. Missing live evidence does not create direct exposure.
+            Source-supported sensitivity from portfolio metadata plus matching contract/news evidence. Missing live evidence does not create direct sensitivity.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
@@ -411,7 +411,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
 
       {portfolioLoading && (
         <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[.02] px-4 py-3 text-[9px] font-mono text-cyan-200/50">
-          Loading current portfolio holdings for macro exposure…
+          Loading current portfolio holdings for macro risk…
         </div>
       )}
       {!portfolioLoading && portfolioError && (
@@ -438,7 +438,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
 
       <JevDecisionPanel
         kind="macro"
-        title="Macro exposure review"
+        title="Macro risk review"
         state={{
           system_stress_score: threatScore,
           taiwan_disruption_probability: taiwanProb,
