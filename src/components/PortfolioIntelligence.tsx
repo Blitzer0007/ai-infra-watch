@@ -615,7 +615,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.avgMove == null ? '—' : (stress.avgMove >= 0 ? '+' : '') + stress.avgMove.toFixed(2) + '%'}</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro risk</div>
             <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
             <div className="text-[8px] font-mono text-white/25 mt-1">{macroHighCount} high · {macroMediumCount} medium · capped at 30</div>
           </div>
@@ -727,34 +727,34 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             </section>
             <section className="min-w-0">
-              <Panel title="Held portfolio universe" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
+              <Panel title="Held all tracked stocks" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                   <FilterInput
                     value={q}
                     onChange={e => setQ(e.target.value)}
                     placeholder="Search ticker, name or theme"
-                    label="Search held portfolio universe by ticker, name, or theme"
+                    label="Search held all tracked stocks by ticker, name, or theme"
                     icon={<Search className="w-3.5 h-3.5" />}
                   />
                   <FilterSelect
                     value={group}
                     onChange={e => setGroup(e.target.value)}
-                    label="Filter held portfolio universe by group"
+                    label="Filter held all tracked stocks by group"
                   >
                     {['All', ...intelligence.groups.map((item) => item.name)].map(g => <option key={g}>{g}</option>)}
                   </FilterSelect>
                   <FilterSelect
                     value={holdingFilter}
                     onChange={e => setHoldingFilter(e.target.value as typeof holdingFilter)}
-                    label="Filter held portfolio universe by state"
+                    label="Filter held all tracked stocks by state"
                   >
                     {['All', 'Positive Today', 'Negative Today', 'Below Cost', 'Needs Review'].map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
                   <FilterSelect
                     value={holdingSort}
                     onChange={e => setHoldingSort(e.target.value as typeof holdingSort)}
-                    label="Sort held portfolio universe"
+                    label="Sort held all tracked stocks"
                   >
                     {['Symbol', 'P&L %', 'Daily Move', 'Value'].map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
@@ -808,7 +808,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'watchlist' && (
-        <Panel title="Watchlist intelligence universe" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
+        <Panel title="Watchlist intelligence" subtitle={WATCHLIST.length + " configured names analyzed using the same market/peer/rotation framework"}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {WATCHLIST.map(w => {
               const quote = livePrices[w.symbol];
@@ -902,7 +902,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
             <Insight title="Memory cluster" body="SK Hynix · Micron · SanDisk · DRAM" icon={<BarChart3/>}/>
             <Insight title="Compute cluster" body="NVDA · AMD · TSM · QCOM · INTC · CBRS" icon={<Network/>}/>
-            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware breadth" icon={<TrendingUp/>}/>
+            <Insight title="Software rotation" body="NOW · CRM · TEAM vs AI hardware performance" icon={<TrendingUp/>}/>
           </div>
         </Panel>
       )}
@@ -933,7 +933,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             })}</div>
             <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
           </Panel>
-          <Panel title="Pair monitor" subtitle="Relative-strength spread history and current transition state">
+          <Panel title="Peer comparison" subtitle="Performance gap history and current change">
             <div className="space-y-2">{rotation.pairs.map(x => {
               const spreadClass = x.spread == null ? 'text-white/35' : x.spread >= 0 ? 'text-emerald-300' : 'text-rose-300';
               const trendClass = x.trend === 'widening' ? 'text-emerald-300' : x.trend === 'narrowing' ? 'text-rose-300' : x.trend === 'stable' ? 'text-amber-300' : 'text-white/35';
@@ -976,7 +976,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'network' && (
-        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        <Panel title="Stock relationship network" subtitle="Live first-order peer relationships from the all tracked stocks — select a holding to inspect its connected names">
         {selectedAnalysis ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
@@ -1445,12 +1445,12 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
     </div>
     <div className={'mt-3 rounded-xl border p-4 ' + (h.recoveryAlert ? 'border-emerald-300/25 bg-emerald-300/[.05]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.recoveryAlert ? 'text-emerald-300' : 'text-white/35')}>{h.recoveryAlert ? 'Recovery watch · triggered' : 'Recovery watch · not triggered'}</div>
-      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence gates remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-sm mt-2">{h.recoveryAlert ? 'The holding is declining today while the evidence checks remain supportive.' : 'No recovery-watch alert is triggered for this holding under the current evidence checks.'}</div>
       <div className="text-[10px] text-white/40 mt-2">{h.recoveryAlert ? h.strategyContext : 'Requires a fresh declining quote, position below cost, and supportive group/peer evidence.'}</div>
     </div>
     <div className={'mt-3 rounded-xl border p-4 ' + (h.averageInAlert ? 'border-emerald-300/20 bg-emerald-300/[.04]' : 'border-white/10 bg-white/[.02]')}>
       <div className={'text-[9px] font-mono uppercase tracking-widest ' + (h.averageInAlert ? 'text-emerald-300' : 'text-white/35')}>{h.averageInAlert ? 'Average-in review · triggered' : 'Average-in review · not triggered'}</div>
-      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence gate.'}</div>
+      <div className="text-sm mt-2">{h.averageInAlert ? 'Price is below your average cost and every configured evidence gate is currently satisfied.' : 'No average-in review is triggered for this holding under the current evidence checks.'}</div>
       <div className="text-[10px] text-white/40 mt-2">{h.averageInAlert ? h.strategyContext : 'Use the gate breakdown below to see which conditions are currently preventing an average-in review.'}</div>
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
         {checks.map(check => <GateCheck key={check.label} label={check.label} passed={check.passed} detail={check.detail} />)}
