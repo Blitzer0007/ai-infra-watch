@@ -4,7 +4,7 @@ import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, Tr
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, PORTFOLIO_AS_OF, PORTFOLIO_SNAPSHOT, type PositionAnalysis } from '../utils/portfolioPositions';
-import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
+import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
@@ -70,6 +70,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [holdingSort, setHoldingSort] = useState<'Symbol' | 'P&L %' | 'Daily Move' | 'Value'>('Symbol');
   const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
+  const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
@@ -288,7 +289,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)));
     });
     return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices]);
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
 
   useEffect(() => {
     let cancelled = false;
@@ -337,7 +338,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -714,9 +715,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
             </section>
             <section className="min-w-0">
-              <Panel title="Held portfolio universe" subtitle="Persistent positions · live quote state · select a holding to update the intelligence rendered below">
+              <Panel title="Held portfolio universe" subtitle="Broker positions · live quotes · actual holding dates · select a holding to update the intelligence rendered below">
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,1.4fr)_180px_170px_150px] gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                   <FilterInput
                     value={q}
                     onChange={e => setQ(e.target.value)}
@@ -767,7 +768,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
           <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
             <span className="font-mono text-white/65 uppercase mr-2">LEGACY SNAPSHOT</span>
-            {PORTFOLIO_AS_OF} · retained only as migration context; persistent holdings above are the source of truth.
+            Broker order history imported through 2026-10-04 · first purchase date is used for holding-period context; transaction history is used for cash-flow-aware peer comparisons.
           </div>
 
           <SignalScorecardPanel />
