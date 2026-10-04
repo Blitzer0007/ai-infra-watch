@@ -5,6 +5,27 @@ import { calculateActualPortfolio, ruleDistance, simulateSameCash, countIndepend
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const LEVERAGE = { SOXL: 3 };
+const DIGEST_TIME_ZONE = process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata';
+function localDate(value = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: DIGEST_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+}
+function previousOrSamePoint(points, date) {
+  const ordered = (points || []).filter(point => point?.date && Number(point?.price) > 0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let selected = null;
+  for (const point of ordered) {
+    if (String(point.date) <= String(date)) selected = point;
+    else break;
+  }
+  return selected;
+}
+function persistStageState(id, state) {
+  if (!id || !state) return Promise.resolve();
+  return fetch(SUPABASE_URL + '/rest/v1/portfolio_holdings?id=eq.' + encodeURIComponent(id), {
+    method:'PATCH',
+    headers:{...sbHeaders(),Prefer:'return=minimal'},
+    body:JSON.stringify({rule_stage_state:state}),
+  }).catch(error=>console.error('decision center stage-state persistence failed:',error));
+}
 
 function sbHeaders() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service configuration is missing');
