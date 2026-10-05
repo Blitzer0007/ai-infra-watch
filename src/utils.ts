@@ -1,47 +1,3 @@
-import { WatchlistItem } from './types';
-
-export interface AppConfig {
-  finnhubKey: string;
-  watchlist: string[];
-  alerts: { symbol: string; targetPrice: number; type: 'above' | 'below'; active: boolean }[];
-  largeMoveEnabled: boolean;
-  largeMovePct: number;
-  browserNotifications: boolean;
-  catalystAlerts: boolean;
-}
-
-const CONFIG_KEY = 'aiw_config_v1';
-
-export const DEFAULT_CONFIG: AppConfig = {
-  finnhubKey: '',
-  watchlist: ['NVDA', 'NBIS', 'DGXX', 'MU', 'AMD'],
-  alerts: [
-    { symbol: 'DGXX', targetPrice: 5.0, type: 'above', active: true },
-    { symbol: 'NBIS', targetPrice: 20.0, type: 'below', active: false }
-  ],
-  largeMoveEnabled: true,
-  largeMovePct: 5,
-  browserNotifications: false,
-  catalystAlerts: true
-};
-
-export function loadConfig(): AppConfig {
-  try {
-    const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return DEFAULT_CONFIG;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CONFIG, ...parsed };
-  } catch (e) {
-    return DEFAULT_CONFIG;
-  }
-}
-
-export function saveConfig(cfg: AppConfig): void {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
-  try {
-    window.dispatchEvent(new CustomEvent('aiw-config-changed', { detail: cfg }));
-  } catch {
-    // Server synchronization is handled by the authenticated app shell.
   }
 }
 
@@ -65,6 +21,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
   source: 'live';
   provider?: string;
   retrievedAt?: string;
+  marketTime?: string | null;
+  asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
 }> {
@@ -85,6 +43,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       source: 'live',
       provider: data.provider,
       retrievedAt: data.retrievedAt,
+      marketTime: data.marketTime,
+      asOf: data.asOf,
       stale: data.stale === true,
       cached: data.cached === true
     };
@@ -109,6 +69,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       source: 'live',
       provider: 'Finnhub',
       retrievedAt: new Date().toISOString(),
+      marketTime: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
+      asOf: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
       stale: false,
       cached: false
     };
@@ -130,6 +92,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
         source: 'live',
         provider: data.provider,
         retrievedAt: data.retrievedAt,
+        marketTime: data.marketTime,
+        asOf: data.asOf,
         stale: data.stale === true,
         cached: data.cached === true
       };
