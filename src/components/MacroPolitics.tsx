@@ -4,7 +4,7 @@ import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-
 import { MacroRisk } from '../types';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
-import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
+import { derivePortfolioExposure, validatePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
 import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 
@@ -21,6 +21,8 @@ function exposureClass(level: ExposureLevel) {
   if (level === 'Secondary') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
   return 'bg-white/5 text-white/40 border-white/10';
 }
+
+type MacroScenarioKey = 'taiwan' | 'power' | 'export';
 
 function exposureFactor(level: ExposureLevel) {
   if (level === 'Direct') return 1;
@@ -46,7 +48,13 @@ function PortfolioScenarioSensitivity({
   positions?: PortfolioPosition[];
 }) {
   const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
+  const validation = validatePortfolioExposure(derivedExposure);
   const totalInvested = positions.reduce((sum, position) => sum + position.investedValue, 0);
+  const scenarioInputs = {
+    taiwan: { value: taiwanProb, weight: 0.5 },
+    power: { value: gridSeverity, weight: 0.25 },
+    export: { value: embargoBreadth, weight: 0.25 },
+  } as const;
   const portfolioRows = derivedExposure.map((exposure) => {
     const position = positions.find((item) => item.symbol === exposure.symbol);
     const live = livePrices[exposure.symbol];
@@ -55,9 +63,12 @@ function PortfolioScenarioSensitivity({
       : position?.investedValue ?? 0;
     const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
     const sensitivity = Math.round(
-      taiwanProb * 0.5 * exposureFactor(exposure.taiwan.level) +
-      gridSeverity * 0.25 * exposureFactor(exposure.power.level) +
-      embargoBreadth * 0.25 * exposureFactor(exposure.export.level)
+      (Object.entries(scenarioInputs) as Array<[MacroScenarioKey, { value: number; weight: number }]>).reduce((sum, [scenario, input]) => {
+        const dimension = exposure[scenario];
+        return sum + (dimension?.assessment === 'assessed'
+          ? input.value * input.weight * exposureFactor(dimension.level)
+          : 0);
+      }, 0)
     );
     return {
       ...exposure,
@@ -83,9 +94,13 @@ function PortfolioScenarioSensitivity({
             Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
           </p>
         </div>
-        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3">
+        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3 min-w-[220px]">
           <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300/60">Portfolio scenario sensitivity</div>
           <div className="text-2xl font-black font-mono text-cyan-300 mt-1">{Math.round(portfolioSensitivity)} / 100</div>
+          <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/35">
+            Exposure validation: <span className={validation.status === 'VALIDATED' ? 'text-emerald-300' : validation.status === 'PARTIAL' ? 'text-amber-300' : 'text-white/45'}>{validation.status}</span>
+            <span className="text-white/25"> · {validation.assessedDimensions}/{validation.dimensions || 0} dimensions assessed</span>
+          </div>
         </div>
       </div>
 
@@ -453,6 +468,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
           taiwan_disruption_probability: taiwanProb,
           power_grid_shortfall: gridSeverity,
           export_control_breadth: embargoBreadth,
+          exposure_validation: validation,
           live_risks: activeRisks.slice(0, 8).map((risk) => ({
             id: risk.id,
             category: risk.category,
@@ -518,73 +534,3 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Interactive Impact Calculator */}
-        <div className="bg-[#15181E]/30 border border-white/10 p-5 rounded-2xl flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2 border-b border-white/10 pb-3">
-              <ShieldAlert className="w-5 h-5 text-rose-500" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-white">Geopolitical Risk Stress Tool</h3>
-            </div>
-
-            <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[8px] font-mono uppercase tracking-wider text-amber-200/70">SIMULATED SCENARIO · not observed likelihood</div>
-            <p className="text-xs text-white/60 leading-relaxed">
-              Slide variables representing user-defined scenario inputs to evaluate simulated cumulative supply-chain impacts on neocloud networks.
-            </p>
-
-            <div className="space-y-4 pt-2 font-mono text-xs">
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>TSMC Disruption Probability</span>
-                  <span className="text-white font-black">{taiwanProb}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={taiwanProb}
-                  onChange={(e) => setTaiwanProb(parseInt(e.target.value))}
-                  className="w-full accent-rose-500 cursor-pointer"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>Northeast Power Grid Shortfall</span>
-                  <span className="text-white font-black">{gridSeverity}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={gridSeverity}
-                  onChange={(e) => setGridSeverity(parseInt(e.target.value))}
-                  className="w-full accent-amber-500 cursor-pointer"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>AI Chip Export Prohibitions</span>
-                  <span className="text-white font-black">{embargoBreadth}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={embargoBreadth}
-                  onChange={(e) => setEmbargoBreadth(parseInt(e.target.value))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
-
-        </div>
-      </div>
-    </div>
-  );
-}
