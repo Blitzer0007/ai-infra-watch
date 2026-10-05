@@ -47,7 +47,7 @@ export function classifyFreshness(
     const ageMinutes = Math.max(0, (nowMs - referenceMs) / 60000);
     return {
       label: ageMinutes <= 120 ? 'Delayed' : 'Last close',
-      referenceTime: new Date(referenceMs).toISOString(),
+      referenceTime: new Date(marketMs).toISOString(),
       ageMinutes,
     };
   }
