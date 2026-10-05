@@ -328,6 +328,11 @@ function normalizeAnalystValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+function normalizePositiveAnalystTarget(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 const ANALYST_SEARCH_NAMES = {
   NVDA: 'NVIDIA',
   MSFT: 'Microsoft',
@@ -453,7 +458,7 @@ async function handleAnalyst(req, res) {
     priceTarget.targetLow,
     priceTarget.targetMean,
     priceTarget.targetMedian,
-  ].some(value => Number.isFinite(Number(value)));
+  ].some(value => normalizePositiveAnalystTarget(value) != null);
   const hasEstimateEvidence = epsEstimates.some(row => row && (
     Number.isFinite(Number(row?.epsAvg ?? row?.epsAverage)) ||
     Number.isFinite(Number(row?.epsHigh)) ||
@@ -495,10 +500,10 @@ async function handleAnalyst(req, res) {
     },
     priceTarget: {
       lastUpdated: priceTarget.lastUpdated || priceTarget.lastUpdatedAt || null,
-      high: normalizeAnalystValue(priceTarget.targetHigh),
-      low: normalizeAnalystValue(priceTarget.targetLow),
-      mean: normalizeAnalystValue(priceTarget.targetMean),
-      median: normalizeAnalystValue(priceTarget.targetMedian),
+      high: normalizePositiveAnalystTarget(priceTarget.targetHigh),
+      low: normalizePositiveAnalystTarget(priceTarget.targetLow),
+      mean: normalizePositiveAnalystTarget(priceTarget.targetMean),
+      median: normalizePositiveAnalystTarget(priceTarget.targetMedian),
     },
     epsEstimates: epsEstimates.slice(0, 8).map(row => ({
       period: row?.period || null,

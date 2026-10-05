@@ -37,3 +37,26 @@ test('classifies analyst freshness consistently', () => {
   assert.equal(analystFreshness('2026-09-20T00:00:00.000Z', now), 'stale');
   assert.equal(analystFreshness(null, now), 'unknown');
 });
+
+
+test('treats zero and negative analyst targets as unavailable', () => {
+  const zero = normalizeAnalystConsensus({
+    analystCount: 12,
+    currentPrice: 100,
+    priceTarget: { low: 0, mean: -1, median: 0, high: 160 },
+  });
+  const positive = normalizeAnalystConsensus({
+    analystCount: 12,
+    currentPrice: 100,
+    priceTarget: { low: 80, mean: 125, median: 120, high: 160 },
+  });
+
+  assert.equal(zero.target.low, null);
+  assert.equal(zero.target.mean, null);
+  assert.equal(zero.target.median, null);
+  assert.equal(zero.target.high, 160);
+  assert.equal(zero.target.medianUpsidePct, null);
+  assert.equal(zero.target.meanUpsidePct, null);
+  assert.equal(positive.target.median, 120);
+  assert.equal(positive.target.medianUpsidePct, 20);
+});

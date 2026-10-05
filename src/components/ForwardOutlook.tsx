@@ -884,7 +884,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           source: analystBody?.source || null,
           retrievedAt: analystBody?.retrievedAt || null,
           analystCount: Number.isFinite(Number(analystBody?.analystCount)) ? Number(analystBody.analystCount) : null,
-          medianTarget: Number.isFinite(Number(analystBody?.priceTarget?.median)) ? Number(analystBody.priceTarget.median) : null,
+          medianTarget: Number.isFinite(Number(analystBody?.priceTarget?.median)) && Number(analystBody.priceTarget.median) > 0 ? Number(analystBody.priceTarget.median) : null,
           webEvidenceCount: Math.max(0, Number(analystBody?.webEvidenceCount) || 0),
           error: null,
         };
