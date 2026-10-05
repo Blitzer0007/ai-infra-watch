@@ -52,3 +52,13 @@ jobs:
             --retry-all-errors \
             --retry-delay 3 \
             "https://ai-infra-watch-theta.vercel.app/api/forecast-auto-track"
+
+          echo "Verifying forecasts that have reached their target date..."
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $OIDC_TOKEN" \
+            --header "User-Agent: ai-infra-watch-forecast-verification/1.0" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 3 \
+            "https://ai-infra-watch-theta.vercel.app/api/forecast-verification"
