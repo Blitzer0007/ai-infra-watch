@@ -17,14 +17,36 @@ jobs:
     name: Track 20D forecasts for held portfolio
     runs-on: ubuntu-slim
     timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - name: Run forecast auto tracker
+      - name: Run forecast auto tracker with GitHub OIDC
         env:
-          AIW_CRON_SECRET: ${{ secrets.AIW_CRON_SECRET }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "$AIW_CRON_SECRET" ]; then
-            echo "::error::Missing AIW_CRON_SECRET repository secret."
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::GitHub Actions OIDC token endpoint is unavailable."
             exit 1
           fi
-          curl --fail-with-body --silent --show-error             --request GET             --header "Authorization: Bearer $AIW_CRON_SECRET"             --header "User-Agent: ai-infra-watch-forecast-auto-tracker/1.0"             --retry 3             --retry-all-errors             --retry-delay 3             "https://ai-infra-watch-theta.vercel.app/api/forecast-auto-track"
+
+          OIDC_TOKEN="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            --get --data-urlencode "audience=ai-infra-watch" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+
+          if [ -z "$OIDC_TOKEN" ]; then
+            echo "::error::GitHub Actions returned an empty OIDC token."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $OIDC_TOKEN" \
+            --header "User-Agent: ai-infra-watch-forecast-auto-tracker/1.1" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 3 \
+            "https://ai-infra-watch-theta.vercel.app/api/forecast-auto-track"
