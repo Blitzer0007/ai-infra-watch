@@ -57,6 +57,11 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function positiveNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function compactItems(items: unknown[], limit = 8): ForecastEvidenceItem[] {
   if (!Array.isArray(items)) return [];
   return items.slice(0, limit).map((item: any) => ({
@@ -125,7 +130,7 @@ export function createForecastEvidenceSnapshot(input: {
       source: analyst.source ? String(analyst.source) : null,
       retrievedAt: analyst.retrievedAt ? String(analyst.retrievedAt) : null,
       analystCount: finiteNumber(analyst.analystCount),
-      medianTarget: finiteNumber(analyst.medianTarget),
+      medianTarget: positiveNumber(analyst.medianTarget),
       webEvidenceCount: Math.max(0, Math.floor(Number(analyst.webEvidenceCount) || 0)),
       error: analyst.error ? String(analyst.error) : null,
     },
