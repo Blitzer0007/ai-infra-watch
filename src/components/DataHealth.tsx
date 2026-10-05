@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { authFetch } from '../utils/apiAuth';
+import FreshnessBadge from './FreshnessBadge';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -228,6 +229,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + health.tone}>
                   {health.label}
                 </span>
+                {key === 'market' && <FreshnessBadge marketTime={item?.marketTime} retrievedAt={item?.retrievedAt} asOf={item?.asOf} stale={item?.stale} showAge={false} />}
                 <span className="text-[8px] font-mono uppercase text-white/20">{status}</span>
               </div>
             </div>
