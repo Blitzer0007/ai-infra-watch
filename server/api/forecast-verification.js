@@ -88,18 +88,19 @@ async function sendForecastValidationTelegram(results) {
     try {
       const accuracy = forecastAccuracyPct(item.actualReturn, item.median);
       const direction = Number(item.actualReturn) === 0 || Number(item.median) === 0
-        ? 'FLAT / NO DIRECTION'
-        : Math.sign(Number(item.actualReturn)) === Math.sign(Number(item.median)) ? 'DIRECTION HIT' : 'DIRECTION MISS';
+        ? 'No clear direction'
+        : Math.sign(Number(item.actualReturn)) === Math.sign(Number(item.median)) ? 'Direction right' : 'Direction wrong';
       const text = [
-        'AI Infra Watch · Forecast Validated', '',
+        'AI Infra Watch · Forecast Result', '',
         item.ticker + ' · ' + item.horizon + 'D forecast', direction, '',
         'Predicted median: ' + Number(item.median).toFixed(2) + '%',
         'Actual return: ' + Number(item.actualReturn).toFixed(2) + '%',
-        'Accuracy: ' + (accuracy == null ? 'N/A' : accuracy.toFixed(1) + '%'),
-        'Median error: ' + Number(item.medianError).toFixed(2) + ' pp',
+        'Prediction match: ' + (accuracy == null ? 'N/A' : accuracy.toFixed(1) + '%'),
+        'Typical miss: ' + Number(item.medianError).toFixed(2) + ' percentage points',
         'Target: ' + item.targetDate + ' · Verified: ' + item.actualDate, '',
         'Forecast-validation result only; not a trade instruction.',
-      ].join('\\n');
+      ].join('
+');
       const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text }), signal: AbortSignal.timeout(10000),
