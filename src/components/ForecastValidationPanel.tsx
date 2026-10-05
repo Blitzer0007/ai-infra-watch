@@ -14,11 +14,20 @@ type ValidationSummary = {
   rolling?: { last10: Rolling; last25: Rolling; last50: Rolling };
   newestVerifiedAt?: string | null;
 };
+type Learning = {
+  sampleSize: number;
+  model: { typicalMiss: number | null; directionRightPct: number | null; predictionMatchPct: number | null };
+  baseline: { name: string; typicalMiss: number | null; improvementPct: number | null };
+  drift: { status: string; score: number | null; recent?: Rolling; prior?: Rolling };
+  evidenceLearning: { multipleChannelSamples: number; otherSamples: number; predictionMatchLift: number | null; note: string };
+  recentLessons?: Array<{ ticker: string; directionRight: boolean | null; rangeHit: boolean; evidenceQuality: string; explanation: string }>;
+};
 type Rolling = { count: number; directionRightPct: number | null; predictionMatchPct: number | null };
 
 export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symbol: string; horizon?: number }) {
   const [summary, setSummary] = useState<ValidationSummary | null>(null);
   const [globalGate, setGlobalGate] = useState<{ verifiedCount: number; minimumRequired: number; ready: boolean } | null>(null);
+  const [learning, setLearning] = useState<Learning | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,6 +48,7 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
         if (cancelled) return;
         setSummary(body?.overall?.count ? body.overall : null);
         setGlobalGate(body?.globalValidationGate || body?.validationGate || null);
+        setLearning(body?.learning || null);
       })
       .catch(err => {
         if (!cancelled) {
@@ -92,6 +102,24 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
             <Metric label="Range hit" value={summary.p25p75CoveragePct == null ? '—' : summary.p25p75CoveragePct.toFixed(1) + '%'} />
             <Metric label="Prediction match" value={summary.predictionMatchPct == null ? '—' : summary.predictionMatchPct.toFixed(1) + '%'} />
           </div>
+          {learning && (
+            <div className="mt-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[.02] p-3">
+              <div className="text-[8px] font-mono uppercase tracking-wider text-cyan-200/50">What are we learning?</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                <Metric label="Better than no-change" value={learning.baseline.improvementPct == null ? '—' : (learning.baseline.improvementPct >= 0 ? '+' : '') + learning.baseline.improvementPct.toFixed(1) + '%'} />
+                <Metric label="Model typical miss" value={learning.model.typicalMiss == null ? '—' : learning.model.typicalMiss.toFixed(2) + ' pp'} />
+                <Metric label="Model drift" value={learning.drift.status === 'insufficient' ? 'Not enough data' : learning.drift.status.replace('-', ' ')} />
+                <Metric label="Evidence impact" value={learning.evidenceLearning.predictionMatchLift == null ? 'Still learning' : (learning.evidenceLearning.predictionMatchLift >= 0 ? '+' : '') + learning.evidenceLearning.predictionMatchLift.toFixed(1) + ' pp'} />
+              </div>
+              <div className="mt-2 text-[8px] leading-4 text-white/35">{learning.evidenceLearning.note}</div>
+              {learning.recentLessons?.[0] && (
+                <div className="mt-2 rounded border border-white/5 bg-black/10 p-2 text-[8px] leading-4 text-white/40">
+                  <span className="text-white/60">{learning.recentLessons[0].ticker}:</span> {learning.recentLessons[0].explanation} Evidence at creation: {learning.recentLessons[0].evidenceQuality}.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
             <div className="text-[8px] font-mono uppercase tracking-wider text-white/30">Is the model improving?</div>
             <div className="mt-2 grid grid-cols-3 gap-2">
