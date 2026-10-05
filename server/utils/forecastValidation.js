@@ -23,6 +23,56 @@ function sampleStatus(count) {
   return 'established';
 }
 
+function eligible(rows) {
+  return rows.filter(row => Number(row?.median) !== 0 && Number(row?.actual_return) !== 0);
+}
+
+function directionRightPct(rows) {
+  const usable = eligible(rows);
+  if (!usable.length) return null;
+  return Number((usable.filter(row => Math.sign(Number(row.median)) === Math.sign(Number(row.actual_return))).length / usable.length * 100).toFixed(1));
+}
+
+function predictionMatchPct(rows) {
+  const usable = eligible(rows);
+  if (!usable.length) return null;
+  return Number(mean(usable.map(row => {
+    const actual = Math.abs(Number(row.actual_return));
+    const miss = Math.abs(Number(row.median) - Number(row.actual_return));
+    return Math.max(0, 100 - (miss / Math.max(actual, 1)) * 100);
+  })).toFixed(1));
+}
+
+function typicalMiss(rows) {
+  const errors = rows
+    .map(row => Math.abs(Number(row.actual_return) - Number(row.median)))
+    .filter(Number.isFinite);
+  return errors.length ? Number(percentile(errors, 0.5).toFixed(2)) : null;
+}
+
+function summarizeSubset(rows) {
+  const signedErrors = rows
+    .map(row => Number(row.actual_return) - Number(row.median))
+    .filter(Number.isFinite);
+  const p25p75 = rows.length
+    ? rows.filter(row => Number(row.p25) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p75)).length / rows.length * 100
+    : null;
+  const p10p90 = rows.length
+    ? rows.filter(row => Number(row.p10) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p90)).length / rows.length * 100
+    : null;
+
+  return {
+    count: rows.length,
+    directionRightPct: directionRightPct(rows),
+    predictionMatchPct: predictionMatchPct(rows),
+    typicalMiss: typicalMiss(rows),
+    medianAbsoluteError: typicalMiss(rows),
+    meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
+    p25p75CoveragePct: p25p75 == null ? null : Number(p25p75.toFixed(1)),
+    p10p90CoveragePct: p10p90 == null ? null : Number(p10p90.toFixed(1)),
+  };
+}
+
 export function summarizeForecastRows(rows = []) {
   const verified = rows.filter(row => {
     const actualRaw = row?.actual_return;
@@ -34,54 +84,35 @@ export function summarizeForecastRows(rows = []) {
       Number.isFinite(Number(medianRaw));
   });
 
-  const eligible = verified.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
   const signedErrors = verified
     .map(row => Number(row.actual_return) - Number(row.median))
     .filter(Number.isFinite);
-  const absErrors = signedErrors.map(value => Math.abs(value));
-  const p25p75 = verified.length
-    ? verified.filter(row => Number(row.p25) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p75)).length / verified.length * 100
-    : null;
-  const p10p90 = verified.length
-    ? verified.filter(row => Number(row.p10) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p90)).length / verified.length * 100
-    : null;
 
-  const directionalAccuracyPct = eligible.length
-    ? eligible.filter(row => Math.sign(Number(row.median)) === Math.sign(Number(row.actual_return))).length / eligible.length * 100
-    : null;
-
-  const predictionMatchPct = (subset) => {
-    const eligible = subset.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
-    if (!eligible.length) return null;
-    return Number(mean(eligible.map(row => {
-      const actual = Math.abs(Number(row.actual_return));
-      const miss = Math.abs(Number(row.median) - Number(row.actual_return));
-      return Math.max(0, 100 - (miss / Math.max(actual, 1)) * 100);
-    })).toFixed(1));
-  };
+  const base = summarizeSubset(verified);
   const rolling = (size) => {
     const subset = verified.slice(0, size);
-    const eligible = subset.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
-    const directionRightPct = eligible.length
-      ? Number((eligible.filter(row => Math.sign(Number(row.median)) === Math.sign(Number(row.actual_return))).length / eligible.length * 100).toFixed(2))
-      : null;
-    return { directionRightPct, predictionMatchPct: predictionMatchPct(subset) };
+    const summary = summarizeSubset(subset);
+    return {
+      count: summary.count,
+      directionRightPct: summary.directionRightPct,
+      predictionMatchPct: summary.predictionMatchPct,
+    };
   };
 
   return {
     count: verified.length,
-    predictionMatchPct: predictionMatchPct(verified),
+    predictionMatchPct: base.predictionMatchPct,
     rolling: {
-      last10: { count: Math.min(10, verified.length), directionRightPct: rolling(10).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 10)) },
-      last25: { count: Math.min(25, verified.length), directionRightPct: rolling(25).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 25)) },
-      last50: { count: Math.min(50, verified.length), directionRightPct: rolling(50).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 50)) },
+      last10: rolling(10),
+      last25: rolling(25),
+      last50: rolling(50),
     },
     sampleStatus: sampleStatus(verified.length),
-    directionalAccuracyPct: directionalAccuracyPct == null ? null : Number(directionalAccuracyPct.toFixed(2)),
-    medianAbsoluteError: absErrors.length ? Number(percentile(absErrors, 0.5).toFixed(4)) : null,
-    meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(4)) : null,
-    p25p75CoveragePct: p25p75 == null ? null : Number(p25p75.toFixed(2)),
-    p10p90CoveragePct: p10p90 == null ? null : Number(p10p90.toFixed(2)),
+    directionalAccuracyPct: base.directionRightPct,
+    medianAbsoluteError: base.medianAbsoluteError,
+    meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
+    p25p75CoveragePct: base.p25p75CoveragePct,
+    p10p90CoveragePct: base.p10p90CoveragePct,
     oldestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
     newestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
   };
