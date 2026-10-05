@@ -27,7 +27,7 @@ type Price = {
   stale?: boolean;
   cached?: boolean;
 };
-type PortfolioTab = 'overview' | 'research' | 'watchlist' | 'events' | 'rotation' | 'network';
+type PortfolioTab = 'overview' | 'holdings' | 'performance' | 'evidence' | 'research' | 'watchlist' | 'events' | 'rotation' | 'network';
 type PortfolioHistoryPoint = { date: string; price: number };
 type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
 type HistoricalPriceState = {
@@ -61,8 +61,9 @@ const WATCHLIST = STOCK_UNIVERSE;
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => {
     const value = new URLSearchParams(window.location.search).get('portfolio_tab');
-    return value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
+    return value === 'holdings' || value === 'performance' || value === 'evidence' || value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
   });
+  const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
   const [holdingFilter, setHoldingFilter] = useState<'All' | 'Positive Today' | 'Negative Today' | 'Below Cost' | 'Needs Review'>('All');
@@ -97,6 +98,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   const changeTab = (nextTab: PortfolioTab) => {
     setTab(nextTab);
+  };
+  const changeViewMode = (mode: 'simple' | 'detailed') => {
+    setViewMode(mode);
+    localStorage.setItem('aiw-portfolio-view-mode', mode);
   };
 
   useEffect(() => {
@@ -570,10 +575,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="text-2xl font-black mt-2">Portfolio + Watchlist Decision Lab</div>
           <div className="text-xs text-white/45 mt-1">Broker snapshot · live market feed · peers · rotation · catalysts · event study</div>
         </div>
-        <div className="flex flex-wrap gap-2 text-[10px] font-mono text-white/40">
+        <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
+          <span className="px-2 py-1 rounded-full border border-white/10">DATA {stressFreshCount}/{analyses.length} LIVE</span>
           <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">ADD REVIEWS {addReviews}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">RISK REVIEWS {riskReviews}</span>
+          <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
+            <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
+            <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
+          </div>
         </div>
       </div>
 
@@ -707,7 +717,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         <Metric label="AI infra signal" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
         <Metric label="Top live group" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
       </div>      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        {([['overview','Overview'],['research','Research'],['watchlist','Watchlist'],['events','Event Study'],['rotation','Money Rotation'],['network','Relationship Graph']] as const).map(x =>
+        {([['overview','Overview'],['holdings','Holdings'],['performance','Performance'],['evidence','Evidence'],['watchlist','Explore · Watchlist'],['events','Explore · Event Study'],['rotation','Explore · Money Rotation'],['network','Explore · Relationship Graph']] as const).map(x =>
           <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
             {x[1]}
           </button>
