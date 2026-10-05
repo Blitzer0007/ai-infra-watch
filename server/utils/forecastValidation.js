@@ -59,7 +59,14 @@ export function summarizeForecastRows(rows = []) {
       return Math.max(0, 100 - (miss / Math.max(actual, 1)) * 100);
     })).toFixed(1));
   };
-  const rolling = (size) => summarizeForecastRows(verified.slice(0, size));
+  const rolling = (size) => {
+    const subset = verified.slice(0, size);
+    const eligible = subset.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
+    const directionRightPct = eligible.length
+      ? Number((eligible.filter(row => Math.sign(Number(row.median)) === Math.sign(Number(row.actual_return))).length / eligible.length * 100).toFixed(2))
+      : null;
+    return { directionRightPct, predictionMatchPct: predictionMatchPct(subset) };
+  };
 
   return {
     count: verified.length,
