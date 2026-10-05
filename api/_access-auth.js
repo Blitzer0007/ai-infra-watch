@@ -1,6 +1,8 @@
-const configuredAccessToken = () => String(
-  process.env.AIW_ACCESS_TOKEN || process.env.AGENT_API_TOKEN || process.env.CRON_SECRET || ''
-).trim();
+const configuredAccessTokens = () => [
+  process.env.AIW_ACCESS_TOKEN,
+  process.env.AGENT_API_TOKEN,
+  process.env.CRON_SECRET,
+].map(value => String(value || '').trim()).filter(Boolean);
 
 function bearerToken(req) {
   const value = String(req.headers?.authorization || '').trim();
@@ -9,8 +11,8 @@ function bearerToken(req) {
 }
 
 export function requireAccess(req, res) {
-  const expected = configuredAccessToken();
-  if (!expected) {
+  const expected = configuredAccessTokens();
+  if (!expected.length) {
     res.status(503).json({
       ok: false,
       error: 'Private access is not configured',
@@ -18,7 +20,7 @@ export function requireAccess(req, res) {
     });
     return false;
   }
-  if (bearerToken(req) !== expected) {
+  if (!expected.includes(bearerToken(req))) {
     res.status(401).json({ ok: false, error: 'Authentication required' });
     return false;
   }
@@ -26,5 +28,5 @@ export function requireAccess(req, res) {
 }
 
 export function accessConfigured() {
-  return Boolean(configuredAccessToken());
+  return configuredAccessTokens().length > 0;
 }
