@@ -432,6 +432,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       label: score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained',
     };
   }, [rawWeightedStress, stableStressScore]);
+  const weightedStress = stress;
   const macroHighCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
   const macroMediumCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
