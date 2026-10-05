@@ -1,5 +1,5 @@
 const configuredAccessToken = () => String(
-  process.env.AIW_ACCESS_TOKEN || process.env.AGENT_API_TOKEN || ''
+  process.env.AIW_ACCESS_TOKEN || process.env.AGENT_API_TOKEN || process.env.CRON_SECRET || ''
 ).trim();
 
 function bearerToken(req) {
