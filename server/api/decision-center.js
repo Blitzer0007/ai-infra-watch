@@ -136,6 +136,26 @@ function sortedHistoryPoints(history) {
     : [];
 }
 
+function dailyVolatilityPct(points, lookback = 20) {
+  const ordered = sortedHistoryPoints({ points }).slice(-(lookback + 1));
+  const returns = [];
+  for (let i = 1; i < ordered.length; i++) {
+    const previous = Number(ordered[i - 1]?.price);
+    const current = Number(ordered[i]?.price);
+    if (previous > 0 && current > 0) returns.push((current / previous - 1) * 100);
+  }
+  if (returns.length < 5) return null;
+  const average = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+  const variance = returns.reduce((sum, value) => sum + (value - average) ** 2, 0) / returns.length;
+  return Math.sqrt(Math.max(0, variance));
+}
+
+function pullbackThresholdPct(points) {
+  const dailyVol = dailyVolatilityPct(points);
+  if (dailyVol == null) return 3;
+  return Math.max(2, Number((dailyVol * 2).toFixed(2)));
+}
+
 function normalizeBrokerAlerts(holding) {
   if (Array.isArray(holding?.broker_alerts)) {
     return holding.broker_alerts
@@ -491,6 +511,7 @@ export default async function handler(req, res) {
         const recent = sortedHistoryPoints(histories[symbol]).slice(-20);
         const recentHigh = recent.length ? Math.max(...recent.map(point => Number(point.price))) : null;
         const pullbackPct = recentHigh && Number(q.price) > 0 ? (recentHigh / Number(q.price) - 1) * 100 : null;
+        const pullbackThreshold = pullbackThresholdPct(recent);
         const benchmarkSymbol = String(holding.risk_group || '').toLowerCase() === 'semiconductor' ? 'SOXX' : 'SPY';
         const benchmarkRecent = sortedHistoryPoints(histories[benchmarkSymbol]).slice(-20);
         const stockStart = recent.length > 1 ? Number(recent[0].price) : null;
@@ -500,13 +521,16 @@ export default async function handler(req, res) {
         const stockReturn = stockStart > 0 && stockEnd > 0 ? (stockEnd / stockStart - 1) * 100 : null;
         const benchmarkReturn = benchmarkStart > 0 && benchmarkEnd > 0 ? (benchmarkEnd / benchmarkStart - 1) * 100 : null;
         const supportingEvidence = stockReturn != null && benchmarkReturn != null && stockReturn >= benchmarkReturn;
-        if ((pullbackPct != null && pullbackPct >= 3) || supportingEvidence) {
+        const meaningfulPullback = pullbackPct != null && pullbackPct >= pullbackThreshold;
+        if (meaningfulPullback || supportingEvidence) {
           actionItems.push({
             severity: 'WATCH',
             symbol,
             title: 'Increase allocation review',
             detail: 'Recorded thesis is present and no rule is near/breached. Evidence: ' +
-              (pullbackPct != null && pullbackPct >= 3 ? '≥3% pullback from recent high' : '20-point return is holding up versus ' + benchmarkSymbol) +
+              (meaningfulPullback
+                ? 'pullback ' + pullbackPct.toFixed(1) + '% from recent high vs ' + pullbackThreshold.toFixed(1) + '% volatility-scaled threshold (2× recent daily volatility)'
+                : '20-day return is holding up versus ' + benchmarkSymbol) +
               '. Review only; this is not an automatic buy instruction.',
             impact: null,
           });
