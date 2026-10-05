@@ -99,8 +99,7 @@ async function sendForecastValidationTelegram(results) {
         'Typical miss: ' + Number(item.medianError).toFixed(2) + ' percentage points',
         'Target: ' + item.targetDate + ' · Verified: ' + item.actualDate, '',
         'Forecast-validation result only; not a trade instruction.',
-      ].join('
-');
+      ].join('\n');
       const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text }), signal: AbortSignal.timeout(10000),
@@ -111,7 +110,7 @@ async function sendForecastValidationTelegram(results) {
   }
   return { configured: true, sent, errors };
 }
-\nfunction mean(v) { return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; }
+function mean(v) { return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; }
 function stdev(v) { if (v.length < 2) return 0; const m=mean(v); return Math.sqrt(mean(v.map(x=>(x-m)**2))); }
 function percentile(v,p) {
   if (!v.length) return 0;
