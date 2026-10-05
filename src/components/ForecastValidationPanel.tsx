@@ -1,4 +1,5 @@
-// Forecast validation labels intentionally favor plain-language terms for the dashboard.\nimport { useEffect, useState } from 'react';
+// Forecast validation labels intentionally favor plain-language terms for the dashboard.
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 
