@@ -665,7 +665,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     const eventDate = (item: any) => String(item?.date || item?.publishedAt || item?.published_at || item?.filingDate || '').slice(0, 10);
     const eventTitle = (item: any) => String(item?.title || item?.name || item?.summary || 'Relevant event');
     const now = new Date();
-    const horizonEnd = new Date(now.getTime() + 20 * 86400000);
+    const horizonEnd = new Date(addBusinessDays(now, 20) + 'T23:59:59Z');
     const upcoming = [...contracts, ...news, ...politicalSignals]
       .filter(item => {
         const date = eventDate(item);
@@ -884,7 +884,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           source: analystBody?.source || null,
           retrievedAt: analystBody?.retrievedAt || null,
           analystCount: Number.isFinite(Number(analystBody?.analystCount)) ? Number(analystBody.analystCount) : null,
-          medianTarget: Number.isFinite(Number(analystBody?.priceTarget?.median)) ? Number(analystBody.priceTarget.median) : null,
+          medianTarget: Number.isFinite(Number(analystBody?.priceTarget?.median)) && Number(analystBody.priceTarget.median) > 0 ? Number(analystBody.priceTarget.median) : null,
           webEvidenceCount: Math.max(0, Number(analystBody?.webEvidenceCount) || 0),
           error: null,
         };
@@ -1268,7 +1268,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
-                <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 days</span></div>
+                <div className="flex items-center gap-2 mb-3"><CalendarRange className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Next 20 trading days (about 28 calendar days)</span></div>
                 <div className="mb-3 rounded-lg border border-emerald-400/10 bg-emerald-400/[.025] p-3">
                   <div className="text-[8px] font-mono uppercase tracking-widest text-emerald-200/70">Real earnings calendar · {selectedStock}</div>
                   {earningsLoading ? <div className="mt-2 text-[9px] font-mono text-white/30">Loading earnings calendar…</div> : earnings.length ? <div className="mt-2 space-y-1.5">{earnings.slice(0, 5).map((event, index) => <div key={event.symbol + event.date + index} className="flex flex-wrap gap-2 text-[9px] font-mono"><span className="text-white/65">{event.date}</span><span className="text-white/45">{event.hour ? event.hour.toUpperCase() : 'timing not specified'}</span><span className="text-emerald-200">{event.title || 'Earnings report'}</span></div>)}</div> : <div className="mt-2 text-[9px] text-white/35">No confirmed earnings event returned in the next 30 days.</div>}
