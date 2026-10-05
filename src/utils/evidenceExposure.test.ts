@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validatePortfolioExposure, type ExposureEvidenceItem } from './evidenceExposure';
+import { calculateExposureWeightedMacroLoad, validatePortfolioExposure, type ExposureEvidenceItem } from './evidenceExposure';
 
 const assessed: ExposureEvidenceItem = {
   level: 'Direct',
@@ -37,4 +37,16 @@ test('exposure validation: partial coverage is PARTIAL', () => {
 
 test('exposure validation: empty portfolio is NOT ASSESSED', () => {
   assert.equal(validatePortfolioExposure([]).status, 'NOT ASSESSED');
+});
+test('exposure-weighted macro load separates assessed and worst-case missing evidence', () => {
+    const result = calculateExposureWeightedMacroLoad([
+      { symbol: 'AAA', value: 100, taiwan: assessed, power: notAssessed, export: assessed },
+    ], [
+      { title: 'Taiwan advanced-node exposure', impactRating: 'high' },
+      { title: 'Data-center power availability', impactRating: 'medium' },
+      { title: 'AI-chip export controls', impactRating: 'high' },
+    ]);
+    assert.equal(result.assessedLoad, 24);
+    assert.equal(result.worstCaseLoad, 30);
+  assert.equal(result.assessedCoveragePct, 66.7);
 });

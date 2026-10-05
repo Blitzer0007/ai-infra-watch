@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculateStressScore, median, sampleQuality, summarizeSample, summarizeCalibration, summarizeValidationMatrix } from './measurement';
+import { buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculateStressScore, calculatePortfolioStressScore, applyStressHysteresis, median, sampleQuality, summarizeSample, summarizeCalibration, summarizeValidationMatrix } from './measurement';
 
 describe('stress score', () => {
   it('returns zero stress for neutral inputs', () => {
@@ -22,6 +22,20 @@ describe('stress score', () => {
     assert.equal(result.freshCount, 2);
     assert.equal(result.breadth, 0.5);
     assert.equal(result.avgMove, 0);
+  });
+});
+
+describe('portfolio stress controls', () => {
+  it('accepts an exposure-weighted macro load override', () => {
+    const result = calculatePortfolioStressScore([
+      { symbol: 'NVDA', investedValue: 100, currentValue: 100, pnl: 0, pnlPct: 0, dailyChangePct: 0, group: 'AI' },
+    ], 2, 1, 7);
+    assert.equal(result.macroLoad, 7);
+  });
+
+  it('holds small score changes inside the hysteresis deadband', () => {
+    assert.equal(applyStressHysteresis(50, 53, 4), 50);
+    assert.equal(applyStressHysteresis(50, 55, 4), 55);
   });
 });
 

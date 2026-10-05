@@ -62,25 +62,31 @@ function PortfolioScenarioSensitivity({
       ? live.price * position.quantity
       : position?.investedValue ?? 0;
     const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
-    const sensitivity = Math.round(
+    const calculateSensitivity = (worstCase: boolean) => Math.round(
       (Object.entries(scenarioInputs) as Array<[MacroScenarioKey, { value: number; weight: number }]>).reduce((sum, [scenario, input]) => {
         const dimension = exposure[scenario];
-        return sum + (dimension?.assessment === 'assessed'
-          ? input.value * input.weight * exposureFactor(dimension.level)
-          : 0);
+        const factor = dimension?.assessment === 'assessed'
+          ? exposureFactor(dimension.level)
+          : worstCase ? 1 : 0;
+        return sum + input.value * input.weight * factor;
       }, 0)
     );
+    const assessedSensitivity = calculateSensitivity(false);
+    const worstCaseSensitivity = calculateSensitivity(true);
     return {
       ...exposure,
       position,
       currentValue,
       portfolioWeight,
-      sensitivity,
-      weightedContribution: sensitivity * (portfolioWeight / 100),
+      sensitivity: assessedSensitivity,
+      worstCaseSensitivity,
+      weightedContribution: assessedSensitivity * (portfolioWeight / 100),
+      worstCaseContribution: worstCaseSensitivity * (portfolioWeight / 100),
     };
   });
 
   const portfolioSensitivity = portfolioRows.reduce((sum, row) => sum + row.weightedContribution, 0);
+  const portfolioWorstCaseSensitivity = portfolioRows.reduce((sum, row) => sum + row.worstCaseContribution, 0);
 
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
@@ -94,13 +100,17 @@ function PortfolioScenarioSensitivity({
             Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
           </p>
         </div>
-        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3 min-w-[220px]">
+        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3 min-w-[250px]">
           <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300/60">Portfolio scenario sensitivity</div>
-          <div className="text-2xl font-black font-mono text-cyan-300 mt-1">{Math.round(portfolioSensitivity)} / 100</div>
+          <div className="grid grid-cols-2 gap-4 mt-1">
+            <div><div className="text-[8px] text-white/30 font-mono uppercase">Assessed-only</div><div className="text-2xl font-black font-mono text-cyan-300">{Math.round(portfolioSensitivity)} / 100</div></div>
+            <div><div className="text-[8px] text-white/30 font-mono uppercase">Worst case</div><div className="text-2xl font-black font-mono text-amber-300">{Math.round(portfolioWorstCaseSensitivity)} / 100</div></div>
+          </div>
           <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/35">
             Exposure validation: <span className={validation.status === 'VALIDATED' ? 'text-emerald-300' : validation.status === 'PARTIAL' ? 'text-amber-300' : 'text-white/45'}>{validation.status}</span>
             <span className="text-white/25"> · {validation.assessedDimensions}/{validation.dimensions || 0} dimensions assessed</span>
           </div>
+          <div className="mt-1 text-[8px] text-white/25 font-mono">Worst case treats each unassessed dimension as Direct exposure; it is an upper-bound sensitivity, not a prediction.</div>
         </div>
       </div>
 
@@ -123,7 +133,7 @@ function PortfolioScenarioSensitivity({
       </div>
 
       <div className="text-[9px] text-white/25 font-mono mt-3">
-        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. "Not assessed" is used when no baseline or matching evidence exists. Portfolio weighting uses invested capital.
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Assessed-only excludes unassessed dimensions; worst case assumes unassessed = Direct. Portfolio weighting uses invested capital.
       </div>
     </div>
   );

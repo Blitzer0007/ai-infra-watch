@@ -12,12 +12,13 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import { applyStressHysteresis, buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
+import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../utils/evidenceExposure';
 import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
 type Price = {
@@ -401,8 +402,37 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const stressStaleCount = analyses.filter(item => item.livePrice != null && item.liveStale).length;
   const portfolioMetricInputs = useMemo(() => analyses.map(item => ({ symbol: item.symbol, investedValue: item.investedValue, currentValue: item.currentValue, pnl: item.pnl, pnlPct: item.pnlPct, dailyChangePct: item.dailyChangePct, group: item.group })), [analyses]);
   const concentration = useMemo(() => calculatePortfolioConcentration(portfolioMetricInputs), [portfolioMetricInputs]);
-  const weightedStress = useMemo(() => calculatePortfolioStressScore(portfolioMetricInputs, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length, macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length), [portfolioMetricInputs, macroRisks]);
-  const stress = weightedStress;
+  const macroExposureRows = useMemo(() => {
+    const exposure = derivePortfolioExposure(analyses.map(item => item.symbol), contracts, news, positions);
+    const values = new Map(analyses.map(item => [item.symbol, item.currentValue ?? item.investedValue]));
+    return exposure.map(row => ({ ...row, value: Number(values.get(row.symbol) || 0) }));
+  }, [analyses, contracts, news, positions]);
+  const macroExposureLoad = useMemo(
+    () => calculateExposureWeightedMacroLoad(macroExposureRows, macroRisks),
+    [macroExposureRows, macroRisks],
+  );
+  const rawWeightedStress = useMemo(
+    () => calculatePortfolioStressScore(
+      portfolioMetricInputs,
+      macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length,
+      macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length,
+      macroExposureLoad.assessedLoad,
+    ),
+    [portfolioMetricInputs, macroRisks, macroExposureLoad.assessedLoad],
+  );
+  const [stableStressScore, setStableStressScore] = useState<number | null>(null);
+  useEffect(() => {
+    setStableStressScore(previous => applyStressHysteresis(previous, rawWeightedStress.score));
+  }, [rawWeightedStress.score]);
+  const stress = useMemo(() => {
+    const score = stableStressScore ?? rawWeightedStress.score;
+    return {
+      ...rawWeightedStress,
+      score,
+      label: score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained',
+    };
+  }, [rawWeightedStress, stableStressScore]);
+  const weightedStress = stress;
   const macroHighCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
   const macroMediumCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
@@ -453,8 +483,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         riskReview: riskHoldings,
       },
       measurements: {
-        weightedStress: weightedStress.score,
-        weightedStressLabel: weightedStress.label,
+        weightedStress: stress.score,
+        weightedStressLabel: stress.label,
+        macroLoadAssessed: macroExposureLoad.assessedLoad,
+        macroLoadWorstCase: macroExposureLoad.worstCaseLoad,
+        macroExposureCoveragePct: macroExposureLoad.assessedCoveragePct,
         weightedBreadth: weightedStress.weightedBreadth,
         weightedAverageMove: weightedStress.weightedAvgMove,
         concentrationHhi: concentration.hhi,
@@ -607,7 +640,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <span className="text-[9px] font-mono uppercase text-white/25">Higher = more observed stress</span>
               </div>
               <div className="text-[10px] text-white/35 mt-0.5">
-                Share up today + average daily move + macro risk load · {stressFreshCount}/{analyses.length} holdings with fresh quotes{stressStaleCount ? ' · ' + stressStaleCount + ' stale' : ''}
+                Share up today + average daily move + exposure-weighted macro load · {stressFreshCount}/{analyses.length} holdings with current quotes{stressStaleCount ? ' · ' + stressStaleCount + ' last close' : ''}
               </div>
             </div>
           </div>
@@ -633,8 +666,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Macro load</div>
-            <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{stress.macroLoad}/30</div>
-            <div className="text-[8px] font-mono text-white/25 mt-1">{macroHighCount} high · {macroMediumCount} medium · capped at 30</div>
+            <div className="text-[10px] font-mono font-bold text-white/70 mt-1">{macroExposureLoad.assessedLoad.toFixed(1)}/30</div>
+            <div className="text-[8px] font-mono text-white/25 mt-1">assessed · worst {macroExposureLoad.worstCaseLoad.toFixed(1)}/30</div>
+            <div className="text-[7px] font-mono text-white/20 mt-1">{macroExposureLoad.assessedCoveragePct.toFixed(0)}% exposure dimensions assessed</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Data coverage</div>

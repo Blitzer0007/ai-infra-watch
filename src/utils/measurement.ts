@@ -93,6 +93,7 @@ export function calculatePortfolioStressScore(
   inputs: PortfolioMetricInput[],
   highMacroCount = 0,
   mediumMacroCount = 0,
+  macroLoadOverride?: number,
 ): PortfolioStressResult {
   const valid = inputs.filter(item =>
     Number.isFinite(item.dailyChangePct ?? NaN) &&
@@ -114,11 +115,13 @@ export function calculatePortfolioStressScore(
     : null;
   const breadthStress = weightedBreadth == null ? 0 : (1 - weightedBreadth) * 40;
   const moveStress = weightedAvgMove == null ? 0 : clamp((-weightedAvgMove / 5) * 30, 0, 30);
-  const macroLoad = clamp(
-    Math.max(0, highMacroCount) * 12 + Math.max(0, mediumMacroCount) * 6,
-    0,
-    30,
-  );
+  const macroLoad = Number.isFinite(macroLoadOverride)
+    ? clamp(Number(macroLoadOverride), 0, 30)
+    : clamp(
+      Math.max(0, highMacroCount) * 12 + Math.max(0, mediumMacroCount) * 6,
+      0,
+      30,
+    );
   const concentration = calculatePortfolioConcentration(inputs);
   const concentrationPenalty = concentration.hhi == null
     ? 0
@@ -138,6 +141,18 @@ export function calculatePortfolioStressScore(
     weightedBreadth,
     concentrationPenalty,
   };
+}
+
+export function applyStressHysteresis(
+  previousScore: number | null,
+  rawScore: number,
+  deadband = 4,
+): number {
+  const next = clamp(Math.round(rawScore), 0, 100);
+  if (previousScore == null || !Number.isFinite(previousScore)) return next;
+  return Math.abs(next - previousScore) <= Math.max(0, deadband)
+    ? Math.round(previousScore)
+    : next;
 }
 
 export function calculatePortfolioConcentration(inputs: PortfolioMetricInput[]): PortfolioConcentration {

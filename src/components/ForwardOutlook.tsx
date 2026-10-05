@@ -1014,6 +1014,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     }
   };
 
+  useEffect(() => {
+    if (!loading && history.length >= 220 + horizon && !backtestBusy) {
+      void runBacktest();
+    }
+  }, [selectedStock, horizon, history.length, loading]);
+
   const runValidationMatrix = async () => {
     if (matrixBusy) return;
     setMatrixBusy(true);

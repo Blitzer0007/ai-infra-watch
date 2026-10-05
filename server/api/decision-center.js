@@ -144,7 +144,7 @@ function dailyVolatilityPct(points, lookback = 20) {
     const current = Number(ordered[i]?.price);
     if (previous > 0 && current > 0) returns.push((current / previous - 1) * 100);
   }
-  if (returns.length < 5) return null;
+  if (returns.length < 2) return null;
   const average = returns.reduce((sum, value) => sum + value, 0) / returns.length;
   const variance = returns.reduce((sum, value) => sum + (value - average) ** 2, 0) / returns.length;
   return Math.sqrt(Math.max(0, variance));
@@ -152,7 +152,7 @@ function dailyVolatilityPct(points, lookback = 20) {
 
 function pullbackThresholdPct(points) {
   const dailyVol = dailyVolatilityPct(points);
-  if (dailyVol == null) return 3;
+  if (dailyVol == null) return null;
   return Math.max(2, Number((dailyVol * 2).toFixed(2)));
 }
 
@@ -521,7 +521,7 @@ export default async function handler(req, res) {
         const stockReturn = stockStart > 0 && stockEnd > 0 ? (stockEnd / stockStart - 1) * 100 : null;
         const benchmarkReturn = benchmarkStart > 0 && benchmarkEnd > 0 ? (benchmarkEnd / benchmarkStart - 1) * 100 : null;
         const supportingEvidence = stockReturn != null && benchmarkReturn != null && stockReturn >= benchmarkReturn;
-        const meaningfulPullback = pullbackPct != null && pullbackPct >= pullbackThreshold;
+        const meaningfulPullback = pullbackPct != null && pullbackThreshold != null && pullbackPct >= pullbackThreshold;
         if (meaningfulPullback || supportingEvidence) {
           actionItems.push({
             severity: 'WATCH',
