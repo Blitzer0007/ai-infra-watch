@@ -38,8 +38,7 @@ test('exposure validation: partial coverage is PARTIAL', () => {
 test('exposure validation: empty portfolio is NOT ASSESSED', () => {
   assert.equal(validatePortfolioExposure([]).status, 'NOT ASSESSED');
 });
-describe('exposure-weighted macro load', () => {
-  it('separates assessed load from worst-case missing-evidence exposure', () => {
+test('exposure-weighted macro load separates assessed and worst-case missing evidence', () => {
     const result = calculateExposureWeightedMacroLoad([
       { symbol: 'AAA', value: 100, taiwan: assessed, power: notAssessed, export: assessed },
     ], [
