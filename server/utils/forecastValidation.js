@@ -118,6 +118,69 @@ export function summarizeForecastRows(rows = []) {
   };
 }
 
+export function buildForecastLearningSummary(rows = []) {
+  const verified = rows.filter(row => String(row?.status || 'verified') === 'verified');
+  const typicalMiss = subset => {
+    const values = subset.map(row => Math.abs(Number(row.actual_return) - Number(row.median))).filter(Number.isFinite);
+    return values.length ? Number(percentile(values, 0.5).toFixed(2)) : null;
+  };
+  const baselineMiss = subset => {
+    const values = subset.map(row => Math.abs(Number(row.actual_return))).filter(Number.isFinite);
+    return values.length ? Number(percentile(values, 0.5).toFixed(2)) : null;
+  };
+  const score = subset => ({
+    count: subset.length,
+    directionRightPct: directionRightPct(subset),
+    predictionMatchPct: predictionMatchPct(subset),
+  });
+  const modelMiss = typicalMiss(verified);
+  const noChangeMiss = baselineMiss(verified);
+  const improvementPct = modelMiss != null && noChangeMiss > 0
+    ? Number(((noChangeMiss - modelMiss) / noChangeMiss * 100).toFixed(1))
+    : null;
+  const recent = score(verified.slice(0, 10));
+  const prior = score(verified.slice(10, 20));
+  const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
+    ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
+    : null;
+  const driftStatus = driftScore == null || verified.length < 20
+    ? 'insufficient'
+    : driftScore >= 5 ? 'improving' : driftScore <= -5 ? 'declining' : 'steady';
+
+  const channelCount = row => {
+    const snapshot = row?.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : {};
+    const counts = snapshot.counts || {};
+    return ['news', 'contracts', 'political', 'macro'].filter(key => Number(counts[key]) > 0).length +
+      (snapshot.analystConsensus?.status === 'available' ? 1 : 0);
+  };
+  const multi = verified.filter(row => channelCount(row) >= 2);
+  const other = verified.filter(row => channelCount(row) < 2);
+  const multiScore = score(multi);
+  const otherScore = score(other);
+  const evidenceLift = multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
+    ? Number((multiScore.predictionMatchPct - otherScore.predictionMatchPct).toFixed(1))
+    : null;
+
+  return {
+    sampleSize: verified.length,
+    model: { typicalMiss: modelMiss, directionRightPct: score(verified).directionRightPct, predictionMatchPct: score(verified).predictionMatchPct },
+    baseline: { name: 'No-change baseline', typicalMiss: noChangeMiss, improvementPct },
+    drift: { status: driftStatus, score: driftScore, recent, prior },
+    evidenceLearning: {
+      multipleChannelSamples: multi.length,
+      otherSamples: other.length,
+      predictionMatchLift: evidenceLift,
+      note: evidenceLift == null
+        ? 'Not enough evidence history to compare evidence quality.'
+        : evidenceLift >= 5
+          ? 'Forecasts with multiple evidence channels have been performing better in this sample.'
+          : evidenceLift <= -5
+            ? 'More evidence has not improved results in this sample; treat the evidence mix as a learning signal, not proof of causation.'
+            : 'Multiple evidence channels have not produced a clear performance difference yet.',
+    },
+  };
+}
+
 export function buildForecastValidationSummary(rows = []) {
   const overall = summarizeForecastRows(rows);
   const groups = new Map();
