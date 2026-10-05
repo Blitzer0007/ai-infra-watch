@@ -374,6 +374,135 @@ function forecastAnalytics(rows) {
   };
 }
 
+function forecastLearning(rows) {
+  const verified = rows
+    .filter(row => String(row.status) === 'verified')
+    .filter(row => Number.isFinite(Number(row.actual_return)) && Number.isFinite(Number(row.median)))
+    .sort((a, b) => String(b.verified_at || b.created_at || '').localeCompare(String(a.verified_at || a.created_at || '')));
+
+  const errors = verified.map(row => Math.abs(Number(row.actual_return) - Number(row.median)));
+  const baselineErrors = verified.map(row => Math.abs(Number(row.actual_return)));
+  const modelError = errors.length ? percentile(errors, 0.5) : null;
+  const baselineError = baselineErrors.length ? percentile(baselineErrors, 0.5) : null;
+  const improvementPct = modelError != null && baselineError > 0
+    ? Number(((baselineError - modelError) / baselineError * 100).toFixed(1))
+    : null;
+
+  const score = subset => {
+    if (!subset.length) return { count: 0, directionRightPct: null, predictionMatchPct: null };
+    const usable = subset.filter(row => Number(row.actual_return) !== 0 && Number(row.median) !== 0);
+    const directionRightPct = usable.length
+      ? usable.filter(row => Math.sign(Number(row.actual_return)) === Math.sign(Number(row.median))).length / usable.length * 100
+      : null;
+    const predictionMatchPct = usable.length
+      ? mean(usable.map(row => Math.max(0, 100 - Math.abs(Number(row.actual_return) - Number(row.median)) / Math.max(Math.abs(Number(row.actual_return)), 1) * 100))
+      : null;
+    return {
+      count: subset.length,
+      directionRightPct: directionRightPct == null ? null : Number(directionRightPct.toFixed(1)),
+      predictionMatchPct: predictionMatchPct == null ? null : Number(predictionMatchPct.toFixed(1)),
+    };
+  };
+
+  const recent = score(verified.slice(0, 10));
+  const prior = score(verified.slice(10, 20));
+  const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
+    ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
+    : null;
+  const driftStatus = driftScore == null || verified.length < 20
+    ? 'insufficient'
+    : driftScore >= 5 ? 'improving' : driftScore <= -5 ? 'declining' : 'steady';
+
+  const withEvidence = verified.map(row => {
+    const snapshot = row.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : {};
+    const counts = snapshot.counts || {};
+    const channelCount = ['news', 'contracts', 'political', 'macro']
+      .filter(key => Number(counts[key]) > 0).length +
+      (snapshot.analystConsensus?.status === 'available' ? 1 : 0);
+    const directionRight = Number(row.actual_return) !== 0 && Number(row.median) !== 0
+      ? Math.sign(Number(row.actual_return)) === Math.sign(Number(row.median))
+      : null;
+    const rangeHit = Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75);
+    let explanation;
+    if (directionRight === true && rangeHit) explanation = 'Direction was right and the actual result stayed inside the expected range.';
+    else if (directionRight === true) explanation = 'Direction was right, but the move was outside the expected middle range.';
+    else if (directionRight === false) explanation = 'Direction was wrong; the model expected the move on the other side.';
+    else explanation = 'There was no clear directional outcome to judge.';
+    return {
+      id: row.id,
+      ticker: String(row.ticker || '').toUpperCase(),
+      horizon: Number(row.horizon),
+      directionRight,
+      rangeHit,
+      evidenceChannels: channelCount,
+      evidenceQuality: channelCount >= 2 ? 'multiple channels' : channelCount === 1 ? 'one channel' : 'evidence gap',
+      explanation,
+    };
+  });
+
+  const multi = verified.filter(row => {
+    const s = row.evidence_snapshot || {};
+    const c = s.counts || {};
+    return ['news','contracts','political','macro'].filter(k => Number(c[k]) > 0).length + (s.analystConsensus?.status === 'available' ? 1 : 0) >= 2;
+  });
+  const singleOrGap = verified.filter(row => !multi.includes(row));
+  const multiScore = score(multi);
+  const otherScore = score(singleOrGap);
+  const evidenceLift = multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
+    ? Number((multiScore.predictionMatchPct - otherScore.predictionMatchPct).toFixed(1))
+    : null;
+
+  return {
+    sampleSize: verified.length,
+    model: {
+      typicalMiss: modelError == null ? null : Number(modelError.toFixed(2)),
+      directionRightPct: score(verified).directionRightPct,
+      predictionMatchPct: score(verified).predictionMatchPct,
+    },
+    baseline: {
+      name: 'No-change baseline',
+      typicalMiss: baselineError == null ? null : Number(baselineError.toFixed(2)),
+      improvementPct,
+    },
+    drift: { status: driftStatus, score: driftScore, recent, prior },
+    evidenceLearning: {
+      multipleChannelSamples: multi.length,
+      otherSamples: singleOrGap.length,
+      predictionMatchLift: evidenceLift,
+      note: evidenceLift == null
+        ? 'Not enough evidence history to compare evidence quality.'
+        : evidenceLift >= 5
+          ? 'Forecasts with multiple evidence channels have been performing better in this sample.'
+          : evidenceLift <= -5
+            ? 'More evidence has not improved results in this sample; treat the evidence mix as a learning signal, not proof of causation.'
+            : 'Multiple evidence channels have not produced a clear performance difference yet.',
+    },
+    recentLessons: withEvidence.slice(0, 10),
+  };
+}
+
+async function persistForecastLearning(learning) {
+  if (!learning || !learning.sampleSize) return null;
+  const row = {
+    sample_size: learning.sampleSize,
+    model_direction_pct: learning.model.directionRightPct,
+    model_error: learning.model.typicalMiss,
+    baseline_error: learning.baseline.typicalMiss,
+    improvement_pct: learning.baseline.improvementPct,
+    drift_status: learning.drift.status,
+    drift_score: learning.drift.score,
+    findings: learning,
+  };
+  const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_learning_runs', {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(row),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || 'Forecast learning save failed.');
+  return data?.[0] || null;
+}
+
 function normalize(row) {
   return {
     id: row.id,
@@ -397,7 +526,15 @@ function normalize(row) {
     actualDate: row.actual_date || undefined,
     actualPrice: row.actual_price == null ? undefined : Number(row.actual_price),
     actualReturn: row.actual_return == null ? undefined : Number(row.actual_return),
-    medianError: row.median_error == null ? undefined : Number(row.median_error)
+    medianError: row.median_error == null ? undefined : Number(row.median_error),
+    learning: row.status === 'verified' ? (() => {
+      const snapshot = row.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : {};
+      const counts = snapshot.counts || {};
+      const evidenceChannels = ['news','contracts','political','macro'].filter(key => Number(counts[key]) > 0).length + (snapshot.analystConsensus?.status === 'available' ? 1 : 0);
+      const directionRight = Number(row.actual_return) !== 0 && Number(row.median) !== 0 ? Math.sign(Number(row.actual_return)) === Math.sign(Number(row.median)) : null;
+      const rangeHit = Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75);
+      return { directionRight, rangeHit, evidenceChannels, evidenceQuality: evidenceChannels >= 2 ? 'multiple channels' : evidenceChannels === 1 ? 'one channel' : 'evidence gap' };
+    })() : undefined
   };
 }
 
@@ -418,9 +555,15 @@ export default async function handler(req, res) {
     if (isCronRequest) {
       if (req.method !== 'GET') return send(res, 405, { error: 'Cron verification requires GET.' });
       const verification = await verifyDueForecasts();
+      const allResponse = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?select=*&order=created_at.desc&limit=500', { headers: headers() });
+      const allRows = await allResponse.json();
+      if (!allResponse.ok) throw new Error(allRows?.message || 'Failed to load forecast learning history.');
+      const learning = forecastLearning(allRows);
+      let learningRun = null;
+      if (learning.sampleSize) learningRun = await persistForecastLearning(learning);
       let modelEvaluation = null;
       if (new Date().getUTCDay() === 0) modelEvaluation = await evaluateForecastModels();
-      return send(res, 200, { ok: true, verification, modelEvaluation });
+      return send(res, 200, { ok: true, verification, learning, learningRun, modelEvaluation });
     }
 
     if (req.method === 'GET') {
@@ -453,7 +596,8 @@ export default async function handler(req, res) {
       const data = await response.json();
       if (!response.ok) return send(res, response.status, { error: data?.message || 'Failed to load forecasts.' });
       const analytics = forecastAnalytics(data);
-      return send(res, 200, { forecasts: data.map(normalize), analytics });
+      const learning = forecastLearning(data);
+      return send(res, 200, { forecasts: data.map(normalize), analytics: { ...analytics, learning } });
     }
 
     if (req.method === 'POST') {
