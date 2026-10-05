@@ -194,7 +194,7 @@ export default async function handler(req, res) {
         rule_text: effectiveRule,
         rule_snapshot: ruleSnapshot,
         decision_price: Number(latest.price),
-        benchmark_symbol: 'SPY',
+        benchmark_symbol: benchmarkSymbol,
         benchmark_entry_price: Number(benchmarkEntry.price),
         forecast_snapshot_id: forecast?.id || null,
         forecast_median: forecast?.median == null ? null : Number(forecast.median),
