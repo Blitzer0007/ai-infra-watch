@@ -1,4 +1,4 @@
-export type FreshnessLabel = 'Live' | 'Delayed' | 'Last close';
+export type FreshnessLabel = 'Live' | 'Delayed' | 'Last close' | 'Unknown';
 
 export type FreshnessInput = {
   retrievedAt?: string | null;
@@ -23,16 +23,36 @@ export function classifyFreshness(
   input: FreshnessInput,
   nowMs = Date.now(),
 ): FreshnessResult {
-  const referenceMs = parseTimestamp(input.marketTime) ?? parseTimestamp(input.retrievedAt) ?? parseTimestamp(input.asOf);
-  if (input.stale === true || referenceMs == null) {
+  const marketMs = parseTimestamp(input.marketTime);
+  const retrievalMs = parseTimestamp(input.retrievedAt);
+  const asOfMs = parseTimestamp(input.asOf);
+
+  if (input.stale === true) {
+    const referenceMs = marketMs ?? asOfMs ?? retrievalMs;
     return {
-      label: 'Last close',
+      label: referenceMs == null ? 'Unknown' : 'Last close',
       referenceTime: referenceMs == null ? null : new Date(referenceMs).toISOString(),
       ageMinutes: referenceMs == null ? null : Math.max(0, (nowMs - referenceMs) / 60000),
     };
   }
 
-  const ageMinutes = Math.max(0, (nowMs - referenceMs) / 60000);
+  if (marketMs == null && asOfMs == null && retrievalMs == null) {
+    return { label: 'Unknown', referenceTime: null, ageMinutes: null };
+  }
+
+  // A retrieval timestamp is not a market timestamp. Without market-time
+  // provenance we never call the quote Live, even when it was fetched recently.
+  if (marketMs == null) {
+    const referenceMs = asOfMs ?? retrievalMs!;
+    const ageMinutes = Math.max(0, (nowMs - referenceMs) / 60000);
+    return {
+      label: ageMinutes <= 120 ? 'Delayed' : 'Last close',
+      referenceTime: new Date(referenceMs).toISOString(),
+      ageMinutes,
+    };
+  }
+
+  const ageMinutes = Math.max(0, (nowMs - marketMs) / 60000);
   const label: FreshnessLabel =
     ageMinutes <= 15 ? 'Live' :
     ageMinutes <= 120 ? 'Delayed' :
