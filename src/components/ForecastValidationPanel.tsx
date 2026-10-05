@@ -9,8 +9,11 @@ type ValidationSummary = {
   medianAbsoluteError: number | null;
   p25p75CoveragePct: number | null;
   meanSignedErrorPct: number | null;
+  predictionMatchPct?: number | null;
+  rolling?: { last10: Rolling; last25: Rolling; last50: Rolling };
   newestVerifiedAt?: string | null;
 };
+type Rolling = { count: number; directionRightPct: number | null; predictionMatchPct: number | null };
 
 export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symbol: string; horizon?: number }) {
   const [summary, setSummary] = useState<ValidationSummary | null>(null);
@@ -59,10 +62,10 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Forecast validation</div>
           </div>
           <div className="text-sm font-black mt-1">{symbol} · {horizon}D verified history</div>
-          <div className="text-[9px] text-white/30 mt-1">Descriptive validation of completed forecasts. It does not alter portfolio decision rules or create a trade instruction.</div>
+          <div className="text-[9px] text-white/30 mt-1">Shows how closely completed forecasts matched what actually happened. This helps us learn whether the model is improving — it is not a trade instruction.</div>
         </div>
         <div className="text-right text-[8px] font-mono text-white/25">
-          {loading ? 'Loading' : globalGate?.ready ? 'Global sample gate: 50+' : 'Global sample gate: building'}
+          {loading ? 'Loading' : globalGate?.ready ? 'Validation history: 50+' : 'Building validation history'}
         </div>
       </div>
 
@@ -83,21 +86,33 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
             <Metric label="Verified" value={String(summary.count)} />
-            <Metric label="Direction" value={summary.directionalAccuracyPct == null ? '—' : summary.directionalAccuracyPct.toFixed(1) + '%'} />
-            <Metric label="Typical error" value={summary.medianAbsoluteError == null ? '—' : summary.medianAbsoluteError.toFixed(2) + ' pp'} />
-            <Metric label="Likely range" value={summary.p25p75CoveragePct == null ? '—' : summary.p25p75CoveragePct.toFixed(1) + '%'} />
-            <Metric label="Bias" value={summary.meanSignedErrorPct == null ? '—' : (summary.meanSignedErrorPct >= 0 ? '+' : '') + summary.meanSignedErrorPct.toFixed(2) + ' pp'} />
+            <Metric label="Direction right" value={summary.directionalAccuracyPct == null ? '—' : summary.directionalAccuracyPct.toFixed(1) + '%'} />
+            <Metric label="Typical miss" value={summary.medianAbsoluteError == null ? '—' : summary.medianAbsoluteError.toFixed(2) + ' pp'} />
+            <Metric label="Range hit" value={summary.p25p75CoveragePct == null ? '—' : summary.p25p75CoveragePct.toFixed(1) + '%'} />
+            <Metric label="Prediction match" value={summary.predictionMatchPct == null ? '—' : summary.predictionMatchPct.toFixed(1) + '%'} />
+          </div>
+          <div className="mt-3 rounded-lg border border-white/5 bg-black/10 p-3">
+            <div className="text-[8px] font-mono uppercase tracking-wider text-white/30">Is the model improving?</div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[['Last 10', summary.rolling?.last10], ['Last 25', summary.rolling?.last25], ['Last 50', summary.rolling?.last50]].map(([label, item]) => (
+                <div key={label as string} className="rounded border border-white/5 p-2">
+                  <div className="text-[8px] text-white/30">{label as string}</div>
+                  <div className="text-[10px] font-mono mt-1">{item?.predictionMatchPct == null ? '—' : item.predictionMatchPct.toFixed(1) + '% match'}</div>
+                  <div className="text-[8px] text-white/25 mt-1">{item?.directionRightPct == null ? '—' : item.directionRightPct.toFixed(1) + '% direction right'} · {item?.count || 0} checked</div>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[8px] font-mono text-white/30">
             <span className="rounded border border-white/10 bg-white/5 px-2 py-1 uppercase">{summary.sampleStatus.replace('-', ' ')}</span>
             {summary.newestVerifiedAt && <span>Last verified {new Date(summary.newestVerifiedAt).toLocaleString()}</span>}
-            {globalGate && <span>Global verified sample {globalGate.verifiedCount} / {globalGate.minimumRequired}</span>}
+            {globalGate && <span>Verified history {globalGate.verifiedCount} / {globalGate.minimumRequired}</span>}
           </div>
           <div className="mt-2 text-[8px] text-white/25">Validation sample status is shown separately from the holding's evidence gates and recorded decision context.</div>
         </>
       )}
 
-      {globalGate && !globalGate.ready && <div className="mt-3 flex items-center gap-2 text-[8px] font-mono text-white/30"><ShieldAlert className="w-3.5 h-3.5 text-amber-300" /> 50 verified forecasts are required before the global validation gate is considered established.</div>}
+      {globalGate && !globalGate.ready && <div className="mt-3 flex items-center gap-2 text-[8px] font-mono text-white/30"><ShieldAlert className="w-3.5 h-3.5 text-amber-300" /> 50 completed forecasts are needed before the overall validation history is considered established.</div>}
     </section>
   );
 }
