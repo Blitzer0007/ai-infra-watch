@@ -112,6 +112,12 @@ export default function BuySellWatchlist() {
 
   if (!config) return null;
 
+  const completeRuleCount = portfolioRules.filter(holding =>
+    Boolean(String(holding.decisionThesis || holding.notes || '').trim()) &&
+    Number(holding.lossLimitPct) > 0 &&
+    Boolean(String(holding.exitRuleType || '').trim())
+  ).length;
+
   const handleToggleAlert = (index: number) => {
     const alerts = [...config.alerts];
     alerts[index] = { ...alerts[index], active: !alerts[index].active };
@@ -234,7 +240,7 @@ export default function BuySellWatchlist() {
             <p className="text-[10px] text-white/40 mt-1">One place to review every holding's thesis, risk limit, exit rule, allocation boundaries and broker review prices. These are review/alert points, not automatic trades.</p>
           </div>
           <div className="shrink-0 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.04] px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-emerald-200">
-            {portfolioRules.length} / 11 rules loaded
+            {completeRuleCount} of {portfolioRules.length} holdings have complete rules
           </div>
         </div>
 
@@ -265,9 +271,9 @@ export default function BuySellWatchlist() {
                     </td>
                     <td className="px-3 py-3 align-top font-mono">{h.targetAllocationPct == null ? '—' : h.targetAllocationPct + '%'}</td>
                     <td className="px-3 py-3 align-top font-mono">{h.maxAllocationPct == null ? '—' : h.maxAllocationPct + '%'}</td>
-                    <td className="px-3 py-3 align-top font-mono">{h.lossLimitPct == null ? '—' : h.lossLimitPct + '%'}</td>
+                    <td className="px-3 py-3 align-top font-mono">{h.lossLimitPct == null ? 'Not set' : h.lossLimitPct + '%'}{Number(h.lossLimitPct) > 0 && Number(h.averageCost) > 0 ? ' · stop ' + formatPrice(h.averageCost * (1 - Number(h.lossLimitPct) / 100)) : ''}</td>
                     <td className="px-3 py-3 align-top font-mono uppercase">{h.exitRuleType ? (h.exitRuleType === 'trailing_stop' ? 'Trailing' : h.exitRuleType.replaceAll('_', ' ')) + (h.exitRuleValue == null ? '' : ' · ' + h.exitRuleValue + '%') : '—'}</td>
-                    <td className="px-3 py-3 align-top font-mono text-amber-100">{h.brokerAlertPrices?.length ? h.brokerAlertPrices.map(price => '$' + formatPrice(price)).join(' / ') : 'Not set'}</td>
+                    <td className="px-3 py-3 align-top font-mono text-amber-100">{h.brokerAlerts?.length ? h.brokerAlerts.map(alert => alert.direction === 'below' ? 'Below ' + formatPrice(alert.price) + ' STOP' : 'Above ' + formatPrice(alert.price) + ' TARGET').join(' · ') : h.brokerAlertPrices?.length ? h.brokerAlertPrices.map(price => Number(h.averageCost) > 0 && Number(price) < Number(h.averageCost) ? 'Below ' + formatPrice(Number(price)) + ' STOP' : 'Above ' + formatPrice(Number(price)) + ' TARGET').join(' · ') : 'Not set'}</td>
                     <td className="px-3 py-3 align-top max-w-[360px] text-white/45">{h.decisionThesis || 'Not recorded'}</td>
                     <td className="px-3 py-3 align-top">
                       <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-mono uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white">Edit</button>
