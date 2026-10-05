@@ -531,7 +531,7 @@ export default function App() {
                 </span>
               )}
               {(() => {
-                const quoteValues = Object.values(tickerPrices).filter(Boolean);
+                const quoteValues = Object.values(tickerPrices) as LivePrice[];
                 const fresh = quoteValues.filter(item => !item.stale).length;
                 const stale = quoteValues.filter(item => item.stale).length;
                 return quoteValues.length ? (
