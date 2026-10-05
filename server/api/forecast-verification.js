@@ -60,15 +60,57 @@ async function verifyDueForecasts() {
       );
       const updateData = await updateResponse.json();
       if (!updateResponse.ok) throw new Error(updateData?.message || 'Supabase update failed.');
-      results.push({ id: forecast.id, ticker: forecast.ticker, targetDate: forecast.target_date, actualDate: point.date, actualReturn });
+      results.push({ id: forecast.id, ticker: forecast.ticker, targetDate: forecast.target_date, actualDate: point.date, actualReturn, horizon: Number(forecast.horizon), median: Number(forecast.median), medianError: Number(patch.median_error) });
     } catch (error) {
       failures.push({ id: forecast.id, ticker: forecast.ticker, error: error?.message || 'Verification failed.' });
     }
   }
-  return { checked: due.length, verified: results.length, failed: failures.length, results, failures };
+  const telegram = await sendForecastValidationTelegram(results);\n  return { checked: due.length, verified: results.length, failed: failures.length, results, failures, telegram };
 }
 
-function mean(v) { return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; }
+
+function forecastAccuracyPct(actualReturn, predictedReturn) {
+  const actual = Number(actualReturn);
+  const predicted = Number(predictedReturn);
+  if (!Number.isFinite(actual) || !Number.isFinite(predicted)) return null;
+  const denominator = Math.max(Math.abs(actual), 1);
+  return Number(Math.max(0, 100 - (Math.abs(actual - predicted) / denominator) * 100).toFixed(1));
+}
+
+async function sendForecastValidationTelegram(results) {
+  if (!results.length) return { configured: false, sent: 0, errors: [] };
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!botToken || !chatId) return { configured: false, sent: 0, errors: ['Telegram credentials are not configured.'] };
+  let sent = 0;
+  const errors = [];
+  for (const item of results) {
+    try {
+      const accuracy = forecastAccuracyPct(item.actualReturn, item.median);
+      const direction = Number(item.actualReturn) === 0 || Number(item.median) === 0
+        ? 'FLAT / NO DIRECTION'
+        : Math.sign(Number(item.actualReturn)) === Math.sign(Number(item.median)) ? 'DIRECTION HIT' : 'DIRECTION MISS';
+      const text = [
+        'AI Infra Watch · Forecast Validated', '',
+        item.ticker + ' · ' + item.horizon + 'D forecast', direction, '',
+        'Predicted median: ' + Number(item.median).toFixed(2) + '%',
+        'Actual return: ' + Number(item.actualReturn).toFixed(2) + '%',
+        'Accuracy: ' + (accuracy == null ? 'N/A' : accuracy.toFixed(1) + '%'),
+        'Median error: ' + Number(item.medianError).toFixed(2) + ' pp',
+        'Target: ' + item.targetDate + ' · Verified: ' + item.actualDate, '',
+        'Forecast-validation result only; not a trade instruction.',
+      ].join('\\n');
+      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text }), signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error('Telegram HTTP ' + response.status);
+      sent += 1;
+    } catch (error) { errors.push(item.ticker + ': ' + String(error?.message || error)); }
+  }
+  return { configured: true, sent, errors };
+}
+\nfunction mean(v) { return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; }
 function stdev(v) { if (v.length < 2) return 0; const m=mean(v); return Math.sqrt(mean(v.map(x=>(x-m)**2))); }
 function percentile(v,p) {
   if (!v.length) return 0;
