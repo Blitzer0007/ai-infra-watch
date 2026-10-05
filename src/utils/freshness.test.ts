@@ -1,31 +1,32 @@
-import { describe, expect, it } from 'vitest';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { classifyFreshness, freshnessLabel } from './freshness';
 
-describe('freshness labels', () => {
+test('freshness labels', () => {
   const now = Date.parse('2026-10-05T10:00:00.000Z');
 
-  it('labels a recent market timestamp Live', () => {
-    expect(freshnessLabel({ marketTime: '2026-10-05T09:55:00.000Z' }, now)).toBe('Live');
+  test('labels a recent market timestamp Live', () => {
+    assert.equal(freshnessLabel({ marketTime: '2026-10-05T09:55:00.000Z' }, now), 'Live');
   });
 
-  it('labels a moderately old timestamp Delayed', () => {
-    expect(freshnessLabel({ retrievedAt: '2026-10-05T08:30:00.000Z' }, now)).toBe('Delayed');
+  test('labels a moderately old timestamp Delayed', () => {
+    assert.equal(freshnessLabel({ retrievedAt: '2026-10-05T08:30:00.000Z' }, now), 'Delayed');
   });
 
-  it('labels an old timestamp Last close', () => {
-    expect(freshnessLabel({ retrievedAt: '2026-10-04T20:00:00.000Z' }, now)).toBe('Last close');
+  test('labels an old timestamp Last close', () => {
+    assert.equal(freshnessLabel({ retrievedAt: '2026-10-04T20:00:00.000Z' }, now), 'Last close');
   });
 
-  it('forces Last close when the provider marks data stale', () => {
-    expect(freshnessLabel({ retrievedAt: '2026-10-05T09:59:00.000Z', stale: true }, now)).toBe('Last close');
+  test('forces Last close when the provider marks data stale', () => {
+    assert.equal(freshnessLabel({ retrievedAt: '2026-10-05T09:59:00.000Z', stale: true }, now), 'Last close');
   });
 
-  it('prefers market time over retrieval time', () => {
+  test('prefers market time over retrieval time', () => {
     const result = classifyFreshness({
       marketTime: '2026-10-05T07:00:00.000Z',
       retrievedAt: '2026-10-05T09:59:00.000Z',
     }, now);
-    expect(result.label).toBe('Last close');
-    expect(result.ageMinutes).toBe(180);
+    assert.equal(result.label, 'Last close');
+    assert.equal(result.ageMinutes, 180);
   });
 });
