@@ -195,6 +195,7 @@ def test_analyst_expectations_panel(page):
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
     page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
+    page.get_by_text("Holdings", exact=True).click()
     page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
     assert "EXTERNAL ANALYST EXPECTATIONS" in page.get_by_test_id("analyst-expectations").inner_text().upper()
 
