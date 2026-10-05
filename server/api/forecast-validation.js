@@ -1,5 +1,5 @@
 import { requireAccess } from '../../api/_access-auth.js';
-import { buildForecastValidationSummary } from '../utils/forecastValidation.js';
+import { buildForecastValidationSummary, buildForecastLearningSummary } from '../utils/forecastValidation.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -18,7 +18,7 @@ function headers() {
 
 async function loadVerifiedForecasts({ ticker, horizon } = {}) {
   const params = new URLSearchParams();
-  params.set('select', 'ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at');
+  params.set('select', 'ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot');
   params.set('status', 'eq.verified');
   params.set('order', 'verified_at.desc');
   params.set('limit', String(MAX_ROWS));
@@ -54,6 +54,7 @@ export default async function handler(req, res) {
 
     const rows = await loadVerifiedForecasts({ ticker: ticker || null, horizon });
     const summary = buildForecastValidationSummary(rows);
+    const learning = buildForecastLearningSummary(rows);
     let globalValidationGate = summary.validationGate;
     if (ticker || horizon != null) {
       const globalRows = await loadVerifiedForecasts({ horizon: 20 });
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
         truncated: rows.length >= MAX_ROWS,
       },
       ...summary,
+      learning,
       globalValidationGate,
       generatedAt: new Date().toISOString(),
     });
