@@ -28,6 +28,7 @@ type ForecastSnapshot = {
   decisionThesis?: string; lossLimitPct?: number | null; exitRuleType?: string | null; exitRuleValue?: number | null; exitRuleText?: string; practicalNotes?: string; brokerAlertPrices?: number[];
   modelVersion?: string;
   evidenceSnapshot?: ForecastEvidenceSnapshot;
+  evidenceState?: 'CAPTURED' | 'LEGACY_NO_SNAPSHOT' | 'INVALID_SNAPSHOT';
   status: 'pending' | 'verified'; verifiedAt?: string; actualDate?: string; actualPrice?: number; actualReturn?: number; medianError?: number;
 };
 
@@ -139,6 +140,9 @@ type ForecastAnalytics = {
   byDirection: Array<{bucket:string; count:number;}>;
   validationGate?: { minimumRequired:number; verifiedCount:number; ready:boolean; status:string; };
   evidenceCoverage?: { forecastsWithSnapshot:number; analystAvailable:number; analystMissingOrFailed:number; withNews:number; withContracts:number; withPolitical:number; withMacro:number; multiChannel:number; };
+  evidenceStateCounts?: { CAPTURED:number; LEGACY_NO_SNAPSHOT:number; INVALID_SNAPSHOT:number; };
+  verifiedEvidenceStateCounts?: { CAPTURED:number; LEGACY_NO_SNAPSHOT:number; INVALID_SNAPSHOT:number; };
+  legacyVerifiedCount?: number;
   longTerm: {verifiedCount:number; oldestVerifiedAt:string|null; newestVerifiedAt:string|null;};
 };
 
@@ -154,6 +158,18 @@ type VerificationDrift = {
   state: 'limited' | 'stable' | 'watch' | 'drift-signal';
 };
 
+function getForecastEvidenceState(forecast: Pick<ForecastSnapshot, 'evidenceState' | 'evidenceSnapshot'>): NonNullable<ForecastSnapshot['evidenceState']> {
+  if (forecast.evidenceState) return forecast.evidenceState;
+  const snapshot = forecast.evidenceSnapshot;
+  if (snapshot && snapshot.capturedAt && snapshot.source === 'forward_outlook') return 'CAPTURED';
+  if (snapshot && Object.keys(snapshot).length > 0) return 'INVALID_SNAPSHOT';
+  return 'LEGACY_NO_SNAPSHOT';
+}
+
+function isForecastCalibrationEligible(forecast: ForecastSnapshot): boolean {
+  return forecast.status === 'verified' && getForecastEvidenceState(forecast) === 'CAPTURED';
+}
+
 function calculateVerificationDrift(
   items: ForecastSnapshot[],
   ticker: string,
@@ -161,7 +177,7 @@ function calculateVerificationDrift(
 ): VerificationDrift {
   const verified = items
     .filter(item =>
-      item.status === 'verified' &&
+      isForecastCalibrationEligible(item) &&
       item.ticker === ticker &&
       item.horizon === horizon &&
       item.actualReturn != null &&
@@ -1406,7 +1422,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {verificationMessage && <div className="text-[10px] font-mono text-cyan-200/80 border border-cyan-300/10 rounded-xl p-2">{verificationMessage}</div>}
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1 aiw-scroll-region">{forecasts.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 10).map(f => (
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[9px] font-mono">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span><span className={getForecastEvidenceState(f) === 'CAPTURED' ? 'text-emerald-300' : getForecastEvidenceState(f) === 'INVALID_SNAPSHOT' ? 'text-rose-300' : 'text-amber-300'}>{getForecastEvidenceState(f).replaceAll('_', ' ')}</span></div>
             <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Likely range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
             {f.evidenceSnapshot && <div className="mt-1 text-white/30">
               Creation evidence: {f.evidenceSnapshot.analystConsensus?.status || 'missing'} analyst evidence · {
@@ -1415,8 +1431,9 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 (f.evidenceSnapshot.counts?.political || 0) +
                 (f.evidenceSnapshot.counts?.macro || 0)
               } event/context items · captured {f.evidenceSnapshot.capturedAt ? new Date(f.evidenceSnapshot.capturedAt).toLocaleString() : 'unknown time'}
+              {getForecastEvidenceState(f) === 'INVALID_SNAPSHOT' ? ' · INVALID creation snapshot; excluded from calibration' : ''}
             </div>}
-            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Legacy forecast — creation-time evidence snapshot was not captured.</div>}
+            {getForecastEvidenceState(f) === 'LEGACY_NO_SNAPSHOT' && <div className="mt-1 text-amber-200/60">Legacy forecast — no creation-time evidence snapshot was captured; excluded from calibration.</div>}
             {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
@@ -1430,19 +1447,22 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           </div>
           <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here. Direction, error, bias, and coverage are descriptive while the sample is below 50; the validation gate is considered established only at 50+ verified forecasts.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(isForecastCalibrationEligible).length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>isForecastCalibrationEligible(f) && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>isForecastCalibrationEligible(f) && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
           </div>
           {forecastAnalytics?.evidenceCoverage && (
             <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Creation-time evidence coverage</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[9px] font-mono">
-                <div><span className="text-white/30">Snapshots</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.forecastsWithSnapshot}</span></div>
-                <div><span className="text-white/30">Analyst</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.analystAvailable}</span></div>
-                <div><span className="text-white/30">News</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.withNews}</span></div>
+                <div><span className="text-white/30">Captured</span><span className="ml-2 text-white/70">{forecastAnalytics?.verifiedEvidenceStateCounts?.CAPTURED ?? forecastAnalytics?.evidenceCoverage.forecastsWithSnapshot}</span></div>
+                <div><span className="text-white/30">Legacy excluded</span><span className="ml-2 text-amber-200/80">{forecastAnalytics?.verifiedEvidenceStateCounts?.LEGACY_NO_SNAPSHOT ?? forecastAnalytics?.legacyVerifiedCount ?? 0}</span></div>
+                <div><span className="text-white/30">Invalid snapshot</span><span className="ml-2 text-rose-200/80">{forecastAnalytics?.verifiedEvidenceStateCounts?.INVALID_SNAPSHOT ?? 0}</span></div>
                 <div><span className="text-white/30">Multi-channel</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.multiChannel}</span></div>
+              </div>
+              <div className="mt-2 text-[8px] text-white/25">
+                Only CAPTURED forecasts enter calibration. Legacy or invalid creation evidence remains visible for auditability but is excluded from quality statistics.
               </div>
               <div className="mt-2 text-[8px] text-white/25">Descriptive coverage of evidence captured when forecasts were created; it does not measure forecast quality or imply that any evidence caused an outcome.</div>
             </div>
