@@ -231,7 +231,9 @@ function runModelBacktest(history,horizon,model) {
   if(!rows.length) return null;
   const direction=rows.filter(r=>r.median!==0&&r.actual!==0&&Math.sign(r.median)===Math.sign(r.actual)).length/rows.filter(r=>r.median!==0&&r.actual!==0).length;
   const error=percentile(rows.map(r=>Math.abs(r.actual-r.median)),.5);
-  return {direction,error,tests:rows.length};
+  const baselineError=percentile(rows.map(r=>Math.abs(r.actual)),.5);
+  const improvementPct=baselineError>0?((baselineError-error)/baselineError)*100:null;
+  return {direction,error,baselineError,improvementPct,tests:rows.length};
 }
 async function modelHistory(ticker) {
   const data = await routedHistory(ticker, '5y');
@@ -262,11 +264,17 @@ async function evaluateForecastModels() {
         v1_direction: v1?.direction ?? null, v1_error: v1?.error ?? null,
         v2_direction: v2?.direction ?? null, v2_error: v2?.error ?? null,
         baseline_direction: null,
-        baseline_error: null,
-        model_improvement_pct: null,
+        baseline_error: selected?.baselineError ?? null,
+        model_improvement_pct: selected?.improvementPct ?? null,
         drift_status: null,
         drift_score: null,
-        learning_summary: { source: 'rolling-verified-forecast-learning', selectedModel: active },
+        learning_summary: {
+          source: 'rolling-verified-forecast-learning',
+          selectedModel: active,
+          modelTypicalMiss: selected?.error ?? null,
+          noChangeTypicalMiss: selected?.baselineError ?? null,
+          improvementPct: selected?.improvementPct ?? null,
+        },
         validation_tests: Math.max(v1?.tests || 0, v2?.tests || 0),
         updated_at: new Date().toISOString()
       });
@@ -616,7 +624,9 @@ export default async function handler(req, res) {
       let learningRun = null;
       if (learning.sampleSize) learningRun = await persistForecastLearning(learning);
       let modelEvaluation = null;
-      if (new Date().getUTCDay() === 0) modelEvaluation = await evaluateForecastModels();
+      const utcHour = new Date().getUTCHours();
+      const utcMinute = new Date().getUTCMinutes();
+      if (utcHour === 1 && utcMinute < 30) modelEvaluation = await evaluateForecastModels();
       return send(res, 200, { ok: true, verification, learning, learningRun, modelEvaluation });
     }
 
