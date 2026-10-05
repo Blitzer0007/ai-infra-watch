@@ -48,6 +48,5 @@ test('exposure-weighted macro load separates assessed and worst-case missing evi
     ]);
     assert.equal(result.assessedLoad, 24);
     assert.equal(result.worstCaseLoad, 30);
-    assert.equal(result.assessedCoveragePct, 66.7);
-  });
+  assert.equal(result.assessedCoveragePct, 66.7);
 });
