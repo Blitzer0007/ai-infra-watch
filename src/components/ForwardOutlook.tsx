@@ -140,6 +140,7 @@ type ForecastAnalytics = {
   validationGate?: { minimumRequired:number; verifiedCount:number; ready:boolean; status:string; };
   evidenceCoverage?: { forecastsWithSnapshot:number; analystAvailable:number; analystMissingOrFailed:number; withNews:number; withContracts:number; withPolitical:number; withMacro:number; multiChannel:number; };
   longTerm: {verifiedCount:number; oldestVerifiedAt:string|null; newestVerifiedAt:string|null;};
+  legacyVerifiedCount?: number;
 };
 
 type VerificationDrift = {
@@ -1370,7 +1371,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
             {forecastAnalytics && forecastAnalytics.sampleSize > 0 && (
         <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[.02] p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Verified forecasts aggregated by ticker, horizon, scenario and model.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/70">Forecast validation analytics</div><p className="text-[10px] text-white/35 mt-1">Only verified forecasts with a creation-time evidence snapshot are included in calibration analytics.</p></div><span className="text-[9px] font-mono text-white/40">Verified {forecastAnalytics.sampleSize}{forecastAnalytics.legacyVerifiedCount ? ' · legacy excluded ' + forecastAnalytics.legacyVerifiedCount : ''}</span></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">50+ validation gate</div><div className="text-sm font-mono font-bold mt-1">{forecastValidationGate(forecastAnalytics?.validationGate?.verifiedCount ?? forecastAnalytics?.sampleSize ?? 0).ready ? 'READY' : 'BUILDING'}</div></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Sample status</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.sampleStatus ? forecastAnalytics.sampleStatus.replace('-', ' ') : 'insufficient'}</div></div>
