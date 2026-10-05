@@ -165,4 +165,54 @@ export function derivePortfolioExposure(
   }));
 }
 
+
+export type ExposureValidationStatus = 'VALIDATED' | 'PARTIAL' | 'NOT ASSESSED';
+
+export type ExposureValidation = {
+  status: ExposureValidationStatus;
+  holdings: number;
+  dimensions: number;
+  assessedDimensions: number;
+  notAssessedDimensions: number;
+  assessedPct: number;
+  fullyAssessedHoldings: number;
+};
+
+const DIMENSIONS: MacroScenario[] = ['taiwan', 'power', 'export'];
+
+export function validatePortfolioExposure(
+  rows: Array<{
+    symbol: string;
+    taiwan: ExposureEvidenceItem;
+    power: ExposureEvidenceItem;
+    export: ExposureEvidenceItem;
+  }>,
+): ExposureValidation {
+  const holdings = rows.length;
+  const dimensions = holdings * DIMENSIONS.length;
+  const assessedDimensions = rows.reduce(
+    (sum, row) => sum + DIMENSIONS.filter(scenario => row[scenario]?.assessment === 'assessed').length,
+    0,
+  );
+  const notAssessedDimensions = Math.max(0, dimensions - assessedDimensions);
+  const fullyAssessedHoldings = rows.filter(row =>
+    DIMENSIONS.every(scenario => row[scenario]?.assessment === 'assessed'),
+  ).length;
+  const assessedPct = dimensions > 0 ? assessedDimensions / dimensions * 100 : 0;
+
+  return {
+    status: dimensions === 0 || assessedDimensions === 0
+      ? 'NOT ASSESSED'
+      : assessedDimensions === dimensions
+        ? 'VALIDATED'
+        : 'PARTIAL',
+    holdings,
+    dimensions,
+    assessedDimensions,
+    notAssessedDimensions,
+    assessedPct: Number(assessedPct.toFixed(1)),
+    fullyAssessedHoldings,
+  };
+}
+
 export { BASELINE };
