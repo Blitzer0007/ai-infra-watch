@@ -1256,20 +1256,35 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               }
               {(!portfolioContext.hasHolding || !decisionEditing) &&
                 <div>
+
                   <div className="text-[8px] text-white/25 uppercase font-mono">Recorded thesis</div>
                   <div className="text-[10px] text-white/65 mt-1 leading-relaxed">{portfolioContext.holding?.decisionThesis || portfolioContext.thesis || 'No thesis recorded. Forecast does not invent a reason to own the stock.'}</div>
                   <div className="grid grid-cols-2 gap-2 mt-3">
-                    <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.lossLimitPct == null ? 'Not recorded' : portfolioContext.holding.lossLimitPct + '%'}</div>{portfolioContext.holding?.lossLimitPct != null && Number(portfolioContext.holding?.averageCost) > 0 ? <div className="text-[8px] font-mono text-white/25 mt-1">Computed stop {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100)){'}'}</div> : null}</div>
-                    <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? ((portfolioContext.holding.exitRuleType.replace('_', ' ')) + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div></div>
+                    <div className="rounded-lg border border-white/5 bg-black/10 p-2">
+                      <div className="text-[8px] text-white/25 uppercase font-mono">Loss limit</div>
+                      <div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.lossLimitPct == null ? 'Not recorded' : portfolioContext.holding.lossLimitPct + '%'}</div>
+                      {portfolioContext.holding?.lossLimitPct != null && Number(portfolioContext.holding?.averageCost) > 0 ? (
+                        <div className="text-[8px] font-mono text-white/25 mt-1">Computed stop {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100))}</div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-black/10 p-2">
+                      <div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div>
+                      <div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? (portfolioContext.holding.exitRuleType.replace('_', ' ') + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div>
+                    </div>
                   </div>
                   {(portfolioContext.holding?.brokerAlerts?.length || portfolioContext.holding?.brokerAlertPrices?.length) ? (
                     <div className="text-[8px] font-mono text-white/35 mt-2">
-                      Broker alerts: {(portfolioContext.holding.brokerAlerts?.length
+                      Broker alerts:{' '}
+                      {(portfolioContext.holding.brokerAlerts?.length
                         ? portfolioContext.holding.brokerAlerts
-                        : portfolioContext.holding.brokerAlertPrices?.map(price => ({
+                        : (portfolioContext.holding.brokerAlertPrices || []).map(price => ({
                             price,
-                            direction: Number(portfolioContext.holding?.averageCost) > 0 && Number(price) < Number(portfolioContext.holding.averageCost) ? 'below' : 'above'
-                          }))).map(alert => (alert.direction === 'below' ? '↓ ' : '↑ ') + '
+                            direction: Number(portfolioContext.holding?.averageCost) > 0 && Number(price) < Number(portfolioContext.holding.averageCost) ? 'below' : 'above',
+                          })))
+                        .map(alert => (alert.direction === 'below' ? '↓ ' : '↑ ') + '$' + formatPrice(Number(alert.price)) + ' ' + (alert.direction === 'below' ? 'STOP' : 'TARGET'))
+                        .join(' · ')}
+                    </div>
+                  ) : null}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
               }
