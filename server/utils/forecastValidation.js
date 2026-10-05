@@ -50,8 +50,25 @@ export function summarizeForecastRows(rows = []) {
     ? eligible.filter(row => Math.sign(Number(row.median)) === Math.sign(Number(row.actual_return))).length / eligible.length * 100
     : null;
 
+  const predictionMatchPct = (subset) => {
+    const eligible = subset.filter(row => Number(row.median) !== 0 && Number(row.actual_return) !== 0);
+    if (!eligible.length) return null;
+    return Number(mean(eligible.map(row => {
+      const actual = Math.abs(Number(row.actual_return));
+      const miss = Math.abs(Number(row.median) - Number(row.actual_return));
+      return Math.max(0, 100 - (miss / Math.max(actual, 1)) * 100);
+    })).toFixed(1));
+  };
+  const rolling = (size) => summarizeForecastRows(verified.slice(0, size));
+
   return {
     count: verified.length,
+    predictionMatchPct: predictionMatchPct(verified),
+    rolling: {
+      last10: { count: Math.min(10, verified.length), directionRightPct: rolling(10).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 10)) },
+      last25: { count: Math.min(25, verified.length), directionRightPct: rolling(25).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 25)) },
+      last50: { count: Math.min(50, verified.length), directionRightPct: rolling(50).directionalAccuracyPct, predictionMatchPct: predictionMatchPct(verified.slice(0, 50)) },
+    },
     sampleStatus: sampleStatus(verified.length),
     directionalAccuracyPct: directionalAccuracyPct == null ? null : Number(directionalAccuracyPct.toFixed(2)),
     medianAbsoluteError: absErrors.length ? Number(percentile(absErrors, 0.5).toFixed(4)) : null,
