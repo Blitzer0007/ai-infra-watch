@@ -1,4 +1,52 @@
+import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory } from '../../api/_market-data.js';
+
+const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
+const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
+const GITHUB_REPOSITORY = 'Blitzer0007/ai-infra-watch';
+let githubJwksCache = { expiresAt: 0, keys: [] };
+
+function base64UrlJson(segment) {
+  try { return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')); } catch { return null; }
+}
+
+async function githubOidcVerified(req) {
+  const authorization = String(req.headers?.authorization || '');
+  if (!authorization.startsWith('Bearer ')) return false;
+  const token = authorization.slice('Bearer '.length).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const header = base64UrlJson(parts[0]);
+  const claims = base64UrlJson(parts[1]);
+  if (!header || !claims || header.alg !== 'RS256' || !header.kid) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (claims.iss !== GITHUB_OIDC_ISSUER) return false;
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes('ai-infra-watch')) return false;
+  if (claims.repository !== GITHUB_REPOSITORY || claims.ref !== 'refs/heads/main') return false;
+  const workflowRef = String(claims.job_workflow_ref || '');
+  const workflowPath = workflowRef.startsWith(GITHUB_REPOSITORY + '/') ? workflowRef.slice(GITHUB_REPOSITORY.length + 1).split('@')[0] : '';
+  if (workflowPath !== '.github/workflows/forecast-auto-tracker.yml') return false;
+  if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= now) return false;
+  try {
+    if (githubJwksCache.expiresAt <= Date.now()) {
+      const response = await fetch(GITHUB_OIDC_JWKS_URL, { headers: { 'User-Agent': 'ai-infra-watch-github-oidc/1.0' }, signal: AbortSignal.timeout(5000) });
+      if (!response.ok) return false;
+      const body = await response.json();
+      if (!Array.isArray(body?.keys)) return false;
+      githubJwksCache = { expiresAt: Date.now() + 5 * 60 * 1000, keys: body.keys };
+    }
+    const jwk = githubJwksCache.keys.find(key => key.kid === header.kid && key.kty === 'RSA');
+    if (!jwk) return false;
+    const publicKey = createPublicKey({ key: jwk, format: 'jwk' });
+    const verifier = createVerify('RSA-SHA256');
+    verifier.update(parts[0] + '.' + parts[1]);
+    verifier.end();
+    return verifier.verify(publicKey, Buffer.from(parts[2], 'base64url'));
+  } catch { return false; }
+}
+
+
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -557,7 +605,7 @@ export default async function handler(req, res) {
   try {
     const cronSecret = String(process.env.CRON_SECRET || '').trim();
     const authorization = String(req.headers?.authorization || '');
-    const isCronRequest = cronSecret && authorization === 'Bearer ' + cronSecret;
+    const isCronRequest = Boolean(cronSecret && authorization === 'Bearer ' + cronSecret) || await githubOidcVerified(req);
     if (isCronRequest) {
       if (req.method !== 'GET') return send(res, 405, { error: 'Cron verification requires GET.' });
       const verification = await verifyDueForecasts();
