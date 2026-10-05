@@ -1195,10 +1195,10 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
 
   const recommendation = data?.recommendation || {};
   const target = data?.priceTarget || {};
-  const median = Number.isFinite(Number(target.median)) ? Number(target.median) : null;
-  const mean = Number.isFinite(Number(target.mean)) ? Number(target.mean) : null;
-  const low = Number.isFinite(Number(target.low)) ? Number(target.low) : null;
-  const high = Number.isFinite(Number(target.high)) ? Number(target.high) : null;
+  const median = Number.isFinite(Number(target.median)) && Number(target.median) > 0 ? Number(target.median) : null;
+  const mean = Number.isFinite(Number(target.mean)) && Number(target.mean) > 0 ? Number(target.mean) : null;
+  const low = Number.isFinite(Number(target.low)) && Number(target.low) > 0 ? Number(target.low) : null;
+  const high = Number.isFinite(Number(target.high)) && Number(target.high) > 0 ? Number(target.high) : null;
   const consensus = normalizeAnalystConsensus({ recommendation, priceTarget: target, currentPrice, retrievedAt: data?.retrievedAt ?? null, source: data?.source ?? null, analystCount: data?.analystCount ?? null });
   const targetMove = consensus.target.medianUpsidePct;
   const ratingCount = consensus.analystCount;
@@ -1214,7 +1214,7 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
           <div className="text-sm font-black text-white mt-1">Street estimates · separate from Forecast Track</div>
           <div className="text-[9px] font-mono text-white/30 mt-1">External consensus and estimate data; not an AI Infra Watch forecast.</div>
         </div>
-        <div className="text-[8px] font-mono uppercase text-white/25">{loading ? "Loading" : data?.source || "Finnhub"}</div>
+        <div className="text-[8px] font-mono uppercase text-white/25">{loading ? "Loading" : !error && data && ratingCount > 0 && median == null ? "PARTIAL" : data?.source || "Finnhub"}</div>
       </div>
 
       {error && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{error}</div>}
@@ -1230,10 +1230,10 @@ function AnalystExpectationsPanel({ symbol, currentPrice }: { symbol: string; cu
             <Info label="Strong sell" value={String(recommendation.strongSell ?? 0) + (ratingCount ? ' · ' + consensus.percentages.strongSell.toFixed(0) + '%' : '')} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-            <Info label="Median target" value={median == null ? "—" : "$" + median.toFixed(2)} />
-            <Info label="Mean target" value={mean == null ? "—" : "$" + mean.toFixed(2)} />
-            <Info label="Target low" value={low == null ? "—" : "$" + low.toFixed(2)} />
-            <Info label="Target high" value={high == null ? "—" : "$" + high.toFixed(2)} />
+            <Info label="Median target" value={median == null ? "Not available" : "$" + median.toFixed(2)} />
+            <Info label="Mean target" value={mean == null ? "Not available" : "$" + mean.toFixed(2)} />
+            <Info label="Target low" value={low == null ? "Not available" : "$" + low.toFixed(2)} />
+            <Info label="Target high" value={high == null ? "Not available" : "$" + high.toFixed(2)} />
             <Info label="Vs current" value={targetMove == null ? "—" : (targetMove >= 0 ? "+" : "") + targetMove.toFixed(1) + "%"} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
@@ -1290,16 +1290,24 @@ function PortfolioEvidenceCoverage({
   const held = new Set(analyses.map(item => item.symbol));
   const secCount = contracts.filter(item => held.has(String(item?.company || item?.stockSymbol || '').toUpperCase())).length;
   const congressCount = congressTrades.filter(item => held.has(String(item?.stockSymbol || item?.symbol || '').toUpperCase())).length;
+  const analystEvidenceCount = Array.isArray(analystConsensus?.webEvidence?.results)
+    ? analystConsensus.webEvidence.results.length
+    : Number(analystConsensus?.webEvidenceCount || 0);
+  const analystCount = Number(analystConsensus?.analystCount || 0);
+  const medianTarget = Number.isFinite(Number(analystConsensus?.priceTarget?.targetMedian)) && Number(analystConsensus.priceTarget.targetMedian) > 0
+    ? Number(analystConsensus.priceTarget.targetMedian)
+    : Number.isFinite(Number(analystConsensus?.priceTarget?.median)) && Number(analystConsensus.priceTarget.median) > 0
+      ? Number(analystConsensus.priceTarget.median)
+      : null;
   const analystStatus = analystLoading
     ? 'loading'
     : analystError
       ? 'failed'
       : analystConsensus
-        ? ((analystConsensus.consensusAvailable || Number(analystConsensus.webEvidenceCount || 0) > 0) ? 'available' : 'empty')
+        ? ((analystConsensus.consensusAvailable || analystEvidenceCount > 0)
+          ? (analystCount > 0 && medianTarget == null ? 'partial' : 'available')
+          : 'empty')
         : 'missing';
-  const analystEvidenceCount = Array.isArray(analystConsensus?.webEvidence?.results)
-    ? analystConsensus.webEvidence.results.length
-    : Number(analystConsensus?.webEvidenceCount || 0);
   const channels = [
     { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
     { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
@@ -1308,17 +1316,11 @@ function PortfolioEvidenceCoverage({
     { label: 'Congress', value: congressCount, total: null },
     { label: 'News', value: news.length, total: null },
     { label: 'Macro', value: macroRisks.length, total: null },
-    { label: 'Analysts', value: analystStatus === 'available' ? 1 : 0, total: null },
+    { label: 'Analysts', value: analystStatus === 'available' || analystStatus === 'partial' ? 1 : 0, total: null },
   ];
   const available = channels.filter(item => item.value > 0).length;
   const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
   const analystFresh = analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown';
-  const analystCount = Number(analystConsensus?.analystCount || 0);
-  const medianTarget = Number.isFinite(Number(analystConsensus?.priceTarget?.targetMedian))
-    ? Number(analystConsensus.priceTarget.targetMedian)
-    : Number.isFinite(Number(analystConsensus?.priceTarget?.median))
-      ? Number(analystConsensus.priceTarget.median)
-      : null;
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -1341,11 +1343,11 @@ function PortfolioEvidenceCoverage({
           <div className="text-[8px] font-mono uppercase tracking-widest text-violet-300">Analyst evidence · selected holding</div>
           <div className="text-[9px] text-white/30 mt-1">{selectedSymbol || 'No held holding selected'} · external consensus is separate from the AI Infra Watch forecast.</div>
         </div>
-        <div className="text-[8px] font-mono uppercase text-white/35">{analystStatus}</div>
+        <div className="text-[8px] font-mono uppercase text-white/35">{analystStatus === 'partial' ? 'PARTIAL' : analystStatus}</div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
         <Info label="Analyst count" value={analystCount > 0 ? String(analystCount) : '—'} />
-        <Info label="Median target" value={medianTarget != null ? medianTarget.toFixed(2) : '—'} />
+        <Info label="Median target" value={medianTarget != null ? medianTarget.toFixed(2) : 'Not available'} />
         <Info label="Web evidence" value={analystEvidenceCount > 0 ? String(analystEvidenceCount) : '—'} />
         <Info label="Freshness" value={analystFresh} />
         <Info label="Retrieved" value={analystConsensus?.retrievedAt ? new Date(analystConsensus.retrievedAt).toLocaleString() : '—'} />
