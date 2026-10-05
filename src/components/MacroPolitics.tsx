@@ -534,3 +534,73 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Interactive Impact Calculator */}
+        <div className="bg-[#15181E]/30 border border-white/10 p-5 rounded-2xl flex flex-col justify-between space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 border-b border-white/10 pb-3">
+              <ShieldAlert className="w-5 h-5 text-rose-500" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-white">Geopolitical Risk Stress Tool</h3>
+            </div>
+
+            <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[8px] font-mono uppercase tracking-wider text-amber-200/70">SIMULATED SCENARIO · not observed likelihood</div>
+            <p className="text-xs text-white/60 leading-relaxed">
+              Slide variables representing user-defined scenario inputs to evaluate simulated cumulative supply-chain impacts on neocloud networks.
+            </p>
+
+            <div className="space-y-4 pt-2 font-mono text-xs">
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
+                  <span>TSMC Disruption Probability</span>
+                  <span className="text-white font-black">{taiwanProb}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={taiwanProb}
+                  onChange={(e) => setTaiwanProb(parseInt(e.target.value))}
+                  className="w-full accent-rose-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
+                  <span>Northeast Power Grid Shortfall</span>
+                  <span className="text-white font-black">{gridSeverity}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={gridSeverity}
+                  onChange={(e) => setGridSeverity(parseInt(e.target.value))}
+                  className="w-full accent-amber-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
+                  <span>AI Chip Export Prohibitions</span>
+                  <span className="text-white font-black">{embargoBreadth}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={embargoBreadth}
+                  onChange={(e) => setEmbargoBreadth(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+
+
+        </div>
+      </div>
+    </div>
+  );
+}
