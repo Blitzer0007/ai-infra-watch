@@ -468,7 +468,6 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
           taiwan_disruption_probability: taiwanProb,
           power_grid_shortfall: gridSeverity,
           export_control_breadth: embargoBreadth,
-          exposure_validation: validation,
           live_risks: activeRisks.slice(0, 8).map((risk) => ({
             id: risk.id,
             category: risk.category,
