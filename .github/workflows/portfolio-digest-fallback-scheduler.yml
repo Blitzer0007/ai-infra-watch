@@ -73,18 +73,18 @@ jobs:
             --request GET \
             --header "Authorization: Bearer $OIDC_TOKEN" \
             --header "User-Agent: ai-infra-watch-github-actions-fallback/4.0" \
-            --write-out '\\n%{http_code}' \
+            --write-out '\n%{http_code}' \
             --retry 3 --retry-all-errors --retry-delay 3 \
             "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$SLOT")
           STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
           BODY=$(printf '%s' "$RESPONSE" | sed '$d')
           if [ "$STATUS" = "200" ]; then
-            printf '%s\\n' "$BODY"
+            printf '%s\n' "$BODY"
             exit 0
           fi
           echo "::warning::OIDC digest request returned HTTP $STATUS."
           if [ -z "${FALLBACK_TOKEN:-}" ]; then
-            printf '%s\\n' "$BODY"
+            printf '%s\n' "$BODY"
             exit 1
           fi
           echo "Retrying digest with the server scheduler credential."
