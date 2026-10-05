@@ -15,7 +15,7 @@ function percentile(values, p) {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
 }
 
-function sampleStatus(count) {
+export function forecastSampleStatus(count) {
   if (count < 10) return 'insufficient';
   if (count < 25) return 'early';
   if (count < FORECAST_VALIDATION_MINIMUM) return 'developing';
@@ -107,7 +107,7 @@ export function summarizeForecastRows(rows = []) {
       last25: rolling(25),
       last50: rolling(50),
     },
-    sampleStatus: sampleStatus(verified.length),
+    sampleStatus: forecastSampleStatus(verified.length),
     directionalAccuracyPct: base.directionRightPct,
     medianAbsoluteError: base.medianAbsoluteError,
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
@@ -178,6 +178,16 @@ export function buildForecastLearningSummary(rows = []) {
             ? 'More evidence has not improved results in this sample; treat the evidence mix as a learning signal, not proof of causation.'
             : 'Multiple evidence channels have not produced a clear performance difference yet.',
     },
+  };
+}
+
+export function forecastValidationGate(count) {
+  const verifiedCount = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
+  return {
+    minimumRequired: FORECAST_VALIDATION_MINIMUM,
+    verifiedCount,
+    ready: verifiedCount >= FORECAST_VALIDATION_MINIMUM,
+    status: verifiedCount >= FORECAST_VALIDATION_MINIMUM ? '50+ validated forecasts' : 'building validation sample',
   };
 }
 
