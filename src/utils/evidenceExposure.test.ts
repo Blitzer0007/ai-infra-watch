@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { validatePortfolioExposure, type ExposureEvidenceItem } from './evidenceExposure';
 
 const assessed: ExposureEvidenceItem = {
@@ -14,28 +15,28 @@ const notAssessed: ExposureEvidenceItem = {
   sourceCounts: { profile: 0, contracts: 0, news: 0 },
 };
 
-describe('portfolio exposure validation', () => {
-  it('returns VALIDATED when every holding has all three dimensions assessed', () => {
+test('portfolio exposure validation', () => {
+  test('returns VALIDATED when every holding has all three dimensions assessed', () => {
     const result = validatePortfolioExposure([
       { symbol: 'NVDA', taiwan: assessed, power: assessed, export: assessed },
     ]);
-    expect(result.status).toBe('VALIDATED');
-    expect(result.assessedDimensions).toBe(3);
-    expect(result.fullyAssessedHoldings).toBe(1);
-    expect(result.assessedPct).toBe(100);
+    assert.equal(result.status, 'VALIDATED');
+    assert.equal(result.assessedDimensions, 3);
+    assert.equal(result.fullyAssessedHoldings, 1);
+    assert.equal(result.assessedPct, 100);
   });
 
-  it('returns PARTIAL when some dimensions are not assessed', () => {
+  test('returns PARTIAL when some dimensions are not assessed', () => {
     const result = validatePortfolioExposure([
       { symbol: 'CUSTOM', taiwan: assessed, power: notAssessed, export: assessed },
     ]);
-    expect(result.status).toBe('PARTIAL');
-    expect(result.assessedDimensions).toBe(2);
-    expect(result.notAssessedDimensions).toBe(1);
-    expect(result.assessedPct).toBeCloseTo(66.7);
+    assert.equal(result.status, 'PARTIAL');
+    assert.equal(result.assessedDimensions, 2);
+    assert.equal(result.notAssessedDimensions, 1);
+    assert.ok(Math.abs(result.assessedPct - 66.7) < 0.1);
   });
 
-  it('does not call an empty portfolio assessed', () => {
-    expect(validatePortfolioExposure([]).status).toBe('NOT ASSESSED');
+  test('does not call an empty portfolio assessed', () => {
+    assert.equal(validatePortfolioExposure([]).status, 'NOT ASSESSED');
   });
 });
