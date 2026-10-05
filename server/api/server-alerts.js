@@ -1,4 +1,6 @@
 import { createPublicKey, createVerify } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { requireAccess } from '../../api/_access-auth.js';
 import { getTickerValidationContext } from '../utils/forecastValidation.js';
 
@@ -14,6 +16,19 @@ const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
 const GITHUB_REPOSITORY = 'Blitzer0007/ai-infra-watch';
 const GITHUB_WORKFLOW = '.github/workflows/server-smart-alerts.yml';
 let githubJwksCache = { expiresAt: 0, keys: [] };
+
+function loadDashboardUniverse() {
+  try {
+    const payload = JSON.parse(readFileSync(join(process.cwd(), 'data', 'stock_watchlist.json'), 'utf8'));
+    return Array.isArray(payload?.watchlist)
+      ? payload.watchlist.map(item => String(item?.symbol || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+const DASHBOARD_UNIVERSE = loadDashboardUniverse();
 
 function base64UrlJson(segment) {
   try { return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')); } catch { return null; }
@@ -240,7 +255,11 @@ async function evaluate() {
   const portfolioSymbols = await getPortfolioSymbols();
   const normalizedAlerts = (Array.isArray(config.alerts) ? config.alerts : []).map(normalizeAlert).filter(Boolean);
   const alertSymbols = normalizedAlerts.map(alert => alert.symbol);
+  // Keep server-side Smart Move monitoring aligned with the dashboard universe,
+  // not just the user's five-item alert watchlist/portfolio. This ensures a move
+  // visible in the dashboard can still alert when the browser is closed.
   const watchedSymbols = [...new Set([
+    ...DASHBOARD_UNIVERSE,
     ...(Array.isArray(config.watchlist) ? config.watchlist : []),
     ...alertSymbols,
     ...portfolioSymbols,
