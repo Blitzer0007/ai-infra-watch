@@ -220,24 +220,43 @@ function benchmarkOutcomeLabel(excess, benchmark) {
 }
 
 async function fetchDecisionCenter() {
-  const secret = String(process.env.CRON_SECRET || process.env.AIW_ACCESS_TOKEN || '').trim();
-  if (!secret) return { decision: null, error: 'No server-side access token is configured' };
-  try {
-    const response = await fetch('https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center', {
-      headers: {
-        Authorization: 'Bearer ' + secret,
-        'User-Agent': 'ai-infra-watch-daily-digest/3.0',
-      },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!response.ok) return { decision: null, error: 'Decision center HTTP ' + response.status };
-    const body = await response.json().catch(() => null);
-    return body?.ok
-      ? { decision: body, error: null }
-      : { decision: null, error: 'Decision center returned an invalid response' };
-  } catch (error) {
-    return { decision: null, error: error instanceof Error ? error.message : 'Decision center request failed' };
+  const secrets = [
+    process.env.CRON_SECRET,
+    process.env.AIW_ACCESS_TOKEN,
+    process.env.AGENT_API_TOKEN,
+  ].map(value => String(value || '').trim()).filter(Boolean);
+
+  if (!secrets.length) return { decision: null, error: 'No server-side access token is configured' };
+
+  let lastError = 'Decision center request failed';
+  for (const secret of secrets) {
+    try {
+      const response = await fetch('https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center', {
+        headers: {
+          Authorization: 'Bearer ' + secret,
+          'User-Agent': 'ai-infra-watch-daily-digest/4.0',
+        },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (response.ok) {
+        const body = await response.json().catch(() => null);
+        if (body?.ok) return { decision: body, error: null };
+        lastError = 'Decision center returned an invalid response';
+        continue;
+      }
+
+      lastError = 'Decision center HTTP ' + response.status;
+      // Try the next configured server-side credential. This prevents a stale
+      // credential in one slot from breaking the decision layer when another
+      // configured credential is valid.
+      if (response.status === 401 || response.status === 403) continue;
+      return { decision: null, error: lastError };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Decision center request failed';
+    }
   }
+
+  return { decision: null, error: lastError };
 }
 
 export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionError = null) {
