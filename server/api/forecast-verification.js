@@ -223,12 +223,24 @@ function aggregateForecastSubset(subset) {
   };
 }
 
+function hasCreationEvidence(row) {
+  const snapshot = row?.evidence_snapshot;
+  return Boolean(snapshot && typeof snapshot === 'object' && snapshot.capturedAt && snapshot.source === 'forward_outlook');
+}
+
 function forecastAnalytics(rows) {
   const verified = rows.filter(row =>
     String(row.status) === 'verified' &&
     Number.isFinite(Number(row.actual_return)) &&
-    Number.isFinite(Number(row.median))
+    Number.isFinite(Number(row.median)) &&
+    hasCreationEvidence(row)
   );
+  const legacyVerifiedCount = rows.filter(row =>
+    String(row.status) === 'verified' &&
+    Number.isFinite(Number(row.actual_return)) &&
+    Number.isFinite(Number(row.median)) &&
+    !hasCreationEvidence(row)
+  ).length;
   const aggregate = aggregateForecastSubset;
   const overall = aggregate(verified);
   const grouped=(keyFn, decorate)=>{
@@ -269,6 +281,7 @@ function forecastAnalytics(rows) {
 
   return {
     sampleSize:verified.length,
+    legacyVerifiedCount,
     sampleStatus: overall.sampleStatus,
     evidenceCoverage,
     directionalAccuracyPct: overall.directionalAccuracyPct,

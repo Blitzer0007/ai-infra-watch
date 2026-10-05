@@ -195,6 +195,7 @@ def test_analyst_expectations_panel(page):
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
     page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
+    page.get_by_text("Holdings", exact=True).click()
     page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
     assert "EXTERNAL ANALYST EXPECTATIONS" in page.get_by_test_id("analyst-expectations").inner_text().upper()
 
@@ -249,9 +250,9 @@ def test_money_rotation_semantic_colors_mount(page):
 def test_exit_profit_scenarios_identify_selected_ticker(page):
     mock_local_apis(page)
     goto_app(page)
-    page.get_by_test_id("nav-portfolio").click()
+    page.goto("/portfolio?portfolio_tab=holdings", wait_until="domcontentloaded")
     portfolio = page.get_by_test_id("portfolio-intelligence")
-    portfolio.wait_for(state="attached", timeout=30000)
+    portfolio.wait_for(state="visible", timeout=30000)
     page.get_by_text("Exit / Profit Scenarios", exact=True).wait_for(state="visible", timeout=30000)
     section = page.get_by_text("Exit / Profit Scenarios", exact=True).locator("..")
     assert "NVDA" in section.inner_text()

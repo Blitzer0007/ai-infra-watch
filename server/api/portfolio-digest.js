@@ -209,6 +209,16 @@ function signedPct(value) {
   return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
 }
 
+function benchmarkOutcomeLabel(excess, benchmark) {
+  if (!Number.isFinite(excess)) return 'comparison unavailable';
+  const abs = signedMoney(Math.abs(excess)).replace('+', '');
+  return excess > 0
+    ? 'Outperformed ' + benchmark + ' by ' + abs
+    : excess < 0
+      ? 'Underperformed ' + benchmark + ' by ' + abs
+      : 'Matched ' + benchmark;
+}
+
 async function fetchDecisionCenter() {
   const secret = String(process.env.CRON_SECRET || process.env.AIW_ACCESS_TOKEN || '').trim();
   if (!secret) return { decision: null, error: 'No server-side access token is configured' };
@@ -255,7 +265,11 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
   const actions = Array.isArray(decision?.actionItems) ? decision.actionItems.slice(0, 3) : [];
   const actCount = actions.filter(item => item.severity === 'ACT').length;
   const watchCount = actions.filter(item => item.severity === 'WATCH').length;
+  const evaluatedRules = Number(decision?.rules?.total || 0);
+  const holdingsCount = Number(decision?.portfolio?.holdings || 0);
+  const noRuleCount = Number(decision?.rules?.noRule || 0);
   lines.push('ACTION NEEDED · ' + actCount + ' ACT · ' + watchCount + ' WATCH');
+  lines.push('SELF-CHECK · checked ' + evaluatedRules + ' rules across ' + holdingsCount + ' holdings' + (noRuleCount ? ' · ' + noRuleCount + ' without active rules' : ' · all holdings have active rules'));
   if (actions.length) {
     actions.forEach((item, index) => {
       const tag = item.severity === 'ACT' ? 'ACT' : 'WATCH';
@@ -293,10 +307,10 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
     'Cash-flow P&L: ' + signedMoney(Number(portfolio.cashFlowPnl || 0)),
     'Same cash in SPY: ' + (spy?.pnl == null ? 'unavailable' : signedMoney(Number(spy.pnl))) +
       (spy?.coverage?.status === 'partial' ? ' · partial coverage' : '') +
-      (excessSpy == null ? '' : ' · Edge ' + signedMoney(excessSpy)),
+      (excessSpy == null ? '' : ' · ' + benchmarkOutcomeLabel(excessSpy, 'SPY')),
     'Same cash in SOXX: ' + (soxx?.pnl == null ? 'unavailable' : signedMoney(Number(soxx.pnl))) +
       (soxx?.coverage?.status === 'partial' ? ' · partial coverage' : '') +
-      (excessSoxx == null ? '' : ' · Edge ' + signedMoney(excessSoxx)),
+      (excessSoxx == null ? '' : ' · ' + benchmarkOutcomeLabel(excessSoxx, 'SOXX')),
   );
 
   const riskScenarios = Array.isArray(portfolio.riskScenarios)
@@ -314,6 +328,7 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
   lines.push(
     '',
     'RISK',
+    'Scenario model: exposure × beta × leverage × configured shock · illustrative, not a prediction.',
     'Top 3 holdings: ' + (portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '% of value'),
     'Scenario stress total: ' + signedMoney(scenarioTotal) + ' across ' + riskScenarios.length + ' risk groups',
     ...visibleRiskScenarios.map(item =>

@@ -58,15 +58,14 @@ export default function DecisionJournalPanel(){
       setWeekly(body?.weekly||null);
       setHoldings(p);
       setTransactions([]);
+      if (p[0] && !holdingId) {
+        setHoldingId(p[0].id);
+        setThesis(p[0].decisionThesis || p[0].notes || '');
+        setRuleText(ruleFor(p[0]));
+        setBenchmark(p[0].riskGroup?.toLowerCase() === 'semiconductor' ? 'SOXX' : 'SPY');
+      }
       setLoading(false);
       fetchPortfolioTransactions().then(setTransactions).catch(() => setTransactions([]));
-      return;
-      if(!holdingId&&p[0]){
-        setHoldingId(p[0].id);
-        setThesis(p[0].decisionThesis||p[0].notes||'');
-        setRuleText(ruleFor(p[0]));
-        setBenchmark(p[0].riskGroup?.toLowerCase()==='semiconductor'?'SOXX':'SPY');
-      }
     }catch(e){setError(e instanceof Error?e.message:'Decision journal unavailable');}
     finally{setLoading(false);}
   };

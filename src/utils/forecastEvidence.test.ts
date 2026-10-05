@@ -58,3 +58,25 @@ test('limits event evidence to a bounded creation-time snapshot', () => {
   assert.equal(snapshot.events.news.length, 8);
   assert.equal(snapshot.counts.news, 8);
 });
+
+
+test('treats a non-positive analyst target as unavailable in the snapshot', () => {
+  const zero = createForecastEvidenceSnapshot({
+    capturedAt: '2026-10-03T10:00:00.000Z',
+    ticker: 'NVDA',
+    analyst: { status: 'available', analystCount: 69, medianTarget: 0 },
+  });
+  const negative = createForecastEvidenceSnapshot({
+    capturedAt: '2026-10-03T10:00:00.000Z',
+    ticker: 'NVDA',
+    analyst: { status: 'available', analystCount: 69, medianTarget: -10 },
+  });
+  const positive = createForecastEvidenceSnapshot({
+    capturedAt: '2026-10-03T10:00:00.000Z',
+    ticker: 'NVDA',
+    analyst: { status: 'available', analystCount: 69, medianTarget: 250 },
+  });
+  assert.equal(zero.analystConsensus.medianTarget, null);
+  assert.equal(negative.analystConsensus.medianTarget, null);
+  assert.equal(positive.analystConsensus.medianTarget, 250);
+});

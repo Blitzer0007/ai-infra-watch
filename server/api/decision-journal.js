@@ -194,8 +194,12 @@ export default async function handler(req, res) {
         rule_text: effectiveRule,
         rule_snapshot: ruleSnapshot,
         decision_price: Number(latest.price),
-        benchmark_symbol: 'SPY',
+        benchmark_symbol: benchmarkSymbol,
         benchmark_entry_price: Number(benchmarkEntry.price),
+        action_taken: ['none', 'BUY', 'SELL', 'HOLD', 'OTHER'].includes(String(body.actionTaken || '').toUpperCase())
+          ? String(body.actionTaken || 'none').toUpperCase()
+          : 'none',
+        transaction_id: String(body.transactionId || '').trim() || null,
         forecast_snapshot_id: forecast?.id || null,
         forecast_median: forecast?.median == null ? null : Number(forecast.median),
         forecast_p25: forecast?.p25 == null ? null : Number(forecast.p25),

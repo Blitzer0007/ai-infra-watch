@@ -48,6 +48,11 @@ const finite = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const positiveFinite = (value: unknown): number | null => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 export function normalizeAnalystConsensus(input: AnalystConsensusInput): AnalystConsensus {
   const ratings = RATING_KEYS.reduce((result, key) => {
     result[key] = Math.max(0, Math.round(finite(input.recommendation?.[key]) ?? 0));
@@ -63,10 +68,10 @@ export function normalizeAnalystConsensus(input: AnalystConsensusInput): Analyst
     return result;
   }, {} as Record<keyof AnalystRecommendationCounts, number>);
 
-  const low = finite(input.priceTarget?.low);
-  const mean = finite(input.priceTarget?.mean);
-  const median = finite(input.priceTarget?.median);
-  const high = finite(input.priceTarget?.high);
+  const low = positiveFinite(input.priceTarget?.low);
+  const mean = positiveFinite(input.priceTarget?.mean);
+  const median = positiveFinite(input.priceTarget?.median);
+  const high = positiveFinite(input.priceTarget?.high);
   const current = finite(input.currentPrice);
 
   return {

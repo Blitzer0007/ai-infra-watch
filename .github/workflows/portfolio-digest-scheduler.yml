@@ -3,9 +3,13 @@ run-name: Portfolio Digest • ${{ github.event.schedule || 'manual/push' }}
 
 on:
   schedule:
-    # Five minutes after the requested hours.
+    # Five minutes after each requested local digest time.
+    # Separate entries let github.event.schedule identify the intended slot.
     # UTC → 06:05, 12:05, 18:05 and 22:05 Asia/Kolkata.
-    - cron: '35 0,6,12,16 * * *'
+    - cron: '35 0 * * *'
+    - cron: '35 6 * * *'
+    - cron: '35 12 * * *'
+    - cron: '35 16 * * *'
   push:
     branches:
       - main
@@ -52,7 +56,23 @@ jobs:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
-          SLOT=$(TZ=Asia/Kolkata date '+%Y-%m-%d-%H')
+          SCHEDULE="${{ github.event.schedule || '' }}"
+          case "$SCHEDULE" in
+            *" 0 "*) EXPECTED_HOUR=6 ;;
+            *" 6 "*) EXPECTED_HOUR=12 ;;
+            *" 12 "*) EXPECTED_HOUR=18 ;;
+            *" 16 "*) EXPECTED_HOUR=22 ;;
+            *) EXPECTED_HOUR=$(TZ=Asia/Kolkata date '+%H') ;;
+          esac
+          NOW_DATE=$(TZ=Asia/Kolkata date '+%Y-%m-%d')
+          NOW_HOUR=$(TZ=Asia/Kolkata date '+%H')
+          if (( 10#$NOW_HOUR < EXPECTED_HOUR )); then
+            SLOT_DATE=$(TZ=Asia/Kolkata date -d 'yesterday' '+%Y-%m-%d')
+          else
+            SLOT_DATE="$NOW_DATE"
+          fi
+          SLOT="$SLOT_DATE-$(printf '%02d' "$EXPECTED_HOUR")"
+          echo "Intended digest slot: $SLOT (actual execution: $(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M:%S %Z'))"
           curl --fail-with-body --silent --show-error \
             --request GET \
             --header "Authorization: Bearer $OIDC_TOKEN" \
