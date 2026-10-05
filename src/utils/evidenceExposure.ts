@@ -215,4 +215,107 @@ export function validatePortfolioExposure(
   };
 }
 
+
+export type MacroRiskInput = {
+  title?: string | null;
+  category?: string | null;
+  impactRating?: string | null;
+};
+
+export type ExposureWeightedMacroLoad = {
+  assessedLoad: number;
+  worstCaseLoad: number;
+  assessedCoveragePct: number;
+  assessedExposureByScenario: Record<MacroScenario, number>;
+  worstCaseExposureByScenario: Record<MacroScenario, number>;
+  scenarioSeverity: Record<MacroScenario, number>;
+};
+
+const SCENARIO_MATCHERS: Record<MacroScenario, RegExp> = {
+  taiwan: /taiwan|tsmc|advanced.?node|foundry/i,
+  power: /power|grid|data.?center/i,
+  export: /export|chip.?control|china|sanction|embargo/i,
+};
+
+function riskSeverity(risk: MacroRiskInput): number {
+  const rating = String(risk?.impactRating || '').toLowerCase();
+  return rating === 'high' ? 12 : rating === 'medium' ? 6 : 0;
+}
+
+function scenarioSeverityFromRisks(scenario: MacroScenario, risks: MacroRiskInput[]) {
+  return Math.min(12, Math.max(0, risks
+    .filter(risk => SCENARIO_MATCHERS[scenario].test(String(risk?.title || '') + ' ' + String(risk?.category || '')))
+    .reduce((max, risk) => Math.max(max, riskSeverity(risk)), 0)));
+}
+
+/**
+ * Converts exposure evidence into a capped 30-point macro load.
+ * Assessed load uses only validated dimensions. Worst case assumes any
+ * unassessed dimension could be Direct exposure, making the missing-data
+ * effect visible instead of silently lowering the headline risk.
+ */
+export function calculateExposureWeightedMacroLoad(
+  rows: Array<{
+    symbol: string;
+    value: number;
+    taiwan: ExposureEvidenceItem;
+    power: ExposureEvidenceItem;
+    export: ExposureEvidenceItem;
+  }>,
+  risks: MacroRiskInput[] = [],
+): ExposureWeightedMacroLoad {
+  const scenarios: MacroScenario[] = ['taiwan', 'power', 'export'];
+  const totalValue = rows.reduce((sum, row) => sum + Math.max(0, Number(row.value) || 0), 0);
+  const severity = Object.fromEntries(
+    scenarios.map(scenario => [scenario, scenarioSeverityFromRisks(scenario, risks)]),
+  ) as Record<MacroScenario, number>;
+
+  const assessedExposureByScenario = {} as Record<MacroScenario, number>;
+  const worstCaseExposureByScenario = {} as Record<MacroScenario, number>;
+
+  scenarios.forEach(scenario => {
+    if (!totalValue) {
+      assessedExposureByScenario[scenario] = 0;
+      worstCaseExposureByScenario[scenario] = 0;
+      return;
+    }
+    let assessedWeighted = 0;
+    let worstWeighted = 0;
+    rows.forEach(row => {
+      const weight = Math.max(0, Number(row.value) || 0) / totalValue;
+      const evidence = row[scenario];
+      const assessedLevel = evidence?.assessment === 'assessed' ? LEVEL_SCORE[evidence.level] : 0;
+      const worstLevel = evidence?.assessment === 'assessed' ? LEVEL_SCORE[evidence.level] : 1;
+      assessedWeighted += weight * assessedLevel;
+      worstWeighted += weight * worstLevel;
+    });
+    assessedExposureByScenario[scenario] = assessedWeighted;
+    worstCaseExposureByScenario[scenario] = worstWeighted;
+  });
+
+  const assessedLoad = Math.min(
+    30,
+    scenarios.reduce((sum, scenario) => sum + severity[scenario] * assessedExposureByScenario[scenario], 0),
+  );
+  const worstCaseLoad = Math.min(
+    30,
+    scenarios.reduce((sum, scenario) => sum + severity[scenario] * worstCaseExposureByScenario[scenario], 0),
+  );
+
+  const dimensions = rows.length * scenarios.length;
+  const assessedDimensions = rows.reduce(
+    (sum, row) => sum + scenarios.filter(scenario => row[scenario]?.assessment === 'assessed').length,
+    0,
+  );
+
+  return {
+    assessedLoad: Number(assessedLoad.toFixed(1)),
+    worstCaseLoad: Number(worstCaseLoad.toFixed(1)),
+    assessedCoveragePct: dimensions ? Number((assessedDimensions / dimensions * 100).toFixed(1)) : 0,
+    assessedExposureByScenario,
+    worstCaseExposureByScenario,
+    scenarioSeverity: severity,
+  };
+}
+
 export { BASELINE };
