@@ -65,6 +65,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
   source: 'live';
   provider?: string;
   retrievedAt?: string;
+  marketTime?: string | null;
+  asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
 }> {
@@ -85,6 +87,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       source: 'live',
       provider: data.provider,
       retrievedAt: data.retrievedAt,
+      marketTime: data.marketTime,
+      asOf: data.asOf,
       stale: data.stale === true,
       cached: data.cached === true
     };
@@ -109,6 +113,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       source: 'live',
       provider: 'Finnhub',
       retrievedAt: new Date().toISOString(),
+      marketTime: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
+      asOf: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
       stale: false,
       cached: false
     };
@@ -130,6 +136,8 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
         source: 'live',
         provider: data.provider,
         retrievedAt: data.retrievedAt,
+        marketTime: data.marketTime,
+        asOf: data.asOf,
         stale: data.stale === true,
         cached: data.cached === true
       };

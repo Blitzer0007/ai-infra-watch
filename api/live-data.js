@@ -494,7 +494,17 @@ export default async function handler(req, res) {
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  evidenceAvailability.market = { ...evidenceAvailability.market, retrievedAt: Object.values(stockPrices).reduce((latest, item) => item?.retrievedAt && item.retrievedAt > latest ? item.retrievedAt : latest, ''), refreshIntervalSeconds: 60 };
+  const latestMarketQuote = Object.values(stockPrices).reduce((latest, item) => {
+    if (!latest || String(item?.marketTime || item?.retrievedAt || item?.asOf || '') > String(latest.marketTime || latest.retrievedAt || latest.asOf || '')) return item;
+    return latest;
+  }, null);
+  evidenceAvailability.market = {
+    ...evidenceAvailability.market,
+    retrievedAt: latestMarketQuote?.retrievedAt || latestMarketQuote?.asOf || null,
+    marketTime: latestMarketQuote?.marketTime || latestMarketQuote?.asOf || null,
+    asOf: latestMarketQuote?.asOf || latestMarketQuote?.marketTime || null,
+    refreshIntervalSeconds: 60,
+  };
 
   const data = {
     build: {

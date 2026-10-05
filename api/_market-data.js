@@ -61,7 +61,8 @@ async function yahooQuote(symbol) {
     changePct: Number.isFinite(previous) && previous !== 0 ? ((price / previous) - 1) * 100 : 0,
     source: 'Yahoo Finance',
     provider: 'yahoo',
-    asOf: new Date().toISOString(),
+    marketTime: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : null,
+    asOf: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : new Date().toISOString(),
     stale: false
   };
 }

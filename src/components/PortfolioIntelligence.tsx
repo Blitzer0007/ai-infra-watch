@@ -19,11 +19,14 @@ import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 import ForecastValidationPanel from './ForecastValidationPanel';
+import FreshnessBadge from './FreshnessBadge';
 type Price = {
   price: number;
   changePct: number;
   provider?: string;
   retrievedAt?: string;
+  marketTime?: string | null;
+  asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
 };
@@ -576,7 +579,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="text-xs text-white/45 mt-1">Broker snapshot · live market feed · peers · rotation · catalysts · event study</div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
-          <span className="px-2 py-1 rounded-full border border-white/10">DATA {stressFreshCount}/{analyses.length} LIVE</span>
+          <span className="px-2 py-1 rounded-full border border-white/10">DATA {stressFreshCount}/{analyses.length} CURRENT</span>
+          {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
           <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">ADD REVIEWS {addReviews}</span>
           <span className="px-2 py-1 rounded-full border border-white/10">RISK REVIEWS {riskReviews}</span>

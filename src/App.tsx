@@ -10,6 +10,7 @@ import { PORTFOLIO_POSITIONS } from './utils/portfolioPositions';
 import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser, notifyTelegram } from './utils/alertEngine';
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
 import { authFetch, getAccessToken } from './utils/apiAuth';
+import FreshnessBadge from './components/FreshnessBadge';
 
 const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
@@ -42,6 +43,8 @@ type LivePrice = {
   changePct: number;
   provider?: string;
   retrievedAt?: string;
+  marketTime?: string | null;
+  asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
 };
@@ -167,6 +170,8 @@ export default function App() {
               changePct: res.changePct,
               provider: res.provider,
               retrievedAt: res.retrievedAt,
+              marketTime: res.marketTime,
+              asOf: res.asOf,
               stale: res.stale,
               cached: res.cached
             };
@@ -255,6 +260,8 @@ export default function App() {
               changePct: res.changePct,
               provider: res.provider,
               retrievedAt: res.retrievedAt,
+              marketTime: res.marketTime,
+              asOf: res.asOf,
               stale: res.stale,
               cached: res.cached
             };
@@ -351,6 +358,7 @@ export default function App() {
                 <span className={isUp ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
                   {p ? `${isUp ? '▲' : '▼'} ${formatPct(p.changePct)}` : '—'}
                 </span>
+                {p && <FreshnessBadge marketTime={p.marketTime} retrievedAt={p.retrievedAt} asOf={p.asOf} stale={p.stale} showAge={false} />}
               </span>
             );
           })}
@@ -367,6 +375,7 @@ export default function App() {
                 <span className={isUp ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
                   {p ? `${isUp ? '▲' : '▼'} ${formatPct(p.changePct)}` : '—'}
                 </span>
+                {p && <FreshnessBadge marketTime={p.marketTime} retrievedAt={p.retrievedAt} asOf={p.asOf} stale={p.stale} showAge={false} />}
               </span>
             );
           })}
@@ -521,6 +530,16 @@ export default function App() {
                   SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
                 </span>
               )}
+              {(() => {
+                const quoteValues = Object.values(tickerPrices) as LivePrice[];
+                const fresh = quoteValues.filter(item => !item.stale).length;
+                const stale = quoteValues.filter(item => item.stale).length;
+                return quoteValues.length ? (
+                  <span className="text-[8px] font-mono uppercase tracking-wider text-white/35">
+                    QUOTE FRESHNESS · {fresh} current · {stale} last close
+                  </span>
+                ) : null;
+              })()}
               <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
                 AUTO: FEED 5M · QUOTES 60S{lastQuoteRefresh ? ' · LAST QUOTE ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
               </span>

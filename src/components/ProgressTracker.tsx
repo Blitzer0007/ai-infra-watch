@@ -5,6 +5,7 @@ import { Calendar, CheckCircle, Clock, AlertCircle, Award, Search, Loader2, X } 
 import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
+import FreshnessBadge from './FreshnessBadge';
 
 function matchesDate(milestoneDate: string, historyDate: string): boolean {
   const m = milestoneDate.trim().toLowerCase();
@@ -27,7 +28,7 @@ function matchesDate(milestoneDate: string, historyDate: string): boolean {
 }
 
 interface ProgressTrackerProps {
-  livePrices?: Record<string, { price: number; changePct: number }>;
+  livePrices?: Record<string, { price: number; changePct: number; marketTime?: string | null; retrievedAt?: string; asOf?: string | null; stale?: boolean }>;
 }
 
 const TRACKER_SYMBOLS_STORAGE_KEY = 'aiw-progress-tracker-symbols-v1';
@@ -534,9 +535,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           )}
 
           <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
-            <span className="text-[10px] font-mono text-white/60 flex items-center space-x-1.5">
-              <Award className="w-4 h-4 text-emerald-400" />
-              <span>Current price: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
+            <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
+              <span className="inline-flex items-center space-x-1.5">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>Current price: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
             </span>
           </div>
         </div>

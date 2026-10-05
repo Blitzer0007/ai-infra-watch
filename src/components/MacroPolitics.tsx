@@ -4,7 +4,7 @@ import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-
 import { MacroRisk } from '../types';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
-import { derivePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
+import { derivePortfolioExposure, validatePortfolioExposure, type ExposureLevel } from '../utils/evidenceExposure';
 import JevDecisionPanel from './JevDecisionPanel';
 import AutopilotSignalsPanel from './AutopilotSignalsPanel';
 
@@ -21,6 +21,8 @@ function exposureClass(level: ExposureLevel) {
   if (level === 'Secondary') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
   return 'bg-white/5 text-white/40 border-white/10';
 }
+
+type MacroScenarioKey = 'taiwan' | 'power' | 'export';
 
 function exposureFactor(level: ExposureLevel) {
   if (level === 'Direct') return 1;
@@ -46,7 +48,13 @@ function PortfolioScenarioSensitivity({
   positions?: PortfolioPosition[];
 }) {
   const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
+  const validation = validatePortfolioExposure(derivedExposure);
   const totalInvested = positions.reduce((sum, position) => sum + position.investedValue, 0);
+  const scenarioInputs = {
+    taiwan: { value: taiwanProb, weight: 0.5 },
+    power: { value: gridSeverity, weight: 0.25 },
+    export: { value: embargoBreadth, weight: 0.25 },
+  } as const;
   const portfolioRows = derivedExposure.map((exposure) => {
     const position = positions.find((item) => item.symbol === exposure.symbol);
     const live = livePrices[exposure.symbol];
@@ -55,9 +63,12 @@ function PortfolioScenarioSensitivity({
       : position?.investedValue ?? 0;
     const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
     const sensitivity = Math.round(
-      taiwanProb * 0.5 * exposureFactor(exposure.taiwan.level) +
-      gridSeverity * 0.25 * exposureFactor(exposure.power.level) +
-      embargoBreadth * 0.25 * exposureFactor(exposure.export.level)
+      (Object.entries(scenarioInputs) as Array<[MacroScenarioKey, { value: number; weight: number }]>).reduce((sum, [scenario, input]) => {
+        const dimension = exposure[scenario];
+        return sum + (dimension?.assessment === 'assessed'
+          ? input.value * input.weight * exposureFactor(dimension.level)
+          : 0);
+      }, 0)
     );
     return {
       ...exposure,
@@ -83,9 +94,13 @@ function PortfolioScenarioSensitivity({
             Maps your current scenario inputs onto the exposure matrix and portfolio weights. This is a sensitivity index, not an expected price move or return forecast.
           </p>
         </div>
-        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3">
+        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3 min-w-[220px]">
           <div className="text-[8px] font-mono uppercase tracking-widest text-cyan-300/60">Portfolio scenario sensitivity</div>
           <div className="text-2xl font-black font-mono text-cyan-300 mt-1">{Math.round(portfolioSensitivity)} / 100</div>
+          <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/35">
+            Exposure validation: <span className={validation.status === 'VALIDATED' ? 'text-emerald-300' : validation.status === 'PARTIAL' ? 'text-amber-300' : 'text-white/45'}>{validation.status}</span>
+            <span className="text-white/25"> · {validation.assessedDimensions}/{validation.dimensions || 0} dimensions assessed</span>
+          </div>
         </div>
       </div>
 

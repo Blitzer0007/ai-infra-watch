@@ -228,6 +228,13 @@ function hasCreationEvidence(row) {
   return Boolean(snapshot && typeof snapshot === 'object' && snapshot.capturedAt && snapshot.source === 'forward_outlook');
 }
 
+function evidenceState(row) {
+  if (hasCreationEvidence(row)) return 'CAPTURED';
+  const snapshot = row?.evidence_snapshot;
+  if (snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length > 0) return 'INVALID_SNAPSHOT';
+  return 'LEGACY_NO_SNAPSHOT';
+}
+
 function forecastAnalytics(rows) {
   const verified = rows.filter(row =>
     String(row.status) === 'verified' &&
@@ -279,9 +286,23 @@ function forecastAnalytics(rows) {
     }).length,
   };
 
+  const stateRows = rows.reduce((counts, row) => {
+    const state = evidenceState(row);
+    counts[state] = (counts[state] || 0) + 1;
+    return counts;
+  }, { CAPTURED: 0, LEGACY_NO_SNAPSHOT: 0, INVALID_SNAPSHOT: 0 });
+
+  const verifiedStateRows = verified.reduce((counts, row) => {
+    const state = evidenceState(row);
+    counts[state] = (counts[state] || 0) + 1;
+    return counts;
+  }, { CAPTURED: 0, LEGACY_NO_SNAPSHOT: 0, INVALID_SNAPSHOT: 0 });
+
   return {
     sampleSize:verified.length,
     legacyVerifiedCount,
+    evidenceStateCounts: stateRows,
+    verifiedEvidenceStateCounts: verifiedStateRows,
     sampleStatus: overall.sampleStatus,
     evidenceCoverage,
     directionalAccuracyPct: overall.directionalAccuracyPct,
@@ -327,6 +348,7 @@ function normalize(row) {
     modelVersion: row.model_version || 'analogue-v1',
     createdSource: row.created_source || 'forward_outlook',
     evidenceSnapshot: row.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : undefined,
+    evidenceState: evidenceState(row),
     status: row.status,
     verifiedAt: row.verified_at || undefined,
     actualDate: row.actual_date || undefined,
