@@ -75,6 +75,32 @@ export default function BuySellWatchlist() {
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
+    const syncServerConfig = async () => {
+      try {
+        const response = await authFetch('/api/alert-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            watchlist: config.watchlist,
+            alerts: config.alerts,
+            largeMoveEnabled: config.largeMoveEnabled,
+            largeMovePct: config.largeMovePct,
+            catalystAlerts: config.catalystAlerts,
+          }),
+          cache: 'no-store',
+        });
+        if (!response.ok && !cancelled) console.warn('Server smart alert configuration sync failed:', await response.text().catch(() => ''));
+      } catch (error) {
+        if (!cancelled) console.warn('Server smart alert configuration sync failed:', error);
+      }
+    };
+    void syncServerConfig();
+    return () => { cancelled = true; };
+  }, [config]);
+
+  useEffect(() => {
+    if (!config) return;
+    let cancelled = false;
     let timer: number | undefined;
 
     const refreshQuotes = async () => {
