@@ -1461,9 +1461,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 <div><span className="text-white/30">Invalid snapshot</span><span className="ml-2 text-rose-200/80">{forecastAnalytics?.verifiedEvidenceStateCounts?.INVALID_SNAPSHOT ?? 0}</span></div>
                 <div><span className="text-white/30">Multi-channel</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.multiChannel}</span></div>
               </div>
-              <div className="mt-2 text-[8px] text-white/25">
-                Only CAPTURED forecasts enter calibration. Legacy or invalid creation evidence remains visible for auditability but is excluded from quality statistics.
-              </div>
+              <div className="mt-2 text-[8px] text-white/25">Only CAPTURED forecasts enter calibration. Legacy or invalid creation evidence remains visible for auditability but is excluded from quality statistics.</div>
               <div className="mt-2 text-[8px] text-white/25">Descriptive coverage of evidence captured when forecasts were created; it does not measure forecast quality or imply that any evidence caused an outcome.</div>
             </div>
           )}
@@ -1497,7 +1495,131 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4"> + formatPrice(currentPrice) : '—'}</div>
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+            <div>
+              <div className="flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Historical backtest</span></div>
+              <p className="text-[10px] text-white/40 mt-1">Replay the same analogue method on past dates without using information from the future.</p>
+            </div>
+            <button onClick={runBacktest} disabled={backtestBusy || loading || history.length < 220 + horizon} className="px-3 py-2 rounded border border-emerald-300/20 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{backtestBusy ? 'BACKTESTING…' : 'RUN BACKTEST'}</button>
+          </div>
+          {backtestMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{backtestMessage}</div>}
+          {backtest ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-violet-300/20 bg-violet-300/5 p-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-violet-200/80">JEV validation analyst</div>
+                    <p className="text-[10px] text-white/45 mt-1">JEV interprets the measured backtest; it cannot change the numerical results. It identifies evidence gaps, caveats, and the next validation experiment.</p>
+                  </div>
+                  <button onClick={runJevBacktestValidation} disabled={jevValidationBusy} className="px-3 py-2 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{jevValidationBusy ? 'JEV ANALYZING…' : 'RUN JEV VALIDATION'}</button>
+                </div>
+                {jevValidationError && <div className="mt-2 text-[10px] font-mono text-amber-200 border border-amber-300/10 rounded-lg p-2">{jevValidationError}</div>}
+                {jevValidation && <div className="mt-3 space-y-2">
+                  <div className="text-xs text-white/70 leading-relaxed">{jevValidation.summary}</div>
+                  <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
+                    {jevValidation.choice && <span className="px-2 py-1 rounded border border-violet-300/20 text-violet-200">JEV route: {jevValidation.choice}</span>}
+                    {jevValidation.evidenceGate && <span className="px-2 py-1 rounded border border-cyan-300/20 text-cyan-200">Evidence gate: {jevValidation.evidenceGate}</span>}
+                    {jevValidation.confidence != null && <span className="px-2 py-1 rounded border border-white/10 text-white/50">Confidence: {typeof jevValidation.confidence === 'number' ? jevValidation.confidence.toFixed(2) : jevValidation.confidence}</span>}
+                    {jevValidation.answerSource && <span className="px-2 py-1 rounded border border-white/10 text-white/40">Source: {jevValidation.answerSource}</span>}
+                  </div>
+                </div>}
+              </div>
+              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
+              <div className="text-[9px] font-mono text-violet-200/60 uppercase">Active forecast model: {modelVersion}{modelConfig?.validation_tests ? ' · validated on ' + modelConfig.validation_tests + ' tests' : ''}</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Likely range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Wider expected range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct-direction lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {backtest.rows.slice(-8).reverse().map(row => (
+                  <div key={row.asOfDate} className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/5 px-2 py-1.5 text-[9px] font-mono text-white/45">
+                    <span>{row.asOfDate} → {row.targetDate}</span>
+                    <span>Typical expected move {formatReturn(row.median)}</span>
+                    <span>Actual {formatReturn(row.actual)}</span>
+                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'Likely range' : 'outside Likely range'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <div className="text-[10px] text-white/30 font-mono">Run the backtest to validate the historical analogue method for {selectedStock} at the selected horizon.</div>}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[.03] p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-200/80">Cross-ticker validation matrix</div>
+            <p className="text-[10px] text-white/45 mt-1">Runs the same backtest across 8 AI/technology tickers and all 5 horizons. This is a validation summary, not a ranking.</p>
+          </div>
+          <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
+        </div>
+        {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
+        {matrix && <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg likely-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg wider-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
+          </div>
+          <div className="overflow-x-auto"><DataTable<any>
+            rows={matrix.details as any[]}
+            rowKey={(row) => row.ticker + '-' + row.horizon}
+            empty="No forecast validation matrix rows available."
+            initialSort={{ key: 'ticker', direction: 'asc' }}
+            columns={[
+              { key: 'ticker', header: 'Ticker', accessor: row => row.ticker },
+              { key: 'horizon', header: 'Horizon', accessor: row => row.horizon, type: 'number', render: row => row.horizon + 'D' },
+              { key: 'tests', header: 'Tests', accessor: row => row.tests, type: 'number', align: 'right' },
+              { key: 'direction', header: 'Direction', accessor: row => row.direction, type: 'percent', align: 'right', render: row => (row.direction * 100).toFixed(0) + '%' },
+              { key: 'baseline', header: 'Baseline', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
+              { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
+              { key: 'coverage', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
+            ]}
+          /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[8px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
+        </div>}
+      </div>
+
+      {backtest && backtest.calibration.length > 0 && (
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4">
+          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/80">Forecast validation · calibration</div><div className="text-[10px] text-white/40 mt-1">Directional confidence is measured against realized positive outcomes. This describes historical calibration; it does not modify the forecast.</div></div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-3">
+            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[8px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex items-center gap-2 mb-3"><TrendingUp className="w-4 h-4 text-emerald-400" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">What drives the analogue</span></div>
+          <ul className="space-y-2 text-xs text-white/55">
+            <li>• 20-day momentum: <span className="text-white">{formatReturn(metrics.momentum)}</span></li>
+            <li>• Annualized volatility: <span className="text-white">{metrics.volatility.toFixed(1)}%</span></li>
+            <li>• Current daily move: <span className="text-white">{formatReturn(metrics.dailyChange)}</span></li>
+            <li>• 1-year move: <span className="text-white">{formatReturn(metrics.oneYear)}</span></li>
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Scenario caveat</span></div>
+          <p className="text-xs text-white/55 leading-relaxed">The scenario controls are transparent stress adjustments. They do not claim to know the future. The strongest output is the historical distribution and its evidence trail.</p>
+        </div>
+      </div>
+    </div>
+  );
+} + formatPrice(currentPrice) : '—'}</div>
               {quote && <div className="mt-1 flex justify-end"><FreshnessBadge {...quote} showAge /></div>}
             </div>
           </div>
@@ -1810,9 +1932,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 <div><span className="text-white/30">Invalid snapshot</span><span className="ml-2 text-rose-200/80">{forecastAnalytics?.verifiedEvidenceStateCounts?.INVALID_SNAPSHOT ?? 0}</span></div>
                 <div><span className="text-white/30">Multi-channel</span><span className="ml-2 text-white/70">{forecastAnalytics?.evidenceCoverage.multiChannel}</span></div>
               </div>
-              <div className="mt-2 text-[8px] text-white/25">
-                Only CAPTURED forecasts enter calibration. Legacy or invalid creation evidence remains visible for auditability but is excluded from quality statistics.
-              </div>
+              <div className="mt-2 text-[8px] text-white/25">Only CAPTURED forecasts enter calibration. Legacy or invalid creation evidence remains visible for auditability but is excluded from quality statistics.</div>
               <div className="mt-2 text-[8px] text-white/25">Descriptive coverage of evidence captured when forecasts were created; it does not measure forecast quality or imply that any evidence caused an outcome.</div>
             </div>
           )}
@@ -1847,3 +1967,127 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+            <div>
+              <div className="flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Historical backtest</span></div>
+              <p className="text-[10px] text-white/40 mt-1">Replay the same analogue method on past dates without using information from the future.</p>
+            </div>
+            <button onClick={runBacktest} disabled={backtestBusy || loading || history.length < 220 + horizon} className="px-3 py-2 rounded border border-emerald-300/20 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{backtestBusy ? 'BACKTESTING…' : 'RUN BACKTEST'}</button>
+          </div>
+          {backtestMessage && <div className="text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2 mb-3">{backtestMessage}</div>}
+          {backtest ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-violet-300/20 bg-violet-300/5 p-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-widest text-violet-200/80">JEV validation analyst</div>
+                    <p className="text-[10px] text-white/45 mt-1">JEV interprets the measured backtest; it cannot change the numerical results. It identifies evidence gaps, caveats, and the next validation experiment.</p>
+                  </div>
+                  <button onClick={runJevBacktestValidation} disabled={jevValidationBusy} className="px-3 py-2 rounded border border-violet-300/30 bg-violet-300/10 text-violet-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{jevValidationBusy ? 'JEV ANALYZING…' : 'RUN JEV VALIDATION'}</button>
+                </div>
+                {jevValidationError && <div className="mt-2 text-[10px] font-mono text-amber-200 border border-amber-300/10 rounded-lg p-2">{jevValidationError}</div>}
+                {jevValidation && <div className="mt-3 space-y-2">
+                  <div className="text-xs text-white/70 leading-relaxed">{jevValidation.summary}</div>
+                  <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
+                    {jevValidation.choice && <span className="px-2 py-1 rounded border border-violet-300/20 text-violet-200">JEV route: {jevValidation.choice}</span>}
+                    {jevValidation.evidenceGate && <span className="px-2 py-1 rounded border border-cyan-300/20 text-cyan-200">Evidence gate: {jevValidation.evidenceGate}</span>}
+                    {jevValidation.confidence != null && <span className="px-2 py-1 rounded border border-white/10 text-white/50">Confidence: {typeof jevValidation.confidence === 'number' ? jevValidation.confidence.toFixed(2) : jevValidation.confidence}</span>}
+                    {jevValidation.answerSource && <span className="px-2 py-1 rounded border border-white/10 text-white/40">Source: {jevValidation.answerSource}</span>}
+                  </div>
+                </div>}
+              </div>
+              <div className="text-[9px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
+              <div className="text-[9px] font-mono text-violet-200/60 uppercase">Active forecast model: {modelVersion}{modelConfig?.validation_tests ? ' · validated on ' + modelConfig.validation_tests + ' tests' : ''}</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Likely range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Wider expected range coverage</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Correct-direction lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Error lift</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Calibration gap</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {backtest.rows.slice(-8).reverse().map(row => (
+                  <div key={row.asOfDate} className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-white/5 bg-black/5 px-2 py-1.5 text-[9px] font-mono text-white/45">
+                    <span>{row.asOfDate} → {row.targetDate}</span>
+                    <span>Typical expected move {formatReturn(row.median)}</span>
+                    <span>Actual {formatReturn(row.actual)}</span>
+                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'Likely range' : 'outside Likely range'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <div className="text-[10px] text-white/30 font-mono">Run the backtest to validate the historical analogue method for {selectedStock} at the selected horizon.</div>}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[.03] p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-emerald-200/80">Cross-ticker validation matrix</div>
+            <p className="text-[10px] text-white/45 mt-1">Runs the same backtest across 8 AI/technology tickers and all 5 horizons. This is a validation summary, not a ranking.</p>
+          </div>
+          <button onClick={runValidationMatrix} disabled={matrixBusy} className="px-3 py-2 rounded border border-emerald-300/30 bg-emerald-300/10 text-emerald-100 text-[9px] font-mono font-black uppercase disabled:opacity-40">{matrixBusy ? 'RUNNING MATRIX…' : 'RUN VALIDATION MATRIX'}</button>
+        </div>
+        {matrixMessage && <div className="mt-3 text-[10px] font-mono text-emerald-200/80 border border-emerald-300/10 rounded-xl p-2">{matrixMessage}</div>}
+        {matrix && <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg likely-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Avg wider-range coverage</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline correct direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Baseline error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
+          </div>
+          <div className="overflow-x-auto"><DataTable<any>
+            rows={matrix.details as any[]}
+            rowKey={(row) => row.ticker + '-' + row.horizon}
+            empty="No forecast validation matrix rows available."
+            initialSort={{ key: 'ticker', direction: 'asc' }}
+            columns={[
+              { key: 'ticker', header: 'Ticker', accessor: row => row.ticker },
+              { key: 'horizon', header: 'Horizon', accessor: row => row.horizon, type: 'number', render: row => row.horizon + 'D' },
+              { key: 'tests', header: 'Tests', accessor: row => row.tests, type: 'number', align: 'right' },
+              { key: 'direction', header: 'Direction', accessor: row => row.direction, type: 'percent', align: 'right', render: row => (row.direction * 100).toFixed(0) + '%' },
+              { key: 'baseline', header: 'Baseline', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
+              { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
+              { key: 'coverage', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
+            ]}
+          /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[8px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
+        </div>}
+      </div>
+
+      {backtest && backtest.calibration.length > 0 && (
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4">
+          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><div><div className="text-[9px] font-mono uppercase tracking-widest text-cyan-200/80">Forecast validation · calibration</div><div className="text-[10px] text-white/40 mt-1">Directional confidence is measured against realized positive outcomes. This describes historical calibration; it does not modify the forecast.</div></div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-3">
+            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[8px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex items-center gap-2 mb-3"><TrendingUp className="w-4 h-4 text-emerald-400" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">What drives the analogue</span></div>
+          <ul className="space-y-2 text-xs text-white/55">
+            <li>• 20-day momentum: <span className="text-white">{formatReturn(metrics.momentum)}</span></li>
+            <li>• Annualized volatility: <span className="text-white">{metrics.volatility.toFixed(1)}%</span></li>
+            <li>• Current daily move: <span className="text-white">{formatReturn(metrics.dailyChange)}</span></li>
+            <li>• 1-year move: <span className="text-white">{formatReturn(metrics.oneYear)}</span></li>
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
+          <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Scenario caveat</span></div>
+          <p className="text-xs text-white/55 leading-relaxed">The scenario controls are transparent stress adjustments. They do not claim to know the future. The strongest output is the historical distribution and its evidence trail.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
