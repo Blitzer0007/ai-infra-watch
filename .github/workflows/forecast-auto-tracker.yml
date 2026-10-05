@@ -1,9 +1,11 @@
 name: Forecast Auto Tracker
-run-name: Forecast Auto Tracker • ${{ github.event_name }}
+run-name: Forecast Auto Tracker • ${{ github.event.schedule || github.event_name }}
 
 on:
   schedule:
+    # Supabase Cron is the independent primary scheduler; GitHub remains a secondary recovery path.
     - cron: '15 1 * * 1-5'
+    - cron: '45 1 * * 1-5'
   workflow_dispatch:
 
 concurrency:
