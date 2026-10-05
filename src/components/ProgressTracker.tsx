@@ -192,6 +192,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     : [...historyData];
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
+  const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
+    ? historyData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
+    : null;
 
   const resolveAndTrack = async () => {
     const rawInput = tickerInput.trim();
@@ -423,6 +426,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           {secMilestoneLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
           <span>{secMilestoneLoading ? 'Discovering SEC milestones' : `${secMilestones.length} live SEC milestones found`}</span>
           {secMilestoneError && <span className="text-amber-300 normal-case tracking-normal">· {secMilestoneError}</span>}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>· NBIS tracker verification: {nbisVerification} (market history + SEC milestone path)</span>}
         </div>
       </div>
 

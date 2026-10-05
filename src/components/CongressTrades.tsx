@@ -404,8 +404,16 @@ export default function CongressTrades(_props: CongressTradesProps) {
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
-    return { all: summarize(reactions), buy: summarize(buys), sell: summarize(sells) };
-  }, [reactions]);
+    const uniqueEventDates = new Set(reactions.map(row => row.trade.transactionDate || row.trade.filingDate || row.trade.date).filter(Boolean)).size;
+    const confidence = sourceStatus.kind === 'unavailable' || sourceStatus.stale
+      ? 'Low'
+      : uniqueEventDates >= 30 && reactions.length >= 30
+        ? 'High'
+        : uniqueEventDates >= 15 && reactions.length >= 15
+          ? 'Moderate'
+          : 'Low';
+    return { all: summarize(reactions), buy: summarize(buys), sell: summarize(sells), matched: reactions.length, uniqueEventDates, confidence };
+  }, [reactions, sourceStatus]);
 
   const reactionById = useMemo(() => {
     const map = new Map<string, TradeReaction>();
@@ -434,6 +442,8 @@ export default function CongressTrades(_props: CongressTradesProps) {
             filing_date: trade.filingDate,
           })),
           historical_reaction_matches: reactionSummary.matched,
+          evidence_confidence: reactionSummary.confidence,
+          unique_event_dates: reactionSummary.uniqueEventDates,
         }}
       />
 
@@ -562,9 +572,9 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
           </div>
           <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
-          <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Same-date trades remain correlated.</div>
+          <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Confidence uses matched reactions + unique event dates + source freshness; same-date trades remain correlated.</div>
           <div className={`mt-1 text-[9px] font-mono ${reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}`}>
-            {reactionSummary.matched < 30 ? 'LOW CONFIDENCE · n<30 matched reactions' : 'Sample size ≥30 matched reactions'}
+            {'EVIDENCE CONFIDENCE · ' + reactionSummary.confidence.toUpperCase() + ' · ' + reactionSummary.matched + ' matched reactions across ' + reactionSummary.uniqueEventDates + ' unique event dates'}
           </div>
 
           {historyLoading && (
