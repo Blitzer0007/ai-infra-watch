@@ -49,6 +49,7 @@ jobs:
       - name: Run portfolio digest fallback
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          FALLBACK_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
         run: |
           set -euo pipefail
           SCHEDULE="${{ github.event.schedule || '' }}"
@@ -68,13 +69,30 @@ jobs:
           fi
           SLOT="$SLOT_DATE-$(printf '%02d' "$EXPECTED_HOUR")"
           echo "Intended digest slot: $SLOT (actual execution: $(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M:%S %Z'))"
-          curl --fail-with-body --silent --show-error \
+          RESPONSE=$(curl --silent --show-error \
             --request GET \
             --header "Authorization: Bearer $OIDC_TOKEN" \
-            --header "User-Agent: ai-infra-watch-github-actions-fallback/2.0" \
-            --retry 3 \
-            --retry-all-errors \
-            --retry-delay 3 \
+            --header "User-Agent: ai-infra-watch-github-actions-fallback/4.0" \
+            --write-out '\\n%{http_code}' \
+            --retry 3 --retry-all-errors --retry-delay 3 \
+            "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$SLOT")
+          STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+          BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+          if [ "$STATUS" = "200" ]; then
+            printf '%s\\n' "$BODY"
+            exit 0
+          fi
+          echo "::warning::OIDC digest request returned HTTP $STATUS."
+          if [ -z "${FALLBACK_TOKEN:-}" ]; then
+            printf '%s\\n' "$BODY"
+            exit 1
+          fi
+          echo "Retrying digest with the server scheduler credential."
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer $FALLBACK_TOKEN" \
+            --header "User-Agent: ai-infra-watch-github-actions-secret-fallback/1.0" \
+            --retry 3 --retry-all-errors --retry-delay 3 \
             "https://ai-infra-watch-theta.vercel.app/api/portfolio-digest?slot=$SLOT"
 
       - name: Record completion
