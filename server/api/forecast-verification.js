@@ -65,7 +65,8 @@ async function verifyDueForecasts() {
       failures.push({ id: forecast.id, ticker: forecast.ticker, error: error?.message || 'Verification failed.' });
     }
   }
-  const telegram = await sendForecastValidationTelegram(results);\n  return { checked: due.length, verified: results.length, failed: failures.length, results, failures, telegram };
+  const telegram = await sendForecastValidationTelegram(results);
+  return { checked: due.length, verified: results.length, failed: failures.length, results, failures, telegram };
 }
 
 
