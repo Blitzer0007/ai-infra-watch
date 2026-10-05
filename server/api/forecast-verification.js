@@ -213,6 +213,12 @@ async function evaluateForecastModels() {
         score: selected ? selected.direction - selected.error / 1000 : 0,
         v1_direction: v1?.direction ?? null, v1_error: v1?.error ?? null,
         v2_direction: v2?.direction ?? null, v2_error: v2?.error ?? null,
+        baseline_direction: null,
+        baseline_error: null,
+        model_improvement_pct: null,
+        drift_status: null,
+        drift_score: null,
+        learning_summary: { source: 'rolling-verified-forecast-learning', selectedModel: active },
         validation_tests: Math.max(v1?.tests || 0, v2?.tests || 0),
         updated_at: new Date().toISOString()
       });
