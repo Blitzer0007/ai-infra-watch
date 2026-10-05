@@ -622,3 +622,57 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+}
