@@ -1,6 +1,21 @@
 import { requireAccess } from './_access-auth.js';
 
 const REPO = 'Blitzer0007/ai-infra-watch';
+const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+async function supabase(path) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase scheduler health configuration missing');
+  const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY },
+    signal: AbortSignal.timeout(6000),
+  });
+  const text = await response.text();
+  let data = [];
+  try { data = text ? JSON.parse(text) : []; } catch { data = []; }
+  if (!response.ok) throw new Error('Supabase scheduler health HTTP ' + response.status);
+  return data;
+}
 
 const JOBS = [
   { id:'portfolio-digest-primary', name:'Portfolio digest · primary', path:'portfolio-digest-scheduler.yml', cadence:'35 0,6,12,16 UTC' },
@@ -106,17 +121,61 @@ export default async function handler(req, res) {
       };
     });
 
+    let forecastJob = null;
+    try {
+      const history = await supabase('forecast_scheduler_runs?select=id,created_at,finished_at,source,slot,status,http_status,holdings,created_count,skipped_count,error&order=created_at.desc&limit=20');
+      const successes = history.filter(run => run.status === 'completed' && Number(run.http_status) === 200);
+      const failures = history.filter(run => run.status === 'failed' || Number(run.http_status) >= 400);
+      const latest = history[0] || null;
+      const lastSuccess = successes[0] || null;
+      const lastFailure = failures[0] || null;
+      const nextRun = (now = new Date()) => {
+        const next = new Date(now);
+        next.setUTCSeconds(0,0);
+        const slots = [75,105,135];
+        const day = next.getUTCDay();
+        for (let offset=0; offset<=7; offset += 1) {
+          const candidateDay = (day + offset) % 7;
+          if (candidateDay === 0 || candidateDay === 6) continue;
+          for (const minuteOfDay of slots) {
+            const candidate = new Date(next);
+            candidate.setUTCDate(next.getUTCDate() + offset);
+            candidate.setUTCHours(Math.floor(minuteOfDay / 60), minuteOfDay % 60, 0, 0);
+            if (candidate > now) return candidate.toISOString();
+          }
+        }
+        return null;
+      };
+      forecastJob = {
+        id:'forecast-auto-tracker',
+        name:'Forecast Auto Tracker',
+        cadence:'06:45 + 07:15 + 07:45 IST weekdays',
+        scheduler:'Supabase Cron',
+        status: latest?.status || 'no_runs',
+        conclusion: latest?.status === 'completed' ? 'success' : latest?.status === 'failed' ? 'failure' : latest?.status || null,
+        lastRunAt: latest?.created_at || null,
+        lastSuccessAt: lastSuccess?.finished_at || lastSuccess?.created_at || null,
+        lastFailureAt: lastFailure?.finished_at || lastFailure?.created_at || null,
+        recentFailureCount: failures.length,
+        nextRunAt: nextRun(),
+        lastRun: latest ? { source:latest.source, slot:latest.slot, status:latest.status, httpStatus:latest.http_status, holdings:latest.holdings, created:latest.created_count, skipped:latest.skipped_count, error:latest.error } : null,
+        recentRuns: history.slice(0,5).map(run => ({ source:run.source, slot:run.slot, status:run.status, httpStatus:run.http_status, createdAt:run.created_at, finishedAt:run.finished_at, created:run.created_count, skipped:run.skipped_count, error:run.error })),
+      };
+    } catch (error) {
+      forecastJob = { id:'forecast-auto-tracker', name:'Forecast Auto Tracker', cadence:'06:45 + 07:15 + 07:45 IST weekdays', scheduler:'Supabase Cron', status:'unavailable', conclusion:null, nextRunAt:null, error:error instanceof Error ? error.message : 'Forecast scheduler health unavailable' };
+    }
+
     return res.status(200).json({
       ok:true,
       retrievedAt:new Date().toISOString(),
-      source:'GitHub Actions',
-      jobs,
+      source:'GitHub Actions + Supabase Cron',
+      jobs:[...jobs, forecastJob],
     });
   } catch (error) {
     return res.status(502).json({
       ok:false,
       error:error instanceof Error ? error.message : 'Scheduled job health unavailable',
-      jobs:JOBS.map(job => ({ ...job, status:'unavailable', nextRunAt:nextScheduledRun(job.id) })),
+      jobs:[...JOBS.map(job => ({ ...job, status:'unavailable', nextRunAt:nextScheduledRun(job.id) })), { id:'forecast-auto-tracker', name:'Forecast Auto Tracker', cadence:'06:45 + 07:15 + 07:45 IST weekdays', scheduler:'Supabase Cron', status:'unavailable', nextRunAt:null }],
     });
   }
 }
