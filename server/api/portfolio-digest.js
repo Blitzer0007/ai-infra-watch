@@ -474,7 +474,6 @@ async function buildDigest(decisionJournal) {
   const date = localDate;
 
   const decisionResult = await fetchDecisionCenter();
-  const decisionJournal = await loadDecisionJournal();
   const decision = decisionResult.decision;
   const isSunday = new Intl.DateTimeFormat('en-US', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', weekday: 'short' }).format(new Date()) === 'Sun';
   const weekly = isSunday && decisionJournal?.getWeeklyDecisionReview
