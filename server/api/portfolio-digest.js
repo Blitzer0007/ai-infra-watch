@@ -406,7 +406,7 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
   return lines.join('\n');
 }
 
-async function buildDigest() {
+async function buildDigest(decisionJournal) {
   const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
   const rows = await Promise.all(holdings.map(async holding => {
     const symbol = String(holding.symbol).trim().toUpperCase();
@@ -630,11 +630,12 @@ export default async function handler(req, res) {
     }
 
     try {
+      const decisionJournal = await loadDecisionJournal();
       if (cron && decisionJournal?.reviewDueDecisionJournal) {
         await decisionJournal.reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
       }
 
-      const digest = await buildDigest();
+      const digest = await buildDigest(decisionJournal);
 
       if (req.method === 'GET' && !cron) {
         return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
