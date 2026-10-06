@@ -250,6 +250,29 @@ export default async function handler(req, res) {
   if (!secretOk && !oidcOk) return res.status(401).json({ error: 'Unauthorized' });
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET required' });
 
+  const runId = createId();
+  const source = secretOk ? 'supabase_cron' : 'github_actions';
+  const slot = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const recordRun = async (patch) => {
+    try {
+      if (patch === 'start') {
+        await supabase('forecast_scheduler_runs', {
+          method: 'POST',
+          body: JSON.stringify({ id: runId, source, slot, status: 'started', metadata: { userAgent: String(req.headers?.['user-agent'] || '') } }),
+        });
+      } else {
+        await supabase('forecast_scheduler_runs?id=eq.' + encodeURIComponent(runId), {
+          method: 'PATCH',
+          body: JSON.stringify({ ...patch, finished_at: new Date().toISOString() }),
+          headers: { Prefer: 'return=minimal' },
+        });
+      }
+    } catch (error) {
+      console.error('forecast scheduler run tracking failed:', error);
+    }
+  };
+  await recordRun('start');
+
   try {
     const horizon = 20;
     const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,practical_notes&quantity=gt.0&order=symbol.asc', { method: 'GET' });
@@ -266,17 +289,23 @@ export default async function handler(req, res) {
       }
     }
 
+    const created = results.filter(item => item.created).length;
+    const skipped = results.filter(item => item.skipped).length;
+    await recordRun({ status: 'completed', http_status: 200, holdings: holdings.length, created_count: created, skipped_count: skipped, metadata: { results } });
     return res.status(200).json({
       ok: true,
       horizon,
       holdings: holdings.length,
-      created: results.filter(item => item.created).length,
-      skipped: results.filter(item => item.skipped).length,
+      created,
+      skipped,
       results,
+      schedulerRunId: runId,
       ranAt: new Date().toISOString(),
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Forecast auto-tracking failed.';
+    await recordRun({ status: 'failed', http_status: 500, error: message });
     console.error('forecast auto-track error:', error);
-    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Forecast auto-tracking failed.' });
+    return res.status(500).json({ ok: false, error: message, schedulerRunId: runId });
   }
 }
