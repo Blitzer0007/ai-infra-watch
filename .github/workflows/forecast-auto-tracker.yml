@@ -1,4 +1,4 @@
-name: Forecast Auto Tracker
+name: Forecast Auto Tracker · 5D + 20D
 run-name: Forecast Auto Tracker • ${{ github.event.schedule || github.event_name }}
 
 on:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   create-forecasts:
-    name: Track 20D forecasts for held portfolio
+    name: Track 5D + 20D forecasts for held portfolio
     runs-on: ubuntu-slim
     timeout-minutes: 10
     permissions:
@@ -47,7 +47,7 @@ jobs:
           curl --fail-with-body --silent --show-error \
             --request GET \
             --header "Authorization: Bearer $OIDC_TOKEN" \
-            --header "User-Agent: ai-infra-watch-forecast-auto-tracker/1.2" \
+            --header "User-Agent: ai-infra-watch-forecast-auto-tracker/2.0" \
             --retry 3 \
             --retry-all-errors \
             --retry-delay 3 \
