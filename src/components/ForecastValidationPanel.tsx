@@ -89,8 +89,8 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
       )}
 
       <div className="mt-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-3 py-2 text-[8px] leading-4 text-white/35">
-        Auto tracking is on: each weekday AI Infra Watch records one new <b className="text-cyan-200/70">20D forecast</b> for each held stock when there is no pending forecast already waiting to mature.
-        A forecast only counts toward the <b className="text-white/60">50 verified sample</b> after its target date is reached and the actual market result is recorded. You do not need to add these manually.
+        Auto tracking is on: each weekday AI Infra Watch records separate <b className="text-cyan-200/70">5D and 20D forecasts</b> for each held stock when that horizon has no pending forecast already waiting to mature.
+        The 5D and 20D streams are validated separately. A forecast only counts toward this horizon's <b className="text-white/60">50 verified sample</b> after its target date is reached and the actual market result is recorded. You do not need to add these manually.
       </div>
 
       {summary && (
@@ -141,7 +141,7 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
         </>
       )}
 
-      {globalGate && !globalGate.ready && <div className="mt-3 flex items-center gap-2 text-[8px] font-mono text-white/30"><ShieldAlert className="w-3.5 h-3.5 text-amber-300" /> 50 completed forecasts are needed before the overall validation history is considered established.</div>}
+      {globalGate && !globalGate.ready && <div className="mt-3 flex items-center gap-2 text-[8px] font-mono text-white/30"><ShieldAlert className="w-3.5 h-3.5 text-amber-300" /> 50 completed forecasts are needed for this horizon before its live validation history is considered established.</div>}
     </section>
   );
 }
