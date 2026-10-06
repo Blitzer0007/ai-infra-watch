@@ -100,7 +100,13 @@ async function supabase(path, options = {}) {
     headers: { ...headers(), ...(options.headers || {}) },
   });
   if (!response.ok) throw new Error('Supabase portfolio request failed: HTTP ' + response.status);
-  return response.json();
+  const body = await response.text();
+  if (!body) return null;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return body;
+  }
 }
 
 function digestSlotKey(req) {
