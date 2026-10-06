@@ -36,7 +36,7 @@ jobs:
             --retry-delay 2 \
             --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             --header "Accept: application/json; api-version=2.0" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ai-infra-watch")""
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ai-infra-watch")"
 
           token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           if [ -z "$token" ]; then
