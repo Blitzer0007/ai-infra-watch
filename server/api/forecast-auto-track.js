@@ -274,30 +274,37 @@ export default async function handler(req, res) {
   await recordRun('start');
 
   try {
-    const horizon = 20;
+    const horizons = [5, 20];
     const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,practical_notes&quantity=gt.0&order=symbol.asc', { method: 'GET' });
     const results = [];
-    for (const holding of holdings) {
-      try {
-        results.push(await buildAutoForecast(holding, horizon));
-      } catch (error) {
-        results.push({
-          skipped: true,
-          ticker: String(holding.symbol || '').toUpperCase(),
-          reason: error instanceof Error ? error.message : 'forecast generation failed',
-        });
+    for (const horizon of horizons) {
+      for (const holding of holdings) {
+        try {
+          results.push({ horizon, ...(await buildAutoForecast(holding, horizon)) });
+        } catch (error) {
+          results.push({
+            horizon,
+            skipped: true,
+            ticker: String(holding.symbol || '').toUpperCase(),
+            reason: error instanceof Error ? error.message : 'forecast generation failed',
+          });
+        }
       }
     }
 
     const created = results.filter(item => item.created).length;
     const skipped = results.filter(item => item.skipped).length;
-    await recordRun({ status: 'completed', http_status: 200, holdings: holdings.length, created_count: created, skipped_count: skipped, metadata: { results } });
+    const createdByHorizon = Object.fromEntries(horizons.map(horizon => [String(horizon), results.filter(item => item.horizon === horizon && item.created).length]));
+    const skippedByHorizon = Object.fromEntries(horizons.map(horizon => [String(horizon), results.filter(item => item.horizon === horizon && item.skipped).length]));
+    await recordRun({ status: 'completed', http_status: 200, holdings: holdings.length, created_count: created, skipped_count: skipped, metadata: { horizons, createdByHorizon, skippedByHorizon, results } });
     return res.status(200).json({
       ok: true,
-      horizon,
+      horizons,
       holdings: holdings.length,
       created,
       skipped,
+      createdByHorizon,
+      skippedByHorizon,
       results,
       schedulerRunId: runId,
       ranAt: new Date().toISOString(),
