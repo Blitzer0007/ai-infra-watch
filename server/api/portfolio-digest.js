@@ -78,7 +78,8 @@ async function authorize(req, res) {
   if (await isCron(req)) return true;
   return requireAccess(req, res);
 }
-\nasync function loadDecisionJournal() {
+
+async function loadDecisionJournal() {
   try {
     return await import('./decision-journal.js');
   } catch (error) {
