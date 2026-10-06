@@ -22,20 +22,21 @@ jobs:
     steps:
       - name: Request GitHub OIDC token
         id: oidc
-        env:
-          OIDC_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          OIDC_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "$OIDC_REQUEST_URL" ] || [ -z "$OIDC_REQUEST_TOKEN" ]; then
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
             echo "::error::GitHub Actions OIDC token endpoint is unavailable."
+            echo "::error::Verify that this job has id-token: write permission."
             exit 1
           fi
 
           response="$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer $OIDC_REQUEST_TOKEN" \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             --header "Accept: application/json; api-version=2.0" \
-            "$OIDC_REQUEST_URL&audience=ai-infra-watch")"
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ai-infra-watch")""
 
           token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           if [ -z "$token" ]; then
