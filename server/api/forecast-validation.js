@@ -16,10 +16,11 @@ function headers() {
   };
 }
 
-async function loadVerifiedForecasts({ ticker, horizon } = {}) {
+async function loadVerifiedForecasts({ ticker, horizon, createdSource = 'auto_portfolio' } = {}) {
   const params = new URLSearchParams();
-  params.set('select', 'ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot');
+  params.set('select', 'ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot,created_source');
   params.set('status', 'eq.verified');
+  if (createdSource) params.set('created_source', 'eq.' + encodeURIComponent(createdSource));
   params.set('order', 'verified_at.desc');
   params.set('limit', String(MAX_ROWS));
   if (ticker) params.set('ticker', 'eq.' + String(ticker).trim().toUpperCase());
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
     const learning = buildForecastLearningSummary(rows);
     let globalValidationGate = summary.validationGate;
     if (ticker || horizon != null) {
-      const globalRows = await loadVerifiedForecasts({ horizon: 20 });
+      const globalRows = await loadVerifiedForecasts({ horizon: horizon ?? 20 });
       globalValidationGate = buildForecastValidationSummary(globalRows).validationGate;
     }
 
