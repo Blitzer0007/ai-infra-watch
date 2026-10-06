@@ -457,7 +457,7 @@ function forecastLearning(rows) {
       ? usable.filter(row => Math.sign(Number(row.actual_return)) === Math.sign(Number(row.median))).length / usable.length * 100
       : null;
     const predictionMatchPct = usable.length
-      ? mean(usable.map(row => Math.max(0, 100 - Math.abs(Number(row.actual_return) - Number(row.median)) / Math.max(Math.abs(Number(row.actual_return)), 1) * 100))
+      ? mean(usable.map(row => Math.max(0, 100 - Math.abs(Number(row.actual_return) - Number(row.median)) / Math.max(Math.abs(Number(row.actual_return)), 1) * 100)))
       : null;
     return {
       count: subset.length,
