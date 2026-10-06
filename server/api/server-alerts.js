@@ -7,6 +7,7 @@ import { getTickerValidationContext } from '../utils/forecastValidation.js';
 const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
 const MAX_SMART_ALERTS_PER_SCAN = 10;
+const CATALYST_LOOKBACK_DAYS = 7;
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -250,6 +251,13 @@ async function sendTelegram(events) {
   return { sent, sentEventKeys, errors };
 }
 
+function isRecentCatalystDate(value, now) {
+  const timestamp = Date.parse(String(value || ''));
+  if (!Number.isFinite(timestamp)) return false;
+  const ageMs = now.getTime() - timestamp;
+  return ageMs >= -24 * 60 * 60 * 1000 && ageMs <= CATALYST_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+}
+
 async function evaluate() {
   const config = await getConfig();
   const portfolioSymbols = await getPortfolioSymbols();
@@ -380,7 +388,7 @@ async function evaluate() {
     for (const contract of Array.isArray(catalystFeed?.contracts) ? catalystFeed.contracts : []) {
       const symbol = String(contract?.company || '').trim().toUpperCase();
       const id = String(contract?.id || '').trim();
-      if (!symbol || !allowed.has(symbol) || !id) continue;
+      if (!symbol || !allowed.has(symbol) || !id || !isRecentCatalystDate(contract?.dateSigned, now)) continue;
       const key = 'catalyst:contract:' + id;
       if (states.has(key)) continue;
       events.push({
@@ -397,7 +405,7 @@ async function evaluate() {
     for (const trade of Array.isArray(catalystFeed?.congressTrades) ? catalystFeed.congressTrades : []) {
       const symbol = String(trade?.stockSymbol || '').trim().toUpperCase();
       const id = String(trade?.id || '').trim();
-      if (!symbol || !allowed.has(symbol) || !id) continue;
+      if (!symbol || !allowed.has(symbol) || !id || !isRecentCatalystDate(trade?.date, now)) continue;
       const key = 'catalyst:congress:' + id;
       if (states.has(key)) continue;
       events.push({
@@ -411,6 +419,19 @@ async function evaluate() {
       });
     }
   }
+
+  // Deduplicate before Telegram delivery and state persistence. A feed can contain
+  // the same disclosure more than once; sending first and deduplicating later
+  // caused duplicate Telegram messages and a PostgreSQL ON CONFLICT failure.
+  const uniqueEvents = [];
+  const seenEventKeys = new Set();
+  for (const event of events) {
+    if (!event?.stateKey || seenEventKeys.has(event.stateKey)) continue;
+    seenEventKeys.add(event.stateKey);
+    uniqueEvents.push(event);
+  }
+  events.length = 0;
+  events.push(...uniqueEvents.slice(0, MAX_SMART_ALERTS_PER_SCAN));
 
   if (events.length) {
     try {

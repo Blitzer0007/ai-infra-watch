@@ -1,6 +1,5 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
-import { reviewDueDecisionJournal, getWeeklyDecisionReview } from './decision-journal.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -79,6 +78,15 @@ async function authorize(req, res) {
   if (await isCron(req)) return true;
   return requireAccess(req, res);
 }
+\nasync function loadDecisionJournal() {
+  try {
+    return await import('./decision-journal.js');
+  } catch (error) {
+    console.error('decision journal module unavailable:', error);
+    return null;
+  }
+}
+
 
 function headers() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service configuration is missing');
@@ -465,9 +473,12 @@ async function buildDigest() {
   const date = localDate;
 
   const decisionResult = await fetchDecisionCenter();
+  const decisionJournal = await loadDecisionJournal();
   const decision = decisionResult.decision;
   const isSunday = new Intl.DateTimeFormat('en-US', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', weekday: 'short' }).format(new Date()) === 'Sun';
-  const weekly = isSunday ? await getWeeklyDecisionReview().catch(() => null) : null;
+  const weekly = isSunday && decisionJournal?.getWeeklyDecisionReview
+    ? await decisionJournal.getWeeklyDecisionReview().catch(() => null)
+    : null;
 
   if (decision) {
     return {
@@ -618,8 +629,8 @@ export default async function handler(req, res) {
     }
 
     try {
-      if (cron) {
-        await reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
+      if (cron && decisionJournal?.reviewDueDecisionJournal) {
+        await decisionJournal.reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
       }
 
       const digest = await buildDigest();
