@@ -150,7 +150,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Automation reliability</div>
             <div className="text-sm font-black mt-1">Scheduled job health</div>
-            <div className="text-[9px] text-white/30 mt-1">Last success, recent failures and next expected run from GitHub Actions.</div>
+            <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
           </div>
           <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs checked' : 'unavailable'}</span>
         </div>
@@ -169,7 +169,15 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Failures since last success: {job.recentFailureCount ?? 0}</span>
                 <span>Next expected: {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'not calculated'}</span>
               </div>
-              <div className="mt-1 text-[7px] font-mono text-white/20">Cadence: {job.cadence}</div>
+              <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}</div>
+              {job.id === 'forecast-auto-tracker' && job.lastRun ? (
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
+                  <span className="text-white/35">Holdings processed <b className="text-white/70">{job.lastRun.holdings ?? '—'}</b></span>
+                  <span className="text-white/35">Forecasts created <b className="text-cyan-200">{job.lastRun.created ?? '—'}</b></span>
+                  <span className="text-white/35">Skipped safely <b className="text-white/70">{job.lastRun.skipped ?? '—'}</b></span>
+                  <span className="text-white/35">Run result <b className={job.lastRun.status === 'completed' ? 'text-emerald-300' : 'text-amber-300'}>{job.lastRun.status || '—'}</b></span>
+                </div>
+              ) : null}
             </div>;
           })}
           {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">Loading scheduled job health…</div> : null}
