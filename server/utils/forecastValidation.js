@@ -100,15 +100,17 @@ function independentRows(rows, minimumBusinessDayGap = 20) {
     .filter(row => String(row?.status || 'verified') === 'verified')
     .sort((a, b) => String(a.verified_at || a.created_at || '').localeCompare(String(b.verified_at || b.created_at || '')));
   const selected = [];
-  const lastByTicker = new Map();
+  const lastByTickerHorizon = new Map();
   for (const row of sorted) {
     const ticker = String(row?.ticker || '').trim().toUpperCase();
     if (!ticker) continue;
-    const previous = lastByTicker.get(ticker);
+    const horizon = Number(row?.horizon);
+    const key = ticker + '|' + horizon;
+    const previous = lastByTickerHorizon.get(key);
     const currentDate = row.verified_at || row.created_at;
     if (previous && businessDaysBetween(previous, currentDate) < minimumBusinessDayGap) continue;
     selected.push(row);
-    lastByTicker.set(ticker, currentDate);
+    lastByTickerHorizon.set(key, currentDate);
   }
   return selected;
 }
