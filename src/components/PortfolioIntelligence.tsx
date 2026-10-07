@@ -2,7 +2,7 @@ import DataTable from './DataTable';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
-import { buildIntelligence, buildMoneyRotation, type RotationHorizon } from '../utils/intelligence';
+import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
@@ -186,7 +186,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    const symbols = [...new Set([...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
+    const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
     setPortfolioHistory({ loading: true, histories: {}, error: '' });
     Promise.allSettled(symbols.map(async symbol => {
@@ -206,7 +206,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
   const [rotationGroup, setRotationGroup] = useState<string>('All');
-  const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices), [portfolioHistory.histories, livePrices]);
+  const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices, rotationHorizon), [portfolioHistory.histories, livePrices, rotationHorizon]);
   const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
   useEffect(() => { if (!analyses.length) return; const today = new Date().toISOString().slice(0, 10); const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36); void Promise.allSettled(analyses.map(item => authFetch('/api/signal-scorecard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signalKey: hash(['position_state', item.symbol, item.state, today].join('|')), symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: item.state === 'INSUFFICIENT DATA' ? 0.25 : 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }) }))); }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
@@ -1038,10 +1038,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </BarChart></ResponsiveContainer></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{rotation.groups.filter(g => rotationGroup === 'All' || g.name === rotationGroup).map(g => {
               const tone = rotationDirectionClass(g.direction);
+              const selectedReturn = g.horizons[rotationHorizon];
               return <div key={g.name} className={'rounded-xl border p-3 ' + tone.card}>
                 <div className="flex justify-between gap-2 items-start"><div><span className="text-xs font-bold">{g.name}</span><span className={'ml-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-mono uppercase ' + tone.pill}>{g.direction}</span></div><span className={'text-[10px] font-mono font-bold ' + tone.text}>{Math.round(g.score)}/100</span></div>
                 <div className="text-[9px] text-white/35 mt-1">{g.members.join(' · ')}</div>
-                <div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">{(['1D','20D','60D'] as RotationHorizon[]).map(h => <div key={h}><span className="text-white/20">{h}</span><div className={'font-bold ' + rotationReturnClass(g.horizons[h])}>{g.horizons[h] == null ? '—' : (g.horizons[h]! >= 0 ? '+' : '') + g.horizons[h]!.toFixed(1) + '%'}</div></div>)}</div>
+                <div className="grid grid-cols-3 gap-1 mt-2 text-[8px] font-mono">
+                  <div><span className="text-white/20">Selected</span><div className={'font-bold ' + rotationReturnClass(selectedReturn)}>{selectedReturn == null ? '—' : (selectedReturn >= 0 ? '+' : '') + selectedReturn.toFixed(1) + '%'}</div></div>
+                  <div><span className="text-white/20">1D</span><div className={'font-bold ' + rotationReturnClass(g.horizons['1D'])}>{g.horizons['1D'] == null ? '—' : (g.horizons['1D'] >= 0 ? '+' : '') + g.horizons['1D']!.toFixed(1) + '%'}</div></div>
+                  <div><span className="text-white/20">20D</span><div className={'font-bold ' + rotationReturnClass(g.horizons['20D'])}>{g.horizons['20D'] == null ? '—' : (g.horizons['20D'] >= 0 ? '+' : '') + g.horizons['20D']!.toFixed(1) + '%'}</div></div>
+                </div>
+                <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/25">Scored on {rotationHorizon} · direction compares 1D vs {rotationHorizon === '1D' ? '20D' : rotationHorizon}</div>
               </div>;
             })}</div>
             <div className="mt-3 text-[9px] text-white/30">{rotation.methodology} {portfolioHistory.error ? 'History warning: ' + portfolioHistory.error : ''}</div>
