@@ -707,8 +707,8 @@ export default async function handler(req, res) {
         minimum5D: 25,
         minimum20D: 25,
         independentOverall: independent.length,
-        independent5D,
-        independent20D,
+        independent5D: independent5d,
+        independent20D: independent20d,
         ready: independent.length >= 50 && independent5d >= 25 && independent20d >= 25,
       };
       if (utcHour === 1 && utcMinute < 30 && modelSelectionGate.ready) modelEvaluation = await evaluateForecastModels();
