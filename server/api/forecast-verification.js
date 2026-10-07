@@ -364,7 +364,12 @@ function aggregateForecastSubset(subset) {
 
 function hasCreationEvidence(row) {
   const snapshot = row?.evidence_snapshot;
-  return Boolean(snapshot && typeof snapshot === 'object' && snapshot.capturedAt && snapshot.source === 'forward_outlook');
+  return Boolean(
+    snapshot &&
+    typeof snapshot === 'object' &&
+    snapshot.capturedAt &&
+    ['forward_outlook', 'auto_portfolio'].includes(String(snapshot.source || ''))
+  );
 }
 
 function evidenceState(row) {
