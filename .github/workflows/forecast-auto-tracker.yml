@@ -22,20 +22,21 @@ jobs:
       contents: read
     steps:
       - name: Run forecast auto tracker with GitHub OIDC
-        env:
-          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
             echo "::error::GitHub Actions OIDC token endpoint is unavailable."
+            echo "::error::Verify that this job has id-token: write permission."
             exit 1
           fi
 
           OIDC_RESPONSE="$(curl --fail-with-body --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 3 \
             --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             --get --data-urlencode "audience=ai-infra-watch" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")""
 
           OIDC_TOKEN="$(printf '%s' "$OIDC_RESPONSE" | jq -er '.value')"
 
