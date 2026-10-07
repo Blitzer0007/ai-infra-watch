@@ -33,10 +33,12 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const entries = Object.entries(evidenceAvailability || {});
 
   const sourceHealth = (item: any) => {
-    const status = String(item?.status || 'NOT_FOUND');
+    const status = String(item?.conflictStatus === 'CONFLICT' ? 'CONFLICT' : item?.status || 'NOT_FOUND');
     if (status === 'NOT_FOUND') return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
     if (status === 'PENDING') return { label: 'PENDING', tone: 'text-sky-300 border-sky-400/20 bg-sky-400/5' };
-    if (item?.stale || status === 'STALE') return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+    if (item?.freshness?.status === 'VERY_STALE' || item?.stale || status === 'STALE') return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+    if (item?.freshness?.status === 'AGING') return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+    if (status === 'CONFLICT') return { label: 'CONFLICT', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
     if (!item?.retrievedAt) return { label: status === 'AVAILABLE' ? 'HEALTHY' : status, tone: status === 'AVAILABLE' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]' };
 
     const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
@@ -65,7 +67,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const aging = entries.filter(([, item]) => sourceHealth(item).label === 'AGING').length;
   const stale = entries.filter(([, item]) => sourceHealth(item).label === 'STALE').length;
   const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
-  const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT').length;
+  const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT' || String(item?.conflictStatus || '') === 'CONFLICT').length;
   const fallback = entries.filter(([, item]) => Boolean(item?.fallback)).length;
   const [forecastValidation, setForecastValidation] = useState<any>(null);
   const [forecastValidationError, setForecastValidationError] = useState('');
