@@ -140,6 +140,7 @@ function historicalReturn(points: Array<{ price: number }>, days: number): numbe
 export function buildMoneyRotation(
   histories: Record<string, Array<{ date: string; price: number }>>,
   prices: Record<string, PricePoint>,
+  selectedHorizon: RotationHorizon = '20D',
 ): MoneyRotationSnapshot {
   const now = new Date().toISOString();
   const groupRows: RotationGroup[] = Object.entries(GROUP_MEMBERS).map(([name, members]) => {
@@ -148,12 +149,13 @@ export function buildMoneyRotation(
       return [key, values.length ? avg(values) : null];
     })) as Record<RotationHorizon, number | null>;
     const current = horizons['1D'];
-    const short = horizons['20D'];
-    const direction: RotationGroup['direction'] = current == null || short == null ? 'insufficient' : current > short + 0.5 ? 'strengthening' : current < short - 0.5 ? 'weakening' : 'mixed';
+    const comparison = selectedHorizon === '1D' ? horizons['20D'] : horizons[selectedHorizon];
+    const direction: RotationGroup['direction'] = current == null || comparison == null ? 'insufficient' : current > comparison + 0.5 ? 'strengthening' : current < comparison - 0.5 ? 'weakening' : 'mixed';
     const live = members.map(symbol => prices[symbol]).filter(x => x && x.stale !== true);
     const avgChange = avg(live.map(x => x.changePct).filter(Number.isFinite));
     const breadth = live.length ? live.filter(x => x.changePct >= 0).length / live.length : 0;
-    return { name, members, avgChange, breadth, relativeToUniverse: 0, score: clamp(50 + (short ?? 0) * 2 + (breadth - 0.5) * 30, 0, 100), horizons, direction };
+    const selectedReturn = horizons[selectedHorizon];
+    return { name, members, avgChange, breadth, relativeToUniverse: 0, score: clamp(50 + (selectedReturn ?? 0) * 2 + (breadth - 0.5) * 30, 0, 100), horizons, direction };
   });
   const pairs: RotationPair[] = PAIRS.map(([left, right, label]) => {
     const leftHistory = histories[left] || []; const rightHistory = histories[right] || [];
@@ -165,5 +167,5 @@ export function buildMoneyRotation(
     const trend: RotationPair['trend'] = latest == null || prior == null ? 'insufficient' : Math.abs(latest - prior) < 0.5 ? 'stable' : latest > prior ? 'widening' : 'narrowing';
     return { left, right, label, spread: prices[left]?.stale !== true && prices[right]?.stale !== true ? (prices[left]?.changePct ?? 0) - (prices[right]?.changePct ?? 0) : null, history, trend };
   });
-  return { groups: groupRows, pairs, selectedHorizon: '20D', methodology: 'Flow proxy = price momentum + breadth across the tracked universe; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
+  return { groups: groupRows, pairs, selectedHorizon, methodology: 'Flow proxy = price momentum + breadth across the tracked universe; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
 }
