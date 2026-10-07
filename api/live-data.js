@@ -37,7 +37,7 @@ function sourceFreshness({ latestAt = null, retrievedAt = null, stale = false, f
 }
 
 function canonicalText(value) {
-  return String(value || '').toLowerCase().replace(/https?:\\/\\/|www\\./g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  return String(value || '').toLowerCase().replace(/https?:\/\/|www\./g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function detectFeedConflicts(items = []) {
