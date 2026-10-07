@@ -123,13 +123,14 @@ export function summarizeForecastRows(rows = []) {
       Number.isFinite(Number(medianRaw));
   });
 
-  const signedErrors = verified
+  const independent = independentRows(verified);
+  const signedErrors = independent
     .map(row => Number(row.actual_return) - Number(row.median))
     .filter(Number.isFinite);
 
-  const base = summarizeSubset(verified);
+  const base = summarizeSubset(independent);
   const rolling = (size) => {
-    const subset = verified.slice(0, size);
+    const subset = independent.slice(-size);
     const summary = summarizeSubset(subset);
     return {
       count: summary.count,
@@ -154,8 +155,8 @@ export function summarizeForecastRows(rows = []) {
     p25p75CoveragePct: base.p25p75CoveragePct,
     p10p90CoveragePct: base.p10p90CoveragePct,
     calibrationVerdict: base.calibrationVerdict,
-    oldestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
-    newestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
+    oldestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
+    newestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
   };
 }
 
