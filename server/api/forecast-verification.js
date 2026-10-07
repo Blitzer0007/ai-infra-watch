@@ -374,12 +374,13 @@ function evidenceState(row) {
 }
 
 function forecastAnalytics(rows) {
-  const verified = rows.filter(row =>
+  const verifiedRaw = rows.filter(row =>
     String(row.status) === 'verified' &&
     Number.isFinite(Number(row.actual_return)) &&
     Number.isFinite(Number(row.median)) &&
     hasCreationEvidence(row)
   );
+  const verified = independentValidationRows(verifiedRaw);
   const legacyVerifiedCount = rows.filter(row =>
     String(row.status) === 'verified' &&
     Number.isFinite(Number(row.actual_return)) &&
@@ -388,6 +389,13 @@ function forecastAnalytics(rows) {
   ).length;
   const aggregate = aggregateForecastSubset;
   const overall = aggregate(verified);
+  const calibrationVerdict = overall.count < 25 || overall.p25p75CoveragePct == null || overall.p10p90CoveragePct == null
+    ? 'insufficient'
+    : overall.p25p75CoveragePct < 40 && overall.p10p90CoveragePct < 70
+      ? 'too narrow'
+      : overall.p25p75CoveragePct > 60 && overall.p10p90CoveragePct > 90
+        ? 'too wide'
+        : 'well calibrated';
   const grouped=(keyFn, decorate)=>{
     const map=new Map();
     for(const row of verified){
@@ -448,6 +456,9 @@ function forecastAnalytics(rows) {
     meanSignedErrorPct: overall.meanSignedErrorPct,
     p25p75CoveragePct: overall.p25p75CoveragePct,
     p10p90CoveragePct: overall.p10p90CoveragePct,
+    calibrationVerdict,
+    independentSampleSize: verified.length,
+    rawVerifiedCount: verifiedRaw.length,
     byTickerHorizon:grouped(
       row=>String(row.ticker||'').toUpperCase()+'|'+String(Number(row.horizon)),
       row=>({ticker:String(row.ticker||'').toUpperCase(),horizon:Number(row.horizon)})
@@ -457,9 +468,19 @@ function forecastAnalytics(rows) {
     byDirection,
     validationGate: {
       minimumRequired: 50,
+      minimum5D: 25,
+      minimum20D: 25,
       verifiedCount: verified.length,
-      ready: verified.length >= 50,
-      status: verified.length >= 50 ? '50+ validated forecasts' : 'building validation sample',
+      independent5D: verified.filter(row => Number(row.horizon) === 5).length,
+      independent20D: verified.filter(row => Number(row.horizon) === 20).length,
+      ready: verified.length >= 50 &&
+        verified.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        verified.filter(row => Number(row.horizon) === 20).length >= 25,
+      status: verified.length >= 50 &&
+        verified.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        verified.filter(row => Number(row.horizon) === 20).length >= 25
+        ? '50+ independent validated forecasts with 25+ per horizon'
+        : 'building independent validation sample',
     },
     longTerm:{
       verifiedCount:verified.length,
