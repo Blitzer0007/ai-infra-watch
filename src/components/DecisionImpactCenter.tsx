@@ -140,6 +140,8 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules set" value={(rules.total - rules.noRule) + '/' + rules.total} tone={rules.noRule ? 'warn' : 'good'} />
       </div>
 
+      <PreTradeGate data={data} />
+
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-3">
         <div className="rounded-xl border border-white/5 bg-black/10 p-3">
           <div className="flex items-center justify-between gap-2">
@@ -204,6 +206,79 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         Last checked {data.checkedAt ? new Date(data.checkedAt).toLocaleTimeString() : '—'} · {watch.length} watch items · {rules.noRule} holdings without active rules · 50 verified forecasts is a minimum evidence gate, not 50 independent tests.
       </div>
     </section>
+  );
+}
+
+function PreTradeGate({ data }: { data: DecisionData }) {
+  const rules = data.rules;
+  const portfolio = data.portfolio;
+  const forecast = data.forecast;
+  const signalGate = data.signalGate;
+
+  const checks = [
+    {
+      label: 'Fresh portfolio pricing',
+      ok: portfolio?.quoteCoverage?.status === 'complete',
+      detail: portfolio?.quoteCoverage ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
+    },
+    {
+      label: 'Position rules',
+      ok: Boolean(rules && rules.total > 0 && rules.noRule === 0),
+      detail: rules ? (rules.total - rules.noRule) + '/' + rules.total + ' holdings have active rules' : 'Rule state unavailable',
+    },
+    {
+      label: 'Decision-driving signals',
+      ok: Boolean(signalGate && signalGate.eligible > 0),
+      detail: signalGate ? signalGate.eligible + ' eligible signal families · ' + signalGate.experimental + ' experimental' : 'Signal gate unavailable',
+    },
+    {
+      label: 'Forecast evidence',
+      ok: Boolean(forecast && forecast.verified >= 50 && forecast.gate === 'ready'),
+      detail: forecast ? forecast.verified + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' independent' : 'Forecast validation unavailable',
+    },
+  ];
+
+  const hardBlocks = checks.filter(check => !check.ok && ['Fresh portfolio pricing', 'Position rules'].includes(check.label));
+  const evidenceReview = checks.some(check => !check.ok && ['Decision-driving signals', 'Forecast evidence'].includes(check.label));
+  const state = hardBlocks.length ? 'BLOCKED' : evidenceReview ? 'REVIEW' : 'READY';
+  const stateClass = state === 'BLOCKED'
+    ? 'border-rose-400/20 bg-rose-400/[.04] text-rose-300'
+    : state === 'REVIEW'
+      ? 'border-amber-400/20 bg-amber-400/[.035] text-amber-300'
+      : 'border-emerald-400/20 bg-emerald-400/[.035] text-emerald-300';
+
+  return (
+    <div className={'rounded-xl border p-3 ' + stateClass} data-testid="pre-trade-gate">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-[.2em]">Pre-trade review gate</div>
+          <div className="text-sm font-black mt-1">
+            {state === 'BLOCKED' ? 'Do not act yet' : state === 'REVIEW' ? 'Evidence still needs review' : 'Review conditions are ready'}
+          </div>
+          <div className="text-[9px] leading-4 text-white/40 mt-1 max-w-3xl">
+            This gate does not place or recommend trades. It checks whether the portfolio has enough operational and evidence context for a deliberate decision.
+          </div>
+        </div>
+        <span className="rounded border border-current/20 px-2 py-1 text-[8px] font-mono font-bold uppercase">{state}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-3">
+        {checks.map(check => (
+          <div key={check.label} className="rounded-lg border border-white/5 bg-black/10 p-2.5">
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase">
+              {check.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />}
+              <span className={check.ok ? 'text-emerald-300' : 'text-amber-300'}>{check.ok ? 'PASS' : 'WAIT'}</span>
+            </div>
+            <div className="text-[10px] font-bold text-white/70 mt-2">{check.label}</div>
+            <div className="text-[8px] leading-4 text-white/35 mt-1">{check.detail}</div>
+          </div>
+        ))}
+      </div>
+      {state === 'REVIEW' && (
+        <div className="mt-2 text-[8px] font-mono text-amber-200/70">
+          Forecast validation is still intentionally building its independent sample. Until the evidence gate is ready, forecast output should remain contextual rather than decision-driving.
+        </div>
+      )}
+    </div>
   );
 }
 
