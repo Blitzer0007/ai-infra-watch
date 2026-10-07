@@ -36,7 +36,7 @@ jobs:
             --retry-delay 3 \
             --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             --get --data-urlencode "audience=ai-infra-watch" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL")""
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
 
           OIDC_TOKEN="$(printf '%s' "$OIDC_RESPONSE" | jq -er '.value')"
 
