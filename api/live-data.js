@@ -26,6 +26,38 @@ const FEED_TIMEOUT_MS = 3500;
 let cached = null;
 let cachedAt = 0;
 
+function sourceFreshness({ latestAt = null, retrievedAt = null, stale = false, fallback = false, healthyMinutes = 30, agingMinutes = 120, staleMinutes = 360 } = {}) {
+  const reference = latestAt || retrievedAt;
+  const referenceMs = reference ? Date.parse(reference) : NaN;
+  if (stale) return { status: 'STALE', ageMinutes: Number.isFinite(referenceMs) ? Math.max(0, (Date.now() - referenceMs) / 60000) : null };
+  if (!Number.isFinite(referenceMs)) return { status: 'UNKNOWN', ageMinutes: null };
+  const ageMinutes = Math.max(0, (Date.now() - referenceMs) / 60000);
+  const status = ageMinutes <= healthyMinutes && !fallback ? 'FRESH' : ageMinutes <= agingMinutes ? 'AGING' : ageMinutes <= staleMinutes ? 'STALE' : 'VERY_STALE';
+  return { status, ageMinutes: Number(ageMinutes.toFixed(1)) };
+}
+
+function canonicalText(value) {
+  return String(value || '').toLowerCase().replace(/https?:\\/\\/|www\\./g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function detectFeedConflicts(items = []) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = item?.url ? String(item.url) : canonicalText(item?.title);
+    if (!key) continue;
+    const bucket = groups.get(key) || [];
+    bucket.push(item);
+    groups.set(key, bucket);
+  }
+  const conflicts = [];
+  for (const [key, bucket] of groups) {
+    const dates = [...new Set(bucket.map(item => String(item?.date || item?.dateSigned || '').slice(0, 10)).filter(Boolean))];
+    const sources = [...new Set(bucket.map(item => String(item?.source || '')).filter(Boolean))];
+    if (dates.length > 1 && sources.length > 1) conflicts.push({ key, sources, dates, type: 'same-evidence-different-date' });
+  }
+  return conflicts;
+}
+
 async function fetchSecContracts() {
   const ua = { 'User-Agent': process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research dashboard; contact: configured-admin@example.com)' };
   try {
@@ -489,10 +521,16 @@ export default async function handler(req, res) {
   const congressTrades = congressResult?.items || [];
   const politicalSignalsResult = politicalResult?.items || [];
   const feedRetrievedAt = new Date().toISOString();
-  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: newsResult?.provider || 'GDELT', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback) };
-  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: contractsResult?.source || 'SEC EDGAR', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(contractsResult?.stale), upstreamError: contractsResult?.upstreamError || null };
-  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null };
-  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null };
+  const newsLatestAt = currentNews.map(item => item?.date).filter(Boolean).sort().at(-1) || null;
+  const contractsLatestAt = contracts.map(item => item?.dateSigned).filter(Boolean).sort().at(-1) || null;
+  const politicalLatestAt = politicalSignalsResult.map(item => item?.date).filter(Boolean).sort().at(-1) || null;
+  const congressLatestAt = congressTrades.map(item => item?.date || item?.transactionDate).filter(Boolean).sort().at(-1) || null;
+  const newsConflicts = detectFeedConflicts(currentNews);
+  const politicalConflicts = detectFeedConflicts(politicalSignalsResult);
+  evidenceAvailability.news = { status: currentNews.length ? 'AVAILABLE' : 'NOT_FOUND', count: currentNews.length, source: newsResult?.provider || 'GDELT', retrievedAt: feedRetrievedAt, latestAt: newsLatestAt, refreshIntervalSeconds: 300, fallback: Boolean(newsResult?.fallback), freshness: sourceFreshness({ latestAt: newsLatestAt, retrievedAt: feedRetrievedAt, fallback: Boolean(newsResult?.fallback), healthyMinutes: 180, agingMinutes: 720, staleMinutes: 4320 }), conflictStatus: newsConflicts.length ? 'CONFLICT' : 'CLEAR', conflicts: newsConflicts };
+  evidenceAvailability.contracts = { status: contracts.length ? 'AVAILABLE' : 'NOT_FOUND', count: contracts.length, source: contractsResult?.source || 'SEC EDGAR', retrievedAt: feedRetrievedAt, latestAt: contractsLatestAt, refreshIntervalSeconds: 300, stale: Boolean(contractsResult?.stale), upstreamError: contractsResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: contractsLatestAt, retrievedAt: feedRetrievedAt, stale: Boolean(contractsResult?.stale), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }) };
+  evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, latestAt: politicalLatestAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: politicalLatestAt, retrievedAt: feedRetrievedAt, fallback: Boolean(politicalResult?.upstreamError), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }), conflictStatus: politicalConflicts.length ? 'CONFLICT' : 'CLEAR', conflicts: politicalConflicts };
+  evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, latestAt: congressLatestAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: congressLatestAt, retrievedAt: feedRetrievedAt, stale: Boolean(congressResult?.stale), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }) };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
   const latestMarketQuote = Object.values(stockPrices).reduce((latest, item) => {
     if (!latest || String(item?.marketTime || item?.retrievedAt || item?.asOf || '') > String(latest.marketTime || latest.retrievedAt || latest.asOf || '')) return item;
