@@ -590,7 +590,27 @@ async function deliver(digest, channels) {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if ((channels.includes('telegram') || (!channels.length && botToken && chatId)) && botToken && chatId) {
     try {
-      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: digest.text }) });
+      const dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
+      const actions = Array.isArray(digest?.decision?.actionItems) ? digest.decision.actionItems.slice(0, 3) : [];
+      const inlineKeyboard = [];
+      for (const item of actions) {
+        const symbol = String(item?.symbol || '').trim().toUpperCase();
+        if (!symbol) continue;
+        inlineKeyboard.push([
+          { text: 'Review ' + symbol, url: dashboardBase + '/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) },
+          { text: 'Journal ' + symbol, url: dashboardBase + '/overview' },
+        ]);
+      }
+      inlineKeyboard.push([
+        { text: 'Open Decision Center', url: dashboardBase + '/overview' },
+        { text: 'Open Watchlist', url: dashboardBase + '/watchlist' },
+      ]);
+      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        chat_id: chatId,
+        text: digest.text,
+        reply_markup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
+        disable_web_page_preview: true,
+      }) });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       delivered.push('telegram');
     } catch (error) { errors.push('telegram: ' + (error instanceof Error ? error.message : 'delivery failed')); }
