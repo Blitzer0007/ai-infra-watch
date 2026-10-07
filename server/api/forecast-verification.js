@@ -254,6 +254,7 @@ function chooseModel(v1,v2){
 function independentValidationRows(rows) {
   const sorted = rows
     .filter(row => String(row?.status) === 'verified')
+    .filter(row => hasCreationEvidence(row))
     .filter(row => Number.isFinite(Number(row?.actual_return)) && Number.isFinite(Number(row?.median)))
     .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
   const selected = [];
