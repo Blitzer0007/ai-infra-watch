@@ -50,6 +50,15 @@ function typicalMiss(rows) {
   return errors.length ? Number(percentile(errors, 0.5).toFixed(2)) : null;
 }
 
+function calibrationVerdict(p25p75, p10p90, count) {
+  if (count < 25 || p25p75 == null || p10p90 == null) return 'insufficient';
+  const middleDelta = p25p75 - 50;
+  const wideDelta = p10p90 - 80;
+  if (middleDelta < -10 && wideDelta < -10) return 'too narrow';
+  if (middleDelta > 10 && wideDelta > 10) return 'too wide';
+  return 'well calibrated';
+}
+
 function summarizeSubset(rows) {
   const signedErrors = rows
     .map(row => Number(row.actual_return) - Number(row.median))
@@ -70,9 +79,39 @@ function summarizeSubset(rows) {
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
     p25p75CoveragePct: p25p75 == null ? null : Number(p25p75.toFixed(1)),
     p10p90CoveragePct: p10p90 == null ? null : Number(p10p90.toFixed(1)),
+    calibrationVerdict: calibrationVerdict(p25p75, p10p90, rows.length),
   };
 }
 
+function businessDaysBetween(from, to) {
+  const start = new Date(String(from).slice(0, 10) + 'T00:00:00Z');
+  const end = new Date(String(to).slice(0, 10) + 'T00:00:00Z');
+  if (!(start < end)) return 0;
+  let count = 0;
+  for (const cursor = new Date(start); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const day = cursor.getUTCDay();
+    if (day !== 0 && day !== 6) count += 1;
+  }
+  return count;
+}
+
+function independentRows(rows, minimumBusinessDayGap = 20) {
+  const sorted = [...rows]
+    .filter(row => String(row?.status || 'verified') === 'verified')
+    .sort((a, b) => String(a.verified_at || a.created_at || '').localeCompare(String(b.verified_at || b.created_at || '')));
+  const selected = [];
+  const lastByTicker = new Map();
+  for (const row of sorted) {
+    const ticker = String(row?.ticker || '').trim().toUpperCase();
+    if (!ticker) continue;
+    const previous = lastByTicker.get(ticker);
+    const currentDate = row.verified_at || row.created_at;
+    if (previous && businessDaysBetween(previous, currentDate) < minimumBusinessDayGap) continue;
+    selected.push(row);
+    lastByTicker.set(ticker, currentDate);
+  }
+  return selected;
+}
 export function summarizeForecastRows(rows = []) {
   const verified = rows.filter(row => {
     const actualRaw = row?.actual_return;
@@ -84,13 +123,14 @@ export function summarizeForecastRows(rows = []) {
       Number.isFinite(Number(medianRaw));
   });
 
-  const signedErrors = verified
+  const independent = independentRows(verified);
+  const signedErrors = independent
     .map(row => Number(row.actual_return) - Number(row.median))
     .filter(Number.isFinite);
 
-  const base = summarizeSubset(verified);
+  const base = summarizeSubset(independent);
   const rolling = (size) => {
-    const subset = verified.slice(0, size);
+    const subset = independent.slice(-size);
     const summary = summarizeSubset(subset);
     return {
       count: summary.count,
@@ -101,6 +141,7 @@ export function summarizeForecastRows(rows = []) {
 
   return {
     count: verified.length,
+    independentCount: independentRows(verified).length,
     predictionMatchPct: base.predictionMatchPct,
     rolling: {
       last10: rolling(10),
@@ -113,13 +154,21 @@ export function summarizeForecastRows(rows = []) {
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
     p25p75CoveragePct: base.p25p75CoveragePct,
     p10p90CoveragePct: base.p10p90CoveragePct,
-    oldestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
-    newestVerifiedAt: verified.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
+    calibrationVerdict: base.calibrationVerdict,
+    oldestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
+    newestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
   };
 }
 
 export function buildForecastLearningSummary(rows = []) {
   const verified = rows.filter(row => String(row?.status || 'verified') === 'verified');
+  const independent = independentRows(verified);
+  const score = subset => ({
+    count: subset.length,
+    directionRightPct: directionRightPct(subset),
+    predictionMatchPct: predictionMatchPct(subset),
+    calibrationVerdict: summarizeSubset(subset).calibrationVerdict,
+  });
   const typicalMiss = subset => {
     const values = subset.map(row => Math.abs(Number(row.actual_return) - Number(row.median))).filter(Number.isFinite);
     return values.length ? Number(percentile(values, 0.5).toFixed(2)) : null;
@@ -128,22 +177,18 @@ export function buildForecastLearningSummary(rows = []) {
     const values = subset.map(row => Math.abs(Number(row.actual_return))).filter(Number.isFinite);
     return values.length ? Number(percentile(values, 0.5).toFixed(2)) : null;
   };
-  const score = subset => ({
-    count: subset.length,
-    directionRightPct: directionRightPct(subset),
-    predictionMatchPct: predictionMatchPct(subset),
-  });
-  const modelMiss = typicalMiss(verified);
-  const noChangeMiss = baselineMiss(verified);
+  const modelMiss = typicalMiss(independent);
+  const noChangeMiss = baselineMiss(independent);
   const improvementPct = modelMiss != null && noChangeMiss > 0
     ? Number(((noChangeMiss - modelMiss) / noChangeMiss * 100).toFixed(1))
     : null;
-  const recent = score(verified.slice(0, 10));
-  const prior = score(verified.slice(10, 20));
+
+  const recent = score(independent.slice(-20));
+  const prior = score(independent.slice(-40, -20));
   const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
     ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
     : null;
-  const driftStatus = driftScore == null || verified.length < 20
+  const driftStatus = independent.length < 40 || driftScore == null
     ? 'insufficient'
     : driftScore >= 5 ? 'improving' : driftScore <= -5 ? 'declining' : 'steady';
 
@@ -153,30 +198,54 @@ export function buildForecastLearningSummary(rows = []) {
     return ['news', 'contracts', 'political', 'macro'].filter(key => Number(counts[key]) > 0).length +
       (snapshot.analystConsensus?.status === 'available' ? 1 : 0);
   };
-  const multi = verified.filter(row => channelCount(row) >= 2);
-  const other = verified.filter(row => channelCount(row) < 2);
+  const multi = independent.filter(row => channelCount(row) >= 2);
+  const other = independent.filter(row => channelCount(row) < 2);
   const multiScore = score(multi);
   const otherScore = score(other);
-  const evidenceLift = multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
+  const evidenceReady = multi.length >= 15 && other.length >= 15;
+  const evidenceLift = evidenceReady && multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
     ? Number((multiScore.predictionMatchPct - otherScore.predictionMatchPct).toFixed(1))
     : null;
 
+  const horizon5 = independent.filter(row => Number(row.horizon) === 5);
+  const horizon20 = independent.filter(row => Number(row.horizon) === 20);
+  const validationGate = {
+    minimumOverall: 50,
+    minimum5D: 25,
+    minimum20D: 25,
+    independentOverall: independent.length,
+    independent5D: horizon5.length,
+    independent20D: horizon20.length,
+    ready: independent.length >= 50 && horizon5.length >= 25 && horizon20.length >= 25,
+  };
+
   return {
     sampleSize: verified.length,
-    model: { typicalMiss: modelMiss, directionRightPct: score(verified).directionRightPct, predictionMatchPct: score(verified).predictionMatchPct },
+    independentSampleSize: independent.length,
+    model: {
+      typicalMiss: modelMiss,
+      directionRightPct: score(independent).directionRightPct,
+      predictionMatchPct: score(independent).predictionMatchPct,
+    },
     baseline: { name: 'No-change baseline', typicalMiss: noChangeMiss, improvementPct },
-    drift: { status: driftStatus, score: driftScore, recent, prior },
+    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40 },
     evidenceLearning: {
       multipleChannelSamples: multi.length,
       otherSamples: other.length,
+      minimumPerGroup: 15,
       predictionMatchLift: evidenceLift,
-      note: evidenceLift == null
-        ? 'Not enough evidence history to compare evidence quality.'
-        : evidenceLift >= 5
-          ? 'Forecasts with multiple evidence channels have been performing better in this sample.'
-          : evidenceLift <= -5
-            ? 'More evidence has not improved results in this sample; treat the evidence mix as a learning signal, not proof of causation.'
-            : 'Multiple evidence channels have not produced a clear performance difference yet.',
+      status: evidenceReady ? 'measurable' : 'insufficient',
+      note: !evidenceReady
+        ? 'Need at least 15 independent forecasts in each evidence group before comparing evidence lift.'
+        : evidenceLift == null
+          ? 'Evidence groups are large enough, but the comparison is not yet computable.'
+          : 'Evidence lift is descriptive only; ticker and horizon mix must be reviewed before causal interpretation.',
+    },
+    validationGate,
+    calibration: {
+      p25p75TargetPct: 50,
+      p10p90TargetPct: 80,
+      verdict: summarizeSubset(independent).calibrationVerdict,
     },
   };
 }
@@ -193,9 +262,10 @@ export function forecastValidationGate(count) {
 
 export function buildForecastValidationSummary(rows = []) {
   const overall = summarizeForecastRows(rows);
+  const independent = independentRows(rows);
   const groups = new Map();
 
-  for (const row of rows) {
+  for (const row of independent) {
     if (String(row?.status || 'verified') !== 'verified') continue;
     const ticker = String(row?.ticker || '').trim().toUpperCase();
     const horizon = Number(row?.horizon);
@@ -222,11 +292,19 @@ export function buildForecastValidationSummary(rows = []) {
     byTickerHorizon,
     validationGate: {
       minimumRequired: FORECAST_VALIDATION_MINIMUM,
-      verifiedCount: overall.count,
-      ready: overall.count >= FORECAST_VALIDATION_MINIMUM,
-      status: overall.count >= FORECAST_VALIDATION_MINIMUM
-        ? '50+ validated forecasts'
-        : 'building validation sample',
+      minimum5D: 25,
+      minimum20D: 25,
+      verifiedCount: overall.independentSampleSize,
+      independent5D: independent.filter(row => Number(row.horizon) === 5).length,
+      independent20D: independent.filter(row => Number(row.horizon) === 20).length,
+      ready: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+        independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        independent.filter(row => Number(row.horizon) === 20).length >= 25,
+      status: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+        independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        independent.filter(row => Number(row.horizon) === 20).length >= 25
+        ? '50+ independent validated forecasts with 25+ per horizon'
+        : 'building independent validation sample',
     },
   };
 }
