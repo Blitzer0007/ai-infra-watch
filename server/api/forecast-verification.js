@@ -81,6 +81,7 @@ async function verifyDueForecasts() {
   if (!dueResponse.ok) throw new Error(due?.message || 'Failed to load due forecasts.');
 
   const results = [];
+  const deferred = [];
   const failures = [];
   for (const forecast of due) {
     try {
@@ -89,8 +90,12 @@ async function verifyDueForecasts() {
       // Never verify against a point before the forecast target date.
       // If the market history has not reached the target yet, leave it pending.
       const point = points.find(item => item.date >= forecast.target_date);
-      if (!point || !(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
-        throw new Error('No market point on or after the target date yet.');
+      if (!point) {
+        deferred.push({ id: forecast.id, ticker: forecast.ticker, targetDate: forecast.target_date, reason: 'market point for target date is not available yet.' });
+        continue;
+      }
+      if (!(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
+        throw new Error('Invalid forecast or market price for verification.'); 
       }
 
       const actualReturn = (Number(point.price) / Number(forecast.entry_price) - 1) * 100;
@@ -114,7 +119,7 @@ async function verifyDueForecasts() {
     }
   }
   const telegram = await sendForecastValidationTelegram(results);
-  return { checked: due.length, verified: results.length, failed: failures.length, results, failures, telegram };
+  return { checked: due.length, verified: results.length, deferred: deferred.length, failed: failures.length, results, deferred, failures, telegram };
 }
 
 
@@ -246,6 +251,34 @@ function chooseModel(v1,v2){
   const errorImproved=v2.error<=v1.error*0.95;
   return directionImproved && errorImproved ? 'analogue-v2' : 'analogue-v1';
 }
+function independentValidationRows(rows) {
+  const sorted = rows
+    .filter(row => String(row?.status) === 'verified')
+    .filter(row => Number.isFinite(Number(row?.actual_return)) && Number.isFinite(Number(row?.median)))
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  const selected = [];
+  const lastByTickerHorizon = new Map();
+  const businessDaysBetween = (from, to) => {
+    const start = new Date(String(from).slice(0, 10) + 'T00:00:00Z');
+    const end = new Date(String(to).slice(0, 10) + 'T00:00:00Z');
+    if (!(start < end)) return 0;
+    let count = 0;
+    for (const cursor = new Date(start); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const day = cursor.getUTCDay();
+      if (day !== 0 && day !== 6) count += 1;
+    }
+    return count;
+  };
+  for (const row of sorted) {
+    const key = String(row.ticker || '').toUpperCase() + '|' + String(Number(row.horizon));
+    const previous = lastByTickerHorizon.get(key);
+    if (previous && businessDaysBetween(previous.created_at, row.created_at) < 20) continue;
+    selected.push(row);
+    lastByTickerHorizon.set(key, row);
+  }
+  return selected;
+}
+
 async function evaluateForecastModels() {
   const TICKERS = ['NVDA','MSFT','MU','AVGO','AMD','TSM','META','NBIS'];
   const HORIZONS = [5,20,60,120,252];
@@ -626,8 +659,20 @@ export default async function handler(req, res) {
       let modelEvaluation = null;
       const utcHour = new Date().getUTCHours();
       const utcMinute = new Date().getUTCMinutes();
-      if (utcHour === 1 && utcMinute < 30) modelEvaluation = await evaluateForecastModels();
-      return send(res, 200, { ok: true, verification, learning, learningRun, modelEvaluation });
+      const independent = independentValidationRows(allRows);
+      const independent5d = independent.filter(row => Number(row.horizon) === 5).length;
+      const independent20d = independent.filter(row => Number(row.horizon) === 20).length;
+      const modelSelectionGate = {
+        minimumOverall: 50,
+        minimum5D: 25,
+        minimum20D: 25,
+        independentOverall: independent.length,
+        independent5D,
+        independent20D,
+        ready: independent.length >= 50 && independent5d >= 25 && independent20d >= 25,
+      };
+      if (utcHour === 1 && utcMinute < 30 && modelSelectionGate.ready) modelEvaluation = await evaluateForecastModels();
+      return send(res, 200, { ok: true, verification, learning, learningRun, modelEvaluation, modelSelectionGate });
     }
 
     if (req.method === 'GET') {
