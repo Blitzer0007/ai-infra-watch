@@ -262,9 +262,10 @@ export function forecastValidationGate(count) {
 
 export function buildForecastValidationSummary(rows = []) {
   const overall = summarizeForecastRows(rows);
+  const independent = independentRows(rows);
   const groups = new Map();
 
-  for (const row of rows) {
+  for (const row of independent) {
     if (String(row?.status || 'verified') !== 'verified') continue;
     const ticker = String(row?.ticker || '').trim().toUpperCase();
     const horizon = Number(row?.horizon);
@@ -291,11 +292,19 @@ export function buildForecastValidationSummary(rows = []) {
     byTickerHorizon,
     validationGate: {
       minimumRequired: FORECAST_VALIDATION_MINIMUM,
-      verifiedCount: overall.count,
-      ready: overall.count >= FORECAST_VALIDATION_MINIMUM,
-      status: overall.count >= FORECAST_VALIDATION_MINIMUM
-        ? '50+ validated forecasts'
-        : 'building validation sample',
+      minimum5D: 25,
+      minimum20D: 25,
+      verifiedCount: overall.independentSampleSize,
+      independent5D: independent.filter(row => Number(row.horizon) === 5).length,
+      independent20D: independent.filter(row => Number(row.horizon) === 20).length,
+      ready: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+        independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        independent.filter(row => Number(row.horizon) === 20).length >= 25,
+      status: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+        independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
+        independent.filter(row => Number(row.horizon) === 20).length >= 25
+        ? '50+ independent validated forecasts with 25+ per horizon'
+        : 'building independent validation sample',
     },
   };
 }
