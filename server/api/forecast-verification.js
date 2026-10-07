@@ -470,7 +470,7 @@ function forecastAnalytics(rows) {
 }
 
 function forecastLearning(rows) {
-  const verified = rows
+  const verified = independentValidationRows(rows)
     .filter(row => String(row.status) === 'verified')
     .filter(row => Number.isFinite(Number(row.actual_return)) && Number.isFinite(Number(row.median)))
     .sort((a, b) => String(b.verified_at || b.created_at || '').localeCompare(String(a.verified_at || a.created_at || '')));
@@ -499,12 +499,12 @@ function forecastLearning(rows) {
     };
   };
 
-  const recent = score(verified.slice(0, 10));
-  const prior = score(verified.slice(10, 20));
+  const recent = score(verified.slice(0, 20));
+  const prior = score(verified.slice(20, 40));
   const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
     ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
     : null;
-  const driftStatus = driftScore == null || verified.length < 20
+  const driftStatus = driftScore == null || verified.length < 40
     ? 'insufficient'
     : driftScore >= 5 ? 'improving' : driftScore <= -5 ? 'declining' : 'steady';
 
@@ -518,11 +518,6 @@ function forecastLearning(rows) {
       ? Math.sign(Number(row.actual_return)) === Math.sign(Number(row.median))
       : null;
     const rangeHit = Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75);
-    let explanation;
-    if (directionRight === true && rangeHit) explanation = 'Direction was right and the actual result stayed inside the expected range.';
-    else if (directionRight === true) explanation = 'Direction was right, but the move was outside the expected middle range.';
-    else if (directionRight === false) explanation = 'Direction was wrong; the model expected the move on the other side.';
-    else explanation = 'There was no clear directional outcome to judge.';
     return {
       id: row.id,
       ticker: String(row.ticker || '').toUpperCase(),
@@ -531,21 +526,34 @@ function forecastLearning(rows) {
       rangeHit,
       evidenceChannels: channelCount,
       evidenceQuality: channelCount >= 2 ? 'multiple channels' : channelCount === 1 ? 'one channel' : 'evidence gap',
-      explanation,
     };
   });
 
   const multi = verified.filter(row => {
     const s = row.evidence_snapshot || {};
     const c = s.counts || {};
-    return ['news','contracts','political','macro'].filter(k => Number(c[k]) > 0).length + (s.analystConsensus?.status === 'available' ? 1 : 0) >= 2;
+    return ['news','contracts','political','macro'].filter(k => Number(c[k]) > 0).length +
+      (s.analystConsensus?.status === 'available' ? 1 : 0) >= 2;
   });
-  const singleOrGap = verified.filter(row => !multi.includes(row));
+  const other = verified.filter(row => !multi.includes(row));
   const multiScore = score(multi);
-  const otherScore = score(singleOrGap);
-  const evidenceLift = multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
+  const otherScore = score(other);
+  const evidenceReady = multi.length >= 15 && other.length >= 15;
+  const evidenceLift = evidenceReady && multiScore.predictionMatchPct != null && otherScore.predictionMatchPct != null
     ? Number((multiScore.predictionMatchPct - otherScore.predictionMatchPct).toFixed(1))
     : null;
+
+  const independent5d = verified.filter(row => Number(row.horizon) === 5).length;
+  const independent20d = verified.filter(row => Number(row.horizon) === 20).length;
+  const validationGate = {
+    minimumOverall: 50,
+    minimum5D: 25,
+    minimum20D: 25,
+    verifiedCount: verified.length,
+    independent5D: independent5d,
+    independent20D: independent20d,
+    ready: verified.length >= 50 && independent5d >= 25 && independent20d >= 25,
+  };
 
   return {
     sampleSize: verified.length,
@@ -559,19 +567,24 @@ function forecastLearning(rows) {
       typicalMiss: baselineError == null ? null : Number(baselineError.toFixed(2)),
       improvementPct,
     },
-    drift: { status: driftStatus, score: driftScore, recent, prior },
+    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40 },
     evidenceLearning: {
       multipleChannelSamples: multi.length,
-      otherSamples: singleOrGap.length,
+      otherSamples: other.length,
+      minimumPerGroup: 15,
       predictionMatchLift: evidenceLift,
-      note: evidenceLift == null
-        ? 'Not enough evidence history to compare evidence quality.'
-        : evidenceLift >= 5
-          ? 'Forecasts with multiple evidence channels have been performing better in this sample.'
-          : evidenceLift <= -5
-            ? 'More evidence has not improved results in this sample; treat the evidence mix as a learning signal, not proof of causation.'
-            : 'Multiple evidence channels have not produced a clear performance difference yet.',
+      status: evidenceReady ? 'measurable' : 'insufficient',
+      note: !evidenceReady
+        ? 'Need at least 15 independent forecasts in each evidence group before comparing evidence lift.'
+        : 'Evidence lift is descriptive only; review ticker and horizon mix before causal interpretation.',
     },
+    calibration: {
+      p25p75TargetPct: 50,
+      p10p90TargetPct: 80,
+      p25p75CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75)).length / verified.length * 100).toFixed(1)) : null,
+      p10p90CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p10) && Number(row.actual_return) <= Number(row.p90)).length / verified.length * 100).toFixed(1)) : null,
+    },
+    validationGate,
     recentLessons: withEvidence.slice(0, 10),
   };
 }
