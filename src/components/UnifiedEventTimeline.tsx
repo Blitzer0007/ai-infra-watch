@@ -167,6 +167,40 @@ function macroHolds(symbol: string, macroId: string): boolean {
   return holdings[key].includes(symbol);
 }
 
+function normalizeEventTitle(value: string): string {
+  return clean(value).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function eventDuplicate(a: TimelineEvent, b: TimelineEvent): boolean {
+  if (a.url && b.url && a.url === b.url) return true;
+  const dayA = Date.parse(a.date + 'T00:00:00Z');
+  const dayB = Date.parse(b.date + 'T00:00:00Z');
+  const withinOneDay = Number.isFinite(dayA) && Number.isFinite(dayB) && Math.abs(dayA - dayB) <= 86400000;
+  return withinOneDay && normalizeEventTitle(a.title) === normalizeEventTitle(b.title);
+}
+
+function dedupeTimelineEvents(items: TimelineEvent[]): TimelineEvent[] {
+  const output: TimelineEvent[] = [];
+  for (const item of items) {
+    const existingIndex = output.findIndex(existing => eventDuplicate(existing, item));
+    if (existingIndex < 0) {
+      output.push(item);
+      continue;
+    }
+    const existing = output[existingIndex];
+    const mergedSource = existing.source === item.source
+      ? existing.source
+      : existing.source + ' + ' + item.source;
+    output[existingIndex] = {
+      ...existing,
+      source: mergedSource,
+      url: existing.url || item.url || null,
+      detail: existing.detail,
+    };
+  }
+  return output;
+}
+
 function sourceLevel(kind: TimelineEvent['kind']): TimelineEvent['sourceLevel'] {
   if (kind === 'SEC' || kind === 'Contract') return 'PRIMARY';
   if (kind === 'Congress') return 'PUBLIC DISCLOSURE';
@@ -350,7 +384,7 @@ export default function UnifiedEventTimeline({
       }))
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
-    return [...secEvents, ...earningsEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents, ...autopilotEvents]
+    return dedupeTimelineEvents([...secEvents, ...earningsEvents, ...contractEvents, ...congressEvents, ...macroEvents, ...politicalEvents, ...newsEvents, ...autopilotEvents])
       .filter(event => event.date <= new Date().toISOString().slice(0, 10))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 16);
