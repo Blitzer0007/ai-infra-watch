@@ -1280,7 +1280,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   {portfolioContext.holding?.lossLimitPct != null && Number(portfolioContext.holding.averageCost) > 0 &&
                     !portfolioContext.holding.brokerAlerts?.some(alert => alert.direction === 'below') &&
                     !(portfolioContext.holding.brokerAlertPrices || []).some(price => Number(price) < Number(portfolioContext.holding?.averageCost)) && (
-                      <div className="text-[8px] font-mono text-amber-200/65 mt-2">Downside broker alert not recorded · loss-limit level is {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100)}). Review adding a broker alert at this level.</div>
+                      <div className="text-[8px] font-mono text-amber-200/65 mt-2">Downside broker alert not recorded · loss-limit level is {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100)). Review adding a broker alert at this level.</div>
                   )}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
