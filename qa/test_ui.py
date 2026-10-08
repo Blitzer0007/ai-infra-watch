@@ -358,3 +358,49 @@ def test_purchase_lot_sanity_check_is_visible(page):
     portfolio.wait_for(state="visible", timeout=30000)
     portfolio.get_by_label("Purchase history for NVDA").click()
     portfolio.get_by_text("NO MARKET DATE", exact=True).wait_for(state="visible", timeout=30000)
+
+
+def test_settings_dashboard_favorites_and_notifications_ui(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-settings").click()
+    settings = page.locator("#settings-view")
+    settings.wait_for(state="visible", timeout=30000)
+    assert "Overview favorites" in settings.inner_text()
+    assert "Notifications" in settings.inner_text()
+    assert "Market data" in settings.inner_text()
+    assert "Server delivery" in settings.inner_text()
+    assert "Reset local preferences" in settings.inner_text()
+
+
+def test_watchlist_attention_alerts_and_search_ui(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-watchlist").click()
+    watchlist = page.locator("#watchlist-view")
+    watchlist.wait_for(state="visible", timeout=30000)
+    assert "What needs attention?" in watchlist.inner_text()
+    assert "Your watchlist" in watchlist.inner_text()
+    assert "Price alerts" in watchlist.inner_text()
+    assert "Notifications" in watchlist.inner_text()
+    watchlist.get_by_label("Search your watchlist").fill("NVDA")
+    page.wait_for_timeout(300)
+    assert "NVDA" in watchlist.inner_text()
+    sort = watchlist.get_by_label("Sort your watchlist")
+    sort.select_option("attention")
+    assert "Needs attention" in sort.inner_text()
+
+
+def test_watchlist_alert_edit_flow(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-watchlist").click()
+    watchlist = page.locator("#watchlist-view")
+    watchlist.wait_for(state="visible", timeout=30000)
+    form = watchlist.locator("#watchlist-alert-form")
+    form.get_by_label("Alert stock ticker").fill("NVDA")
+    form.get_by_label("Alert direction").select_option("above")
+    form.get_by_label("Alert target price").fill("250")
+    form.get_by_role("button", name="Add alert").click()
+    assert "NVDA" in form.inner_text()
+    assert "Monitoring" in form.inner_text() or "Near target" in form.inner_text() or "Triggered" in form.inner_text()
