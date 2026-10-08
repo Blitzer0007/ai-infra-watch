@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Loader2, ExternalLink, Activity, Building2, CalendarDays, ChevronDown, FileText, Search, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
@@ -599,7 +599,7 @@ function SummaryMetric({
   label: string;
   value: string;
   tone: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-white/10 bg-[#0b1015] px-4 py-3.5">
@@ -611,7 +611,44 @@ function SummaryMetric({
     </div>
   );
 }
-function FilterBlock({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+function CompanyMetric({
+  label,
+  value,
+  tone,
+  detail,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+  detail?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/35">{label}</div>
+      <div className={'mt-1 text-base font-black leading-tight ' + tone}>{value}</div>
+      {detail && <div className="mt-1 text-[9px] text-white/30">{detail}</div>}
+    </div>
+  );
+}
+
+function SecondaryMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2.5">
+      <div className="text-[9px] font-mono uppercase tracking-wider text-white/30">{label}</div>
+      <div className={'mt-1 text-sm font-bold ' + tone}>{value}</div>
+    </div>
+  );
+}
+
+function FilterBlock({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return <div><label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-white/75">{icon}{label}</label>{children}</div>;
 }
 
