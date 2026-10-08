@@ -173,5 +173,5 @@ def test_exploratory_congress_filters(page):
     page.get_by_text('House Member', exact=True).wait_for(state='visible', timeout=30000)
     page.get_by_text('House Seller', exact=True).wait_for(state='detached', timeout=30000)
 
-    page.get_by_role('button', name='Clear table filters', exact=True).click()
+    page.get_by_role('button', name='Reset filters', exact=True).click()
     page.locator('span', has_text='3 matching disclosures').wait_for(state='visible', timeout=30000)
