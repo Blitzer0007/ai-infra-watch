@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Cpu, Server, Activity, ArrowRight, ShieldAlert, BadgeInfo } from 'lucide-react';
-import { AppConfig, formatPrice, formatPct, fetchLiveQuote } from '../utils';
+import { AppConfig, formatPrice, formatPct, fetchLiveQuote, getOverviewFavorites } from '../utils';
 import DecisionImpactCenter from './DecisionImpactCenter';
 import { STOCK_METADATA } from '../data';
 
@@ -215,7 +215,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
     async function fetchAll() {
       setLoadingQuotes(true);
       const fetched: Record<string, any> = {};
-      const symbols = config.watchlist.slice(0, 3);
+      const symbols = overviewFavorites;
       if (symbols.length === 0) symbols.push('NVDA', 'NBIS', 'DGXX');
 
       for (const sym of symbols) {
@@ -238,7 +238,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
       active = false;
       clearInterval(interval);
     };
-  }, [config.watchlist, config.finnhubKey]);
+  }, [overviewFavorites.join(','), config.finnhubKey]);
 
   // Selected relationships mapping for visual highlighting
   const getRelations = (id: string) => {
@@ -383,7 +383,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
 
       {/* Quote Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {config.watchlist.slice(0, 3).map((sym) => {
+        {overviewFavorites.map((sym) => {
           const q = quotes[sym];
           const name = STOCK_METADATA[sym]?.name || sym;
           
