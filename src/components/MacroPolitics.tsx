@@ -397,15 +397,15 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
 function scenarioBaselineFromRisks(risks: MacroRisk[] = []) {
   let taiwan = 15;
   let power = 30;
-  let export = 25;
+  let exportBreadth = 25;
   for (const risk of risks) {
     const text = (String(risk.title || '') + ' ' + String(risk.description || '')).toLowerCase();
     const score = risk.impactRating === 'high' ? 75 : risk.impactRating === 'medium' ? 45 : 15;
     if (text.includes('taiwan') || text.includes('tsmc')) taiwan = score;
     else if (text.includes('power') || text.includes('grid')) power = score;
-    else if (text.includes('export') || text.includes('embargo') || text.includes('prohibition')) export = score;
+    else if (text.includes('export') || text.includes('embargo') || text.includes('prohibition')) exportBreadth = score;
   }
-  return { taiwan, power, export };
+  return { taiwan, power, export: exportBreadth };
 }
 
 function feedStatus(item: any) {
