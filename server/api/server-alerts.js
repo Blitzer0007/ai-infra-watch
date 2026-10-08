@@ -527,6 +527,7 @@ export default async function handler(req, res) {
             ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
             : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
         source: 'Yahoo Finance quote',
+        value: q.changePct,
         sessionDate: session.sessionDate,
       });
 
