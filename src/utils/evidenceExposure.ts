@@ -61,8 +61,24 @@ function clean(value: unknown) {
   return String(value ?? '').toLowerCase();
 }
 
-function matches(text: string, keywords: string[]) {
+function termPattern(keyword: string) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\function matches(text: string, keywords: string[]) {
   return keywords.filter(keyword => text.includes(keyword));
+}');
+  return new RegExp('\\b' + escaped.replace(/\\s+/g, '\\s+') + '\\b', 'i');
+}
+
+function matches(text: string, keywords: string[]) {
+  return keywords.filter(keyword => termPattern(keyword).test(text));
+}
+
+function symbolMatches(text: string, symbol: string) {
+  const normalized = String(symbol || '').trim().toUpperCase();
+  if (!normalized) return false;
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\function matches(text: string, keywords: string[]) {
+  return keywords.filter(keyword => text.includes(keyword));
+}');
+  return new RegExp('\\b' + escaped + '\\b', 'i').test(text);
 }
 
 function toLevel(score: number): ExposureLevel {
@@ -92,7 +108,7 @@ export function deriveExposure(
   const symbolUpper = symbol.toUpperCase();
   const relatedContracts = contracts.filter(item =>
     clean(item.company).toUpperCase() === symbolUpper ||
-    clean(item.client).toUpperCase().includes(symbolUpper)
+    symbolMatches(clean(item.client), symbolUpper)
   );
 
   const contractText = relatedContracts
@@ -109,7 +125,7 @@ export function deriveExposure(
     const searchable = [item.title, item.summary, item.description, symbols]
       .map(clean)
       .join(' ');
-    return searchable.toUpperCase().includes(symbolUpper);
+    return symbolMatches(searchable, symbolUpper);
   });
 
   const newsText = relatedNews
@@ -232,9 +248,9 @@ export type ExposureWeightedMacroLoad = {
 };
 
 const SCENARIO_MATCHERS: Record<MacroScenario, RegExp> = {
-  taiwan: /taiwan|tsmc|advanced.?node|foundry/i,
-  power: /power|grid|data.?center/i,
-  export: /export|chip.?control|china|sanction|embargo/i,
+  taiwan: /\b(taiwan|tsmc|advanced[ -]?node|foundry)\b/i,
+  power: /\b(power|grid|data[ -]?center)\b/i,
+  export: /\b(export|chip[ -]?control|china|sanction|embargo)\b/i,
 };
 
 function riskSeverity(risk: MacroRiskInput): number {
