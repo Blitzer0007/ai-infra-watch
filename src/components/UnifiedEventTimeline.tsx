@@ -179,7 +179,7 @@ function eventDuplicate(a: TimelineEvent, b: TimelineEvent): boolean {
   return withinOneDay && normalizeEventTitle(a.title) === normalizeEventTitle(b.title);
 }
 
-function dedupeTimelineEvents(items: TimelineEvent[]): TimelineEvent[] {
+export function dedupeTimelineEvents(items: TimelineEvent[]): TimelineEvent[] {
   const output: TimelineEvent[] = [];
   for (const item of items) {
     const existingIndex = output.findIndex(existing => eventDuplicate(existing, item));
