@@ -391,7 +391,7 @@ export default function CongressTrades({ liveTrades = [] }: CongressTradesProps)
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, benchmarkHistory, (trade.filingDate || trade.date || trade.transactionDate).filingDate || (trade.filingDate || trade.date || trade.transactionDate).transactionDate || (trade.filingDate || trade.date || trade.transactionDate).date),
+        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.transactionDate || trade.date),
       }))
       .filter((row) => row.reaction);
   }, [filtered, history, benchmarkHistory, symbolFilter]);
@@ -419,7 +419,7 @@ export default function CongressTrades({ liveTrades = [] }: CongressTradesProps)
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
-    const uniqueEventDates = new Set(reactions.map(row => row.trade.transactionDate || row.trade.filingDate || row.trade.date).filter(Boolean)).size;
+    const uniqueEventDates = new Set(reactions.map(row => row.trade.filingDate || row.trade.transactionDate || row.trade.date).filter(Boolean)).size;
     const confidence = sourceStatus.kind === 'unavailable' || sourceStatus.stale
       ? 'Low'
       : uniqueEventDates >= 30 && reactions.length >= 30
