@@ -130,7 +130,7 @@ def test_portfolio_search_is_functional(page):
     search = portfolio.get_by_placeholder("Search ticker, company or theme")
     search.fill("NVDA")
     page.wait_for_timeout(500)
-    assert "Portfolio + Watchlist Decision Lab" in portfolio.inner_text()
+    assert "Portfolio Overview & Decisions" in portfolio.inner_text()
 
 def test_autonomous_research_ui_without_calling_llm(page):
     mock_local_apis(page)
@@ -256,8 +256,8 @@ def test_exit_profit_scenarios_identify_selected_ticker(page):
     page.get_by_text("What-if price scenarios", exact=True).wait_for(state="visible", timeout=30000)
     section = page.get_by_text("What-if price scenarios", exact=True).locator("..")
     assert "NVDA" in section.inner_text()
-    portfolio.get_by_text("Stock symbol", exact=True).wait_for(state="visible", timeout=30000)
-    assert "NVDA" in portfolio.get_by_text("Stock symbol", exact=True).locator("..").inner_text()
+    portfolio.get_by_text("Ticker", exact=True).wait_for(state="visible", timeout=30000)
+    assert "NVDA" in portfolio.get_by_text("Ticker", exact=True).locator("..").inner_text()
 
 
 def test_held_portfolio_filters_and_sort_mount(page):
@@ -266,8 +266,8 @@ def test_held_portfolio_filters_and_sort_mount(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
-    portfolio.get_by_label("Filter held portfolio universe by state").wait_for(state="visible", timeout=30000)
-    portfolio.get_by_label("Sort held portfolio universe").wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Filter your holdings by status").wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Sort your holdings").wait_for(state="visible", timeout=30000)
 
 
 def test_autopilot_signals_panel_mounts_on_macro_page(page):
