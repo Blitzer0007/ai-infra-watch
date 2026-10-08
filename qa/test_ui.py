@@ -367,7 +367,7 @@ def test_settings_dashboard_favorites_and_notifications_ui(page):
     settings = page.locator("#settings-view")
     settings.wait_for(state="visible", timeout=30000)
     assert "Dashboard" in settings.inner_text()
-    assert "Overview favorites" in settings.locator("body").inner_text()
+    settings.get_by_text("Overview favorites", exact=True).wait_for(state="visible", timeout=30000)
     assert "Notifications" in settings.inner_text()
     assert "Market data" in settings.inner_text()
     assert "Server delivery" in settings.inner_text()
