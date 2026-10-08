@@ -86,6 +86,12 @@ function loadForecasts(): ForecastSnapshot[] {
     return [];
   }
 }
+function forecastEvidenceState(snapshot?: ForecastEvidenceSnapshot) {
+  if (snapshot?.capturedAt && snapshot.source === 'forward_outlook') return 'CAPTURED';
+  if (snapshot && typeof snapshot === 'object') return 'INVALID_SNAPSHOT';
+  return 'LEGACY_NO_SNAPSHOT';
+}
+
 function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
 
 function percentile(values: number[], p: number): number {
@@ -1415,14 +1421,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
             <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Likely range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
             {f.evidenceSnapshot && <div className="mt-1 text-white/30">
-              Creation evidence: {f.evidenceSnapshot.analystConsensus?.status || 'missing'} analyst evidence · {
+              Evidence state: {forecastEvidenceState(f.evidenceSnapshot)} · {f.evidenceSnapshot.analystConsensus?.status || 'missing'} analyst evidence · {
                 (f.evidenceSnapshot.counts?.news || 0) +
                 (f.evidenceSnapshot.counts?.contracts || 0) +
                 (f.evidenceSnapshot.counts?.political || 0) +
                 (f.evidenceSnapshot.counts?.macro || 0)
               } event/context items · captured {f.evidenceSnapshot.capturedAt ? new Date(f.evidenceSnapshot.capturedAt).toLocaleString() : 'unknown time'}
             </div>}
-            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Legacy forecast — creation-time evidence snapshot was not captured.</div>}
+            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Evidence state: LEGACY_NO_SNAPSHOT · excluded from calibration statistics.</div>}
             {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
