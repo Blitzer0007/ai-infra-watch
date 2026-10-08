@@ -565,7 +565,7 @@ export default function App() {
               className="max-w-7xl mx-auto"
             >
               {activeView === 'overview' && <Overview config={config} onNavigate={handleNavigate} />}
-              {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} />}
+              {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} portfolioSymbols={portfolioSymbols} />}
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} />}
               {activeView === 'macro' && <MacroPolitics liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
