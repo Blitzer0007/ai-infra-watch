@@ -339,8 +339,6 @@ async function evaluate() {
       const previous = states.get(key);
 
       // One notification per symbol/direction per regular trading session.
-      // The session date in the key replaces the old time-based cooldown, so
-      // the same move cannot fire again after market close or the next day.
       if (previous?.active) continue;
 
       const severity = magnitude >= threshold * LARGE_MOVE_CRITICAL_MULTIPLIER ? 'critical' : 'high';
@@ -350,8 +348,18 @@ async function evaluate() {
         severity,
         symbol,
         title: symbol + ' large move detected',
-        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at 
+        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at price ' + q.price.toFixed(2) + '. ' +
+          (severity === 'critical'
+            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%. '
+            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold. '),
+        source: 'Yahoo Finance quote',
+        value: q.changePct,
+        sessionDate: session.sessionDate,
+      });
 
+      if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
+    }
+  }
   let catalystFeed = null;
   if (config.catalyst_alerts) {
     try {
@@ -426,9 +434,7 @@ async function evaluate() {
   const delivery = await sendTelegram(events);
   const deliveredKeys = new Set(delivery.sentEventKeys || []);
 
-  // Send exactly one end-of-session consolidated summary. It is intentionally
-  // evaluated only after regular hours and uses the current session's persisted
-  // per-symbol events, so the same summary cannot repeat on later scans.
+  // Send exactly one consolidated summary after the regular session.
   const summaryKey = 'large-move-summary:' + session.sessionDate;
   const sessionMoveRows = [...states.entries()]
     .filter(([key, row]) =>
@@ -441,17 +447,15 @@ async function evaluate() {
       symbol: String(row?.metadata?.symbol || key.split(':')[1] || '').toUpperCase(),
       direction: String(row?.metadata?.direction || key.split(':')[2] || ''),
       changePct: Number(row?.metadata?.changePct),
-      price: Number(row?.metadata?.price),
     }));
 
   const newlyDeliveredMoves = events
-    .filter(event => event.type === 'large-move' && deliveredKeys.has(event.stateKey))
+    .filter(event => event.type === 'large-move' && event.symbol !== 'US MARKET' && deliveredKeys.has(event.stateKey))
     .map(event => ({
       key: event.stateKey,
       symbol: event.symbol,
       direction: event.value >= 0 ? 'up' : 'down',
       changePct: Math.abs(Number(event.value)),
-      price: Number(event.message.match(/\\$([0-9.]+)/)?.[1]),
     }));
 
   const summaryRows = [...sessionMoveRows];
@@ -468,8 +472,31 @@ async function evaluate() {
     summaryRows.sort((a, b) => (Number(b.changePct) || 0) - (Number(a.changePct) || 0));
     const lines = summaryRows.slice(0, 20).map(row =>
       '• ' + row.symbol + ' ' + (row.direction === 'down' ? '↓' : '↑') +
-      ' ' + (Number(row.changePct) || 0).toFixed(2) + '%' +
-      (Number.isFinite(row.price) ? ' · 
+      ' ' + (Number(row.changePct) || 0).toFixed(2) + '%'
+    );
+
+    events.push({
+      stateKey: summaryKey,
+      type: 'large-move',
+      severity: summaryRows.some(row => (Number(row.changePct) || 0) >= (Number(config.large_move_pct) || 5) * LARGE_MOVE_CRITICAL_MULTIPLIER)
+        ? 'critical'
+        : 'high',
+      symbol: 'US MARKET',
+      title: 'Large moves consolidated',
+      message: 'Regular-session large moves for ' + session.sessionDate + ': ' + lines.join(' | '),
+      source: 'Server smart alert session summary',
+      sessionDate: session.sessionDate,
+    });
+  }
+
+  // Deliver the consolidated summary separately so its sent-state is durable.
+  let summaryDelivery = { sent: 0, sentEventKeys: [], errors: [] };
+  const summaryEvent = events.find(event => event.stateKey === summaryKey);
+  if (summaryEvent) {
+    summaryDelivery = await sendTelegram([summaryEvent]);
+    if (summaryDelivery.sent) deliveredKeys.add(summaryKey);
+  }
+  for (const symbol of watchedSymbols) {
     const q = quotes.get(symbol);
     if (!q) continue;
     // Quote evaluation itself is observable even when no alert is triggered.
@@ -490,146 +517,6 @@ async function evaluate() {
         sessionDate: event.sessionDate || null,
         direction: event.type === 'large-move' && event.symbol !== 'US MARKET' ? (event.value >= 0 ? 'up' : 'down') : null,
         changePct: event.type === 'large-move' && event.symbol !== 'US MARKET' ? Math.abs(Number(event.value)) : null,
-      },
-    });
-  }
-
-  await upsertRows('server_alert_state', stateUpdates);
-
-  return {
-    evaluated_symbols: watchedSymbols.length,
-    fresh_quotes: quotes.size,
-    configured_price_rules: normalizedAlerts.filter(alert => alert.active).length,
-    candidate_events: events.length,
-    sent: delivery.sent,
-    errors: delivery.errors,
-    catalyst_scan: Boolean(catalystFeed),
-    forecast_validation_contexts: forecastValidationContexts.size,
-    checked_at: timestamp,
-  };
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  if (!authorize(req, res)) return;
-
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' });
-  }
-
-  try {
-    const summary = await evaluate();
-    const status = summary.errors.length && !summary.sent ? 502 : 200;
-    return res.status(status).json({ ok: true, ...summary });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Server alert evaluation failed' });
-  }
-}
- + q.price.toFixed(2) + '. ' +
-          (severity === 'critical'
-            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
-            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
-        source: 'Yahoo Finance quote',
-        value: q.changePct,
-        sessionDate: session.sessionDate,
-      });
-
-      if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
-    }
-  }
-
-  let catalystFeed = null;
-  if (config.catalyst_alerts) {
-    try {
-      const minute = now.getUTCMinutes();
-      if (minute % 30 === 0 || String(process.env.SMART_ALERT_FORCE || '').toLowerCase() === 'true') {
-        catalystFeed = await fetchCatalystFeed();
-      }
-    } catch {
-      catalystFeed = null;
-    }
-
-    const allowed = new Set(watchedSymbols);
-    for (const contract of Array.isArray(catalystFeed?.contracts) ? catalystFeed.contracts : []) {
-      const symbol = String(contract?.company || '').trim().toUpperCase();
-      const id = String(contract?.id || '').trim();
-      if (!symbol || !allowed.has(symbol) || !id || !isRecentCatalystDate(contract?.dateSigned, now)) continue;
-      const key = 'catalyst:contract:' + id;
-      if (states.has(key)) continue;
-      events.push({
-        stateKey: key,
-        type: 'catalyst',
-        severity: 'high',
-        symbol,
-        title: symbol + ' SEC agreement detected',
-        message: (contract?.client || 'Material definitive agreement') + ' · ' + (contract?.value || 'Value not quantified') + (contract?.dateSigned ? ' · ' + contract.dateSigned : ''),
-        source: 'SEC EDGAR',
-      });
-    }
-
-    for (const trade of Array.isArray(catalystFeed?.congressTrades) ? catalystFeed.congressTrades : []) {
-      const symbol = String(trade?.stockSymbol || '').trim().toUpperCase();
-      const id = String(trade?.id || '').trim();
-      if (!symbol || !allowed.has(symbol) || !id || !isRecentCatalystDate(trade?.date, now)) continue;
-      const key = 'catalyst:congress:' + id;
-      if (states.has(key)) continue;
-      events.push({
-        stateKey: key,
-        type: 'catalyst',
-        severity: 'medium',
-        symbol,
-        title: symbol + ' congressional trade disclosed',
-        message: (trade?.politician || 'Unknown filer') + ' reported a ' + (trade?.transactionType || 'transaction') + ' in the range ' + (trade?.amountRange || 'not disclosed') + (trade?.date ? ' · ' + trade.date : ''),
-        source: 'Congressional disclosure feed',
-      });
-    }
-  }
-
-  // Deduplicate before Telegram delivery and state persistence. A feed can contain
-  // the same disclosure more than once; sending first and deduplicating later
-  // caused duplicate Telegram messages and a PostgreSQL ON CONFLICT failure.
-  const uniqueEvents = [];
-  const seenEventKeys = new Set();
-  for (const event of events) {
-    if (!event?.stateKey || seenEventKeys.has(event.stateKey)) continue;
-    seenEventKeys.add(event.stateKey);
-    uniqueEvents.push(event);
-  }
-  events.length = 0;
-  events.push(...uniqueEvents.slice(0, MAX_SMART_ALERTS_PER_SCAN));
-
-  if (events.length) {
-    try {
-      forecastValidationContexts = await getForecastValidationContexts([...new Set(events.map(event => event.symbol))]);
-      events.forEach(event => {
-        event.validationContext = forecastValidationContexts.get(event.symbol) || null;
-      });
-    } catch {
-      forecastValidationContexts = new Map();
-    }
-  }
-
-  const delivery = await sendTelegram(events);
-  const deliveredKeys = new Set(delivery.sentEventKeys || []);
-
-  for (const symbol of watchedSymbols) {
-    const q = quotes.get(symbol);
-    if (!q) continue;
-    // Quote evaluation itself is observable even when no alert is triggered.
-    // Persist only active/triggered states below to keep the state table compact.
-  }
-
-  for (const event of events) {
-    if (!deliveredKeys.has(event.stateKey)) continue;
-    stateUpdates.push({
-      event_key: event.stateKey,
-      active: true,
-      last_seen_at: timestamp,
-      last_triggered_at: timestamp,
-      metadata: {
-        symbol: event.symbol,
-        type: event.type,
-        title: event.title,
       },
     });
   }
