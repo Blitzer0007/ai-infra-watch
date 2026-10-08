@@ -7,6 +7,7 @@ import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
 import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
+import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { createForecastEvidenceSnapshot, type ForecastEvidenceSnapshot } from '../utils/forecastEvidence';
 import DataTable from './DataTable';
 
@@ -173,12 +174,14 @@ function calculateVerificationDrift(
       item.actualReturn != null &&
       item.medianError != null &&
       item.verifiedAt
-    )
-    .sort((a, b) => String(a.verifiedAt).localeCompare(String(b.verifiedAt)));
+    );
+  const independent = independentForecastRows(
+    verified.map(item => ({ ...item, created_at: item.createdAt, target_date: item.targetDate })),
+  ).sort((a, b) => String(a.verifiedAt).localeCompare(String(b.verifiedAt)));
 
-  if (verified.length < 10) {
+  if (independent.length < 40) {
     return {
-      sampleSize: verified.length,
+      sampleSize: independent.length,
       recentCount: 0,
       priorCount: 0,
       recentDirection: null,
@@ -190,9 +193,8 @@ function calculateVerificationDrift(
     };
   }
 
-  const split = Math.floor(verified.length / 2);
-  const prior = verified.slice(0, split);
-  const recent = verified.slice(split);
+  const recent = independent.slice(-10);
+  const prior = independent.slice(-20, -10);
 
   const directionRate = (rows: ForecastSnapshot[]) => {
     const eligible = rows.filter(row => row.median !== 0 && row.actualReturn !== 0);
@@ -1470,7 +1472,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               <div>
                 <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Verification drift monitor</div>
                 <div className="text-[9px] text-white/35 mt-1">
-                  Heuristic comparison of the newest half of verified forecasts for the selected ticker and horizon with the older half. Requires at least 10 verified forecasts.
+                  Drift compares the latest 10 with the prior 10 independent forecasts for this ticker and horizon. It stays insufficient until at least 40 independent forecasts exist.
                 </div>
               </div>
               <span className="px-2 py-1 rounded-full border border-white/10 text-[9px] font-mono uppercase text-white/55">
