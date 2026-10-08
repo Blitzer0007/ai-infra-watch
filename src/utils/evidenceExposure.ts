@@ -64,7 +64,7 @@ function clean(value: unknown) {
 function termPattern(keyword: string) {
   const normalized = String(keyword || '').trim();
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp('\\b' + escaped.replace(/\\s+/g, '\\s+') + '\\b', 'i');
+  return new RegExp('\\b' + escaped.replace(/\s+/g, '\\s+') + '\\b', 'i');
 }
 
 function matches(text: string, keywords: string[]) {
