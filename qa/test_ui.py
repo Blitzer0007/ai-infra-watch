@@ -405,3 +405,90 @@ def test_watchlist_alert_edit_flow(page):
     form.get_by_role("button", name="Add alert").click()
     assert "NVDA" in form.inner_text()
     assert any(label in form.inner_text().upper() for label in ("MONITORING", "NEAR TARGET", "TRIGGERED"))
+
+
+def test_overview_live_signals_and_data_health(page):
+    mock_local_apis(page)
+
+    def overview_live_data(route):
+        if '/api/live-data' not in route.request.url:
+            return route.continue_()
+        route.fulfill(status=200, content_type='application/json', body=json.dumps({
+            'stockPrices': {
+                'NVDA': {'price': 210.0, 'changePct': 2.5, 'stale': False, 'provider': 'qa'},
+                'NBIS': {'price': 220.0, 'changePct': -3.2, 'stale': False, 'provider': 'qa'},
+            },
+            'news': [{
+                'title': 'QA live AI infrastructure headline',
+                'url': 'https://example.com/qa-ai-headline',
+                'source': 'QA Source',
+                'date': '2026-10-08T12:00:00Z',
+            }],
+            'evidenceAvailability': {
+                'market': {'status': 'AVAILABLE'},
+                'news': {'status': 'AVAILABLE', 'count': 1},
+                'contracts': {'status': 'AVAILABLE', 'count': 3},
+                'congress': {'status': 'AVAILABLE', 'count': 2},
+                'political': {'status': 'AVAILABLE', 'count': 4},
+            },
+            'timestamp': 1760000000000,
+            'contracts': [],
+            'congressTrades': [],
+            'macroRisks': [],
+            'politicalSignals': [],
+            'marketSentiment': 'QA mocked',
+        }))
+    page.route('**/api/live-data*', overview_live_data)
+    goto_app(page)
+    overview = page.locator('#overview-view')
+    overview.wait_for(state='visible', timeout=30000)
+    page.get_by_text('QA live AI infrastructure headline', exact=True).wait_for(state='visible', timeout=30000)
+    assert 'Meta expands high-density data center lease with Nebius to $27B' not in overview.inner_text()
+    page.get_by_role('button', name='Open data health', exact=True).click()
+    page.get_by_test_id('data-health').wait_for(state='visible', timeout=30000)
+
+
+def test_macro_scenario_controls_and_evidence_filters(page):
+    mock_local_apis(page)
+
+    def macro_live_data(route):
+        if '/api/live-data' not in route.request.url:
+            return route.continue_()
+        route.fulfill(status=200, content_type='application/json', body=json.dumps({
+            'stockPrices': {'NVDA': {'price': 210, 'changePct': 2.5}},
+            'news': [{'title': 'QA Taiwan supply headline', 'url': 'https://example.com/taiwan', 'source': 'QA News', 'date': '2026-10-08T12:00:00Z'}],
+            'contracts': [],
+            'congressTrades': [],
+            'macroRisks': [
+                {'id': 'taiwan', 'category': 'Supply Chain', 'title': 'Taiwan advanced-node exposure', 'impactRating': 'high', 'description': 'TSMC supply risk.', 'dateUpdated': '2026-10-08'},
+                {'id': 'controls', 'category': 'Trade Policy', 'title': 'AI-chip export controls', 'impactRating': 'high', 'description': 'Export restrictions.', 'dateUpdated': '2026-10-08'},
+                {'id': 'power', 'category': 'Infrastructure', 'title': 'Data-center power availability', 'impactRating': 'medium', 'description': 'Grid and power risk.', 'dateUpdated': '2026-10-08'},
+            ],
+            'politicalSignals': [
+                {'id': 'p1', 'actor': 'U.S. political leadership', 'topic': 'Trade Policy', 'eventType': 'Policy action', 'sourceType': 'primary', 'source': 'whitehouse.gov', 'title': 'QA primary export-control signal', 'date': '2026-10-08T11:00:00Z', 'url': 'https://whitehouse.gov/qa'},
+                {'id': 'p2', 'actor': 'U.S. political leadership', 'topic': 'AI / Technology', 'eventType': 'Political statement / coverage', 'sourceType': 'secondary', 'source': 'example.com', 'title': 'QA secondary AI signal', 'date': '2026-10-08T10:00:00Z', 'url': 'https://example.com/qa'},
+            ],
+            'evidenceAvailability': {
+                'news': {'status': 'AVAILABLE', 'count': 1, 'retrievedAt': '2026-10-08T12:00:00Z'},
+                'political': {'status': 'AVAILABLE', 'count': 2, 'retrievedAt': '2026-10-08T12:00:00Z'},
+                'contracts': {'status': 'AVAILABLE', 'count': 0, 'retrievedAt': '2026-10-08T12:00:00Z'},
+                'congress': {'status': 'AVAILABLE', 'count': 0, 'retrievedAt': '2026-10-08T12:00:00Z'},
+            },
+            'timestamp': 1760000000000,
+            'marketSentiment': 'QA mocked',
+        }))
+    page.route('**/api/live-data*', macro_live_data)
+    goto_app(page)
+    macro = page.locator('#macro-view')
+    macro.wait_for(state='visible', timeout=30000)
+    page.get_by_text('Risk Framework / Exposure Themes', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_role('button', name='Combined stress', exact=True).click()
+    macro.get_by_text('100 / 100', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_role('button', name='Trade Policy', exact=True).click()
+    page.get_by_text('QA primary export-control signal', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_role('button', name='primary', exact=True).click()
+    page.get_by_text('QA secondary AI signal', exact=True).wait_for(state='detached', timeout=30000)
+    page.get_by_role('button', name='Data health', exact=True).click()
+    page.get_by_test_id('data-health').wait_for(state='visible', timeout=30000)
+
+

@@ -111,7 +111,13 @@ export async function getWeeklyDecisionReview() {
   const start = addDays(today, -6);
   const rows = await supabase('decision_journal_entries?select=decision_date,decision,review_status,outcome_return_pct,benchmark_return_pct,excess_return_pct,decision_score_pct,forecast_error_pct,rule_followed&order=decision_date.desc&limit=500', { method: 'GET' });
   const week = rows.filter(r => String(r.decision_date) >= start && String(r.decision_date) <= today);
-  const outcomes = week.filter(r => Number.isFinite(Number(r.excess_return_pct)));
+  // Only outcome-ready/completed entries count as outcomes. A pending journal entry
+  // must not inflate the weekly outcome count merely because a nullable metric
+  // contains a stale or partial value.
+  const outcomes = week.filter(r =>
+    ['outcome_ready', 'completed'].includes(String(r.review_status || '').toLowerCase()) &&
+    Number.isFinite(Number(r.excess_return_pct))
+  );
   const scored = outcomes.map(r => Number.isFinite(Number(r.decision_score_pct))
     ? Number(r.decision_score_pct)
     : decisionScore(r.decision, r.excess_return_pct)).filter(Number.isFinite);
