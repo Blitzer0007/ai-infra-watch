@@ -240,11 +240,9 @@ function PreTradeGate({ data }: { data: DecisionData }) {
 
   const needsReview = checks.some(check => !check.ok);
   const state = needsReview ? 'REVIEW' : 'READY';
-  const stateClass = state === 'BLOCKED'
-    ? 'border-rose-400/20 bg-rose-400/[.04] text-rose-300'
-    : state === 'REVIEW'
-      ? 'border-amber-400/20 bg-amber-400/[.035] text-amber-300'
-      : 'border-emerald-400/20 bg-emerald-400/[.035] text-emerald-300';
+  const stateClass = state === 'REVIEW'
+    ? 'border-amber-400/20 bg-amber-400/[.035] text-amber-300'
+    : 'border-emerald-400/20 bg-emerald-400/[.035] text-emerald-300';
 
   return (
     <div className={'rounded-xl border p-3 ' + stateClass} data-testid="pre-trade-gate">
