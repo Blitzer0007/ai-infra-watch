@@ -1363,6 +1363,8 @@ function PortfolioEvidenceCoverage({
           ? (analystCount > 0 && medianTarget == null ? 'partial' : 'available')
           : 'empty')
         : 'missing';
+  const missingGroup = analyses.filter(item => item.groupScore == null).map(item => item.symbol);
+  const missingPeers = analyses.filter(item => item.vsPeers == null).map(item => item.symbol);
   const channels = [
     { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
     { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
@@ -1375,13 +1377,20 @@ function PortfolioEvidenceCoverage({
   ];
   const available = channels.filter(item => item.value > 0).length;
   const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
+  const statusDetail = missingGroup.length || missingPeers.length
+    ? 'Sufficient overall, but ' +
+      (missingGroup.length ? missingGroup.length + ' holdings missing group data' : '') +
+      (missingGroup.length && missingPeers.length ? ' and ' : '') +
+      (missingPeers.length ? missingPeers.length + ' holdings missing peer data' : '') +
+      '.'
+    : 'All holdings have group and peer coverage.';
   const analystFresh = analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown';
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
         <h2 className="text-base font-black mt-1">{status}</h2>
-        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
+        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score. {statusDetail}</div>
       </div>
       <div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div>
     </div>
@@ -1392,6 +1401,7 @@ function PortfolioEvidenceCoverage({
         {channel.total != null && <div className="text-[8px] font-mono text-white/25 mt-1">{channel.value}/{channel.total}</div>}
       </div>)}
     </div>
+    {(missingGroup.length || missingPeers.length) ? <div className="mt-3 rounded-xl border border-amber-400/10 bg-amber-400/[.02] p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-amber-300">Missing holding coverage</div><div className="text-[9px] text-white/40 mt-1">{missingGroup.length ? 'Group: ' + missingGroup.join(', ') : 'Group: complete'}</div><div className="text-[9px] text-white/40 mt-1">{missingPeers.length ? 'Peers: ' + missingPeers.join(', ') : 'Peers: complete'}</div></div> : null}
     <div className="mt-3 rounded-xl border border-violet-400/10 bg-violet-400/[.025] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
