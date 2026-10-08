@@ -139,7 +139,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Cash-flow P&L" value={signedMoney(portfolio.cashFlowPnl)} tone={(portfolio.cashFlowPnl || 0) >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="20D verified" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.verified ?? 0) >= 50 ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="20D verified" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules set" value={(rules.total - rules.noRule) + '/' + rules.total} tone={rules.noRule ? 'warn' : 'good'} />
       </div>
 
@@ -197,12 +197,9 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
       </div>
 
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio price coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
-      {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; edge values are withheld when trades could not be matched.</div>}
-      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio valuation coverage: {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% · status {portfolio.quoteCoverage.status}.</div>}
-      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
       {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
+      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">
@@ -236,8 +233,8 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     },
     {
       label: 'Forecast evidence',
-      ok: Boolean(forecast && forecast.verified >= 50 && forecast.gate === 'ready'),
-      detail: forecast ? forecast.verified + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' independent' : 'Forecast validation unavailable',
+      ok: Boolean(forecast && forecast.independentVerified >= 50 && forecast.independent5D >= 25 && forecast.independent20D >= 25 && forecast.gate === 'ready'),
+      detail: forecast ? (forecast.independentVerified ?? 0) + '/50 independent · ' + (forecast.independent5D ?? 0) + ' 5D · ' + (forecast.independent20D ?? 0) + ' 20D' : 'Forecast validation unavailable',
     },
   ];
 
