@@ -204,6 +204,7 @@ const FLOWCHART_NODES: Record<string, {
 };
 
 export default function Overview({ config, onNavigate }: OverviewProps) {
+  const overviewFavorites = getOverviewFavorites(config);
   const [quotes, setQuotes] = useState<Record<string, any>>({});
   const [loadingQuotes, setLoadingQuotes] = useState(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string>('all');
