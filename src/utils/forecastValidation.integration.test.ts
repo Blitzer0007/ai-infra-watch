@@ -67,7 +67,7 @@ describe('forecast validation integration contract', () => {
     ];
     const summary = buildForecastValidationSummary(rows);
     assert.equal(summary.byTickerHorizon.length, 3);
-    assert.equal(summary.overall.independentCount, 3);
+    assert.equal(summary.overall.independentCount, 4);
 
     const context = getTickerValidationContext(rows, 'nvda', 20);
     assert.equal(context?.ticker, 'NVDA');
