@@ -394,6 +394,34 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
   );
 }
 
+function scenarioBaselineFromRisks(risks: MacroRisk[] = []) {
+  let taiwan = 15;
+  let power = 30;
+  let export = 25;
+  for (const risk of risks) {
+    const text = (String(risk.title || '') + ' ' + String(risk.description || '')).toLowerCase();
+    const score = risk.impactRating === 'high' ? 75 : risk.impactRating === 'medium' ? 45 : 15;
+    if (text.includes('taiwan') || text.includes('tsmc')) taiwan = score;
+    else if (text.includes('power') || text.includes('grid')) power = score;
+    else if (text.includes('export') || text.includes('embargo') || text.includes('prohibition')) export = score;
+  }
+  return { taiwan, power, export };
+}
+
+function feedStatus(item: any) {
+  if (!item) return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
+  if (item.conflictStatus === 'CONFLICT' || item.status === 'CONFLICT') return { label: 'CONFLICT', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
+  if (item.freshness?.status === 'VERY_STALE' || item.stale) return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+  if (item.freshness?.status === 'AGING') return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+  if (item.fallback) return { label: 'FALLBACK', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+  if (item.status === 'AVAILABLE') return { label: 'HEALTHY', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' };
+  return { label: String(item.status || 'UNKNOWN').toUpperCase(), tone: 'text-white/45 border-white/10 bg-white/5' };
+}
+
+function evidenceCount(item: any) {
+  return Number.isFinite(Number(item?.count)) ? Number(item.count) : 0;
+}
+
 export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [], evidenceAvailability = {}, onNavigate }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
