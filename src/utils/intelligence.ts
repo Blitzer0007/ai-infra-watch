@@ -25,7 +25,7 @@ export type PairSignal = {
 };
 
 export type RotationHorizon = '1D' | '5D' | '20D' | '60D' | '3M' | '6M';
-export type RotationGroup = IntelligenceGroup & { horizons: Record<RotationHorizon, number | null>; direction: 'strengthening' | 'weakening' | 'mixed' | 'insufficient'; };
+export type RotationGroup = IntelligenceGroup & { horizons: Record<RotationHorizon, number | null>; direction: 'strengthening' | 'weakening' | 'mixed' | 'insufficient'; scoreMethod: 'percentile' | 'insufficient'; };
 export type RotationPair = PairSignal & { history: number[]; trend: 'widening' | 'narrowing' | 'stable' | 'insufficient'; };
 export type MoneyRotationSnapshot = { groups: RotationGroup[]; pairs: RotationPair[]; selectedHorizon: RotationHorizon; methodology: string; freshness: string; };
 
@@ -73,6 +73,15 @@ function avg(values: number[]) {
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
+
+function percentileRank(values: number[], value: number): number | null {
+  const usable = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!usable.length || !Number.isFinite(value)) return null;
+  if (usable.length === 1) return 50;
+  const atOrBelow = usable.filter(item => item <= value).length;
+  return Number(((atOrBelow - 0.5) / usable.length * 100).toFixed(1));
+}
+
 
 export function buildIntelligence(prices: Record<string, PricePoint>): IntelligenceSnapshot {
   const freshPrices = Object.values(prices).filter(x => x?.stale !== true);
@@ -143,7 +152,7 @@ export function buildMoneyRotation(
   selectedHorizon: RotationHorizon = '20D',
 ): MoneyRotationSnapshot {
   const now = new Date().toISOString();
-  const groupRows: RotationGroup[] = Object.entries(GROUP_MEMBERS).map(([name, members]) => {
+  const rawGroupRows = Object.entries(GROUP_MEMBERS).map(([name, members]) => {
     const horizons = Object.fromEntries(ROTATION_HORIZONS.map(({ key, days }) => {
       const values = members.map(symbol => historicalReturn(histories[symbol] || [], days)).filter((v): v is number => v != null);
       return [key, values.length ? avg(values) : null];
@@ -154,8 +163,15 @@ export function buildMoneyRotation(
     const live = members.map(symbol => prices[symbol]).filter(x => x && x.stale !== true);
     const avgChange = avg(live.map(x => x.changePct).filter(Number.isFinite));
     const breadth = live.length ? live.filter(x => x.changePct >= 0).length / live.length : 0;
-    const selectedReturn = horizons[selectedHorizon];
-    return { name, members, avgChange, breadth, relativeToUniverse: 0, score: clamp(50 + (selectedReturn ?? 0) * 2 + (breadth - 0.5) * 30, 0, 100), horizons, direction };
+    return { name, members, avgChange, breadth, relativeToUniverse: 0, horizons, direction };
+  });
+  const selectedReturns = rawGroupRows
+    .map(row => row.horizons[selectedHorizon])
+    .filter((value): value is number => value != null);
+  const groupRows: RotationGroup[] = rawGroupRows.map(row => {
+    const selectedReturn = row.horizons[selectedHorizon];
+    const score = selectedReturn == null ? 50 : percentileRank(selectedReturns, selectedReturn) ?? 50;
+    return { ...row, score, scoreMethod: selectedReturn == null ? 'insufficient' : 'percentile' };
   });
   const pairs: RotationPair[] = PAIRS.map(([left, right, label]) => {
     const leftHistory = histories[left] || []; const rightHistory = histories[right] || [];
@@ -167,5 +183,5 @@ export function buildMoneyRotation(
     const trend: RotationPair['trend'] = latest == null || prior == null ? 'insufficient' : Math.abs(latest - prior) < 0.5 ? 'stable' : latest > prior ? 'widening' : 'narrowing';
     return { left, right, label, spread: prices[left]?.stale !== true && prices[right]?.stale !== true ? (prices[left]?.changePct ?? 0) - (prices[right]?.changePct ?? 0) : null, history, trend };
   });
-  return { groups: groupRows, pairs, selectedHorizon, methodology: 'Flow proxy = price momentum + breadth across the tracked universe; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
+  return { groups: groupRows, pairs, selectedHorizon, methodology: 'Flow proxy = horizon-specific group return percentile rank, with breadth and momentum shown separately; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
 }
