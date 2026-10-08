@@ -1,7 +1,7 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory } from '../../api/_market-data.js';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
-import { coverageInterval, calibrationVerdict } from '../utils/forecastCalibration.js';
+import { coverageInterval, calibrationVerdict as getCalibrationVerdict } from '../utils/forecastCalibration.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -376,8 +376,9 @@ function forecastAnalytics(rows) {
   ).length;
   const aggregate = aggregateForecastSubset;
   const overall = aggregate(verified);
+  const calibrationVerdictFromAggregate = summary =>
+    getCalibrationVerdict(summary.p25p75CoverageCiPct, summary.p10p90CoverageCiPct, summary.count);
   const calibrationVerdict = calibrationVerdictFromAggregate(overall);
-  const calibrationVerdictFromAggregate = summary => calibrationVerdict(summary.p25p75CoverageCiPct, summary.p10p90CoverageCiPct, summary.count);
   const grouped=(keyFn, decorate)=>{
     const map=new Map();
     for(const row of verified){
