@@ -127,10 +127,22 @@ def test_portfolio_search_is_functional(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
-    search = portfolio.get_by_placeholder("Search ticker, name or theme")
+    search = portfolio.get_by_placeholder("Search ticker, company or theme")
     search.fill("NVDA")
     page.wait_for_timeout(500)
     assert "Portfolio Overview & Decisions" in portfolio.inner_text()
+
+def test_portfolio_friendly_navigation_and_attention_sort(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.get_by_test_id("nav-portfolio").click()
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.wait_for(state="visible", timeout=30000)
+    assert "Portfolio Overview & Decisions" in portfolio.inner_text()
+    portfolio.get_by_role("button", name="Portfolio Research", exact=True).wait_for(state="visible", timeout=30000)
+    portfolio.get_by_label("Sort your holdings").select_option("Attention")
+    portfolio.get_by_label("Filter your holdings by status").select_option("Needs attention")
+
 
 def test_autonomous_research_ui_without_calling_llm(page):
     mock_local_apis(page)
