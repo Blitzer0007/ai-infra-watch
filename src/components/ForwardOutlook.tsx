@@ -1277,6 +1277,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? ((portfolioContext.holding.exitRuleType.replace('_', ' ')) + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div></div>
                   </div>
                   {(portfolioContext.holding?.brokerAlerts?.length || portfolioContext.holding?.brokerAlertPrices?.length) ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker alerts: {portfolioContext.holding.brokerAlerts?.length ? portfolioContext.holding.brokerAlerts.map(alert => alert.direction === 'below' ? 'Below ' + formatPrice(alert.price) + ' STOP' : 'Above ' + formatPrice(alert.price) + ' TARGET').join(' · ') : (portfolioContext.holding.brokerAlertPrices || []).map(price => Number(portfolioContext.holding?.averageCost) > 0 && Number(price) < Number(portfolioContext.holding.averageCost) ? 'Below ' + formatPrice(Number(price)) + ' STOP' : 'Above ' + formatPrice(Number(price)) + ' TARGET').join(' · ')}</div> : null}
+                  {portfolioContext.holding?.lossLimitPct != null && Number(portfolioContext.holding.averageCost) > 0 &&
+                    !portfolioContext.holding.brokerAlerts?.some(alert => alert.direction === 'below') &&
+                    !(portfolioContext.holding.brokerAlertPrices || []).some(price => Number(price) < Number(portfolioContext.holding?.averageCost)) && (
+                      <div className="text-[8px] font-mono text-amber-200/65 mt-2">Downside broker alert not recorded · loss-limit level is {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100)}). Review adding a broker alert at this level.</div>
+                  )}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
               }
