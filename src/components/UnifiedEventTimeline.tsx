@@ -136,18 +136,22 @@ function newsSymbols(title: string): string[] {
   const aliases: Record<string, string[]> = {
     NVDA: ['nvidia', 'nvda', 'blackwell', 'cuda'],
     DGXX: ['digi power', 'dgxx'],
-    DRAM: ['micron', ' dram ', 'memory'],
-    SOXL: ['soxl', 'semiconductor'],
+    DRAM: ['micron', 'dram', 'micron technology'],
+    SOXL: ['soxl', 'direxion daily semiconductor bull 3x'],
     MSFT: ['microsoft', 'msft', 'azure'],
     NBIS: ['nebius', 'nbis'],
     VIVO: ['vivo power', 'vvpr', 'powerhouse'],
     META: ['meta', 'facebook'],
     NOW: ['servicenow', 'service now'],
     PHVS: ['pharvaris', 'phvs'],
+    RKLB: ['rocket lab', 'rklb'],
   };
-  return Object.entries(aliases)
-    .filter(([, terms]) => terms.some(term => text.includes(term)))
-    .map(([symbol]) => symbol);
+  const contains = (term: string) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = term.includes(' ') ? escaped.replace(/\s+/g, '\\s+') : '\\b' + escaped + '\\b';
+    return new RegExp(pattern, 'i').test(text);
+  };
+  return Object.entries(aliases).filter(([, terms]) => terms.some(contains)).map(([symbol]) => symbol);
 }
 
 function normalizePoliticalDate(value: unknown): string {
@@ -168,6 +172,27 @@ function macroHolds(symbol: string, macroId: string, contracts: any[] = [], news
   return exposure.assessment === 'assessed';
 }
 
+
+export function dedupeTimelineEvents(items: TimelineEvent[]): TimelineEvent[] {
+  const output: TimelineEvent[] = [];
+  for (const item of items) {
+    const existingIndex = output.findIndex(existing => {
+      if (existing.url && item.url && existing.url === item.url) return true;
+      const a = Date.parse(existing.date + 'T00:00:00Z');
+      const b = Date.parse(item.date + 'T00:00:00Z');
+      const normalizedA = clean(existing.title).replace(/[^a-z0-9]+/g, ' ').trim();
+      const normalizedB = clean(item.title).replace(/[^a-z0-9]+/g, ' ').trim();
+      return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 86400000 && normalizedA === normalizedB;
+    });
+    if (existingIndex < 0) {
+      output.push(item);
+      continue;
+    }
+    const existing = output[existingIndex];
+    output[existingIndex] = { ...existing, source: existing.source === item.source ? existing.source : existing.source + ' + ' + item.source, url: existing.url || item.url || null };
+  }
+  return output;
+}
 
 function sourceLevel(kind: TimelineEvent['kind']): TimelineEvent['sourceLevel'] {
   if (kind === 'SEC' || kind === 'Contract') return 'PRIMARY';
