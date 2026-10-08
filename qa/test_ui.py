@@ -130,7 +130,7 @@ def test_portfolio_search_is_functional(page):
     search = portfolio.get_by_placeholder("Search ticker, name or theme")
     search.fill("NVDA")
     page.wait_for_timeout(500)
-    assert "Portfolio + Watchlist Decision Lab" in portfolio.inner_text()
+    assert "Portfolio Overview & Decisions" in portfolio.inner_text()
 
 def test_autonomous_research_ui_without_calling_llm(page):
     mock_local_apis(page)
@@ -206,7 +206,7 @@ def test_event_study_uses_consolidated_api(page):
     page.on("request", lambda request: requests.append(request.url))
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("Events", exact=True).click()
     page.wait_for_timeout(1500)
     assert any("/api/company-scale?action=milestones" in url for url in requests)
     assert any("/api/company-scale?action=history" in url for url in requests)
@@ -228,7 +228,7 @@ def test_event_study_identifies_selected_ticker(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("Events", exact=True).click()
     page.get_by_text("SELECTED TICKER", exact=True).wait_for(state="visible", timeout=30000)
     assert page.get_by_text("NVDA", exact=True).count() >= 1
     assert page.get_by_text(
@@ -240,7 +240,7 @@ def test_money_rotation_semantic_colors_mount(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Money Rotation", exact=True).click()
+    page.get_by_text("Money Flow", exact=True).click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
     for label in ("Strengthening", "Weakening", "Mixed", "Insufficient"):
@@ -325,7 +325,7 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("Events", exact=True).click()
     page.get_by_test_id("portfolio-intelligence").get_by_text("SOXX", exact=True).first.wait_for(state="visible", timeout=30000)
     assert "Event" in page.get_by_test_id("portfolio-intelligence").inner_text()
 
@@ -344,7 +344,7 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Event Study", exact=True).click()
+    page.get_by_text("Events", exact=True).click()
     benchmark = page.get_by_text("NVDA · 5D Beta-Adjusted vs SOXX", exact=True)
     benchmark.wait_for(state="visible", timeout=30000)
     assert "SOXX" in benchmark.locator("..").inner_text()
