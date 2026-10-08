@@ -588,6 +588,8 @@ export default function CongressTrades({ liveTrades = [], livePrices = {} }: Con
       }} />
     </div>
   );
+}
+
 function SummaryMetric({
   label,
   value,
