@@ -246,8 +246,8 @@ export type ExposureWeightedMacroLoad = {
 
 const SCENARIO_MATCHERS: Record<MacroScenario, RegExp> = {
   taiwan: /\b(taiwan|tsmc|advanced[ -]?node|foundry)\b/i,
-  power: /\b(power|grid|data[ -]?center)\b/i,
-  export: /\b(export|chip[ -]?control|china|sanction|embargo)\b/i,
+  power: /\b(power[ -]?(availability|demand|capacity)|electricity|grid|data[ -]?center|utility|nuclear|solar|colocation|megawatt|mw)\b/i,
+  export: /\b(export|chip[ -]?control|china|sanction|embargo|restricted|restriction)\b/i,
 };
 
 function riskSeverity(risk: MacroRiskInput): number {
