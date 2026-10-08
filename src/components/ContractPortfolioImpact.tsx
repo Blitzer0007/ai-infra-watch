@@ -4,6 +4,7 @@ import { Contract } from '../types';
 
 type Props = {
   contract: Contract;
+  portfolioSymbols?: string[];
 };
 
 type CompanyScale = {
@@ -21,9 +22,7 @@ type CompanyScale = {
   error?: string;
 };
 
-const PORTFOLIO_SYMBOLS = new Set([
-  'DGXX','DRAM','SOXL','NVDA','MSFT','NBIS','VIVO','META','NOW','PHVS'
-]);
+
 
 const COUNTERPARTY_ALIASES: Array<[RegExp, string]> = [
   [/microsoft|\bmsft\b/i, 'MSFT'],
@@ -117,11 +116,12 @@ function relatedSignals(contract: Contract, counterparty: string | null): string
   return Array.from(out).slice(0, 3);
 }
 
-export default function ContractPortfolioImpact({ contract }: Props) {
+export default function ContractPortfolioImpact({ contract, portfolioSymbols = [] }: Props) {
   const analysis = useMemo(() => {
     const counterparty = canonicalCounterparty(contract.client);
-    const issuerDirect = PORTFOLIO_SYMBOLS.has(contract.company);
-    const counterpartyHeld = counterparty ? PORTFOLIO_SYMBOLS.has(counterparty) : false;
+    const held = new Set(portfolioSymbols.map(symbol => String(symbol).trim().toUpperCase()));
+    const issuerDirect = held.has(String(contract.company || '').toUpperCase());
+    const counterpartyHeld = counterparty ? held.has(counterparty) : false;
     const { amount, qualifier } = parseValue(contract.value);
     const annualized = annualizeValue(contract.value, contract.duration);
     const capacityMw = parseCapacity(contract.hardware) ?? parseCapacity(contract.details);
@@ -137,7 +137,7 @@ export default function ContractPortfolioImpact({ contract }: Props) {
       capacityMw,
       signals,
     };
-  }, [contract]);
+  }, [contract, portfolioSymbols]);
 
   const [scale, setScale] = useState<CompanyScale | null>(null);
   const [scaleLoading, setScaleLoading] = useState(false);
