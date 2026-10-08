@@ -41,6 +41,5 @@ export function calibrationVerdict(p25p75Coverage, p10p90Coverage, count) {
   const wideWide = p10p90Coverage.lowerPct > 80;
   if (middleNarrow && wideNarrow) return 'too narrow';
   if (middleWide && wideWide) return 'too wide';
-  if (middleNarrow || wideNarrow || middleWide || wideWide) return 'mixed';
   return 'well calibrated';
 }
