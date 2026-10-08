@@ -382,7 +382,7 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
     '',
     'FORECAST VALIDATION',
     (forecast.verified ?? 0) + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' independent · ' + (forecast.pending ?? 0) + ' pending',
-    'Independence window: ' + (forecast.independenceWindowBusinessDays ?? 20) + ' business days per ticker.',
+    'Independence rule: non-overlapping forecast windows by ticker and horizon.',
   );
 
   if (weekly) {

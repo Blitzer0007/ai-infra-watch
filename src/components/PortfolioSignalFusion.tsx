@@ -27,15 +27,7 @@ type Props = {
   heldSymbols?: string[];
 };
 
-const PORTFOLIO_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS', 'RKLB'];
-
-const MACRO_HOLDINGS: Record<string, string[]> = {
-  taiwan: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-  export: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-  power: ['DGXX', 'NBIS', 'VIVO', 'META', 'NOW'],
-};
-
-function symbols(values: string[], allowed = PORTFOLIO_SYMBOLS) {
+function symbols(values: string[], allowed: string[]) {
   return [...new Set(values.map(value => String(value).toUpperCase()).filter(value => allowed.includes(value)))];
 }
 
@@ -43,21 +35,49 @@ function date(value?: string) {
   return value ? value.slice(0, 10) : '—';
 }
 
-function newsSymbols(title: string) {
+function containsTerm(text: string, term: string) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = term.includes(' ')
+    ? escaped.replace(/\s+/g, '\\s+')
+    : '\\b' + escaped + '\\b';
+  return new RegExp(pattern, 'i').test(text);
+}
+
+function newsSymbols(title: string, allowed: string[]) {
   const text = title.toLowerCase();
   const aliases: Record<string, string[]> = {
     NVDA: ['nvidia', 'nvda', 'blackwell', 'cuda'],
     DGXX: ['digi power', 'dgxx'],
-    DRAM: ['micron', ' dram ', 'memory'],
-    SOXL: ['soxl', 'semiconductor'],
+    DRAM: ['micron', 'dram', 'micron technology'],
+    SOXL: ['soxl', 'direxion daily semiconductor bull 3x'],
     MSFT: ['microsoft', 'msft'],
     NBIS: ['nebius', 'nbis'],
-    VIVO: ['vivo', 'vvpr', 'powerhouse'],
+    VIVO: ['vivo power', 'vvpr', 'powerhouse'],
     META: ['meta', 'facebook'],
     NOW: ['servicenow', 'service now'],
     PHVS: ['pharvaris', 'phvs'],
   };
-  return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => text.includes(term))).map(([key]) => key));
+  return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => containsTerm(text, term))).map(([key]) => key), allowed);
+}
+
+function macroAffectedSymbols(risk: { title?: string; description?: string; impactSummary?: string }, allowed: string[]) {
+  const text = [risk.title, risk.description, risk.impactSummary].filter(Boolean).join(' ');
+  const aliases: Record<string, string[]> = {
+    NVDA: ['nvidia', 'nvda'],
+    DGXX: ['digi power', 'dgxx'],
+    DRAM: ['micron', 'dram'],
+    SOXL: ['soxl', 'direxion daily semiconductor bull 3x'],
+    MSFT: ['microsoft', 'msft'],
+    NBIS: ['nebius', 'nbis'],
+    VIVO: ['vivo power', 'vvpr', 'powerhouse'],
+    META: ['meta', 'facebook'],
+    NOW: ['servicenow', 'service now'],
+    PHVS: ['pharvaris', 'phvs'],
+    RKLB: ['rocket lab', 'rklb'],
+  };
+  return allowed.filter(symbol =>
+    (aliases[symbol] || [symbol]).some(alias => containsTerm(text, alias)),
+  );
 }
 
 function evidenceProfile(kind: string, source: string, sourceType?: string) {
@@ -102,7 +122,7 @@ function badge(kind: string) {
 
 export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], heldSymbols = [] }: Props) {
   const [autopilotSignals, setAutopilotSignals] = useState<any[]>([]);
-  const portfolioSymbols = heldSymbols.length ? heldSymbols.map(symbol => symbol.toUpperCase()) : PORTFOLIO_SYMBOLS;
+  const portfolioSymbols = heldSymbols.map(symbol => symbol.toUpperCase()).filter(Boolean);
   useEffect(() => {
     let cancelled = false;
     authFetch('/api/autopilot-signals?limit=8', { cache: 'no-store' })
@@ -124,7 +144,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.client || x.details,
         detail: x.details,
         when: x.dateSigned,
-        affected: symbols([x.company]),
+        affected: symbols([x.company], portfolioSymbols),
         source: x.source === 'sec-edgar-primary' ? 'SEC EDGAR' : 'Contracts feed',
         url: x.url || null,
       })),
@@ -137,7 +157,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.stockSymbol + ' ' + (x.transactionType === 'buy' ? 'purchase' : 'sale') + ' disclosure',
         detail: x.politician + ' · ' + x.chamber + ' · ' + x.amountRange + '. Transaction date is used for timeline context.',
         when: x.transactionDate || x.date,
-        affected: symbols([x.stockSymbol]),
+        affected: symbols([x.stockSymbol], portfolioSymbols),
         source: 'Congress disclosure feed',
         url: x.filingPortal || null,
       })),
@@ -149,7 +169,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.title,
         detail: x.impactSummary || x.description,
         when: x.dateUpdated,
-        affected: symbols(MACRO_HOLDINGS[key]),
+        affected: macroAffectedSymbols(x, portfolioSymbols),
         source: 'Live macro risk ledger',
         url: null,
       };
@@ -162,7 +182,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.title || x.topic || 'Political / policy signal',
         detail: (x.eventType || 'Political statement / coverage') + ' · ' + (x.topic || 'AI / Technology'),
         when: x.date || undefined,
-        affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase())),
+        affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase()), portfolioSymbols),
         source: x.source || 'GDELT',
         sourceType: x.sourceType || 'secondary',
         url: x.url || null,
@@ -186,7 +206,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       })),
     ...news
       .filter(x => x && x.title)
-      .map(x => ({ ...x, affected: newsSymbols(x.title || '') }))
+      .map(x => ({ ...x, affected: newsSymbols(x.title || '', portfolioSymbols) }))
       .filter(x => x.affected.length)
       .slice(0, 3)
       .map(x => ({
@@ -200,7 +220,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       })),
   ].sort((a, b) => String(b.when || '').localeCompare(String(a.when || ''))).slice(0, 8);
 
-  const touched = symbols(signals.flatMap(x => x.affected));
+  const touched = symbols(signals.flatMap(x => x.affected), portfolioSymbols);
 
   useEffect(() => {
     if (!signals.length) return;

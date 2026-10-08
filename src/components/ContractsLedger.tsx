@@ -9,9 +9,10 @@ import JevDecisionPanel from './JevDecisionPanel';
 
 interface ContractsLedgerProps {
   liveContracts?: Contract[];
+  portfolioSymbols?: string[];
 }
 
-export default function ContractsLedger({ liveContracts }: ContractsLedgerProps) {
+export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }: ContractsLedgerProps) {
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [filterStatusLevel, setFilterStatusLevel] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -204,7 +205,7 @@ export default function ContractsLedger({ liveContracts }: ContractsLedgerProps)
 
                 <ContractTerms symbol={c.company} accession={c.accession} url={c.url} />
 
-                <ContractPortfolioImpact contract={c} />
+                <ContractPortfolioImpact contract={c} portfolioSymbols={portfolioSymbols} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0F1115]/30 border border-white/5 rounded p-4 text-xs font-mono">
                   <div>

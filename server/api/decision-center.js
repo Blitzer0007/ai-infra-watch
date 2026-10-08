@@ -1,5 +1,6 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
+import { independentForecastCount } from '../utils/forecastIndependence.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -55,34 +56,6 @@ function previousOrSamePoint(points, date) {
   }
   return selected;
 }
-function businessDaysBetween(from, to) {
-  const start = new Date(String(from) + 'T00:00:00Z');
-  const end = new Date(String(to) + 'T00:00:00Z');
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
-  let count = 0;
-  const cursor = new Date(start);
-  while (cursor < end) {
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-    const day = cursor.getUTCDay();
-    if (day !== 0 && day !== 6) count++;
-  }
-  return count;
-}
-function independentForecastCount(rows) {
-  const byTicker = new Map();
-  const ordered = [...rows].filter(row => row?.status === 'verified')
-    .sort((a,b)=>String(a.created_at || a.verified_at || a.target_date || '').localeCompare(String(b.created_at || b.verified_at || b.target_date || '')));
-  for (const row of ordered) {
-    const ticker = String(row.ticker || '').toUpperCase();
-    const anchor = String(row.created_at || row.verified_at || row.target_date || '').slice(0,10);
-    if (!ticker || !anchor) continue;
-    const list = byTicker.get(ticker) || [];
-    if (!list.length || businessDaysBetween(list[list.length-1], anchor) >= 20) list.push(anchor);
-    byTicker.set(ticker, list);
-  }
-  return [...byTicker.values()].reduce((sum,list)=>sum+list.length,0);
-}
-
 function signed(value) {
   return (value >= 0 ? '+' : '') + value.toFixed(2);
 }
@@ -390,7 +363,7 @@ async function fetchEarnings(symbols) {
 
 async function fetchForecastProgress() {
   const rows = await supabase(
-    'forecast_snapshots?select=ticker,horizon,status,target_date,verified_at&horizon=eq.20&order=created_at.desc&limit=2000',
+    'forecast_snapshots?select=ticker,horizon,status,target_date,verified_at,created_at&horizon=in.(5,20)&order=created_at.desc&limit=2000',
   );
   const today = dateOnly(new Date());
   const verified = rows.filter(row => row.status === 'verified');
@@ -399,24 +372,27 @@ async function fetchForecastProgress() {
     .filter(row => row.target_date && row.target_date <= today)
     .sort((a, b) => String(a.target_date).localeCompare(String(b.target_date)));
 
+  const independent = independentForecastCount(verified);
+  const independent5D = independentForecastCount(verified.filter(row => Number(row.horizon) === 5));
+  const independent20D = independentForecastCount(verified.filter(row => Number(row.horizon) === 20));
   const verifiedTickers = new Set(verified.map(row => String(row.ticker).toUpperCase()));
   const verifiedDates = new Set(verified.map(row => String(row.verified_at || '').slice(0, 10)).filter(Boolean));
-  const independentHint = Math.min(
-    verified.length,
-    new Set(verified.map(row => String(row.ticker).toUpperCase() + ':' + String(row.verified_at || '').slice(0, 10))).size,
-  );
+  const ready = independent >= 50 && independent5D >= 25 && independent20D >= 25;
 
   return {
-      verified: verified.length,
-      independentVerified: independentForecastCount(verified),
-      pending: pending.length,
-      due: due.length,
-      remaining: Math.max(0, 50 - verified.length),
-      tickers: verifiedTickers.size,
-      dates: verifiedDates.size,
-      distinctTickerDates: independentHint,
-      gate: verified.length >= 50 ? 'established' : 'building',
-    };
+    verified: verified.length,
+    independentVerified: independent,
+    independent5D,
+    independent20D,
+    pending: pending.length,
+    due: due.length,
+    remaining: Math.max(0, 50 - independent),
+    tickers: verifiedTickers.size,
+    dates: verifiedDates.size,
+    distinctTickerDates: new Set(verified.map(row => String(row.ticker).toUpperCase() + ':' + String(row.verified_at || '').slice(0, 10))).size,
+    gate: ready ? 'ready' : 'building',
+    independenceRule: 'non-overlapping forecast windows by ticker and horizon',
+  };
 }
 
 export default async function handler(req, res) {
@@ -675,7 +651,7 @@ export default async function handler(req, res) {
         'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
         'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
         'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
-        '50 verified forecasts is a minimum evidence gate; independent count uses non-overlapping 20-business-day anchors per ticker.',
+        'Forecast validation requires 50 independent verified forecasts overall, including at least 25 independent 5D and 25 independent 20D forecasts; counts use non-overlapping forecast windows by ticker and horizon.',
         'Decision-driving signal families require 30+ samples, positive median 20D excess return, and win rate above 50%.'
       ],
     });

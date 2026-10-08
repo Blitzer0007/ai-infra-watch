@@ -162,13 +162,16 @@ def test_exploratory_congress_filters(page):
     page.route('**/api/congress-trades*', congress_route)
     goto_app(page)
     page.get_by_test_id('nav-congress').click()
-    page.get_by_text('3 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+    page.locator('span', has_text='3 matching disclosures').wait_for(state='visible', timeout=30000)
 
-    page.get_by_role('button', name='House', exact=True).click()
-    page.get_by_text('2 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_label('Filter Congress trades by chamber').select_option('House')
+    page.get_by_text('House Member', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_text('House Seller', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_text('Senate Member', exact=True).wait_for(state='detached', timeout=30000)
 
     page.get_by_label('Filter Congress trades by transaction type').select_option('buy')
-    page.get_by_text('1 matching disclosure', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_text('House Member', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_text('House Seller', exact=True).wait_for(state='detached', timeout=30000)
 
-    page.get_by_role('button', name='Clear table filters', exact=True).click()
-    page.get_by_text('3 matching disclosures', exact=True).wait_for(state='visible', timeout=30000)
+    page.get_by_role('button', name='Reset filters', exact=True).click()
+    page.locator('span', has_text='3 matching disclosures').wait_for(state='visible', timeout=30000)

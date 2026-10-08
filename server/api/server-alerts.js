@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireAccess } from '../../api/_access-auth.js';
 import { getTickerValidationContext } from '../utils/forecastValidation.js';
+import { getMarketSessionInfo, shouldEmitLargeMoveSummary, shouldEvaluateLargeMove } from '../utils/serverAlertSession.js';
 
-const LARGE_MOVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
 const MAX_SMART_ALERTS_PER_SCAN = 10;
 const CATALYST_LOOKBACK_DAYS = 7;
@@ -166,6 +166,7 @@ async function quote(symbol) {
   return {
     price,
     changePct: Number.isFinite(prevClose) && prevClose !== 0 ? (price / prevClose - 1) * 100 : 0,
+    marketState: String(meta.marketState || '').trim().toUpperCase(),
   };
 }
 
@@ -276,6 +277,7 @@ async function evaluate() {
   const states = await getStates();
   let forecastValidationContexts = new Map();
   const now = new Date();
+  const session = getMarketSessionInfo(now);
   const timestamp = now.toISOString();
   const events = [];
   const stateUpdates = [];
@@ -324,36 +326,18 @@ async function evaluate() {
     }
   }
 
-  if (config.large_move_enabled) {
+  if (config.large_move_enabled && session.isRegularHours) {
     const threshold = Math.max(0.1, Number(config.large_move_pct) || 5);
     for (const symbol of watchedSymbols) {
       const q = quotes.get(symbol);
       const magnitude = Math.abs(q?.changePct ?? 0);
 
-      if (!q || magnitude < threshold) {
-        for (const direction of ['up', 'down']) {
-          const key = 'large-move:' + symbol + ':' + direction;
-          const previous = states.get(key);
-          if (previous?.active) {
-            stateUpdates.push({
-              event_key: key,
-              active: false,
-              last_seen_at: timestamp,
-              last_triggered_at: previous.last_triggered_at || null,
-              metadata: { symbol, type: 'large-move', direction, threshold },
-            });
-          }
-        }
-        continue;
-      }
+      if (!q || magnitude < threshold || !shouldEvaluateLargeMove(now, q.marketState)) continue;
 
       const direction = q.changePct >= 0 ? 'up' : 'down';
-      const key = 'large-move:' + symbol + ':' + direction;
+      const key = 'large-move:' + symbol + ':' + direction + ':' + session.sessionDate;
       const previous = states.get(key);
-      const lastTriggered = previous?.last_triggered_at ? Date.parse(previous.last_triggered_at) : 0;
-      const elapsedMs = lastTriggered > 0 ? Date.parse(timestamp) - lastTriggered : Number.POSITIVE_INFINITY;
-      const inCooldown = elapsedMs < LARGE_MOVE_COOLDOWN_MS;
-      if (previous?.active && inCooldown) continue;
+      if (previous?.active) continue;
 
       const severity = magnitude >= threshold * LARGE_MOVE_CRITICAL_MULTIPLIER ? 'critical' : 'high';
       events.push({
@@ -362,11 +346,13 @@ async function evaluate() {
         severity,
         symbol,
         title: symbol + ' large move detected',
-        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at $' + q.price.toFixed(2) + '. ' +
+        message: symbol + ' is ' + (q.changePct >= 0 ? 'up ' : 'down ') + magnitude.toFixed(2) + '% today at price ' + q.price.toFixed(2) + '. ' +
           (severity === 'critical'
-            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%.'
-            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold.'),
+            ? 'Move is at least ' + (threshold * LARGE_MOVE_CRITICAL_MULTIPLIER).toFixed(2) + '%. '
+            : 'Move crossed the configured ' + threshold.toFixed(2) + '% threshold. '),
         source: 'Yahoo Finance quote',
+        value: q.changePct,
+        sessionDate: session.sessionDate,
       });
 
       if (events.length >= MAX_SMART_ALERTS_PER_SCAN) break;
@@ -447,6 +433,55 @@ async function evaluate() {
   const delivery = await sendTelegram(events);
   const deliveredKeys = new Set(delivery.sentEventKeys || []);
 
+  // One consolidated summary is sent after the regular session.
+  const summaryKey = 'large-move-summary:' + session.sessionDate;
+  const sessionMoveRows = [...states.entries()]
+    .filter(([key, row]) => key.startsWith('large-move:') && key.endsWith(':' + session.sessionDate) && row?.active)
+    .map(([key, row]) => ({
+      key,
+      symbol: String(row?.metadata?.symbol || key.split(':')[1] || '').toUpperCase(),
+      direction: String(row?.metadata?.direction || key.split(':')[2] || ''),
+      changePct: Number(row?.metadata?.changePct),
+    }));
+
+  const newlyDeliveredMoves = events
+    .filter(event => event.type === 'large-move' && event.symbol !== 'US MARKET' && deliveredKeys.has(event.stateKey))
+    .map(event => ({
+      key: event.stateKey,
+      symbol: event.symbol,
+      direction: event.value >= 0 ? 'up' : 'down',
+      changePct: Math.abs(Number(event.value)),
+    }));
+
+  const summaryRows = [...sessionMoveRows];
+  for (const move of newlyDeliveredMoves) {
+    if (!summaryRows.some(row => row.key === move.key)) summaryRows.push(move);
+  }
+
+  if (config.large_move_enabled && shouldEmitLargeMoveSummary(now) && !states.has(summaryKey) && summaryRows.length) {
+    summaryRows.sort((a, b) => (Number(b.changePct) || 0) - (Number(a.changePct) || 0));
+    const lines = summaryRows.slice(0, 20).map(row =>
+      '• ' + row.symbol + ' ' + (row.direction === 'down' ? '↓' : '↑') + ' ' + (Number(row.changePct) || 0).toFixed(2) + '%'
+    );
+    events.push({
+      stateKey: summaryKey,
+      type: 'large-move',
+      severity: summaryRows.some(row => (Number(row.changePct) || 0) >= (Number(config.large_move_pct) || 5) * LARGE_MOVE_CRITICAL_MULTIPLIER) ? 'critical' : 'high',
+      symbol: 'US MARKET',
+      title: 'Large moves consolidated',
+      message: 'Regular-session large moves for ' + session.sessionDate + ': ' + lines.join(' | '),
+      source: 'Server smart alert session summary',
+      sessionDate: session.sessionDate,
+    });
+  }
+
+  let summaryDelivery = { sent: 0, sentEventKeys: [], errors: [] };
+  const summaryEvent = events.find(event => event.stateKey === summaryKey);
+  if (summaryEvent) {
+    summaryDelivery = await sendTelegram([summaryEvent]);
+    if (summaryDelivery.sent) deliveredKeys.add(summaryKey);
+  }
+
   for (const symbol of watchedSymbols) {
     const q = quotes.get(symbol);
     if (!q) continue;
@@ -465,6 +500,9 @@ async function evaluate() {
         symbol: event.symbol,
         type: event.type,
         title: event.title,
+        sessionDate: event.sessionDate || null,
+        direction: event.type === 'large-move' && event.symbol !== 'US MARKET' ? (event.value >= 0 ? 'up' : 'down') : null,
+        changePct: event.type === 'large-move' && event.symbol !== 'US MARKET' ? Math.abs(Number(event.value)) : null,
       },
     });
   }
@@ -476,8 +514,8 @@ async function evaluate() {
     fresh_quotes: quotes.size,
     configured_price_rules: normalizedAlerts.filter(alert => alert.active).length,
     candidate_events: events.length,
-    sent: delivery.sent,
-    errors: delivery.errors,
+    sent: delivery.sent + summaryDelivery.sent,
+    errors: [...delivery.errors, ...summaryDelivery.errors],
     catalyst_scan: Boolean(catalystFeed),
     forecast_validation_contexts: forecastValidationContexts.size,
     checked_at: timestamp,

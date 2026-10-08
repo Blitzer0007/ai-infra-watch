@@ -47,6 +47,9 @@ type DecisionData = {
     independentVerified?: number;
     independenceWindowBusinessDays?: number;
     gate: string;
+    independent5D?: number;
+    independent20D?: number;
+    independenceRule?: string;
   };
   signalGate?: {
     eligible: number;
@@ -136,7 +139,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Cash-flow P&L" value={signedMoney(portfolio.cashFlowPnl)} tone={(portfolio.cashFlowPnl || 0) >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="20D verified" value={(data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.verified ?? 0) >= 50 ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules set" value={(rules.total - rules.noRule) + '/' + rules.total} tone={rules.noRule ? 'warn' : 'good'} />
       </div>
 
@@ -191,15 +194,12 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <RiskCard title="Signal gate" value={(data.signalGate?.eligible ?? 0) + ' eligible'} detail={(data.signalGate?.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
-        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independentVerified ?? 0) + ' independent · ' + (data.forecast?.pending ?? 0) + ' pending · ' + (data.forecast?.independenceWindowBusinessDays ?? 20) + '-business-day window'} />
+        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
       </div>
 
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio price coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
-      {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; edge values are withheld when trades could not be matched.</div>}
-      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio valuation coverage: {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% · status {portfolio.quoteCoverage.status}.</div>}
-      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
       {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
+      {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">
@@ -233,19 +233,16 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     },
     {
       label: 'Forecast evidence',
-      ok: Boolean(forecast && forecast.verified >= 50 && forecast.gate === 'ready'),
-      detail: forecast ? forecast.verified + '/50 verified · ' + (forecast.independentVerified ?? 0) + ' independent' : 'Forecast validation unavailable',
+      ok: Boolean(forecast && forecast.independentVerified >= 50 && forecast.independent5D >= 25 && forecast.independent20D >= 25 && forecast.gate === 'ready'),
+      detail: forecast ? (forecast.independentVerified ?? 0) + '/50 independent · ' + (forecast.independent5D ?? 0) + ' 5D · ' + (forecast.independent20D ?? 0) + ' 20D' : 'Forecast validation unavailable',
     },
   ];
 
-  const hardBlocks = checks.filter(check => !check.ok && ['Fresh portfolio pricing', 'Position rules'].includes(check.label));
-  const evidenceReview = checks.some(check => !check.ok && ['Decision-driving signals', 'Forecast evidence'].includes(check.label));
-  const state = hardBlocks.length ? 'BLOCKED' : evidenceReview ? 'REVIEW' : 'READY';
-  const stateClass = state === 'BLOCKED'
-    ? 'border-rose-400/20 bg-rose-400/[.04] text-rose-300'
-    : state === 'REVIEW'
-      ? 'border-amber-400/20 bg-amber-400/[.035] text-amber-300'
-      : 'border-emerald-400/20 bg-emerald-400/[.035] text-emerald-300';
+  const needsReview = checks.some(check => !check.ok);
+  const state = needsReview ? 'REVIEW' : 'READY';
+  const stateClass = state === 'REVIEW'
+    ? 'border-amber-400/20 bg-amber-400/[.035] text-amber-300'
+    : 'border-emerald-400/20 bg-emerald-400/[.035] text-emerald-300';
 
   return (
     <div className={'rounded-xl border p-3 ' + stateClass} data-testid="pre-trade-gate">
@@ -253,10 +250,10 @@ function PreTradeGate({ data }: { data: DecisionData }) {
         <div>
           <div className="text-[9px] font-mono uppercase tracking-[.2em]">Pre-trade review gate</div>
           <div className="text-sm font-black mt-1">
-            {state === 'BLOCKED' ? 'Do not act yet' : state === 'REVIEW' ? 'Evidence still needs review' : 'Review conditions are ready'}
+            {state === 'REVIEW' ? 'Portfolio review is incomplete' : 'Review conditions are ready'}
           </div>
           <div className="text-[9px] leading-4 text-white/40 mt-1 max-w-3xl">
-            This gate does not place or recommend trades. It checks whether the portfolio has enough operational and evidence context for a deliberate decision.
+            This is a portfolio-level readiness review, not a trade blocker. It does not prevent a rule-driven exit and becomes trade-specific only when a discretionary add or increase is proposed.
           </div>
         </div>
         <span className="rounded border border-current/20 px-2 py-1 text-[8px] font-mono font-bold uppercase">{state}</span>

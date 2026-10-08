@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search, AlertTriangle, Loader2, ExternalLink, Activity } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AlertTriangle, Loader2, ExternalLink, Activity, Building2, CalendarDays, ChevronDown, FileText, Search, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
 import { formatPrice } from '../utils';
 import { CongressTrade } from '../types';
+import { STOCK_METADATA } from '../data';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
 import DataTable from './DataTable';
 
 interface CongressTradesProps {
   liveTrades?: CongressTrade[];
+  livePrices?: Record<string, { price: number; changePct: number; stale?: boolean }>;
 }
 
 type HistoryPoint = {
@@ -33,6 +35,8 @@ type TradeReaction = {
   excessDay20Pct: number | null;
   ownBaselineDay5Pct: number | null;
   ownBaselineGapDay5Pct: number | null;
+  ownBaselineDay20Pct: number | null;
+  ownBaselineGapDay20Pct: number | null;
 };
 
 type SourceStatus = {
@@ -43,7 +47,6 @@ type SourceStatus = {
   upstreamError: string | null;
 };
 
-const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 const benchmarkHistoryCache: Record<string, Promise<HistoryPoint[]>> = {};
 
@@ -68,10 +71,10 @@ function median(values: number[]): number | null {
   return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
 }
 
-function stockBaseline5(history: HistoryPoint[]): number | null {
+function stockBaseline(history: HistoryPoint[], horizon: 5 | 20): number | null {
   const values: number[] = [];
-  for (let i = 0; i + 5 < history.length; i++) {
-    const value = pct(history[i]?.price ?? null, history[i + 5]?.price ?? null);
+  for (let i = 0; i + horizon < history.length; i++) {
+    const value = pct(history[i]?.price ?? null, history[i + horizon]?.price ?? null);
     if (value != null) values.push(value);
   }
   return median(values);
@@ -99,7 +102,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
   const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
   const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
 
-  const baseline5 = stockBaseline5(history);
+  const baseline5 = stockBaseline(history, 5);
+  const baseline20 = stockBaseline(history, 20);
   const nextPct = pct(event.price, next?.price ?? null);
   const day5Pct = pct(event.price, day5?.price ?? null);
   const day20Pct = pct(event.price, day20?.price ?? null);
@@ -125,6 +129,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
     excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
     ownBaselineDay5Pct: baseline5,
     ownBaselineGapDay5Pct: day5Pct == null || baseline5 == null ? null : day5Pct - baseline5,
+    ownBaselineDay20Pct: baseline20,
+    ownBaselineGapDay20Pct: day20Pct == null || baseline20 == null ? null : day20Pct - baseline20,
   };
 }
 
@@ -164,7 +170,7 @@ const INITIAL_SOURCE: SourceStatus = {
   upstreamError: null,
 };
 
-export default function CongressTrades(_props: CongressTradesProps) {
+export default function CongressTrades({ liveTrades = [], livePrices = {} }: CongressTradesProps) {
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('ct_q') || '');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>(() => {
     const value = new URLSearchParams(window.location.search).get('ct_chamber');
@@ -188,6 +194,34 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceStatus, setSourceStatus] = useState<SourceStatus>(INITIAL_SOURCE);
+  const quickFilterSymbols = useMemo(() => {
+    const symbols = [...liveTrades, ...trades, ...searchTrades]
+      .map(trade => String(trade?.stockSymbol || '').trim().toUpperCase())
+      .filter(Boolean);
+    return [...new Set(symbols)].sort();
+  }, [liveTrades, trades, searchTrades]);
+  const popularFilterSymbols = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const trade of [...liveTrades, ...trades, ...searchTrades]) {
+      const symbol = String(trade?.stockSymbol || '').trim().toUpperCase();
+      if (!symbol) continue;
+      counts.set(symbol, (counts.get(symbol) || 0) + 1);
+    }
+    const ranked = [...counts.entries()].sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([symbol]) => symbol);
+    const ordered = symbolFilter !== 'ALL' ? [symbolFilter, ...ranked] : ranked;
+    return [...new Set(ordered)].slice(0, 11);
+  }, [liveTrades, trades, searchTrades, symbolFilter]);
+
+  const moreFilterSymbols = useMemo(
+    () => quickFilterSymbols.filter(symbol => !popularFilterSymbols.includes(symbol)),
+    [quickFilterSymbols, popularFilterSymbols]
+  );
+
+  const selectedMetadata = symbolFilter !== 'ALL' ? STOCK_METADATA[symbolFilter] : undefined;
+  const selectedLivePrice = symbolFilter !== 'ALL' ? livePrices[symbolFilter] : undefined;
+  const selectedHistoryPrice = symbolFilter !== 'ALL' && history.length ? history[history.length - 1]?.price ?? null : null;
+  const selectedPrice = selectedLivePrice?.price ?? selectedHistoryPrice;
+  const selectedChange = selectedLivePrice?.changePct ?? null;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -381,7 +415,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.date || trade.transactionDate),
+        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.transactionDate || trade.date),
       }))
       .filter((row) => row.reaction);
   }, [filtered, history, benchmarkHistory, symbolFilter]);
@@ -396,15 +430,20 @@ export default function CongressTrades(_props: CongressTradesProps) {
       next: avg(rows.map(row => row.reaction?.nextPct)),
       day5: avg(rows.map(row => row.reaction?.day5Pct)),
       day20: avg(rows.map(row => row.reaction?.day20Pct)),
+      medianNext: median(rows.map(row => row.reaction?.nextPct).filter((v): v is number => v != null)),
+      medianDay5: median(rows.map(row => row.reaction?.day5Pct).filter((v): v is number => v != null)),
+      medianDay20: median(rows.map(row => row.reaction?.day20Pct).filter((v): v is number => v != null)),
       excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
       excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
       excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
-       ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
-       ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
+      medianExcessDay5: median(rows.map(row => row.reaction?.excessDay5Pct).filter((v): v is number => v != null)),
+      medianExcessDay20: median(rows.map(row => row.reaction?.excessDay20Pct).filter((v): v is number => v != null)),
+      ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
+      ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
-    const uniqueEventDates = new Set(reactions.map(row => row.trade.transactionDate || row.trade.filingDate || row.trade.date).filter(Boolean)).size;
+    const uniqueEventDates = new Set(reactions.map(row => row.trade.filingDate || row.trade.transactionDate || row.trade.date).filter(Boolean)).size;
     const confidence = sourceStatus.kind === 'unavailable' || sourceStatus.stale
       ? 'Low'
       : uniqueEventDates >= 30 && reactions.length >= 30
@@ -424,260 +463,175 @@ export default function CongressTrades(_props: CongressTradesProps) {
   }, [reactions]);
 
   return (
-    <div className="space-y-6" id="congress-view">
-      <JevDecisionPanel
-        kind="congress"
-        title="Congress disclosure review"
-        state={{
-          selected_symbol: symbolFilter,
-          source: sourceStatus.label,
-          chamber_filter: chamberFilter,
-          matched_trades: filtered.length,
-          trades: filtered.slice(0, 8).map((trade) => ({
-            symbol: trade.stockSymbol,
-            chamber: trade.chamber,
-            transaction_type: trade.transactionType,
-            amount_range: trade.amountRange,
-            transaction_date: trade.transactionDate || trade.date,
-            filing_date: trade.filingDate,
-          })),
-          historical_reaction_matches: reactionSummary.matched,
-          evidence_confidence: reactionSummary.confidence,
-          unique_event_dates: reactionSummary.uniqueEventDates,
-        }}
-      />
-
-      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 04 / Signals</span>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
-          Congressional Trading Signals
-        </h1>
-        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
-          Track public congressional disclosure records across searchable tickers, company names, and members. The preset buttons are only shortcuts.
-        </p>
-      </div>
-
-      <div className="flex items-start space-x-3 bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 text-white/80">
-        <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
-        <div className="text-xs leading-relaxed">
-          <span className="font-black uppercase tracking-wider text-white">Data note:</span> Filing dates can lag the underlying transaction date. Historical price context below is anchored to the disclosure/filing date when available. The transaction date remains a separate field and is not substituted for the disclosure timestamp.
+    <div className="space-y-5" id="congress-view">
+      <div className="flex items-start gap-4 pt-1">
+        <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300"><Building2 className="h-6 w-6" /></div>
+        <div className="min-w-0">
+          <div className="mb-1 text-[10px] font-mono uppercase tracking-[0.18em] text-emerald-300/70">Section 04 / Signals</div>
+          <h1 className="text-3xl md:text-4xl font-black tracking-[-0.045em] text-white">Congress Trades</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-white/50">Track U.S. Congress members' stock trades and analyze historical price context.</p>
         </div>
       </div>
 
-      <div className="bg-[#15181E]/30 border border-white/10 p-4 rounded-xl space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSymbolFilter('ALL')}
-            className={'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
-              (symbolFilter === 'ALL'
-                ? 'bg-white text-black border-white'
-                : 'bg-white/5 text-white/50 border-white/10 hover:text-white')}
-          >
-            Latest Global
-          </button>
-          {TRACKED_SYMBOLS.map((symbol) => (
-            <button
-              key={symbol}
-              onClick={() => setSymbolFilter(symbol)}
-              className={'px-3 py-2 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition ' +
-                (symbolFilter === symbol
-                  ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
-                  : 'bg-white/5 text-white/50 border-white/10 hover:text-white')}
-            >
-              {symbol}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-start gap-3 rounded-2xl border border-amber-400/15 bg-[#11161b] px-4 py-3.5 text-white/80 shadow-[0_10px_35px_rgba(0,0,0,.12)]">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+        <div className="text-[11px] leading-relaxed"><span className="font-black uppercase tracking-wider text-amber-200">Data note:</span>{' '}Filing dates can lag the underlying transaction date. Historical price context below is anchored to the disclosure/filing date when available. The transaction date remains a separate field and is not substituted for the disclosure timestamp.</div>
+      </div>
 
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-          <div className="flex space-x-2 w-full lg:w-auto">
-            {(['all', 'Senate', 'House'] as const).map((ch) => (
-              <button
-                key={ch}
-                onClick={() => setChamberFilter(ch)}
-                className={'px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded border transition flex-1 lg:flex-initial ' +
-                  (chamberFilter === ch
-                    ? 'bg-white text-black border-white'
-                    : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10')}
-              >
-                {ch === 'all' ? 'All Chambers' : ch}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterSelect
-              value={transactionFilter}
-              onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')}
-              label="Filter Congress trades by transaction type"
-              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
-            >
-              <option value="all">All Types</option>
-              <option value="buy">Buy only</option>
-              <option value="sell">Sell only</option>
+      <section className="rounded-2xl border border-white/10 bg-[#0e141a] p-4 md:p-5 shadow-[0_14px_40px_rgba(0,0,0,.14)]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
+          <FilterBlock icon={<Search className="h-3.5 w-3.5 text-white/45" />} label="Ticker / Search">
+            <div className="relative">
+              <FilterInput type="text" placeholder="Search ticker, company, or member..." value={search} onChange={(e) => setSearch(e.target.value)} label="Search Congress trades by politician, company, symbol, type, amount, or date" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white placeholder:text-white/25" />
+              {search.trim() && globalLoading && <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-cyan-300" aria-label="Searching Congress trades" />}
+            </div>
+          </FilterBlock>
+          <FilterBlock icon={<Building2 className="h-3.5 w-3.5 text-white/45" />} label="Chamber">
+            <FilterSelect value={chamberFilter} onChange={(e) => setChamberFilter(e.target.value as 'all' | 'Senate' | 'House')} label="Filter Congress trades by chamber" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+              <option value="all">All Chambers</option><option value="Senate">Senate</option><option value="House">House</option>
             </FilterSelect>
-            <FilterSelect
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')}
-              label="Filter Congress trades by transaction age"
-              className="font-mono text-[10px] uppercase tracking-wider text-white/60"
-            >
-              <option value="all">All Dates</option>
-              <option value="30">Last 30 Days</option>
-              <option value="90">Last 90 Days</option>
-              <option value="365">Last 365 Days</option>
+          </FilterBlock>
+          <FilterBlock icon={<SlidersHorizontal className="h-3.5 w-3.5 text-white/45" />} label="Trade Type">
+            <FilterSelect value={transactionFilter} onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')} label="Filter Congress trades by transaction type" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+              <option value="all">All Types</option><option value="buy">Buy only</option><option value="sell">Sell only</option>
             </FilterSelect>
-          </div>
-
-          <div className="relative w-full lg:w-80">
-            <FilterInput
-              type="text"
-              placeholder="Search member, company, or ticker..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              label="Search Congress trades by politician, company, symbol, type, amount, or date"
-              className="font-mono"
-            />
-            {search.trim() && globalLoading && (
-              <Loader2 className="w-3.5 h-3.5 text-cyan-300 absolute right-3 top-1/2 -translate-y-1/2" aria-label="Searching Congress trades" />
-            )}
-          </div>
+          </FilterBlock>
+          <FilterBlock icon={<CalendarDays className="h-3.5 w-3.5 text-white/45" />} label="Date Range">
+            <FilterSelect value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')} label="Filter Congress trades by transaction age" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+              <option value="all">All Dates</option><option value="30">Last 30 Days</option><option value="90">Last 90 Days</option><option value="365">Last 365 Days</option>
+            </FilterSelect>
+          </FilterBlock>
         </div>
-      </div>
 
-      {symbolFilter !== 'ALL' && (
-        <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-cyan-300" />
-            <div>
-              <div className="text-xs font-black text-white uppercase tracking-wider">Historical price context · {symbolFilter}</div>
-              <div className="text-[9px] text-white/30 font-mono mt-1">
-                Anchored to the transaction date; this shows what the market did afterward and does not establish that the trade caused the move.
-              </div>
+        <div className="my-4 h-px bg-white/[0.07]" />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-white/55">Popular / Active</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setSymbolFilter('ALL')} className={'rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ' + (symbolFilter === 'ALL' ? 'border-emerald-300 bg-emerald-400/10 text-emerald-300 shadow-[0_0_0_1px_rgba(52,211,153,.2)]' : 'border-white/10 bg-[#11171d] text-white/55 hover:border-white/20 hover:text-white')}>Latest Global</button>
+              {popularFilterSymbols.map(symbol => <button key={symbol} type="button" onClick={() => setSymbolFilter(symbol)} className={'rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ' + (symbolFilter === symbol ? 'border-emerald-300 bg-emerald-400/10 text-emerald-300 shadow-[0_0_0_1px_rgba(52,211,153,.2)]' : 'border-white/10 bg-[#11171d] text-white/55 hover:border-white/20 hover:text-white')}>{symbol}</button>)}
+              {moreFilterSymbols.length > 0 && <label className="relative inline-flex"><span className="sr-only">More Congress symbols</span><select value="" onChange={e => e.target.value && setSymbolFilter(e.target.value)} className="appearance-none rounded-xl border border-white/10 bg-[#11171d] px-3.5 py-2.5 pr-9 text-xs font-semibold text-white/60 outline-none transition hover:border-white/20"><option value="">+ More</option>{moreFilterSymbols.map(symbol => <option key={symbol} value={symbol}>{symbol}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/35" /></label>}
             </div>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <SummaryMetric label="All matched" value={String(reactionSummary.all.matched)} tone="text-white" />
-            <SummaryMetric label="Buy 5D vs SPY" value={formatPct(reactionSummary.buy.excessDay5)} tone={reactionTone(reactionSummary.buy.excessDay5)} />
-            <SummaryMetric label="Sell 5D vs SPY" value={formatPct(reactionSummary.sell.excessDay5)} tone={reactionTone(reactionSummary.sell.excessDay5)} />
-            <SummaryMetric label="All 20D vs SPY" value={formatPct(reactionSummary.all.excessDay20)} tone={reactionTone(reactionSummary.all.excessDay20)} />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-2">
-            <SummaryMetric label="Buy next" value={formatPct(reactionSummary.buy.next)} tone={reactionTone(reactionSummary.buy.next)} />
-            <SummaryMetric label="Buy 5D" value={formatPct(reactionSummary.buy.day5)} tone={reactionTone(reactionSummary.buy.day5)} />
-            <SummaryMetric label="Buy 20D" value={formatPct(reactionSummary.buy.day20)} tone={reactionTone(reactionSummary.buy.day20)} />
-            <SummaryMetric label="Sell next" value={formatPct(reactionSummary.sell.next)} tone={reactionTone(reactionSummary.sell.next)} />
-            <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
-            <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
-          </div>
-          <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
-          <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Confidence uses matched reactions + unique event dates + source freshness; same-date trades remain correlated.</div>
-          <div className={`mt-1 text-[9px] font-mono ${reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}`}>
-            {'EVIDENCE CONFIDENCE · ' + reactionSummary.confidence.toUpperCase() + ' · ' + reactionSummary.matched + ' matched reactions across ' + reactionSummary.uniqueEventDates + ' unique event dates'}
-          </div>
-
-          {historyLoading && (
-            <div className="text-[9px] font-mono text-white/30 mt-3">Loading 5-year market history…</div>
-          )}
+          <button type="button" onClick={() => { setSearch(''); setChamberFilter('all'); setTransactionFilter('all'); setDateFilter('all'); setSymbolFilter('ALL'); }} className="self-start rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-white/45 transition hover:bg-white/[0.06] hover:text-white lg:self-end">Reset filters</button>
         </div>
-      )}
+      </section>
 
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/40 font-mono">
-        <span>Congress data source:</span>
-        {sourceStatus.sourceUrl ? (
-          <a
-            href={sourceStatus.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={'inline-flex items-center gap-1 rounded border px-2 py-1 ' + sourceTone(sourceStatus)}
-          >
-            {sourceStatus.label}
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        ) : (
-          <span className={'rounded border px-2 py-1 ' + sourceTone(sourceStatus)}>
-            {sourceStatus.label}
-          </span>
-        )}
-        {sourceStatus.stale && (
-          <span className="text-cyan-300">• showing last-known-good records</span>
-        )}
-        {loading && (
-          <span className="inline-flex items-center gap-1 text-cyan-300">
-            <Loader2 className="w-3 h-3 animate-spin" /> Loading
-          </span>
-        )}
-        {sourceStatus.upstreamError && sourceStatus.kind !== 'unavailable' && (
-          <span className="text-amber-300">• Primary issue: {sourceStatus.upstreamError}</span>
-        )}
-        {error && <span className="text-rose-300">• {error}</span>}
+      {symbolFilter !== 'ALL' && <>
+        <section className="rounded-2xl border border-white/10 bg-[#0e141a] p-4 md:p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[#162029] text-sm font-black text-emerald-300">{symbolFilter.slice(0, 2)}</div>
+              <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="truncate text-xl font-black text-white">{symbolFilter}</h2><span className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/15 bg-emerald-400/10 px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />Selected</span></div><p className="mt-0.5 truncate text-xs text-white/45">{selectedMetadata?.name || 'Selected public-company disclosure ticker'}</p></div>
+            </div>
+            <div className="hidden text-right sm:block"><div className="text-[9px] font-mono uppercase tracking-widest text-white/35">Data coverage</div><div className="mt-1 text-xs text-white/60">{filtered.length} matching disclosures</div></div>
+          </div>
+          <div className="my-4 h-px bg-white/[0.07]" />
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <CompanyMetric label="Latest price" value={selectedPrice == null ? '—' : '$' + formatPrice(selectedPrice)} tone="text-white" detail={selectedChange == null ? (selectedLivePrice?.stale ? 'Last known quote' : 'Historical close') : formatPct(selectedChange)} />
+            <CompanyMetric label="Market cap" value="—" tone="text-white" detail="Not in current feed" />
+            <CompanyMetric label="Sector" value={selectedMetadata?.sector || '—'} tone="text-white" detail="Configured metadata" />
+            <CompanyMetric label="Industry" value="—" tone="text-white" detail="Not in current feed" />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-[#0e141a] p-4 md:p-5">
+          <div className="flex items-start gap-3"><div className="mt-0.5 rounded-lg bg-cyan-400/10 p-2 text-cyan-300"><Activity className="h-5 w-5" /></div><div className="min-w-0"><h2 className="text-lg font-black text-white">Historical Price Context · {symbolFilter}</h2><p className="mt-1 max-w-4xl text-[11px] leading-relaxed text-white/45">Anchored to the disclosure/filing date, this shows what the market did afterward and does not establish that the trade caused the move.</p></div></div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryMetric label="All matched" value={String(reactionSummary.all.matched)} tone="text-white" icon={<FileText className="h-4 w-4" />} />
+            <SummaryMetric label="Buy 5D vs SPY" value={formatPct(reactionSummary.buy.excessDay5)} tone={reactionTone(reactionSummary.buy.excessDay5)} icon={<TrendingUp className="h-4 w-4" />} />
+            <SummaryMetric label="Sell 5D vs SPY" value={formatPct(reactionSummary.sell.excessDay5)} tone={reactionTone(reactionSummary.sell.excessDay5)} icon={<TrendingDown className="h-4 w-4" />} />
+            <SummaryMetric label="All 20D vs SPY" value={formatPct(reactionSummary.all.excessDay20)} tone={reactionTone(reactionSummary.all.excessDay20)} icon={<Activity className="h-4 w-4" />} />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <SecondaryMetric label="Buy next" value={formatPct(reactionSummary.buy.next)} tone={reactionTone(reactionSummary.buy.next)} />
+            <SecondaryMetric label="Buy 5D" value={formatPct(reactionSummary.buy.day5)} tone={reactionTone(reactionSummary.buy.day5)} />
+            <SecondaryMetric label="Buy 20D" value={formatPct(reactionSummary.buy.day20)} tone={reactionTone(reactionSummary.buy.day20)} />
+            <SecondaryMetric label="Sell next" value={formatPct(reactionSummary.sell.next)} tone={reactionTone(reactionSummary.sell.next)} />
+            <SecondaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
+            <SecondaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] font-mono text-white/40"><span>5D mean {formatPct(reactionSummary.all.day5)}</span><span>5D median {formatPct(reactionSummary.all.medianDay5)}</span><span>20D mean {formatPct(reactionSummary.all.day20)}</span><span>20D median {formatPct(reactionSummary.all.medianDay20)}</span><span>Own-stock 5D baseline {formatPct(reactionSummary.all.ownBaselineDay5)}</span></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/10 bg-violet-400/[0.025] px-3 py-2 text-[10px] font-mono text-violet-100/60"><span>Event vs own baseline {formatPct(reactionSummary.all.ownBaselineGapDay5)}</span><span>{reactionSummary.uniqueEventDates} unique event dates · same-date trades remain correlated</span><span className={reactionSummary.matched < 30 ? 'text-amber-300' : 'text-emerald-300'}>EVIDENCE CONFIDENCE · {reactionSummary.confidence.toUpperCase()}</span></div>
+          {historyLoading && <div className="mt-3 inline-flex items-center gap-2 text-[10px] font-mono text-cyan-300/70"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading 5-year market history…</div>}
+        </section>
+      </>}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono uppercase tracking-widest text-white/35">
+        <div className="flex flex-wrap items-center gap-2"><span>Congress data source</span>{sourceStatus.sourceUrl ? <a href={sourceStatus.sourceUrl} target="_blank" rel="noreferrer" className={'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 ' + sourceTone(sourceStatus)}>{sourceStatus.label}<ExternalLink className="h-3 w-3" /></a> : <span className={'rounded-lg border px-2.5 py-1.5 ' + sourceTone(sourceStatus)}>{sourceStatus.label}</span>}{sourceStatus.stale && <span className="text-cyan-300">• last-known-good records</span>}{loading && <span className="inline-flex items-center gap-1 text-cyan-300"><Loader2 className="h-3 w-3 animate-spin" />Loading</span>}{error && <span className="text-rose-300">• {error}</span>}</div>
+        <span>{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
       </div>
 
-      {sourceStatus.kind === 'fallback' && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-400/15 bg-amber-400/5 p-3 text-[10px] text-amber-100/80">
-          <AlertTriangle className="w-4 h-4 text-amber-300 mt-0.5 flex-shrink-0" />
-          <div>
-            <span className="font-black uppercase tracking-wider text-amber-200">Fallback active:</span>{' '}
-            the primary Bargo feed was unavailable, so the API is serving normalized public congressional disclosure records from OpenRegs by DataDawn.
-            The fallback may not include a separate filing/disclosure timestamp or estimated trade price.
-          </div>
-        </div>
-      )}
+      {sourceStatus.kind === 'fallback' && <div className="flex items-start gap-3 rounded-xl border border-amber-400/15 bg-amber-400/5 p-3 text-[10px] text-amber-100/80"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><div><span className="font-black uppercase tracking-wider text-amber-200">Fallback active:</span>{' '}the primary Bargo feed was unavailable, so the API is serving normalized public congressional disclosure records from OpenRegs by DataDawn. The fallback may not include a separate filing/disclosure timestamp or estimated trade price.</div></div>}
+      {sourceStatus.kind === 'cache' && <div className="flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-[10px] text-cyan-100/80"><Activity className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" /><div><span className="font-black uppercase tracking-wider text-cyan-200">Cache fallback active:</span>{' '}both live sources were unavailable, so the page is showing the last successful dataset available to the server.</div></div>}
 
-      {sourceStatus.kind === 'cache' && (
-        <div className="flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-[10px] text-cyan-100/80">
-          <Activity className="w-4 h-4 text-cyan-300 mt-0.5 flex-shrink-0" />
-          <div>
-            <span className="font-black uppercase tracking-wider text-cyan-200">Cache fallback active:</span>{' '}
-            both live sources were unavailable, so the page is showing the last successful dataset available to the server.
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-widest text-white/30">
-        <span aria-live="polite">{filtered.length} matching disclosure{filtered.length === 1 ? '' : 's'}</span>
-        <button
-          type="button"
-          onClick={() => {
-            setSearch('');
-            setChamberFilter('all');
-            setTransactionFilter('all');
-            setDateFilter('all');
-            setSymbolFilter('ALL');
-          }}
-          className="rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/50 hover:text-white hover:bg-white/10 transition"
-        >
-          Clear table filters
-        </button>
-      </div>
-
-      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl overflow-hidden">
+      <div className="rounded-2xl border border-white/10 bg-[#0e141a] overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.015] px-4 py-3"><div><div className="text-[11px] font-semibold text-white/75">Disclosure activity</div><div className="mt-0.5 text-[10px] text-white/35">Sortable public filing records with historical reaction context.</div></div><div className="hidden items-center gap-2 text-[9px] font-mono uppercase tracking-wider text-white/30 sm:flex"><span>Filtered view</span><span className="rounded-md border border-white/10 bg-white/[0.025] px-2 py-1 text-white/55">{filtered.length}</span></div></div>
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto aiw-scroll-region">
-          <DataTable<CongressTrade>
-            rows={filtered}
-            rowKey={(row) => row.id}
-            loading={loading || globalLoading}
-            empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'}
-            initialSort={{ key: 'tradeDate', direction: 'desc' }}
-            columns={[
-              { key: 'filer', header: 'Filer / Chamber', accessor: row => row.politician, render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="text-[10px] text-white/40 font-mono tracking-wide uppercase mt-1">{row.chamber}</div></div> },
-              { key: 'symbol', header: 'Symbol', accessor: row => row.stockSymbol },
-              { key: 'type', header: 'Type', accessor: row => row.transactionType },
-              { key: 'amount', header: 'Amount Range', accessor: row => row.amountRange },
-              { key: 'tradeDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
-              { key: 'filed', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
-              { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '$' + formatPrice(reaction.eventPrice) : '—'; } },
-              { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div>Next {formatPct(reaction?.nextPct ?? null)}</div><div className="text-[9px] mt-1">5D {formatPct(reaction?.day5Pct ?? null)}</div><div className="text-[9px] mt-1">20D {formatPct(reaction?.day20Pct ?? null)}</div><div className="text-[8px] mt-1 text-cyan-200/60">5D vs SPY {formatPct(reaction?.excessDay5Pct ?? null)}</div></div>; } },
-            ]}
-          />
+          <DataTable<CongressTrade> rows={filtered} rowKey={row => row.id} loading={loading || globalLoading} empty={sourceStatus.kind === 'unavailable' ? 'No records available from the configured Congress sources.' : search.trim() ? 'No Congress records match the current search.' : 'No transactions found for the selected filters.'} initialSort={{ key: 'tradeDate', direction: 'desc' }} columns={[
+            { key: 'filer', header: 'Filer / Chamber', accessor: row => row.politician, render: row => <div><div className="font-sans font-bold text-white">{row.politician}</div><div className="mt-1 text-[10px] font-mono uppercase tracking-wide text-white/40">{row.chamber}</div></div> },
+            { key: 'symbol', header: 'Symbol', accessor: row => row.stockSymbol },
+            { key: 'type', header: 'Type', accessor: row => row.transactionType, render: row => <span className={'inline-flex rounded-md border px-2 py-1 text-[9px] font-mono font-bold uppercase tracking-wider ' + (row.transactionType === 'buy' ? 'border-emerald-400/15 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/15 bg-rose-400/10 text-rose-300')}>{row.transactionType}</span> },
+            { key: 'amount', header: 'Amount Range', accessor: row => row.amountRange },
+            { key: 'tradeDate', header: 'Trade Date', accessor: row => row.transactionDate || row.date || '', type: 'date' },
+            { key: 'filed', header: 'Filed', accessor: row => row.filingDate || '', type: 'date' },
+            { key: 'close', header: 'Trade-Day Close', accessor: row => reactionById.get(row.id)?.eventPrice ?? null, type: 'currency', render: row => { const reaction = reactionById.get(row.id); return reaction ? '$' + formatPrice(reaction.eventPrice) : '—'; } },
+            { key: 'afterward', header: 'Afterward', accessor: row => reactionById.get(row.id)?.nextPct ?? null, type: 'percent', align: 'right', render: row => { const reaction = reactionById.get(row.id); return <div className="text-right"><div className={reactionTone(reaction?.nextPct ?? null)}>Next {formatPct(reaction?.nextPct ?? null)}</div><div className="mt-1 text-[9px] text-white/45">5D {formatPct(reaction?.day5Pct ?? null)}</div><div className="mt-1 text-[9px] text-white/45">20D {formatPct(reaction?.day20Pct ?? null)}</div><div className="mt-1 text-[8px] text-cyan-200/60">5D vs SPY {formatPct(reaction?.excessDay5Pct ?? null)}</div></div>; } },
+          ]} />
         </div>
       </div>
+
+      <JevDecisionPanel kind="congress" title="Congress disclosure review" state={{
+        selected_symbol: symbolFilter, source: sourceStatus.label, chamber_filter: chamberFilter, matched_trades: filtered.length,
+        trades: filtered.slice(0, 8).map(trade => ({ symbol: trade.stockSymbol, chamber: trade.chamber, transaction_type: trade.transactionType, amount_range: trade.amountRange, transaction_date: trade.transactionDate || trade.date, filing_date: trade.filingDate })),
+        historical_reaction_matches: reactionSummary.matched, evidence_confidence: reactionSummary.confidence, unique_event_dates: reactionSummary.uniqueEventDates,
+      }} />
     </div>
   );
 }
 
 function SummaryMetric({
+  label,
+  value,
+  tone,
+  icon,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0b1015] px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/35">{label}</div>
+        {icon && <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/5 bg-[#131b22] text-white/55">{icon}</div>}
+      </div>
+      <div className={'mt-1.5 text-2xl font-black tracking-tight ' + tone}>{value}</div>
+    </div>
+  );
+}
+function CompanyMetric({
+  label,
+  value,
+  tone,
+  detail,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+  detail?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/35">{label}</div>
+      <div className={'mt-1 text-base font-black leading-tight ' + tone}>{value}</div>
+      {detail && <div className="mt-1 text-[9px] text-white/30">{detail}</div>}
+    </div>
+  );
+}
+
+function SecondaryMetric({
   label,
   value,
   tone,
@@ -687,9 +641,14 @@ function SummaryMetric({
   tone: string;
 }) {
   return (
-    <div className="rounded-lg border border-white/5 bg-black/10 p-3">
-      <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div>
-      <div className={'text-base font-black mt-1 ' + tone}>{value}</div>
+    <div className="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2.5">
+      <div className="text-[9px] font-mono uppercase tracking-wider text-white/30">{label}</div>
+      <div className={'mt-1 text-sm font-bold ' + tone}>{value}</div>
     </div>
   );
 }
+
+function FilterBlock({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return <div><label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-white/75">{icon}{label}</label>{children}</div>;
+}
+

@@ -50,3 +50,15 @@ test('exposure-weighted macro load separates assessed and worst-case missing evi
     assert.equal(result.worstCaseLoad, 30);
   assert.equal(result.assessedCoveragePct, 66.7);
 });
+test('exposure matching ignores substring collisions such as purchasing power and metadata', () => {
+  const rows = [
+    { symbol: 'META', value: 100, taiwan: assessed, power: assessed, export: assessed },
+    { symbol: 'NVDA', value: 100, taiwan: assessed, power: assessed, export: assessed },
+  ];
+  const result = calculateExposureWeightedMacroLoad(rows, [
+    { title: 'Metadata tooling update', impactRating: 'high' },
+    { title: 'Purchasing power remains stable', impactRating: 'medium' },
+  ]);
+  assert.equal(result.scenarioSeverity.power, 0);
+  assert.equal(result.scenarioSeverity.taiwan, 0);
+});

@@ -7,6 +7,7 @@ import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
 import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
+import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { createForecastEvidenceSnapshot, type ForecastEvidenceSnapshot } from '../utils/forecastEvidence';
 import DataTable from './DataTable';
 
@@ -86,6 +87,12 @@ function loadForecasts(): ForecastSnapshot[] {
     return [];
   }
 }
+function forecastEvidenceState(snapshot?: ForecastEvidenceSnapshot) {
+  if (snapshot?.capturedAt && snapshot.source === 'forward_outlook') return 'CAPTURED';
+  if (snapshot && typeof snapshot === 'object') return 'INVALID_SNAPSHOT';
+  return 'LEGACY_NO_SNAPSHOT';
+}
+
 function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
 
 function percentile(values: number[], p: number): number {
@@ -127,6 +134,7 @@ function forwardReturns(history: PricePoint[], horizon: number): number[] {
 
 type ForecastAnalytics = {
   sampleSize: number;
+  legacyVerifiedCount?: number;
   sampleStatus?: string;
   directionalAccuracyPct?: number | null;
   medianAbsoluteError?: number | null;
@@ -167,12 +175,14 @@ function calculateVerificationDrift(
       item.actualReturn != null &&
       item.medianError != null &&
       item.verifiedAt
-    )
-    .sort((a, b) => String(a.verifiedAt).localeCompare(String(b.verifiedAt)));
+    );
+  const independent = independentForecastRows(
+    verified.map(item => ({ ...item, created_at: item.createdAt, target_date: item.targetDate })),
+  ).sort((a, b) => String(a.verifiedAt).localeCompare(String(b.verifiedAt)));
 
-  if (verified.length < 10) {
+  if (independent.length < 40) {
     return {
-      sampleSize: verified.length,
+      sampleSize: independent.length,
       recentCount: 0,
       priorCount: 0,
       recentDirection: null,
@@ -184,9 +194,8 @@ function calculateVerificationDrift(
     };
   }
 
-  const split = Math.floor(verified.length / 2);
-  const prior = verified.slice(0, split);
-  const recent = verified.slice(split);
+  const recent = independent.slice(-10);
+  const prior = independent.slice(-20, -10);
 
   const directionRate = (rows: ForecastSnapshot[]) => {
     const eligible = rows.filter(row => row.median !== 0 && row.actualReturn !== 0);
@@ -1268,6 +1277,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Exit rule</div><div className="text-[9px] font-mono text-white/45 mt-1">{portfolioContext.holding?.exitRuleType ? ((portfolioContext.holding.exitRuleType.replace('_', ' ')) + (portfolioContext.holding.exitRuleValue != null ? ' · ' + portfolioContext.holding.exitRuleValue + '%' : '')) : 'Not recorded'}</div></div>
                   </div>
                   {(portfolioContext.holding?.brokerAlerts?.length || portfolioContext.holding?.brokerAlertPrices?.length) ? <div className="text-[8px] font-mono text-white/35 mt-2">Broker alerts: {portfolioContext.holding.brokerAlerts?.length ? portfolioContext.holding.brokerAlerts.map(alert => alert.direction === 'below' ? 'Below ' + formatPrice(alert.price) + ' STOP' : 'Above ' + formatPrice(alert.price) + ' TARGET').join(' · ') : (portfolioContext.holding.brokerAlertPrices || []).map(price => Number(portfolioContext.holding?.averageCost) > 0 && Number(price) < Number(portfolioContext.holding.averageCost) ? 'Below ' + formatPrice(Number(price)) + ' STOP' : 'Above ' + formatPrice(Number(price)) + ' TARGET').join(' · ')}</div> : null}
+                  {portfolioContext.holding?.lossLimitPct != null && Number(portfolioContext.holding.averageCost) > 0 &&
+                    !portfolioContext.holding.brokerAlerts?.some(alert => alert.direction === 'below') &&
+                    !(portfolioContext.holding.brokerAlertPrices || []).some(price => Number(price) < Number(portfolioContext.holding?.averageCost)) && (
+                      <div className="text-[8px] font-mono text-amber-200/65 mt-2">Downside broker alert not recorded · loss-limit level is {formatPrice(Number(portfolioContext.holding.averageCost) * (1 - Number(portfolioContext.holding.lossLimitPct) / 100))}. Review adding a broker alert at this level.</div>
+                  )}
                   {portfolioContext.holding?.practicalNotes ? <div className="text-[9px] text-white/45 mt-2 leading-relaxed">{portfolioContext.holding.practicalNotes}</div> : null}
                 </div>
               }
@@ -1415,14 +1429,14 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
             <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Likely range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
             {f.evidenceSnapshot && <div className="mt-1 text-white/30">
-              Creation evidence: {f.evidenceSnapshot.analystConsensus?.status || 'missing'} analyst evidence · {
+              Evidence state: {forecastEvidenceState(f.evidenceSnapshot)} · {f.evidenceSnapshot.analystConsensus?.status || 'missing'} analyst evidence · {
                 (f.evidenceSnapshot.counts?.news || 0) +
                 (f.evidenceSnapshot.counts?.contracts || 0) +
                 (f.evidenceSnapshot.counts?.political || 0) +
                 (f.evidenceSnapshot.counts?.macro || 0)
               } event/context items · captured {f.evidenceSnapshot.capturedAt ? new Date(f.evidenceSnapshot.capturedAt).toLocaleString() : 'unknown time'}
             </div>}
-            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Legacy forecast — creation-time evidence snapshot was not captured.</div>}
+            {!f.evidenceSnapshot && <div className="mt-1 text-amber-200/60">Evidence state: LEGACY_NO_SNAPSHOT · excluded from calibration statistics.</div>}
             {(f.exitRuleType || f.lossLimitPct != null || f.practicalNotes) && <div className="mt-2 text-white/30">Rule: {f.exitRuleType ? f.exitRuleType.replace('_', ' ') : 'not recorded'}{f.exitRuleValue != null ? ' · ' + f.exitRuleValue + '%' : ''}{f.lossLimitPct != null ? ' · loss limit ' + f.lossLimitPct + '%' : ''}{f.practicalNotes ? ' · notes saved' : ''}</div>}
           </div>
         ))}</div>
@@ -1434,12 +1448,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <CheckCircle2 className="w-4 h-4 text-cyan-300" />
             <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Live forecast accuracy</span>
           </div>
-          <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here. Direction, error, bias, and coverage are descriptive while the sample is below 50; the validation gate is considered established only at 50+ verified forecasts.</p>
+          <p className="text-[10px] text-white/40 mb-3">Only snapshot-captured, independently non-overlapping forecasts are used for validation. Legacy verified rows remain visible for auditability but are excluded from calibration.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Validation-eligible</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.independentSampleSize ?? 0}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.directionalAccuracyPct == null ? '—' : forecastAnalytics.directionalAccuracyPct.toFixed(0) + '%'}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
           </div>
           {forecastAnalytics?.evidenceCoverage && (
             <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
@@ -1464,7 +1478,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               <div>
                 <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Verification drift monitor</div>
                 <div className="text-[9px] text-white/35 mt-1">
-                  Heuristic comparison of the newest half of verified forecasts for the selected ticker and horizon with the older half. Requires at least 10 verified forecasts.
+                  Drift compares the latest 10 with the prior 10 independent forecasts for this ticker and horizon. It stays insufficient until at least 40 independent forecasts exist.
                 </div>
               </div>
               <span className="px-2 py-1 rounded-full border border-white/10 text-[9px] font-mono uppercase text-white/55">

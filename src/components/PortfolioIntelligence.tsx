@@ -1363,6 +1363,8 @@ function PortfolioEvidenceCoverage({
           ? (analystCount > 0 && medianTarget == null ? 'partial' : 'available')
           : 'empty')
         : 'missing';
+  const missingGroup = analyses.filter(item => item.groupScore == null).map(item => item.symbol);
+  const missingPeers = analyses.filter(item => item.vsPeers == null).map(item => item.symbol);
   const channels = [
     { label: 'Quotes', value: analyses.filter(item => item.livePrice != null).length, total: analyses.length },
     { label: 'Group', value: analyses.filter(item => item.groupScore != null).length, total: analyses.length },
@@ -1375,13 +1377,20 @@ function PortfolioEvidenceCoverage({
   ];
   const available = channels.filter(item => item.value > 0).length;
   const status = available >= 5 ? 'SUFFICIENT COVERAGE' : available >= 3 ? 'PARTIAL COVERAGE' : 'INSUFFICIENT COVERAGE';
+  const statusDetail = missingGroup.length || missingPeers.length
+    ? 'Sufficient overall, but ' +
+      (missingGroup.length ? missingGroup.length + ' holdings missing group data' : '') +
+      (missingGroup.length && missingPeers.length ? ' and ' : '') +
+      (missingPeers.length ? missingPeers.length + ' holdings missing peer data' : '') +
+      '.'
+    : 'All holdings have group and peer coverage.';
   const analystFresh = analystConsensus ? analystFreshness(analystConsensus.retrievedAt || null) : 'unknown';
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Evidence coverage</div>
         <h2 className="text-base font-black mt-1">{status}</h2>
-        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score.</div>
+        <div className="text-[9px] text-white/35 mt-1">Coverage describes retrieved evidence availability; it is not a confidence, quality, or recommendation score. {statusDetail}</div>
       </div>
       <div className="text-[8px] font-mono text-white/25">{available}/{channels.length} channels available</div>
     </div>
@@ -1392,6 +1401,7 @@ function PortfolioEvidenceCoverage({
         {channel.total != null && <div className="text-[8px] font-mono text-white/25 mt-1">{channel.value}/{channel.total}</div>}
       </div>)}
     </div>
+    {(missingGroup.length || missingPeers.length) ? <div className="mt-3 rounded-xl border border-amber-400/10 bg-amber-400/[.02] p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-amber-300">Missing holding coverage</div><div className="text-[9px] text-white/40 mt-1">{missingGroup.length ? 'Group: ' + missingGroup.join(', ') : 'Group: complete'}</div><div className="text-[9px] text-white/40 mt-1">{missingPeers.length ? 'Peers: ' + missingPeers.join(', ') : 'Peers: complete'}</div></div> : null}
     <div className="mt-3 rounded-xl border border-violet-400/10 bg-violet-400/[.025] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -1446,8 +1456,8 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:Array<PeerCounter
     .slice(0, 5);
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer opportunity-cost scenario</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Closest-peer scenario profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Difference" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Return gap" value={aggregateReturnGap == null ? '—' : (aggregateReturnGap >= 0 ? '+' : '') + aggregateReturnGap.toFixed(2) + ' pts'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
-    {contributors.length > 0 && <div className="mt-3 border-t border-white/5 pt-3"><div className="text-[9px] font-mono uppercase text-white/35">Largest contributors to the difference</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">{contributors.map(item => <div key={(item.holdingSymbol || '—') + ':' + (item.peer?.symbol || '—')} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-bold">{item.holdingSymbol || 'Holding'} → {item.peer?.symbol || 'Peer'}</div><div className="text-[8px] text-white/30">Historical opportunity-cost comparison · not a forecast</div></div><div className={'text-[10px] font-mono font-bold ' + ((item.difference ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{(item.difference ?? 0) >= 0 ? '+' : ''}{(item.difference ?? 0).toFixed(2)}</div></div>)}</div></div>}
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer scenario profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Peer minus actual" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Avg peer gap" value={aggregateReturnGap == null ? '—' : (aggregateReturnGap >= 0 ? '+' : '') + aggregateReturnGap.toFixed(2) + ' pts'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
+    {contributors.length > 0 && <div className="mt-3 border-t border-white/5 pt-3"><div className="text-[9px] font-mono uppercase text-white/35">Largest contributors to the difference</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">{contributors.map(item => <div key={(item.holdingSymbol || '—') + ':' + (item.peer?.symbol || '—')} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-bold">{item.holdingSymbol || 'Holding'} → {item.peer?.symbol || 'Peer'}</div><div className="text-[8px] text-white/30">Historical opportunity-cost comparison · not a forecast</div></div><div className="text-[10px] font-mono font-bold text-white/65">{(item.difference ?? 0) >= 0 ? '+' : ''}{(item.difference ?? 0).toFixed(2)}</div></div>)}</div></div>}
   </section>;
 }
 
@@ -1465,9 +1475,18 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
 }
 
 function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
+  const gap = comparison?.differencePctPoints ?? null;
+  const peer = comparison?.peer?.symbol || 'Peer';
+  const gapSentence = gap == null
+    ? 'Historical opportunity-cost comparison only.'
+    : gap > 0
+      ? peer + ' beat ' + h.symbol + ' by ' + gap.toFixed(2) + ' pts over the same comparison window.'
+      : gap < 0
+        ? h.symbol + ' beat ' + peer + ' by ' + Math.abs(gap).toFixed(2) + ' pts over the same comparison window.'
+        : h.symbol + ' and ' + peer + ' matched over the same comparison window.';
   return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer opportunity-cost comparison</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Shows what the closest configured peer would have done over the same historical window; use this as opportunity cost, not as a recommendation.'}</div></div><div className="text-[8px] font-mono text-white/25">Historical opportunity-cost comparison · not a forecast</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer scenario return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Return gap" value={comparison?.differencePctPoints == null ? '—' : (comparison.differencePctPoints >= 0 ? '+' : '') + comparison.differencePctPoints.toFixed(2) + ' pts'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer scenario value if you made the same trades' : 'Peer scenario value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/><Info label="Difference vs your holding" value={comparison?.difference == null ? '—' : comparison.difference.toFixed(2)}/></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer opportunity-cost comparison</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Shows what the closest configured peer would have done over the same historical window.'}</div><div className="text-[9px] text-white/55 mt-2">{gapSentence} Hindsight only — not a signal and never used by allocation prompts.</div></div><div className="text-[8px] font-mono text-white/25">Historical comparison · not a forecast</div></div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer scenario return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Peer minus you" value={comparison?.differencePctPoints == null ? '—' : (comparison.differencePctPoints >= 0 ? '+' : '') + comparison.differencePctPoints.toFixed(2) + ' pts'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer scenario value if you made the same trades' : 'Peer scenario value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/></div>
     <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.basis === 'broker-transactions' ? 'Mirrors your broker buy/sell cash flows in the peer using each transaction date. This compares historical total-return outcomes, not a forecast.' : comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
   </section>;
 }
