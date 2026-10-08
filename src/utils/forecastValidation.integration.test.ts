@@ -15,7 +15,9 @@ function verifiedRow(overrides: Record<string, unknown> = {}) {
     p90: 14,
     actual_return: 7,
     median_error: 2,
-    verified_at: '2026-10-03T10:00:00Z',
+    created_at: '2026-10-01T10:00:00Z',
+    target_date: '2026-10-29',
+    verified_at: '2026-10-30T10:00:00Z',
     ...overrides,
   };
 }
@@ -50,13 +52,22 @@ describe('forecast validation integration contract', () => {
   it('groups validation by ticker and horizon and returns matching alert context', () => {
     const rows = [
       verifiedRow({ ticker: 'NVDA', horizon: 20 }),
-      verifiedRow({ ticker: 'NVDA', horizon: 20, actual_return: -3, median: -1, median_error: -2 }),
+      verifiedRow({
+        ticker: 'NVDA',
+        horizon: 20,
+        created_at: '2026-10-30T10:00:00Z',
+        target_date: '2026-11-27',
+        verified_at: '2026-11-28T10:00:00Z',
+        actual_return: -3,
+        median: -1,
+        median_error: -2,
+      }),
       verifiedRow({ ticker: 'MU', horizon: 20, actual_return: 2, median: 3, median_error: -1 }),
-      verifiedRow({ ticker: 'NVDA', horizon: 5 }),
+      verifiedRow({ ticker: 'NVDA', horizon: 5, target_date: '2026-10-08' }),
     ];
     const summary = buildForecastValidationSummary(rows);
     assert.equal(summary.byTickerHorizon.length, 3);
-    assert.equal(summary.validationGate.verifiedCount, 4);
+    assert.equal(summary.overall.independentCount, 4);
 
     const context = getTickerValidationContext(rows, 'nvda', 20);
     assert.equal(context?.ticker, 'NVDA');

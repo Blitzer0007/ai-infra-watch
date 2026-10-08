@@ -33,6 +33,8 @@ type TradeReaction = {
   excessDay20Pct: number | null;
   ownBaselineDay5Pct: number | null;
   ownBaselineGapDay5Pct: number | null;
+  ownBaselineDay20Pct: number | null;
+  ownBaselineGapDay20Pct: number | null;
 };
 
 type SourceStatus = {
@@ -43,7 +45,6 @@ type SourceStatus = {
   upstreamError: string | null;
 };
 
-const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 const benchmarkHistoryCache: Record<string, Promise<HistoryPoint[]>> = {};
 
@@ -68,10 +69,10 @@ function median(values: number[]): number | null {
   return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
 }
 
-function stockBaseline5(history: HistoryPoint[]): number | null {
+function stockBaseline(history: HistoryPoint[], horizon: 5 | 20): number | null {
   const values: number[] = [];
-  for (let i = 0; i + 5 < history.length; i++) {
-    const value = pct(history[i]?.price ?? null, history[i + 5]?.price ?? null);
+  for (let i = 0; i + horizon < history.length; i++) {
+    const value = pct(history[i]?.price ?? null, history[i + horizon]?.price ?? null);
     if (value != null) values.push(value);
   }
   return median(values);
@@ -99,7 +100,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
   const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
   const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
 
-  const baseline5 = stockBaseline5(history);
+  const baseline5 = stockBaseline(history, 5);
+  const baseline20 = stockBaseline(history, 20);
   const nextPct = pct(event.price, next?.price ?? null);
   const day5Pct = pct(event.price, day5?.price ?? null);
   const day20Pct = pct(event.price, day20?.price ?? null);
@@ -125,6 +127,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
     excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
     ownBaselineDay5Pct: baseline5,
     ownBaselineGapDay5Pct: day5Pct == null || baseline5 == null ? null : day5Pct - baseline5,
+    ownBaselineDay20Pct: baseline20,
+    ownBaselineGapDay20Pct: day20Pct == null || baseline20 == null ? null : day20Pct - baseline20,
   };
 }
 
@@ -164,7 +168,7 @@ const INITIAL_SOURCE: SourceStatus = {
   upstreamError: null,
 };
 
-export default function CongressTrades(_props: CongressTradesProps) {
+export default function CongressTrades({ liveTrades = [] }: CongressTradesProps) {
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('ct_q') || '');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>(() => {
     const value = new URLSearchParams(window.location.search).get('ct_chamber');
@@ -188,6 +192,12 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceStatus, setSourceStatus] = useState<SourceStatus>(INITIAL_SOURCE);
+  const quickFilterSymbols = useMemo(() => {
+    const symbols = [...liveTrades, ...trades, ...searchTrades]
+      .map(trade => String(trade?.stockSymbol || '').trim().toUpperCase())
+      .filter(Boolean);
+    return [...new Set(symbols)].sort();
+  }, [liveTrades, trades, searchTrades]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -381,7 +391,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.date || trade.transactionDate),
+        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.transactionDate || trade.date),
       }))
       .filter((row) => row.reaction);
   }, [filtered, history, benchmarkHistory, symbolFilter]);
@@ -396,15 +406,20 @@ export default function CongressTrades(_props: CongressTradesProps) {
       next: avg(rows.map(row => row.reaction?.nextPct)),
       day5: avg(rows.map(row => row.reaction?.day5Pct)),
       day20: avg(rows.map(row => row.reaction?.day20Pct)),
+      medianNext: median(rows.map(row => row.reaction?.nextPct).filter((v): v is number => v != null)),
+      medianDay5: median(rows.map(row => row.reaction?.day5Pct).filter((v): v is number => v != null)),
+      medianDay20: median(rows.map(row => row.reaction?.day20Pct).filter((v): v is number => v != null)),
       excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
       excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
       excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
-       ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
-       ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
+      medianExcessDay5: median(rows.map(row => row.reaction?.excessDay5Pct).filter((v): v is number => v != null)),
+      medianExcessDay20: median(rows.map(row => row.reaction?.excessDay20Pct).filter((v): v is number => v != null)),
+      ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
+      ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
-    const uniqueEventDates = new Set(reactions.map(row => row.trade.transactionDate || row.trade.filingDate || row.trade.date).filter(Boolean)).size;
+    const uniqueEventDates = new Set(reactions.map(row => row.trade.filingDate || row.trade.transactionDate || row.trade.date).filter(Boolean)).size;
     const confidence = sourceStatus.kind === 'unavailable' || sourceStatus.stale
       ? 'Low'
       : uniqueEventDates >= 30 && reactions.length >= 30
@@ -475,7 +490,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
           >
             Latest Global
           </button>
-          {TRACKED_SYMBOLS.map((symbol) => (
+          {quickFilterSymbols.map((symbol) => (
             <button
               key={symbol}
               onClick={() => setSymbolFilter(symbol)}
@@ -570,6 +585,12 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell next" value={formatPct(reactionSummary.sell.next)} tone={reactionTone(reactionSummary.sell.next)} />
             <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+            <SummaryMetric label="All 5D mean" value={formatPct(reactionSummary.all.day5)} tone="text-white/70" />
+            <SummaryMetric label="All 5D median" value={formatPct(reactionSummary.all.medianDay5)} tone="text-white/70" />
+            <SummaryMetric label="All 20D mean" value={formatPct(reactionSummary.all.day20)} tone="text-white/70" />
+            <SummaryMetric label="All 20D median" value={formatPct(reactionSummary.all.medianDay20)} tone="text-white/70" />
           </div>
           <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
           <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Confidence uses matched reactions + unique event dates + source freshness; same-date trades remain correlated.</div>

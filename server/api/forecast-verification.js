@@ -1,5 +1,7 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory } from '../../api/_market-data.js';
+import { independentForecastRows } from '../utils/forecastIndependence.js';
+import { coverageInterval, calibrationVerdict as getCalibrationVerdict } from '../utils/forecastCalibration.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -252,45 +254,58 @@ function chooseModel(v1,v2){
   return directionImproved && errorImproved ? 'analogue-v2' : 'analogue-v1';
 }
 function independentValidationRows(rows) {
-  const sorted = rows
-    .filter(row => String(row?.status) === 'verified')
-    .filter(row => hasCreationEvidence(row))
-    .filter(row => Number.isFinite(Number(row?.actual_return)) && Number.isFinite(Number(row?.median)))
-    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
-  const selected = [];
-  const lastByTickerHorizon = new Map();
-  const businessDaysBetween = (from, to) => {
-    const start = new Date(String(from).slice(0, 10) + 'T00:00:00Z');
-    const end = new Date(String(to).slice(0, 10) + 'T00:00:00Z');
-    if (!(start < end)) return 0;
-    let count = 0;
-    for (const cursor = new Date(start); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-      const day = cursor.getUTCDay();
-      if (day !== 0 && day !== 6) count += 1;
-    }
-    return count;
-  };
-  for (const row of sorted) {
-    const key = String(row.ticker || '').toUpperCase() + '|' + String(Number(row.horizon));
-    const previous = lastByTickerHorizon.get(key);
-    if (previous && businessDaysBetween(previous.created_at, row.created_at) < 20) continue;
-    selected.push(row);
-    lastByTickerHorizon.set(key, row);
+  return independentForecastRows(rows)
+    .filter(row => hasCreationEvidence(row));
+}
+
+async function loadValidationGateState() {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/forecast_snapshots?select=ticker,horizon,status,created_at,target_date,evidence_snapshot&status=eq.verified&limit=2000',
+    { headers: headers() },
+  );
+  const rows = await response.json();
+  if (!response.ok || !Array.isArray(rows)) {
+    return { ready: false, independentOverall: 0, independent5D: 0, independent20D: 0 };
   }
-  return selected;
+  const eligible = rows.filter(row => hasCreationEvidence(row));
+  const independent = independentForecastRows(eligible);
+  const independent5D = independentForecastRows(independent.filter(row => Number(row.horizon) === 5)).length;
+  const independent20D = independentForecastRows(independent.filter(row => Number(row.horizon) === 20)).length;
+  return {
+    ready: independent.length >= 50 && independent5D >= 25 && independent20D >= 25,
+    independentOverall: independent.length,
+    independent5D,
+    independent20D,
+  };
+}
+
+async function loadActiveModels() {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/forecast_model_config?select=ticker,horizon,active_model',
+    { headers: headers() },
+  );
+  const rows = await response.json();
+  if (!response.ok || !Array.isArray(rows)) return new Map();
+  return new Map(rows.map(row => [String(row.ticker).toUpperCase() + '|' + Number(row.horizon), String(row.active_model || 'analogue-v1')]));
 }
 
 async function evaluateForecastModels() {
   const TICKERS = ['NVDA','MSFT','MU','AVGO','AMD','TSM','META','NBIS'];
   const HORIZONS = [5,20,60,120,252];
   const results = [];
+  const gate = await loadValidationGateState();
+  const activeModels = await loadActiveModels();
   for (const ticker of TICKERS) {
     const h = await modelHistory(ticker);
     for (const horizon of HORIZONS) {
       const v1 = runModelBacktest(h, horizon, 'analogue-v1');
       const v2 = runModelBacktest(h, horizon, 'analogue-v2');
       if (!v1 && !v2) continue;
-      const active = chooseModel(v1, v2);
+      const key = ticker.toUpperCase() + '|' + horizon;
+      const existingActive = activeModels.get(key);
+      const active = gate.ready
+        ? chooseModel(v1, v2)
+        : existingActive || 'analogue-v1';
       const selected = active === 'analogue-v2' ? v2 : v1;
       await upsertModelConfig({
         ticker, horizon, active_model: active,
@@ -305,6 +320,10 @@ async function evaluateForecastModels() {
         learning_summary: {
           source: 'rolling-verified-forecast-learning',
           selectedModel: active,
+          validationGateReady: gate.ready,
+          independentValidationSamples: gate.independentOverall,
+          independent5D: gate.independent5D,
+          independent20D: gate.independent20D,
           modelTypicalMiss: selected?.error ?? null,
           noChangeTypicalMiss: selected?.baselineError ?? null,
           improvementPct: selected?.improvementPct ?? null,
@@ -341,7 +360,8 @@ function aggregateForecastSubset(subset) {
   if (!subset.length) return {
     count: 0, sampleStatus: sampleStatus(0), directionalAccuracyPct: null,
     medianAbsoluteError: null, meanSignedErrorPct: null,
-    p25p75CoveragePct: null, p10p90CoveragePct: null
+    p25p75CoveragePct: null, p25p75CoverageCiPct: null,
+    p10p90CoveragePct: null, p10p90CoverageCiPct: null
   };
   const eligible = subset.filter(row => Number(row.actual_return)!==0 && Number(row.median)!==0);
   const direction = eligible.length
@@ -349,16 +369,18 @@ function aggregateForecastSubset(subset) {
     : null;
   const signedErrors = subset.map(row => Number(row.actual_return)-Number(row.median)).filter(Number.isFinite);
   const errors = signedErrors.map(value => Math.abs(value)).sort((a,b)=>a-b);
-  const middle = subset.filter(row=>Number(row.p25)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p75)).length/subset.length*100;
-  const wide = subset.filter(row=>Number(row.p10)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p90)).length/subset.length*100;
+  const middle = coverageInterval(subset, 'p25', 'p75');
+  const wide = coverageInterval(subset, 'p10', 'p90');
   return {
     count: subset.length,
     sampleStatus: sampleStatus(subset.length),
     directionalAccuracyPct: direction==null?null:Number(direction.toFixed(2)),
     medianAbsoluteError: errors.length ? Number(errors[Math.floor((errors.length-1)*0.5)].toFixed(4)) : null,
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(4)) : null,
-    p25p75CoveragePct: Number(middle.toFixed(2)),
-    p10p90CoveragePct: Number(wide.toFixed(2)),
+    p25p75CoveragePct: middle.coveragePct,
+    p25p75CoverageCiPct: middle.lowerPct == null ? null : { lower: middle.lowerPct, upper: middle.upperPct },
+    p10p90CoveragePct: wide.coveragePct,
+    p10p90CoverageCiPct: wide.lowerPct == null ? null : { lower: wide.lowerPct, upper: wide.upperPct },
   };
 }
 
@@ -395,13 +417,9 @@ function forecastAnalytics(rows) {
   ).length;
   const aggregate = aggregateForecastSubset;
   const overall = aggregate(verified);
-  const calibrationVerdict = overall.count < 25 || overall.p25p75CoveragePct == null || overall.p10p90CoveragePct == null
-    ? 'insufficient'
-    : overall.p25p75CoveragePct < 40 && overall.p10p90CoveragePct < 70
-      ? 'too narrow'
-      : overall.p25p75CoveragePct > 60 && overall.p10p90CoveragePct > 90
-        ? 'too wide'
-        : 'well calibrated';
+  const calibrationVerdictFromAggregate = summary =>
+    getCalibrationVerdict(summary.p25p75CoverageCiPct, summary.p10p90CoverageCiPct, summary.count);
+  const calibrationVerdict = calibrationVerdictFromAggregate(overall);
   const grouped=(keyFn, decorate)=>{
     const map=new Map();
     for(const row of verified){
@@ -526,8 +544,8 @@ function forecastLearning(rows) {
     };
   };
 
-  const recent = score(verified.slice(0, 20));
-  const prior = score(verified.slice(20, 40));
+  const recent = score(verified.slice(0, 10));
+  const prior = score(verified.slice(10, 20));
   const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
     ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
     : null;
@@ -594,7 +612,7 @@ function forecastLearning(rows) {
       typicalMiss: baselineError == null ? null : Number(baselineError.toFixed(2)),
       improvementPct,
     },
-    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40 },
+    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40, comparisonWindow: 'latest 10 vs prior 10 independent forecasts' },
     evidenceLearning: {
       multipleChannelSamples: multi.length,
       otherSamples: other.length,
@@ -608,8 +626,11 @@ function forecastLearning(rows) {
     calibration: {
       p25p75TargetPct: 50,
       p10p90TargetPct: 80,
-      p25p75CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75)).length / verified.length * 100).toFixed(1)) : null,
-      p10p90CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p10) && Number(row.actual_return) <= Number(row.p90)).length / verified.length * 100).toFixed(1)) : null,
+      p25p75CoveragePct: overall.p25p75CoveragePct,
+      p25p75CoverageCiPct: overall.p25p75CoverageCiPct,
+      p10p90CoveragePct: overall.p10p90CoveragePct,
+      p10p90CoverageCiPct: overall.p10p90CoverageCiPct,
+      verdict: calibrationVerdictFromAggregate(overall),
     },
     validationGate,
     recentLessons: withEvidence.slice(0, 10),

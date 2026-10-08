@@ -61,8 +61,21 @@ function clean(value: unknown) {
   return String(value ?? '').toLowerCase();
 }
 
+function termPattern(keyword: string) {
+  const normalized = String(keyword || '').trim();
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('\\b' + escaped.replace(/\s+/g, '\\s+') + '\\b', 'i');
+}
+
 function matches(text: string, keywords: string[]) {
-  return keywords.filter(keyword => text.includes(keyword));
+  return keywords.filter(keyword => termPattern(keyword).test(text));
+}
+
+function symbolMatches(text: string, symbol: string) {
+  const normalized = String(symbol || '').trim().toUpperCase();
+  if (!normalized) return false;
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('\\b' + escaped + '\\b', 'i').test(text);
 }
 
 function toLevel(score: number): ExposureLevel {
@@ -92,7 +105,7 @@ export function deriveExposure(
   const symbolUpper = symbol.toUpperCase();
   const relatedContracts = contracts.filter(item =>
     clean(item.company).toUpperCase() === symbolUpper ||
-    clean(item.client).toUpperCase().includes(symbolUpper)
+    symbolMatches(clean(item.client), symbolUpper)
   );
 
   const contractText = relatedContracts
@@ -109,7 +122,7 @@ export function deriveExposure(
     const searchable = [item.title, item.summary, item.description, symbols]
       .map(clean)
       .join(' ');
-    return searchable.toUpperCase().includes(symbolUpper);
+    return symbolMatches(searchable, symbolUpper);
   });
 
   const newsText = relatedNews
@@ -232,9 +245,9 @@ export type ExposureWeightedMacroLoad = {
 };
 
 const SCENARIO_MATCHERS: Record<MacroScenario, RegExp> = {
-  taiwan: /taiwan|tsmc|advanced.?node|foundry/i,
-  power: /power|grid|data.?center/i,
-  export: /export|chip.?control|china|sanction|embargo/i,
+  taiwan: /\b(taiwan|tsmc|advanced[ -]?node|foundry)\b/i,
+  power: /\b(power[ -]?(availability|demand|capacity)|electricity|grid|data[ -]?center|utility|nuclear|solar|colocation|megawatt|mw)\b/i,
+  export: /\b(export|chip[ -]?control|china|sanction|embargo|restricted|restriction)\b/i,
 };
 
 function riskSeverity(risk: MacroRiskInput): number {
