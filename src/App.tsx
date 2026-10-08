@@ -564,7 +564,7 @@ export default function App() {
               onAnimationComplete={reloadSettings}
               className="max-w-7xl mx-auto"
             >
-              {activeView === 'overview' && <Overview config={config} onNavigate={handleNavigate} />}
+              {activeView === 'overview' && <Overview config={config} onNavigate={handleNavigate} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} news={liveData?.news} timestamp={liveData?.timestamp} evidenceAvailability={liveData?.evidenceAvailability} />}
               {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} portfolioSymbols={portfolioSymbols} />}
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
