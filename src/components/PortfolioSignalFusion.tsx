@@ -27,15 +27,7 @@ type Props = {
   heldSymbols?: string[];
 };
 
-const PORTFOLIO_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS', 'RKLB'];
-
-const MACRO_HOLDINGS: Record<string, string[]> = {
-  taiwan: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-  export: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-  power: ['DGXX', 'NBIS', 'VIVO', 'META', 'NOW'],
-};
-
-function symbols(values: string[], allowed = PORTFOLIO_SYMBOLS) {
+function symbols(values: string[], allowed: string[]) {
   return [...new Set(values.map(value => String(value).toUpperCase()).filter(value => allowed.includes(value)))];
 }
 
@@ -43,7 +35,13 @@ function date(value?: string) {
   return value ? value.slice(0, 10) : '—';
 }
 
-function newsSymbols(title: string) {
+function containsTerm(text: string, term: string) {
+  const escaped = term.replace(/[.*+?^${}()|[\\]\\]/g, '\\function newsSymbols(title: string) {
+  const text = title.toLowerCase();');
+  return new RegExp(term.includes(' ') ? escaped.replace(/\\s+/g, '\\s+') : '\\b' + escaped + '\\b', 'i').test(text);
+}
+
+function newsSymbols(title: string, allowed: string[]) {
   const text = title.toLowerCase();
   const aliases: Record<string, string[]> = {
     NVDA: ['nvidia', 'nvda', 'blackwell', 'cuda'],
@@ -57,7 +55,21 @@ function newsSymbols(title: string) {
     NOW: ['servicenow', 'service now'],
     PHVS: ['pharvaris', 'phvs'],
   };
-  return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => text.includes(term))).map(([key]) => key));
+  return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => containsTerm(text, term))).map(([key]) => key), allowed);
+}
+
+function macroKeywordMatches(symbol: string, scenario: string, contracts: Contract[], news: NewsItem[]) {
+  const text = [...contracts, ...news]
+    .map(item => [item?.title, item?.summary, item?.description, item?.details, item?.company, item?.client].filter(Boolean).join(' '))
+    .join(' ')
+    .toLowerCase();
+  const terms: Record<string, string[]> = {
+    taiwan: ['taiwan', 'tsmc', 'foundry', 'hbm', 'dram', 'nand'],
+    export: ['export', 'china', 'sanction', 'embargo', 'restricted', 'chip controls'],
+    power: ['power', 'grid', 'data center', 'electricity', 'utility', 'nuclear', 'solar', 'colocation', 'megawatt', 'mw'],
+  };
+  const matchesForScenario = terms[scenario] || [];
+  return symbol && matchesForScenario.some(term => containsTerm(text, term));
 }
 
 function evidenceProfile(kind: string, source: string, sourceType?: string) {
@@ -102,7 +114,7 @@ function badge(kind: string) {
 
 export default function PortfolioSignalFusion({ prices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], heldSymbols = [] }: Props) {
   const [autopilotSignals, setAutopilotSignals] = useState<any[]>([]);
-  const portfolioSymbols = heldSymbols.length ? heldSymbols.map(symbol => symbol.toUpperCase()) : PORTFOLIO_SYMBOLS;
+  const portfolioSymbols = heldSymbols.map(symbol => symbol.toUpperCase()).filter(Boolean);
   useEffect(() => {
     let cancelled = false;
     authFetch('/api/autopilot-signals?limit=8', { cache: 'no-store' })
@@ -124,7 +136,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.client || x.details,
         detail: x.details,
         when: x.dateSigned,
-        affected: symbols([x.company]),
+        affected: symbols([x.company], portfolioSymbols),
         source: x.source === 'sec-edgar-primary' ? 'SEC EDGAR' : 'Contracts feed',
         url: x.url || null,
       })),
@@ -137,7 +149,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.stockSymbol + ' ' + (x.transactionType === 'buy' ? 'purchase' : 'sale') + ' disclosure',
         detail: x.politician + ' · ' + x.chamber + ' · ' + x.amountRange + '. Transaction date is used for timeline context.',
         when: x.transactionDate || x.date,
-        affected: symbols([x.stockSymbol]),
+        affected: symbols([x.stockSymbol], portfolioSymbols),
         source: 'Congress disclosure feed',
         url: x.filingPortal || null,
       })),
@@ -149,7 +161,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.title,
         detail: x.impactSummary || x.description,
         when: x.dateUpdated,
-        affected: symbols(MACRO_HOLDINGS[key]),
+        affected: portfolioSymbols.length && key ? portfolioSymbols.filter(symbol => macroKeywordMatches(symbol, key, contracts, news)) : [],
         source: 'Live macro risk ledger',
         url: null,
       };
@@ -162,7 +174,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.title || x.topic || 'Political / policy signal',
         detail: (x.eventType || 'Political statement / coverage') + ' · ' + (x.topic || 'AI / Technology'),
         when: x.date || undefined,
-        affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase())),
+        affected: symbols((x.relatedSymbols || []).map(symbol => String(symbol).toUpperCase()), portfolioSymbols),
         source: x.source || 'GDELT',
         sourceType: x.sourceType || 'secondary',
         url: x.url || null,
