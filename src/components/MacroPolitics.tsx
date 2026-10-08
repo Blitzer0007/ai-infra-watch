@@ -1,6 +1,6 @@
 import DataTable from './DataTable';
 import { useState, useEffect } from 'react';
-import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-react';
+import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity, RotateCcw, Minus, Plus, ExternalLink, Filter } from 'lucide-react';
 import { MacroRisk } from '../types';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
@@ -14,6 +14,8 @@ interface MacroPoliticsProps {
   contracts?: any[];
   news?: any[];
   politicalSignals?: any[];
+  evidenceAvailability?: Record<string, any>;
+  onNavigate?: (view: string) => void;
 }
 
 function exposureClass(level: ExposureLevel) {
@@ -49,7 +51,13 @@ function PortfolioScenarioSensitivity({
 }) {
   const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
   const validation = validatePortfolioExposure(derivedExposure);
-  const totalInvested = positions.reduce((sum, position) => sum + position.investedValue, 0);
+  const totalReferenceValue = positions.reduce((sum, position) => {
+    const live = livePrices[position.symbol];
+    const currentValue = live?.price != null && Number.isFinite(Number(live.price))
+      ? Number(live.price) * position.quantity
+      : position.investedValue;
+    return sum + Math.max(0, currentValue);
+  }, 0);
   const scenarioInputs = {
     taiwan: { value: taiwanProb, weight: 0.5 },
     power: { value: gridSeverity, weight: 0.25 },
@@ -61,7 +69,7 @@ function PortfolioScenarioSensitivity({
     const currentValue = live?.price != null && position
       ? live.price * position.quantity
       : position?.investedValue ?? 0;
-    const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
+    const portfolioWeight = totalReferenceValue ? (Math.max(0, currentValue) / totalReferenceValue) * 100 : 0;
     const calculateSensitivity = (worstCase: boolean) => Math.round(
       (Object.entries(scenarioInputs) as Array<[MacroScenarioKey, { value: number; weight: number }]>).reduce((sum, [scenario, input]) => {
         const dimension = exposure[scenario];
@@ -82,11 +90,16 @@ function PortfolioScenarioSensitivity({
       worstCaseSensitivity,
       weightedContribution: assessedSensitivity * (portfolioWeight / 100),
       worstCaseContribution: worstCaseSensitivity * (portfolioWeight / 100),
+      referenceCapitalSensitivity: currentValue * (assessedSensitivity / 100),
+      worstCaseReferenceCapitalSensitivity: currentValue * (worstCaseSensitivity / 100),
     };
   });
 
   const portfolioSensitivity = portfolioRows.reduce((sum, row) => sum + row.weightedContribution, 0);
   const portfolioWorstCaseSensitivity = portfolioRows.reduce((sum, row) => sum + row.worstCaseContribution, 0);
+  const portfolioReferenceCapitalSensitivity = portfolioRows.reduce((sum, row) => sum + row.referenceCapitalSensitivity, 0);
+  const portfolioWorstCaseReferenceCapitalSensitivity = portfolioRows.reduce((sum, row) => sum + row.worstCaseReferenceCapitalSensitivity, 0);
+  const topSensitivityRows = portfolioRows.slice().sort((a, b) => b.weightedContribution - a.weightedContribution).slice(0, 3);
 
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
@@ -105,6 +118,16 @@ function PortfolioScenarioSensitivity({
           <div className="grid grid-cols-2 gap-4 mt-1">
             <div><div className="text-[8px] text-white/30 font-mono uppercase">Assessed-only</div><div className="text-2xl font-black font-mono text-cyan-300">{Math.round(portfolioSensitivity)} / 100</div></div>
             <div><div className="text-[8px] text-white/30 font-mono uppercase">Worst case</div><div className="text-2xl font-black font-mono text-amber-300">{Math.round(portfolioWorstCaseSensitivity)} / 100</div></div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg border border-white/5 bg-black/10 px-2 py-2">
+              <div className="text-[8px] font-mono uppercase text-white/25">Reference capital sensitivity</div>
+              <div className="text-sm font-black font-mono text-cyan-200">${portfolioReferenceCapitalSensitivity.toFixed(0)}</div>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/10 px-2 py-2">
+              <div className="text-[8px] font-mono uppercase text-white/25">Upper-bound reference</div>
+              <div className="text-sm font-black font-mono text-amber-200">${portfolioWorstCaseReferenceCapitalSensitivity.toFixed(0)}</div>
+            </div>
           </div>
           <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/35">
             Exposure validation: <span className={validation.status === 'VALIDATED' ? 'text-emerald-300' : validation.status === 'PARTIAL' ? 'text-amber-300' : 'text-white/45'}>{validation.status}</span>
@@ -132,8 +155,17 @@ function PortfolioScenarioSensitivity({
         />
       </div>
 
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+        {topSensitivityRows.map(row => (
+          <div key={row.symbol} className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+            <div className="flex items-center justify-between gap-2"><span className="text-[9px] font-mono uppercase text-white/30">{row.symbol}</span><span className="text-[9px] font-mono text-cyan-200">{row.portfolioWeight.toFixed(1)}%</span></div>
+            <div className="mt-1 text-[9px] uppercase tracking-wider text-white/30">Top weighted scenario contributor</div>
+            <div className="mt-1 text-sm font-black font-mono text-white">${row.referenceCapitalSensitivity.toFixed(0)} reference</div>
+          </div>
+        ))}
+      </div>
       <div className="text-[9px] text-white/25 font-mono mt-3">
-        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Assessed-only excludes unassessed dimensions; worst case assumes unassessed = Direct. Portfolio weighting uses invested capital.
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Reference capital sensitivity uses current value when available and invested value as fallback; it is not a forecasted loss.
       </div>
     </div>
   );
@@ -324,7 +356,7 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
   );
 }
 
-export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [] }: MacroPoliticsProps) {
+export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [], evidenceAvailability = {}, onNavigate }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
@@ -354,25 +386,12 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
     return () => { cancelled = true; };
   }, []);
 
-  // Sync sliders dynamically if live risks are updated
+  // Sync scenario controls to the observed baseline risk framework.
   useEffect(() => {
-    if (liveRisks && liveRisks.length > 0) {
-      liveRisks.forEach((risk) => {
-        const cat = risk.category.toLowerCase();
-        const title = risk.title.toLowerCase();
-        const desc = risk.description.toLowerCase();
-        
-        const score = risk.impactRating === 'high' ? 75 : risk.impactRating === 'medium' ? 45 : 15;
-        
-        if (title.includes('taiwan') || desc.includes('taiwan') || desc.includes('tsmc')) {
-          setTaiwanProb(score);
-        } else if (title.includes('power') || title.includes('grid') || desc.includes('grid') || desc.includes('power')) {
-          setGridSeverity(score);
-        } else if (title.includes('export') || title.includes('embargo') || desc.includes('export') || desc.includes('embargo') || title.includes('prohibition')) {
-          setEmbargoBreadth(score);
-        }
-      });
-    }
+    const baseline = scenarioBaselineFromRisks(liveRisks || []);
+    setTaiwanProb(baseline.taiwan);
+    setGridSeverity(baseline.power);
+    setEmbargoBreadth(baseline.export);
   }, [liveRisks]);
 
   // Calculate customized threat coefficient
@@ -420,6 +439,23 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         </div>
       </div>
 
+      <section className="rounded-2xl border border-white/10 bg-[#15181E]/30 p-4" aria-labelledby="macro-evidence-heading">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Observed evidence status</div>
+            <h2 id="macro-evidence-heading" className="text-xs font-black uppercase tracking-widest text-white mt-1">What is actually changing</h2>
+            <p className="text-[9px] text-white/35 font-mono mt-1">Risk frameworks are separate from observed evidence. Counts below reflect the live feeds returned to this page.</p>
+          </div>
+          {onNavigate && <button type="button" onClick={() => onNavigate('health')} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-cyan-200 hover:bg-white/10"><ExternalLink className="w-3 h-3" /> Data health</button>}
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+          {[['News', 'news'], ['Political / Policy', 'political'], ['SEC Contracts', 'contracts'], ['Congress', 'congress']].map(([label, key]) => {
+            const item = evidenceAvailability[key] || { count: key === 'news' ? news.length : key === 'political' ? politicalSignals.length : key === 'contracts' ? contracts.length : 0, status: 'AVAILABLE' };
+            const status = feedStatus(item);
+            return <div key={key} className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase tracking-wider text-white/30">{label}</span><span className={'px-1.5 py-0.5 rounded border text-[7px] font-mono uppercase ' + status.tone}>{status.label}</span></div><div className="mt-1 text-lg font-black font-mono text-white">{evidenceCount(item)}</div><div className="text-[8px] font-mono text-white/20">{item.freshness?.status || (item.retrievedAt ? 'retrieved' : 'current response')}</div></div>;
+          })}
+        </div>
+      </section>
       <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.03] p-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
@@ -498,7 +534,10 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Current Risk Indicators (Live Feed)</h3>
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white">Risk Framework / Exposure Themes</h3>
+            <p className="text-[9px] text-white/30 font-mono mt-1">Structural monitoring themes. Observed policy/news events are shown separately below.</p>
+          </div>
           
           <div className="space-y-4">
             {activeRisks.map((r) => (
@@ -516,7 +555,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                         : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     }`}>
-                      {r.impactRating.toUpperCase()} IMPACT
+                      STRUCTURAL · {r.impactRating.toUpperCase()}
                     </span>
                     {r.impactSummary && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
@@ -539,7 +578,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
 
                 <div className="flex justify-between text-[9px] font-mono text-white/30 border-t border-white/5 pt-2">
                   <span>LAST REVIEW: {r.dateUpdated}</span>
-                  <span>IMPACT MATRIX: ACTIVE</span>
+                  <span>FRAMEWORK: ACTIVE</span>
                 </div>
               </div>
             ))}
