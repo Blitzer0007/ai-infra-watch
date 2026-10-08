@@ -503,8 +503,8 @@ function forecastLearning(rows) {
     };
   };
 
-  const recent = score(verified.slice(0, 20));
-  const prior = score(verified.slice(20, 40));
+  const recent = score(verified.slice(0, 10));
+  const prior = score(verified.slice(10, 20));
   const driftScore = recent.predictionMatchPct != null && prior.predictionMatchPct != null
     ? Number((recent.predictionMatchPct - prior.predictionMatchPct).toFixed(1))
     : null;
@@ -571,7 +571,7 @@ function forecastLearning(rows) {
       typicalMiss: baselineError == null ? null : Number(baselineError.toFixed(2)),
       improvementPct,
     },
-    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40 },
+    drift: { status: driftStatus, score: driftScore, recent, prior, minimumIndependentSamples: 40, comparisonWindow: 'latest 10 vs prior 10 independent forecasts' },
     evidenceLearning: {
       multipleChannelSamples: multi.length,
       otherSamples: other.length,
