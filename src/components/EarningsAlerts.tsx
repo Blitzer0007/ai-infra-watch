@@ -130,7 +130,7 @@ export default function EarningsAlerts() {
           new Notification('AI Infra Watch · ' + event.symbol + ' earnings tomorrow', {
             body: [
               event.date + ' · ' + timingLabel(event.hour),
-              'Why it matters: ' + event.impact_reasons.slice(0, 2).join(' · '),
+              'Why it matters: ' + (event.impact_reasons || []).slice(0, 2).join(' · '),
             ].join('\n'),
             tag: event.id,
           });
@@ -305,20 +305,20 @@ export default function EarningsAlerts() {
                     Potential impact channels
                   </div>
                   <ul className="mt-2 space-y-1">
-                    {event.impact_reasons.slice(0, 3).map((reason, index) => (
+                    {(event.impact_reasons || []).slice(0, 3).map((reason, index) => (
                       <li key={index} className="text-[10px] leading-relaxed text-white/55">• {reason}</li>
                     ))}
                   </ul>
                 </div>
 
-                {(event.direct_holdings.length > 0 || event.linked_holdings.length > 0) && (
+                {((event.direct_holdings || []).length > 0 || (event.linked_holdings || []).length > 0) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[8px] font-mono uppercase">
-                    {event.direct_holdings.map(symbol => (
+                    {(event.direct_holdings || []).map(symbol => (
                       <span key={'direct-' + symbol} className="rounded border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-1 text-emerald-300">
                         Direct: {symbol}
                       </span>
                     ))}
-                    {event.linked_holdings.map(symbol => (
+                    {(event.linked_holdings || []).map(symbol => (
                       <span key={'linked-' + symbol} className="rounded border border-white/10 bg-white/5 px-1.5 py-1 text-white/45">
                         Linked: {symbol}
                       </span>

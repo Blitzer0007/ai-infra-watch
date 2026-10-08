@@ -1,102 +1,86 @@
-import React, { useEffect, useState } from 'react';
-import { AppConfig, loadConfig, saveConfig, formatPrice } from '../utils';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct } from '../utils';
 import { STOCK_METADATA } from '../data';
-import { Bell, BellOff, Trash2, Plus, Star, Zap, ShieldCheck } from 'lucide-react';
+import { STOCK_UNIVERSE } from '../utils/stockUniverse';
+import { Bell, BellOff, Trash2, Plus, Star, Zap, Search, RefreshCw, Settings2, ArrowUpRight, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
-import { loadAlertEvents, notifyTelegram, requestBrowserNotifications, isTelegramEnabled, setTelegramEnabled } from '../utils/alertEngine';
+import { loadAlertEvents, saveAlertEvents } from '../utils/alertEngine';
 import { fetchPortfolioHoldings, StoredPortfolioHolding } from '../utils/portfolioApi';
 import EarningsAlerts from './EarningsAlerts';
 
+type LiveQuote = {
+  price: number;
+  changePct: number;
+  provider?: string;
+  retrievedAt?: string;
+  asOf?: string | null;
+  stale?: boolean;
+  cached?: boolean;
+};
+
+type AlertDraft = {
+  symbol: string;
+  targetPrice: string;
+  type: 'above' | 'below';
+};
+
+const MAX_WATCHLIST = 50;
+const NEAR_TARGET_PCT = 5;
+const normalizeSymbol = (value: string) => value.trim().toUpperCase().replace(/\s+/g, '');
+
+function distanceToTarget(price: number, target: number) {
+  if (!Number.isFinite(price) || !Number.isFinite(target) || target <= 0) return Number.POSITIVE_INFINITY;
+  return Math.abs((target - price) / target) * 100;
+}
+
+function freshness(quote?: LiveQuote) {
+  if (!quote) return 'Waiting for quote';
+  if (quote.stale) return 'Quote needs refresh';
+  if (quote.cached) return 'Cached quote';
+  return 'Live quote';
+}
+
 export default function BuySellWatchlist() {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [liveQuotes, setLiveQuotes] = useState<Record<string, number>>({});
-  const [portfolioRules, setPortfolioRules] = useState<StoredPortfolioHolding[]>([]);
-  const [portfolioRulesError, setPortfolioRulesError] = useState('');
-  const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
-  const [newSymbol, setNewSymbol] = useState('NBIS');
-  const [newTargetPrice, setNewTargetPrice] = useState('');
-  const [newType, setNewType] = useState<'above' | 'below'>('above');
-  const [alertEvents, setAlertEvents] = useState(loadAlertEvents());
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
-  );
-  const [telegramEnabled, setTelegramEnabledState] = useState(() => isTelegramEnabled());
-  const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
-  const [telegramChecking, setTelegramChecking] = useState(true);
-  const [telegramTesting, setTelegramTesting] = useState(false);
-  const [telegramMessage, setTelegramMessage] = useState('');
+  const [quotes, setQuotes] = useState<Record<string, LiveQuote>>({});
+  const [lastRefresh, setLastRefresh] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [serverSync, setServerSync] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<'attention' | 'symbol' | 'today'>('attention');
+  const [watchDraft, setWatchDraft] = useState('');
+  const [message, setMessage] = useState('');
+  const [alertDraft, setAlertDraft] = useState<AlertDraft>({ symbol: 'NVDA', targetPrice: '', type: 'above' });
+  const [editingAlert, setEditingAlert] = useState<number | null>(null);
+  const [events, setEvents] = useState(loadAlertEvents());
+  const [rules, setRules] = useState<StoredPortfolioHolding[]>([]);
+  const [rulesError, setRulesError] = useState('');
 
   useEffect(() => {
-    setConfig(loadConfig());
-    setAlertEvents(loadAlertEvents());
-
+    const cfg = loadConfig();
+    setConfig(cfg);
+    setEvents(loadAlertEvents());
     let cancelled = false;
-    const loadRules = async () => {
-      try {
-        const holdings = await fetchPortfolioHoldings();
-        if (!cancelled) {
-          setPortfolioRules(holdings);
-          setPortfolioRulesError('');
-        }
-      } catch (error) {
-        if (!cancelled) setPortfolioRulesError(error instanceof Error ? error.message : 'Portfolio rules unavailable');
-      }
-    };
-    void loadRules();
 
-    const checkTelegram = async () => {
-      setTelegramChecking(true);
-      try {
-        const response = await authFetch('/api/alert-notify', { cache: 'no-store' });
+    void fetchPortfolioHoldings()
+      .then(rows => { if (!cancelled) setRules(rows); })
+      .catch(error => { if (!cancelled) setRulesError(error instanceof Error ? error.message : 'Portfolio rules are unavailable.'); });
+
+    void authFetch('/api/alert-config', { cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) return;
         const data = await response.json().catch(() => ({}));
-        if (!cancelled) {
-          if (response.status === 401) {
-            setTelegramConfigured(null);
-            setTelegramMessage('Authentication required. Refresh the dashboard session before enabling Telegram alerts.');
-          } else {
-            setTelegramConfigured(response.ok && data.telegram_configured === true);
-          }
-        }
-      } catch {
-        if (!cancelled) setTelegramConfigured(null);
-      } finally {
-        if (!cancelled) setTelegramChecking(false);
-      }
-    };
-    void checkTelegram();
+        if (!cancelled && data?.config?.updated_at) setServerSync(data.config.updated_at);
+      })
+      .catch(() => {});
+
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => setAlertEvents(loadAlertEvents()), 15000);
-    return () => clearInterval(interval);
+    const timer = window.setInterval(() => setEvents(loadAlertEvents()), 15000);
+    return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (!config) return;
-    let cancelled = false;
-    const syncServerConfig = async () => {
-      try {
-        const response = await authFetch('/api/alert-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            watchlist: config.watchlist,
-            alerts: config.alerts,
-            largeMoveEnabled: config.largeMoveEnabled,
-            largeMovePct: config.largeMovePct,
-            catalystAlerts: config.catalystAlerts,
-          }),
-          cache: 'no-store',
-        });
-        if (!response.ok && !cancelled) console.warn('Server smart alert configuration sync failed:', await response.text().catch(() => ''));
-      } catch (error) {
-        if (!cancelled) console.warn('Server smart alert configuration sync failed:', error);
-      }
-    };
-    void syncServerConfig();
-    return () => { cancelled = true; };
-  }, [config]);
 
   useEffect(() => {
     if (!config) return;
@@ -104,424 +88,293 @@ export default function BuySellWatchlist() {
     let timer: number | undefined;
 
     const refreshQuotes = async () => {
-      const symbols = [...new Set([...config.watchlist, ...config.alerts.map(a => a.symbol)])];
+      setRefreshing(true);
+      const symbols = [...new Set([...config.watchlist, ...config.alerts.map(alert => alert.symbol)])];
       const results = await Promise.all(symbols.map(async symbol => {
         try {
-          const res = await fetch(
-            '/api/quote?symbol=' + encodeURIComponent(symbol) + '&refresh=true',
-            { cache: 'no-store' }
-          );
-          if (!res.ok) return null;
-          const data = await res.json();
-          return [symbol, Number(data.price)] as const;
+          const response = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol) + '&refresh=true', { cache: 'no-store' });
+          if (!response.ok) return null;
+          const data = await response.json();
+          if (!Number.isFinite(Number(data?.price))) return null;
+          return [symbol, {
+            price: Number(data.price),
+            changePct: Number(data.changePct) || 0,
+            provider: data.provider,
+            retrievedAt: data.retrievedAt,
+            asOf: data.asOf,
+            stale: data.stale === true,
+            cached: data.cached === true,
+          } as LiveQuote] as const;
         } catch {
           return null;
         }
       }));
-
-      if (cancelled) return;
-      const next: Record<string, number> = {};
-      results.forEach(item => {
-        if (item && Number.isFinite(item[1])) next[item[0]] = item[1];
-      });
-      setLiveQuotes(prev => ({ ...prev, ...next }));
-      setLastQuoteRefresh(Date.now());
-      timer = window.setTimeout(refreshQuotes, 60000);
+      if (!cancelled) {
+        const next: Record<string, LiveQuote> = {};
+        results.forEach(item => { if (item) next[item[0]] = item[1]; });
+        setQuotes(next);
+        setLastRefresh(Date.now());
+        setRefreshing(false);
+        timer = window.setTimeout(() => { void refreshQuotes(); }, 60000);
+      }
     };
 
     void refreshQuotes();
+    void authFetch('/api/alert-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      watchlist: config.watchlist,
+      alerts: config.alerts,
+      largeMoveEnabled: config.largeMoveEnabled,
+      largeMovePct: config.largeMovePct,
+      catalystAlerts: config.catalystAlerts,
+    }), cache: 'no-store' }).then(async response => {
+      if (!response.ok || cancelled) return;
+      const data = await response.json().catch(() => ({}));
+      setServerSync(data?.updated_at || new Date().toISOString());
+    }).catch(() => {});
+
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [config]);
+  }, [config?.watchlist?.join(','), config?.alerts?.map(a => a.symbol + ':' + a.targetPrice + ':' + a.type + ':' + a.active).join('|')]);
+
+  const persist = (updated: AppConfig) => {
+    setConfig(updated);
+    saveConfig(updated);
+    setMessage('');
+  };
+
+  const catalog = useMemo(() => {
+    const bySymbol = new Map(STOCK_UNIVERSE.map(item => [item.symbol, item]));
+    return [...new Set([
+      ...STOCK_UNIVERSE.map(item => item.symbol),
+      ...(config?.watchlist || []),
+      ...(config?.alerts || []).map(alert => alert.symbol),
+    ])].map(symbol => {
+      const item = bySymbol.get(symbol);
+      const meta = STOCK_METADATA[symbol];
+      return { symbol, name: meta?.name || item?.name || symbol, group: item?.group || meta?.sector || '', theme: item?.theme || '' };
+    }).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }, [config?.watchlist, config?.alerts]);
 
   if (!config) return null;
 
-  const completeRuleCount = portfolioRules.filter(holding =>
-    Boolean(String(holding.decisionThesis || holding.notes || '').trim()) &&
-    Number(holding.lossLimitPct) > 0 &&
-    Boolean(String(holding.exitRuleType || '').trim())
-  ).length;
+  const filtered = config.watchlist.map(symbol => {
+    const row = catalog.find(item => item.symbol === symbol);
+    return { symbol, name: row?.name || symbol, group: row?.group || '', theme: row?.theme || '', quote: quotes[symbol] };
+  }).filter(row => {
+    const text = [row.symbol, row.name, row.group, row.theme].join(' ').toLowerCase();
+    return !query.trim() || text.includes(query.trim().toLowerCase());
+  }).sort((a, b) => {
+    const attention = (symbol: string) => {
+      const q = quotes[symbol]?.price;
+      const alerts = config.alerts.filter(alert => alert.symbol === symbol && alert.active);
+      if (alerts.some(alert => q != null && (alert.type === 'above' ? q >= alert.targetPrice : q <= alert.targetPrice))) return 0;
+      if (alerts.some(alert => q != null && distanceToTarget(q, alert.targetPrice) <= NEAR_TARGET_PCT)) return 1;
+      if (quotes[symbol] && Math.abs(quotes[symbol].changePct) >= config.largeMovePct) return 2;
+      return 3;
+    };
+    if (sort === 'symbol') return a.symbol.localeCompare(b.symbol);
+    if (sort === 'today') return (b.quote?.changePct || 0) - (a.quote?.changePct || 0);
+    return attention(a.symbol) - attention(b.symbol) || a.symbol.localeCompare(b.symbol);
+  });
 
-  const handleToggleAlert = (index: number) => {
-    const alerts = [...config.alerts];
-    alerts[index] = { ...alerts[index], active: !alerts[index].active };
-    const updated = { ...config, alerts };
-    setConfig(updated);
-    saveConfig(updated);
-  };
+  const activeAlerts = config.alerts.filter(alert => alert.active);
+  const triggered = activeAlerts.filter(alert => {
+    const price = quotes[alert.symbol]?.price;
+    return price != null && (alert.type === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice);
+  });
+  const near = activeAlerts.filter(alert => {
+    const price = quotes[alert.symbol]?.price;
+    if (price == null) return false;
+    const hit = alert.type === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice;
+    return !hit && distanceToTarget(price, alert.targetPrice) <= NEAR_TARGET_PCT;
+  });
+  const largeMoves = config.watchlist.filter(symbol => Math.abs(quotes[symbol]?.changePct || 0) >= config.largeMovePct);
+  const freshCount = config.watchlist.filter(symbol => quotes[symbol] && !quotes[symbol].stale && !quotes[symbol].cached).length;
+  const completeRules = rules.filter(h => Boolean(String(h.decisionThesis || h.notes || '').trim()) && Number(h.lossLimitPct) > 0 && Boolean(String(h.exitRuleType || '').trim())).length;
 
-  const handleRemoveAlert = (index: number) => {
-    const updated = { ...config, alerts: config.alerts.filter((_, i) => i !== index) };
-    setConfig(updated);
-    saveConfig(updated);
-  };
-
-  const handleLargeMoveToggle = () => {
-    const updated = { ...config, largeMoveEnabled: !config.largeMoveEnabled };
-    setConfig(updated);
-    saveConfig(updated);
-  };
-
-  const handleLargeMoveThreshold = (value: string) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) return;
-    const updated = { ...config, largeMovePct: parsed };
-    setConfig(updated);
-    saveConfig(updated);
-  };
-
-  const handleTelegramToggle = async () => {
-    setTelegramMessage('');
-    if (!telegramEnabled) {
-      if (telegramConfigured !== true) {
-        setTelegramMessage('Telegram is not configured on the server. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Vercel.');
-        return;
-      }
-      setTelegramEnabled(true);
-      setTelegramEnabledState(true);
-      setTelegramMessage('Telegram alerts enabled for this browser session.');
+  const addWatchlist = (e: React.FormEvent) => {
+    e.preventDefault();
+    const symbol = normalizeSymbol(watchDraft);
+    if (!/^[A-Z0-9.^=-]{1,20}$/.test(symbol)) {
+      setMessage('Enter a valid ticker, such as NVDA or 000660.KS.');
       return;
     }
-
-    setTelegramEnabled(false);
-    setTelegramEnabledState(false);
-    setTelegramMessage('Telegram alerts disabled on this browser. Scheduled server-side digests and earnings alerts are unchanged.');
-  };
-
-  const handleTelegramTest = async () => {
-    if (!telegramEnabled || telegramConfigured !== true || telegramTesting) return;
-    setTelegramTesting(true);
-    setTelegramMessage('Sending test alert…');
-    try {
-      const response = await authFetch('/api/alert-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: {
-            id: 'telegram-test:' + Date.now(),
-            type: 'price',
-            severity: 'info',
-            symbol: 'AIW',
-            title: 'Telegram connection test',
-            message: 'Your AI Infra Watch Telegram signal channel is connected and receiving dashboard alerts.',
-            timestamp: Date.now(),
-            source: 'Watchlist settings',
-          },
-        }),
-        cache: 'no-store',
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || data?.delivery?.error || 'Telegram test failed.');
-      setTelegramMessage('Test alert sent successfully. Check your Telegram chat.');
-    } catch (error) {
-      setTelegramMessage(error instanceof Error ? error.message : 'Telegram test failed.');
-    } finally {
-      setTelegramTesting(false);
+    if (config.watchlist.includes(symbol)) {
+      setMessage(symbol + ' is already being watched.');
+      return;
     }
-  };
-
-  const handleBrowserNotifications = async () => {
-    const permission = await requestBrowserNotifications();
-    setNotificationPermission(permission);
-    if (permission === 'granted') {
-      const updated = { ...config, browserNotifications: true };
-      setConfig(updated);
-      saveConfig(updated);
+    if (config.watchlist.length >= MAX_WATCHLIST) {
+      setMessage('Watchlist is full. Remove a stock before adding another.');
+      return;
     }
+    persist({ ...config, watchlist: [...config.watchlist, symbol] });
+    setWatchDraft('');
   };
 
-  const handleAddAlert = (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetPrice = parseFloat(newTargetPrice);
-    if (!Number.isFinite(targetPrice)) return;
-    const updated = {
+  const removeWatchlist = (symbol: string) => {
+    if (config.watchlist.length <= 1) {
+      setMessage('Keep at least one stock on the watchlist.');
+      return;
+    }
+    persist({
       ...config,
-      alerts: [...config.alerts, { symbol: newSymbol, targetPrice, type: newType, active: true }]
-    };
-    setConfig(updated);
-    saveConfig(updated);
-    setNewTargetPrice('');
+      watchlist: config.watchlist.filter(item => item !== symbol),
+      alerts: config.alerts.filter(alert => alert.symbol !== symbol),
+    });
+  };
+
+  const saveAlert = (e: React.FormEvent) => {
+    e.preventDefault();
+    const symbol = normalizeSymbol(alertDraft.symbol);
+    const target = Number(alertDraft.targetPrice);
+    if (!/^[A-Z0-9.^=-]{1,20}$/.test(symbol) || !Number.isFinite(target) || target <= 0) {
+      setMessage('Enter a valid ticker and positive target price.');
+      return;
+    }
+    const alerts = [...config.alerts];
+    const next = { symbol, targetPrice: target, type: alertDraft.type, active: true };
+    if (editingAlert == null) alerts.push(next);
+    else alerts[editingAlert] = { ...alerts[editingAlert], ...next };
+    persist({
+      ...config,
+      alerts: alerts.slice(0, 100),
+      watchlist: config.watchlist.includes(symbol) ? config.watchlist : config.watchlist.length < MAX_WATCHLIST ? [...config.watchlist, symbol] : config.watchlist,
+    });
+    setEditingAlert(null);
+    setAlertDraft({ symbol: 'NVDA', targetPrice: '', type: 'above' });
+  };
+
+  const refreshNow = async () => {
+    setRefreshing(true);
+    const symbols = [...new Set([...config.watchlist, ...config.alerts.map(alert => alert.symbol)])];
+    const next: Record<string, LiveQuote> = {};
+    await Promise.all(symbols.map(async symbol => {
+      try {
+        const response = await fetch('/api/quote?symbol=' + encodeURIComponent(symbol) + '&refresh=true', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (Number.isFinite(Number(data?.price))) {
+          next[symbol] = {
+            price: Number(data.price),
+            changePct: Number(data.changePct) || 0,
+            provider: data.provider,
+            retrievedAt: data.retrievedAt,
+            asOf: data.asOf,
+            stale: data.stale === true,
+            cached: data.cached === true,
+          };
+        }
+      } catch {}
+    }));
+    setQuotes(next);
+    setLastRefresh(Date.now());
+    setRefreshing(false);
   };
 
   return (
     <div className="space-y-6" id="watchlist-view">
-      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 06 / Signals</span>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Alert Targets &amp; Watchlist</h1>
-        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">Monitor configured price thresholds using the live server market feed.</p>
-        <div className="text-[9px] font-mono uppercase tracking-wider text-white/30 mt-1">
-          AUTO QUOTES 60S{lastQuoteRefresh ? ' · LAST CHECK ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
+      <div className="aiw-page-header border-b border-white/10 pb-5">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 07 / Monitoring</span>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Watchlist</h1>
+            <p className="text-xs text-white/50 max-w-3xl mt-2">Stocks you are watching, what needs attention, alerts and upcoming events.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/40">{freshCount}/{config.watchlist.length} fresh</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/40">{activeAlerts.length} active alerts</span>
+            <span className={serverSync ? 'rounded border border-emerald-400/15 bg-emerald-400/5 px-2 py-1 text-emerald-300' : 'rounded border border-white/10 bg-white/5 px-2 py-1 text-white/35'}>{serverSync ? 'Server sync ' + new Date(serverSync).toLocaleTimeString() : 'Server sync pending'}</span>
+          </div>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.025] p-4 md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div><div className="text-[9px] font-mono uppercase tracking-widest text-amber-200">What needs attention?</div><h2 className="text-lg font-black text-white mt-1">Your watchlist at a glance</h2></div>
+          <button type="button" onClick={() => void refreshNow()} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase text-white/60 hover:text-white disabled:opacity-40"><RefreshCw className={refreshing ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} /> {refreshing ? 'Refreshing…' : 'Refresh prices'}</button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[8px] uppercase font-mono text-white/30">Watched</div><div className="text-xl font-black text-white mt-1">{config.watchlist.length}</div></div>
+          <div className="rounded-lg border border-rose-400/15 bg-rose-400/5 p-3"><div className="text-[8px] uppercase font-mono text-white/30">Triggered</div><div className="text-xl font-black text-white mt-1">{triggered.length}</div></div>
+          <div className="rounded-lg border border-amber-400/15 bg-amber-400/5 p-3"><div className="text-[8px] uppercase font-mono text-white/30">Near target</div><div className="text-xl font-black text-white mt-1">{near.length}</div></div>
+          <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 p-3"><div className="text-[8px] uppercase font-mono text-white/30">Large moves</div><div className="text-xl font-black text-white mt-1">{largeMoves.length}</div></div>
+          <div className="rounded-lg border border-white/10 bg-black/15 p-3"><div className="text-[8px] uppercase font-mono text-white/30">Rule coverage</div><div className="text-xl font-black text-white mt-1">{completeRules}/{rules.length || 0}</div></div>
+        </div>
+        {(triggered.length || near.length || largeMoves.length) ? (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            {triggered.slice(0, 3).map(alert => <div key={'trigger-' + alert.symbol + alert.targetPrice} className="rounded-lg border border-rose-400/15 bg-rose-400/5 p-3"><div className="flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 text-rose-300" /><span className="text-[10px] font-bold text-white">{alert.symbol}</span></div><p className="text-[9px] text-rose-200/70 mt-1">{'Target reached at $' + quotes[alert.symbol]?.price.toFixed(2) + '.'}</p></div>)}
+            {near.slice(0, 3).map(alert => <div key={'near-' + alert.symbol + alert.targetPrice} className="rounded-lg border border-amber-400/15 bg-amber-400/5 p-3"><div className="flex items-center gap-2"><Info className="w-3.5 h-3.5 text-amber-300" /><span className="text-[10px] font-bold text-white">{alert.symbol}</span></div><p className="text-[9px] text-amber-100/60 mt-1">{distanceToTarget(quotes[alert.symbol].price, alert.targetPrice).toFixed(1) + '% from target.'}</p></div>)}
+            {largeMoves.slice(0, 3).map(symbol => <div key={'move-' + symbol} className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 p-3"><div className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-cyan-300" /><span className="text-[10px] font-bold text-white">{symbol}</span></div><p className="text-[9px] text-cyan-100/60 mt-1">{formatPct(quotes[symbol]?.changePct) + ' today.'}</p></div>)}
+          </div>
+        ) : <div className="mt-3 rounded-lg border border-white/5 bg-black/15 p-3 text-[10px] text-white/35">Nothing needs attention based on your active alerts and large-move threshold.</div>}
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-white/[.02] p-4 md:p-5">
+        <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
+          <div><h2 className="text-sm font-black text-white">Your watchlist</h2><p className="text-[10px] text-white/35 mt-1">Up to {MAX_WATCHLIST} stocks. Server Smart Alerts can monitor these without the browser being open.</p></div>
+          <form onSubmit={addWatchlist} className="flex gap-2 w-full xl:w-auto"><input aria-label="Add stock to watchlist" value={watchDraft} onChange={e => setWatchDraft(e.target.value)} placeholder="Add ticker, e.g. NVDA" className="min-w-0 w-full xl:w-56 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-mono text-white outline-none" /><button type="submit" className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] font-bold text-emerald-200"><Plus className="w-3.5 h-3.5" /> Add</button></form>
+        </div>
+        <div className="mt-3 flex flex-col md:flex-row gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-white/30" aria-hidden="true" /><input aria-label="Search your watchlist" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search ticker, company or theme" className="w-full rounded-lg border border-white/10 bg-black/20 pl-9 pr-3 py-2 text-[10px] text-white outline-none" /></div><select aria-label="Sort your watchlist" value={sort} onChange={e => setSort(e.target.value as typeof sort)} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-mono uppercase text-white/55"><option value="attention">Needs attention</option><option value="symbol">Ticker</option><option value="today">Today's move</option></select></div>
+        {message && <div className="mt-2 rounded-lg border border-amber-400/10 bg-amber-400/5 px-3 py-2 text-[9px] text-amber-200">{message}</div>}
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {filtered.map(row => {
+            const alert = config.alerts.find(item => item.symbol === row.symbol && item.active);
+            const hit = alert && row.quote ? (alert.type === 'above' ? row.quote.price >= alert.targetPrice : row.quote.price <= alert.targetPrice) : false;
+            const isNear = alert && row.quote && !hit ? distanceToTarget(row.quote.price, alert.targetPrice) <= NEAR_TARGET_PCT : false;
+            return <article key={row.symbol} className={'rounded-xl border p-4 bg-[#15181E]/30 ' + (hit ? 'border-rose-400/25' : isNear ? 'border-amber-400/20' : 'border-white/10')}>
+              <div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="flex items-center gap-2"><span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-mono font-black text-white">{row.symbol}</span>{hit && <span className="rounded bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-rose-300">Target reached</span>}{isNear && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-amber-300">Near target</span>}</div><h3 className="text-[12px] font-black text-white mt-2 truncate">{row.name}</h3><p className="text-[9px] text-white/30 mt-0.5 truncate">{row.group}{row.theme ? ' · ' + row.theme : ''}</p></div><Star className="w-4 h-4 text-amber-300 fill-amber-300" aria-hidden="true" /></div>
+              <div className="mt-4 flex items-end justify-between gap-3"><div><div className="text-2xl font-black font-mono text-white">{row.quote ? '$' + formatPrice(row.quote.price) : '—'}</div><div className={(row.quote?.changePct || 0) >= 0 ? 'text-[10px] font-mono font-bold text-emerald-300 mt-1' : 'text-[10px] font-mono font-bold text-rose-300 mt-1'}>{row.quote ? formatPct(row.quote.changePct) + ' today' : 'Quote unavailable'}</div></div><div className="text-right"><div className={row.quote?.stale ? 'text-[8px] font-mono uppercase text-amber-300' : 'text-[8px] font-mono uppercase text-white/30'}>{freshness(row.quote)}</div>{row.quote?.retrievedAt && <div className="text-[8px] text-white/20 mt-1">{new Date(row.quote.retrievedAt).toLocaleTimeString()}</div>}</div></div>
+              {alert && row.quote && <div className="mt-3 rounded-lg border border-white/5 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/30">Your target</div><div className="mt-1 flex items-center justify-between gap-2"><span className="text-[10px] font-mono font-bold text-white">{alert.type === 'above' ? 'Above' : 'Below'} {'$' + formatPrice(alert.targetPrice)}</span><span className="text-[9px] text-white/40">{hit ? 'Reached' : distanceToTarget(row.quote.price, alert.targetPrice).toFixed(1) + '% away'}</span></div></div>}
+              <div className="mt-3 flex flex-wrap gap-1.5"><button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(row.symbol); }} className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-bold uppercase text-white/60 hover:text-white">View <ArrowUpRight className="w-3 h-3" /></button><button type="button" onClick={() => { setAlertDraft({ symbol: row.symbol, targetPrice: '', type: 'above' }); setEditingAlert(null); document.getElementById('watchlist-alert-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="rounded border border-cyan-300/10 bg-cyan-300/5 px-2 py-1.5 text-[8px] font-bold uppercase text-cyan-200">Set alert</button><button type="button" onClick={() => removeWatchlist(row.symbol)} aria-label={'Remove ' + row.symbol + ' from watchlist'} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-bold uppercase text-white/45 hover:text-rose-300">Remove</button></div>
+            </article>;
+          })}
+        </div>
+        {!filtered.length && <div className="mt-4 rounded-lg border border-white/10 bg-black/15 p-6 text-center text-[10px] text-white/35">No watched stocks match your search.</div>}
+      </section>
+
+      <section id="watchlist-alert-form" className="rounded-2xl border border-white/10 bg-white/[.02] p-4 md:p-5">
+        <div className="flex items-end justify-between gap-3"><div><h2 className="text-sm font-black text-white">{editingAlert == null ? 'Price alerts' : 'Edit price alert'}</h2><p className="text-[10px] text-white/35 mt-1">Be notified when price crosses a level.</p></div><span className="text-[9px] font-mono uppercase text-white/30">{activeAlerts.length}/{config.alerts.length} active</span></div>
+        <form onSubmit={saveAlert} className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2">
+          <input aria-label="Alert stock ticker" list="watchlist-stock-options" value={alertDraft.symbol} onChange={e => setAlertDraft(prev => ({ ...prev, symbol: e.target.value }))} placeholder="Ticker" className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-mono text-white outline-none" />
+          <select aria-label="Alert direction" value={alertDraft.type} onChange={e => setAlertDraft(prev => ({ ...prev, type: e.target.value as 'above' | 'below' }))} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-mono uppercase text-white/65"><option value="above">Rises above</option><option value="below">Falls below</option></select>
+          <input aria-label="Alert target price" type="number" min="0.0001" step="any" required placeholder="Target price" value={alertDraft.targetPrice} onChange={e => setAlertDraft(prev => ({ ...prev, targetPrice: e.target.value }))} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-mono text-white outline-none" />
+          <button type="submit" className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-2 text-[10px] font-bold uppercase text-black"><Plus className="w-3.5 h-3.5" /> {editingAlert == null ? 'Add alert' : 'Save alert'}</button>
+        </form>
+        <datalist id="watchlist-stock-options">{catalog.map(item => <option key={item.symbol} value={item.symbol}>{item.name}</option>)}</datalist>
+        {editingAlert != null && <button type="button" onClick={() => { setEditingAlert(null); setAlertDraft({ symbol: 'NVDA', targetPrice: '', type: 'above' }); }} className="mt-2 text-[9px] text-white/40 hover:text-white">Cancel edit</button>}
+        <div className="mt-4 space-y-2">
+          {config.alerts.map((alert, index) => {
+            const price = quotes[alert.symbol]?.price;
+            const hit = price != null && (alert.type === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice);
+            const isNear = price != null && !hit && distanceToTarget(price, alert.targetPrice) <= NEAR_TARGET_PCT;
+            return <div key={alert.symbol + ':' + alert.targetPrice + ':' + index} className={'flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg border p-3 ' + (hit && alert.active ? 'border-rose-400/20 bg-rose-400/5' : isNear && alert.active ? 'border-amber-400/15 bg-amber-400/5' : 'border-white/10 bg-black/15')}>
+              <div><div className="flex flex-wrap items-center gap-2"><span className="text-[11px] font-mono font-black text-white">{alert.symbol}</span><span className="text-[9px] text-white/40">{alert.type === 'above' ? 'Rises above' : 'Falls below'} {'$' + formatPrice(alert.targetPrice)}</span><span className={!alert.active ? 'rounded px-1.5 py-0.5 text-[8px] font-bold uppercase bg-white/5 text-white/30' : hit ? 'rounded px-1.5 py-0.5 text-[8px] font-bold uppercase bg-rose-400/10 text-rose-300' : isNear ? 'rounded px-1.5 py-0.5 text-[8px] font-bold uppercase bg-amber-400/10 text-amber-300' : 'rounded px-1.5 py-0.5 text-[8px] font-bold uppercase bg-emerald-400/10 text-emerald-300'}>{!alert.active ? 'Paused' : hit ? 'Triggered' : isNear ? 'Near target' : 'Monitoring'}</span></div><div className="text-[9px] text-white/30 mt-1">Current {price == null ? '—' : '$' + formatPrice(price)}{price != null && !hit ? ' · ' + distanceToTarget(price, alert.targetPrice).toFixed(1) + '% away' : ''}</div></div>
+              <div className="flex items-center gap-1"><button type="button" onClick={() => { setEditingAlert(index); setAlertDraft({ symbol: alert.symbol, targetPrice: String(alert.targetPrice), type: alert.type }); }} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-bold uppercase text-white/55 hover:text-white">Edit</button><button type="button" aria-label={alert.active ? 'Pause ' + alert.symbol + ' alert' : 'Enable ' + alert.symbol + ' alert'} onClick={() => persist({ ...config, alerts: config.alerts.map((item, i) => i === index ? { ...item, active: !item.active } : item) })} className="rounded border border-white/10 bg-white/5 p-1.5 text-white/45">{alert.active ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}</button><button type="button" aria-label={'Delete ' + alert.symbol + ' alert'} onClick={() => persist({ ...config, alerts: config.alerts.filter((_, i) => i !== index) })} className="rounded border border-white/10 bg-white/5 p-1.5 text-white/45 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button></div>
+            </div>;
+          })}
+          {!config.alerts.length && <p className="rounded-lg border border-white/10 bg-black/15 p-5 text-[10px] text-white/35 text-center">No price alerts yet.</p>}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[.02] p-4 md:p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><h2 className="text-sm font-black text-white">Notifications</h2><p className="text-[10px] text-white/35 mt-1">Notification controls are centralized in Settings.</p></div><button type="button" onClick={() => { window.location.href = '/settings'; }} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase text-white/55 hover:text-white">Manage notifications <ArrowUpRight className="w-3 h-3" /></button></div>
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2"><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Browser</div><div className="text-[9px] text-white/55 mt-1">{config.browserNotifications ? 'Enabled' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Large moves</div><div className="text-[9px] text-white/55 mt-1">{config.largeMoveEnabled ? config.largeMovePct + '% threshold' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Catalysts</div><div className="text-[9px] text-white/55 mt-1">{config.catalystAlerts ? 'Enabled' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Server</div><div className="text-[9px] text-emerald-300/80 mt-1"><CheckCircle2 className="inline w-3 h-3 mr-1" />Independent</div></div></div>
+      </section>
 
       <EarningsAlerts />
 
-      <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.025] p-4 md:p-5">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-amber-200">Portfolio Rules Matrix</div>
-            <h2 className="text-lg font-black uppercase tracking-tight text-white mt-1">All holdings · decision &amp; allocation rules</h2>
-            <p className="text-[10px] text-white/40 mt-1">One place to review every holding's thesis, risk limit, exit rule, allocation boundaries and broker review prices. These are review/alert points, not automatic trades.</p>
-          </div>
-          <div className="shrink-0 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.04] px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-emerald-200">
-            {completeRuleCount} of {portfolioRules.length} holdings have complete rules
-          </div>
-        </div>
+      <details className="rounded-2xl border border-white/10 bg-white/[.02] p-4 md:p-5">
+        <summary className="cursor-pointer list-none flex items-center justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-widest text-amber-200">Portfolio rules</div><h2 className="text-sm font-black text-white mt-1">Targets, risk limits and exit rules</h2><p className="text-[10px] text-white/35 mt-1">Review the rules saved for the holdings you own.</p></div><Settings2 className="w-4 h-4 text-white/30" /></summary>
+        {rulesError ? <div className="mt-4 rounded-lg border border-rose-400/15 bg-rose-400/5 p-3 text-[10px] text-rose-200">{rulesError}</div> : <div className="mt-4 overflow-x-auto rounded-xl border border-white/10"><table className="min-w-[860px] w-full text-left"><thead className="bg-black/20"><tr className="text-[8px] font-mono uppercase tracking-widest text-white/35"><th className="px-3 py-2.5">Stock</th><th className="px-3 py-2.5">Target</th><th className="px-3 py-2.5">Max</th><th className="px-3 py-2.5">Loss limit</th><th className="px-3 py-2.5">Exit rule</th><th className="px-3 py-2.5">Broker alerts</th></tr></thead><tbody className="divide-y divide-white/5">{rules.map(h => <tr key={h.symbol} className="text-[10px] text-white/60"><td className="px-3 py-3 font-mono font-black text-white">{h.symbol}</td><td className="px-3 py-3 font-mono">{h.targetAllocationPct == null ? '—' : h.targetAllocationPct + '%'}</td><td className="px-3 py-3 font-mono">{h.maxAllocationPct == null ? '—' : h.maxAllocationPct + '%'}</td><td className="px-3 py-3 font-mono">{h.lossLimitPct == null ? 'Not set' : h.lossLimitPct + '%'}</td><td className="px-3 py-3 font-mono uppercase">{h.exitRuleType ? (h.exitRuleType === 'trailing_stop' ? 'Trailing' : h.exitRuleType.replaceAll('_', ' ')) + (h.exitRuleValue == null ? '' : ' · ' + h.exitRuleValue + '%') : 'Not set'}</td><td className="px-3 py-3 font-mono text-amber-100">{h.brokerAlerts?.length ? h.brokerAlerts.map(a => (a.direction === 'below' ? 'Below ' : 'Above ') + formatPrice(a.price)).join(' · ') : 'Not set'}</td></tr>)}</tbody></table></div>}
+      </details>
 
-        {portfolioRulesError ? (
-          <div className="mt-4 rounded-lg border border-rose-400/15 bg-rose-400/[0.04] px-3 py-2 text-[10px] text-rose-200">{portfolioRulesError}</div>
-        ) : portfolioRules.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-white/10 bg-black/10 px-3 py-5 text-center text-[10px] text-white/35">Loading portfolio rules…</div>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
-            <table className="min-w-[1050px] w-full text-left">
-              <thead className="bg-black/20">
-                <tr className="text-[8px] font-mono uppercase tracking-widest text-white/35">
-                  <th className="px-3 py-2.5">Stock</th>
-                  <th className="px-3 py-2.5">Target</th>
-                  <th className="px-3 py-2.5">Max</th>
-                  <th className="px-3 py-2.5">Loss limit</th>
-                  <th className="px-3 py-2.5">Exit rule</th>
-                  <th className="px-3 py-2.5">Broker alerts</th>
-                  <th className="px-3 py-2.5">Thesis</th>
-                  <th className="px-3 py-2.5">Edit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {portfolioRules.map(h => (
-                  <tr key={h.symbol} className="text-[10px] text-white/65 hover:bg-white/[0.02]">
-                    <td className="px-3 py-3 align-top">
-                      <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="font-mono font-black text-white hover:text-amber-200">{h.symbol}</button>
-                    </td>
-                    <td className="px-3 py-3 align-top font-mono">{h.targetAllocationPct == null ? '—' : h.targetAllocationPct + '%'}</td>
-                    <td className="px-3 py-3 align-top font-mono">{h.maxAllocationPct == null ? '—' : h.maxAllocationPct + '%'}</td>
-                    <td className="px-3 py-3 align-top font-mono">{h.lossLimitPct == null ? 'Not set' : h.lossLimitPct + '%'}{Number(h.lossLimitPct) > 0 && Number(h.averageCost) > 0 ? ' · stop ' + formatPrice(h.averageCost * (1 - Number(h.lossLimitPct) / 100)) : ''}</td>
-                    <td className="px-3 py-3 align-top font-mono uppercase">{h.exitRuleType ? (h.exitRuleType === 'trailing_stop' ? 'Trailing' : h.exitRuleType.replaceAll('_', ' ')) + (h.exitRuleValue == null ? '' : ' · ' + h.exitRuleValue + '%') : '—'}</td>
-                    <td className="px-3 py-3 align-top font-mono text-amber-100">{h.brokerAlerts?.length ? h.brokerAlerts.map(alert => alert.direction === 'below' ? 'Below ' + formatPrice(alert.price) + ' STOP' : 'Above ' + formatPrice(alert.price) + ' TARGET').join(' · ') : h.brokerAlertPrices?.length ? h.brokerAlertPrices.map(price => Number(h.averageCost) > 0 && Number(price) < Number(h.averageCost) ? 'Below ' + formatPrice(Number(price)) + ' STOP' : 'Above ' + formatPrice(Number(price)) + ' TARGET').join(' · ') : 'Not set'}</td>
-                    <td className="px-3 py-3 align-top max-w-[360px] text-white/45">{h.decisionThesis || 'Not recorded'}</td>
-                    <td className="px-3 py-3 align-top">
-                      <button type="button" onClick={() => { window.location.href = '/outlook?symbol=' + encodeURIComponent(h.symbol); }} className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-mono uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white">Edit</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <section className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+        <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-black text-white">Recent alerts</h2><p className="text-[9px] text-white/30 mt-1">Local notification history from this device.</p></div><div className="flex items-center gap-2"><span className="text-[8px] font-mono uppercase text-white/25">{events.length} stored</span><button type="button" onClick={() => { saveAlertEvents([]); setEvents([]); }} className="text-[8px] font-bold uppercase text-white/35 hover:text-rose-300">Clear</button></div></div>
+        <div className="mt-3 max-h-64 overflow-y-auto space-y-2">{events.slice(0, 12).map(event => <div key={event.id} className="rounded-lg border border-white/5 bg-black/15 p-2.5"><div className="flex items-center justify-between gap-2"><span className="text-[9px] font-bold text-white">{event.title}</span><span className="text-[8px] font-mono uppercase text-white/25">{event.severity}</span></div><div className="text-[9px] text-white/45 mt-1">{event.message}</div><div className="text-[8px] font-mono text-white/20 mt-1">{new Date(event.timestamp).toLocaleString()}</div></div>)}{!events.length && <p className="text-[10px] text-white/30 py-4 text-center">No local alert events yet.</p>}</div>
       </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Active Watchlist</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {config.watchlist.map(symbol => {
-              const meta = STOCK_METADATA[symbol];
-              const price = liveQuotes[symbol];
-              return (
-                <div key={symbol} className="bg-[#15181E]/30 border border-white/10 p-4 rounded-xl flex flex-col justify-between space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[9px] font-mono px-2 py-0.5 bg-white/5 border border-white/10 rounded text-white font-black tracking-widest uppercase">{symbol}</span>
-                      <h4 className="text-sm font-black uppercase tracking-tight text-white mt-2 truncate max-w-[180px]">{meta?.name || symbol}</h4>
-                    </div>
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  </div>
-                  <div className="flex items-baseline space-x-2 pt-1 font-mono">
-                    <span className="text-2xl font-black text-white">{price != null ? '$' + formatPrice(price) : '—'}</span>
-                    <span className="text-xs font-bold text-white/40">LIVE</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4">
-          <div className="space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">Price Target Signals</h3>
-            <div className="space-y-3 font-mono text-xs">
-              {config.alerts.length === 0 ? (
-                <p className="text-white/40 text-center py-6">No alerts set. Create one below.</p>
-              ) : config.alerts.map((alert, index) => {
-                const price = liveQuotes[alert.symbol];
-                const triggered = price != null && (alert.type === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice);
-                const badgeClass = triggered && alert.active
-                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/10 animate-pulse'
-                  : 'bg-white/5 text-white/40 border border-white/5';
-                return (
-                  <div key={index} className="flex items-center justify-between p-2.5 bg-[#0F1115]/40 border border-white/10 rounded">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-black text-white">{alert.symbol}</span>
-                        <span className={'text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ' + badgeClass}>
-                          {triggered && alert.active ? 'TRIGGERED' : 'MONITORING'}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-white/40">
-                        If {alert.type} {'$' + formatPrice(alert.targetPrice)} (Cur: {price != null ? '$' + formatPrice(price) : '—'})
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <button onClick={() => handleToggleAlert(index)} className="p-1.5 hover:bg-white/5 text-white/40 hover:text-white rounded cursor-pointer transition" title={alert.active ? 'Mute Alert' : 'Enable Alert'}>
-                        {alert.active ? <Bell className="w-4 h-4 text-emerald-400" /> : <BellOff className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => handleRemoveAlert(index)} className="p-1.5 hover:bg-white/5 text-white/40 hover:text-rose-400 rounded cursor-pointer transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Catalyst Alerts</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = { ...config, catalystAlerts: !config.catalystAlerts };
-                  setConfig(updated);
-                  saveConfig(updated);
-                }}
-                className={config.catalystAlerts ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}
-              >
-                {config.catalystAlerts ? 'ON' : 'OFF'}
-              </button>
-            </div>
-            <p className="text-[10px] text-white/40">New SEC material-agreement filings and congressional disclosures for watched symbols.</p>
-          </div>
-
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Telegram Notifications</span>
-                <div className="text-[9px] text-white/30 mt-1">
-                  {telegramChecking
-                    ? 'Checking server configuration…'
-                    : telegramConfigured === true
-                      ? 'Server bot connected'
-                      : telegramConfigured === false
-                        ? 'Server bot not configured'
-                        : telegramMessage || 'Authentication required' }
-                </div>
-              </div>
-              <span className={telegramConfigured === true ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}>
-                {telegramConfigured === true ? 'CONNECTED' : telegramChecking ? 'CHECKING' : telegramMessage ? 'AUTH REQUIRED' : 'NOT READY'}
-              </span>
-            </div>
-            <p className="text-[10px] text-white/40">Send price-target, Smart Move, and catalyst signals to your configured Telegram chat.</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => void handleTelegramToggle()}
-                disabled={telegramChecking || telegramConfigured !== true}
-                className={telegramEnabled
-                  ? 'px-3 py-2 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50'
-                  : 'px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50'}
-              >
-                {telegramEnabled ? '✓ Telegram enabled' : 'Enable Telegram alerts'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleTelegramTest()}
-                disabled={!telegramEnabled || telegramConfigured !== true || telegramTesting}
-                className="px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
-              >
-                {telegramTesting ? 'Sending…' : 'Send test alert'}
-              </button>
-            </div>
-            {telegramMessage && <p className="text-[9px] text-white/50 leading-relaxed">{telegramMessage}</p>}
-          </div>
-
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Smart Move Alerts</span>
-              <button
-                type="button"
-                onClick={handleLargeMoveToggle}
-                className={config.largeMoveEnabled ? 'px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase' : 'px-2 py-1 rounded border border-white/10 bg-white/5 text-white/40 text-[9px] font-bold uppercase'}
-              >
-                {config.largeMoveEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-[10px] text-white/50">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Alert when a watched stock moves at least</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  value={config.largeMovePct}
-                  onChange={e => handleLargeMoveThreshold(e.target.value)}
-                  className="w-16 px-2 py-1.5 bg-[#0F1115] border border-white/10 rounded text-white text-right"
-                />
-                <span className="text-[10px] text-white/40">%</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleBrowserNotifications}
-              disabled={notificationPermission === 'granted'}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-white/70 disabled:opacity-50"
-            >
-              <Bell className="w-3.5 h-3.5" />
-              {notificationPermission === 'granted' ? 'Browser notifications enabled' : 'Enable browser notifications'}
-            </button>
-          </div>
-
-          <form onSubmit={handleAddAlert} className="space-y-3 pt-3 border-t border-white/10 font-mono text-xs">
-            <span className="text-[9px] text-white/40 uppercase tracking-widest font-black block">Add Signal Threshold</span>
-            <div className="grid grid-cols-2 gap-2">
-              <select value={newSymbol} onChange={e => setNewSymbol(e.target.value)} className="px-2 py-2 bg-[#0F1115] border border-white/10 rounded text-white focus:outline-none font-mono text-xs">
-                {Object.keys(STOCK_METADATA).map(s => <option key={s} value={s} className="bg-[#0F1115] text-white">{s}</option>)}
-              </select>
-              <select value={newType} onChange={e => setNewType(e.target.value as 'above' | 'below')} className="px-2 py-2 bg-[#0F1115] border border-white/10 rounded text-white focus:outline-none font-mono text-xs">
-                <option value="above">Goes Above</option>
-                <option value="below">Goes Below</option>
-              </select>
-            </div>
-            <div className="flex space-x-2">
-              <input type="number" step="any" required placeholder="Price threshold..." value={newTargetPrice} onChange={e => setNewTargetPrice(e.target.value)} className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded text-white focus:outline-none font-mono text-xs" />
-              <button type="submit" className="px-4 py-2 bg-white text-black border border-white hover:bg-white/90 font-bold uppercase tracking-wider rounded flex items-center space-x-1 cursor-pointer transition text-xs">
-                <Plus className="w-4 h-4" /><span>Add</span>
-              </button>
-            </div>
-          </form>
-
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/40 uppercase tracking-widest font-black">Recent Alert Events</span>
-              <span className="text-[9px] font-mono text-white/30">{alertEvents.length} stored</span>
-            </div>
-            {alertEvents.length === 0 ? (
-              <p className="text-[10px] text-white/30 py-2">No alert events yet. The monitor checks every 60 seconds.</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {alertEvents.slice(0, 8).map(event => (
-                  <div key={event.id} className="p-2.5 rounded border border-white/10 bg-[#0F1115]/40">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="text-[10px] font-bold text-white truncate">{event.title}</span>
-                      </div>
-                      <span className="text-[8px] uppercase text-white/30">{event.severity}</span>
-                    </div>
-                    <p className="text-[9px] text-white/50 mt-1 leading-relaxed">{event.message}</p>
-                    <p className="text-[8px] text-white/25 mt-1 font-mono">{new Date(event.timestamp).toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

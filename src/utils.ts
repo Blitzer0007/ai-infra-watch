@@ -2,7 +2,10 @@ import { WatchlistItem } from './types';
 
 export interface AppConfig {
   finnhubKey: string;
+  // Stocks monitored for alerts and watchlist attention.
   watchlist: string[];
+  // Stocks pinned to the three Overview favorite cards.
+  overviewFavorites: string[];
   alerts: { symbol: string; targetPrice: number; type: 'above' | 'below'; active: boolean }[];
   largeMoveEnabled: boolean;
   largeMovePct: number;
@@ -15,6 +18,7 @@ const CONFIG_KEY = 'aiw_config_v1';
 export const DEFAULT_CONFIG: AppConfig = {
   finnhubKey: '',
   watchlist: ['NVDA', 'NBIS', 'DGXX', 'MU', 'AMD'],
+  overviewFavorites: ['NVDA', 'NBIS', 'DGXX'],
   alerts: [
     { symbol: 'DGXX', targetPrice: 5.0, type: 'above', active: true },
     { symbol: 'NBIS', targetPrice: 20.0, type: 'below', active: false }
@@ -30,10 +34,25 @@ export function loadConfig(): AppConfig {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return DEFAULT_CONFIG;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CONFIG, ...parsed };
+    const legacyFavorites = Array.isArray(parsed?.overviewFavorites)
+      ? parsed.overviewFavorites
+      : Array.isArray(parsed?.watchlist)
+        ? parsed.watchlist.slice(0, 3)
+        : DEFAULT_CONFIG.overviewFavorites;
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      watchlist: Array.isArray(parsed?.watchlist) ? parsed.watchlist : DEFAULT_CONFIG.watchlist,
+      overviewFavorites: [...new Set(legacyFavorites.map((value: unknown) => String(value).trim().toUpperCase()).filter(Boolean))].slice(0, 3),
+    };
   } catch (e) {
     return DEFAULT_CONFIG;
   }
+}
+
+export function getOverviewFavorites(config: AppConfig): string[] {
+  const favorites = Array.isArray(config.overviewFavorites) ? config.overviewFavorites : [];
+  return [...new Set(favorites.map(value => String(value).trim().toUpperCase()).filter(Boolean))].slice(0, 3);
 }
 
 export function saveConfig(cfg: AppConfig): void {
