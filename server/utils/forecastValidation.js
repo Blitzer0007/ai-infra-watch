@@ -1,3 +1,6 @@
+import { independentForecastRows } from './forecastIndependence.js';
+import { coverageInterval, calibrationVerdict } from './forecastCalibration.js';
+
 const FORECAST_VALIDATION_MINIMUM = 50;
 const DEFAULT_FORECAST_HORIZON = 20;
 
@@ -50,25 +53,12 @@ function typicalMiss(rows) {
   return errors.length ? Number(percentile(errors, 0.5).toFixed(2)) : null;
 }
 
-function calibrationVerdict(p25p75, p10p90, count) {
-  if (count < 25 || p25p75 == null || p10p90 == null) return 'insufficient';
-  const middleDelta = p25p75 - 50;
-  const wideDelta = p10p90 - 80;
-  if (middleDelta < -10 && wideDelta < -10) return 'too narrow';
-  if (middleDelta > 10 && wideDelta > 10) return 'too wide';
-  return 'well calibrated';
-}
-
 function summarizeSubset(rows) {
   const signedErrors = rows
     .map(row => Number(row.actual_return) - Number(row.median))
     .filter(Number.isFinite);
-  const p25p75 = rows.length
-    ? rows.filter(row => Number(row.p25) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p75)).length / rows.length * 100
-    : null;
-  const p10p90 = rows.length
-    ? rows.filter(row => Number(row.p10) <= Number(row.actual_return) && Number(row.actual_return) <= Number(row.p90)).length / rows.length * 100
-    : null;
+  const middleCoverage = coverageInterval(rows, 'p25', 'p75');
+  const wideCoverage = coverageInterval(rows, 'p10', 'p90');
 
   return {
     count: rows.length,
@@ -77,9 +67,17 @@ function summarizeSubset(rows) {
     typicalMiss: typicalMiss(rows),
     medianAbsoluteError: typicalMiss(rows),
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
-    p25p75CoveragePct: p25p75 == null ? null : Number(p25p75.toFixed(1)),
-    p10p90CoveragePct: p10p90 == null ? null : Number(p10p90.toFixed(1)),
-    calibrationVerdict: calibrationVerdict(p25p75, p10p90, rows.length),
+    p25p75CoveragePct: middleCoverage.coveragePct,
+    p25p75CoverageCiPct: middleCoverage.lowerPct == null ? null : {
+      lower: middleCoverage.lowerPct,
+      upper: middleCoverage.upperPct,
+    },
+    p10p90CoveragePct: wideCoverage.coveragePct,
+    p10p90CoverageCiPct: wideCoverage.lowerPct == null ? null : {
+      lower: wideCoverage.lowerPct,
+      upper: wideCoverage.upperPct,
+    },
+    calibrationVerdict: calibrationVerdict(middleCoverage, wideCoverage, rows.length),
   };
 }
 
@@ -125,7 +123,7 @@ export function summarizeForecastRows(rows = []) {
       Number.isFinite(Number(medianRaw));
   });
 
-  const independent = independentRows(verified);
+  const independent = independentForecastRows(verified);
   const signedErrors = independent
     .map(row => Number(row.actual_return) - Number(row.median))
     .filter(Number.isFinite);
@@ -143,14 +141,14 @@ export function summarizeForecastRows(rows = []) {
 
   return {
     count: verified.length,
-    independentCount: independentRows(verified).length,
+    independentCount: independent.length,
     predictionMatchPct: base.predictionMatchPct,
     rolling: {
       last10: rolling(10),
       last25: rolling(25),
       last50: rolling(50),
     },
-    sampleStatus: forecastSampleStatus(verified.length),
+    sampleStatus: forecastSampleStatus(independent.length),
     directionalAccuracyPct: base.directionRightPct,
     medianAbsoluteError: base.medianAbsoluteError,
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
@@ -164,7 +162,7 @@ export function summarizeForecastRows(rows = []) {
 
 export function buildForecastLearningSummary(rows = []) {
   const verified = rows.filter(row => String(row?.status || 'verified') === 'verified');
-  const independent = independentRows(verified);
+  const independent = independentForecastRows(verified);
   const score = subset => ({
     count: subset.length,
     directionRightPct: directionRightPct(subset),
@@ -264,7 +262,7 @@ export function forecastValidationGate(count) {
 
 export function buildForecastValidationSummary(rows = []) {
   const overall = summarizeForecastRows(rows);
-  const independent = independentRows(rows);
+  const independent = independentForecastRows(rows);
   const groups = new Map();
 
   for (const row of independent) {
