@@ -139,7 +139,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Cash-flow P&L" value={signedMoney(portfolio.cashFlowPnl)} tone={(portfolio.cashFlowPnl || 0) >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="20D verified" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules set" value={(rules.total - rules.noRule) + '/' + rules.total} tone={rules.noRule ? 'warn' : 'good'} />
       </div>
 
