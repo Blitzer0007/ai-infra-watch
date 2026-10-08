@@ -59,18 +59,24 @@ function newsSymbols(title: string, allowed: string[]) {
   return symbols(Object.entries(aliases).filter(([, terms]) => terms.some(term => containsTerm(text, term))).map(([key]) => key), allowed);
 }
 
-function macroKeywordMatches(symbol: string, scenario: string, contracts: Contract[], news: NewsItem[]) {
-  const text = [...contracts, ...news]
-    .map(item => [item?.title, item?.summary, item?.description, item?.details, item?.company, item?.client].filter(Boolean).join(' '))
-    .join(' ')
-    .toLowerCase();
-  const terms: Record<string, string[]> = {
-    taiwan: ['taiwan', 'tsmc', 'foundry', 'hbm', 'dram', 'nand'],
-    export: ['export', 'china', 'sanction', 'embargo', 'restricted', 'chip controls'],
-    power: ['power', 'grid', 'data center', 'electricity', 'utility', 'nuclear', 'solar', 'colocation', 'megawatt', 'mw'],
+function macroAffectedSymbols(risk: { title?: string; description?: string; impactSummary?: string }, allowed: string[]) {
+  const text = [risk.title, risk.description, risk.impactSummary].filter(Boolean).join(' ');
+  const aliases: Record<string, string[]> = {
+    NVDA: ['nvidia', 'nvda'],
+    DGXX: ['digi power', 'dgxx'],
+    DRAM: ['micron', 'dram'],
+    SOXL: ['soxl', 'semiconductor'],
+    MSFT: ['microsoft', 'msft'],
+    NBIS: ['nebius', 'nbis'],
+    VIVO: ['vivo', 'vvpr', 'powerhouse'],
+    META: ['meta', 'facebook'],
+    NOW: ['servicenow', 'service now'],
+    PHVS: ['pharvaris', 'phvs'],
+    RKLB: ['rocket lab', 'rklb'],
   };
-  const matchesForScenario = terms[scenario] || [];
-  return symbol && matchesForScenario.some(term => containsTerm(text, term));
+  return allowed.filter(symbol =>
+    (aliases[symbol] || [symbol]).some(alias => containsTerm(text, alias)),
+  );
 }
 
 function evidenceProfile(kind: string, source: string, sourceType?: string) {
@@ -162,7 +168,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
         title: x.title,
         detail: x.impactSummary || x.description,
         when: x.dateUpdated,
-        affected: portfolioSymbols.length && key ? portfolioSymbols.filter(symbol => macroKeywordMatches(symbol, key, contracts, news)) : [],
+        affected: macroAffectedSymbols(x, portfolioSymbols),
         source: 'Live macro risk ledger',
         url: null,
       };
