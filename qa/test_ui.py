@@ -256,8 +256,8 @@ def test_exit_profit_scenarios_identify_selected_ticker(page):
     page.get_by_text("What-if price scenarios", exact=True).wait_for(state="visible", timeout=30000)
     section = page.get_by_text("What-if price scenarios", exact=True).locator("..")
     assert "NVDA" in section.inner_text()
-    portfolio.get_by_text("Ticker", exact=True).wait_for(state="visible", timeout=30000)
-    assert "NVDA" in portfolio.get_by_text("Ticker", exact=True).locator("..").inner_text()
+    portfolio.get_by_text("Stock symbol", exact=True).wait_for(state="visible", timeout=30000)
+    assert "NVDA" in portfolio.get_by_text("Stock symbol", exact=True).locator("..").inner_text()
 
 
 def test_held_portfolio_filters_and_sort_mount(page):
