@@ -81,37 +81,6 @@ function summarizeSubset(rows) {
   };
 }
 
-function businessDaysBetween(from, to) {
-  const start = new Date(String(from).slice(0, 10) + 'T00:00:00Z');
-  const end = new Date(String(to).slice(0, 10) + 'T00:00:00Z');
-  if (!(start < end)) return 0;
-  let count = 0;
-  for (const cursor = new Date(start); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    const day = cursor.getUTCDay();
-    if (day !== 0 && day !== 6) count += 1;
-  }
-  return count;
-}
-
-function independentRows(rows, minimumBusinessDayGap = 20) {
-  const sorted = [...rows]
-    .filter(row => String(row?.status || 'verified') === 'verified')
-    .sort((a, b) => String(a.verified_at || a.created_at || '').localeCompare(String(b.verified_at || b.created_at || '')));
-  const selected = [];
-  const lastByTickerHorizon = new Map();
-  for (const row of sorted) {
-    const ticker = String(row?.ticker || '').trim().toUpperCase();
-    if (!ticker) continue;
-    const horizon = Number(row?.horizon);
-    const key = ticker + '|' + horizon;
-    const previous = lastByTickerHorizon.get(key);
-    const currentDate = row.verified_at || row.created_at;
-    if (previous && businessDaysBetween(previous, currentDate) < minimumBusinessDayGap) continue;
-    selected.push(row);
-    lastByTickerHorizon.set(key, currentDate);
-  }
-  return selected;
-}
 export function summarizeForecastRows(rows = []) {
   const verified = rows.filter(row => {
     const actualRaw = row?.actual_return;
