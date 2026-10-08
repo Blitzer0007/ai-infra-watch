@@ -487,6 +487,9 @@ async function evaluate() {
         symbol: event.symbol,
         type: event.type,
         title: event.title,
+        sessionDate: event.sessionDate || null,
+        direction: event.type === 'large-move' && event.symbol !== 'US MARKET' ? (event.value >= 0 ? 'up' : 'down') : null,
+        changePct: event.type === 'large-move' && event.symbol !== 'US MARKET' ? Math.abs(Number(event.value)) : null,
       },
     });
   }
