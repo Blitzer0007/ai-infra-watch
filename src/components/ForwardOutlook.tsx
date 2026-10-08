@@ -134,6 +134,7 @@ function forwardReturns(history: PricePoint[], horizon: number): number[] {
 
 type ForecastAnalytics = {
   sampleSize: number;
+  legacyVerifiedCount?: number;
   sampleStatus?: string;
   directionalAccuracyPct?: number | null;
   medianAbsoluteError?: number | null;
@@ -1442,12 +1443,12 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <CheckCircle2 className="w-4 h-4 text-cyan-300" />
             <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Live forecast accuracy</span>
           </div>
-          <p className="text-[10px] text-white/40 mb-3">Only forecasts that have reached their target date and been verified against market history are counted here. Direction, error, bias, and coverage are descriptive while the sample is below 50; the validation gate is considered established only at 50+ verified forecasts.</p>
+          <p className="text-[10px] text-white/40 mb-3">Only snapshot-captured, independently non-overlapping forecasts are used for validation. Legacy verified rows remain visible for auditability but are excluded from calibration.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Verified</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'verified').length}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Validation-eligible</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.independentSampleSize ?? 0}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.actualReturn != null && f.median !== 0); return v.length ? (v.filter(f=>Math.sign(f.median)===Math.sign(f.actualReturn!)).length/v.length*100).toFixed(0)+'%' : '—'; })()}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{(() => { const v=forecasts.filter(f=>f.status==='verified' && f.medianError != null).map(f=>Math.abs(f.medianError!)); return v.length ? percentile(v,0.5).toFixed(1)+' pp' : '—'; })()}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.directionalAccuracyPct == null ? '—' : forecastAnalytics.directionalAccuracyPct.toFixed(0) + '%'}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[8px] text-white/25 uppercase font-mono">Typical prediction error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
           </div>
           {forecastAnalytics?.evidenceCoverage && (
             <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
