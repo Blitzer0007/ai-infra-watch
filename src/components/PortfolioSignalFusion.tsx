@@ -36,12 +36,13 @@ function date(value?: string) {
 }
 
 function containsTerm(text: string, term: string) {
-  const escaped = term.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = term.includes(' ')
-    ? escaped.replace(/\\s+/g, '\\s+')
+    ? escaped.replace(/\s+/g, '\\s+')
     : '\\b' + escaped + '\\b';
   return new RegExp(pattern, 'i').test(text);
 }
+
 function newsSymbols(title: string, allowed: string[]) {
   const text = title.toLowerCase();
   const aliases: Record<string, string[]> = {
