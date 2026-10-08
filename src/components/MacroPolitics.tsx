@@ -1,6 +1,6 @@
 import DataTable from './DataTable';
 import { useState, useEffect } from 'react';
-import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity, RotateCcw, Minus, Plus, ExternalLink, Filter } from 'lucide-react';
+import { ShieldAlert, AlertCircle, Activity, RotateCcw, Minus, Plus, ExternalLink, Filter } from 'lucide-react';
 import { MacroRisk } from '../types';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
