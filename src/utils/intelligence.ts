@@ -74,7 +74,7 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-function percentileRank(values: number[], value: number): number | null {
+export function percentileRank(values: number[], value: number): number | null {
   const usable = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!usable.length || !Number.isFinite(value)) return null;
   if (usable.length === 1) return 50;
