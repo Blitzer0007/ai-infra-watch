@@ -62,9 +62,7 @@ function clean(value: unknown) {
 }
 
 function termPattern(keyword: string) {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\function matches(text: string, keywords: string[]) {
-  return keywords.filter(keyword => text.includes(keyword));
-}');
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('\\b' + escaped.replace(/\\s+/g, '\\s+') + '\\b', 'i');
 }
 
@@ -75,9 +73,7 @@ function matches(text: string, keywords: string[]) {
 function symbolMatches(text: string, symbol: string) {
   const normalized = String(symbol || '').trim().toUpperCase();
   if (!normalized) return false;
-  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\function matches(text: string, keywords: string[]) {
-  return keywords.filter(keyword => text.includes(keyword));
-}');
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('\\b' + escaped + '\\b', 'i').test(text);
 }
 
