@@ -311,7 +311,7 @@ export default function EarningsAlerts() {
                   </ul>
                 </div>
 
-                {(event.direct_holdings.length > 0 || event.linked_holdings.length > 0) && (
+                {((event.direct_holdings || []).length > 0 || (event.linked_holdings || []).length > 0) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[8px] font-mono uppercase">
                     {(event.direct_holdings || []).map(symbol => (
                       <span key={'direct-' + symbol} className="rounded border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-1 text-emerald-300">
