@@ -1,5 +1,7 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory } from '../../api/_market-data.js';
+import { independentForecastRows } from '../utils/forecastIndependence.js';
+import { coverageInterval, calibrationVerdict } from '../utils/forecastCalibration.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -252,32 +254,8 @@ function chooseModel(v1,v2){
   return directionImproved && errorImproved ? 'analogue-v2' : 'analogue-v1';
 }
 function independentValidationRows(rows) {
-  const sorted = rows
-    .filter(row => String(row?.status) === 'verified')
-    .filter(row => hasCreationEvidence(row))
-    .filter(row => Number.isFinite(Number(row?.actual_return)) && Number.isFinite(Number(row?.median)))
-    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
-  const selected = [];
-  const lastByTickerHorizon = new Map();
-  const businessDaysBetween = (from, to) => {
-    const start = new Date(String(from).slice(0, 10) + 'T00:00:00Z');
-    const end = new Date(String(to).slice(0, 10) + 'T00:00:00Z');
-    if (!(start < end)) return 0;
-    let count = 0;
-    for (const cursor = new Date(start); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-      const day = cursor.getUTCDay();
-      if (day !== 0 && day !== 6) count += 1;
-    }
-    return count;
-  };
-  for (const row of sorted) {
-    const key = String(row.ticker || '').toUpperCase() + '|' + String(Number(row.horizon));
-    const previous = lastByTickerHorizon.get(key);
-    if (previous && businessDaysBetween(previous.created_at, row.created_at) < 20) continue;
-    selected.push(row);
-    lastByTickerHorizon.set(key, row);
-  }
-  return selected;
+  return independentForecastRows(rows)
+    .filter(row => hasCreationEvidence(row));
 }
 
 async function evaluateForecastModels() {
@@ -341,7 +319,8 @@ function aggregateForecastSubset(subset) {
   if (!subset.length) return {
     count: 0, sampleStatus: sampleStatus(0), directionalAccuracyPct: null,
     medianAbsoluteError: null, meanSignedErrorPct: null,
-    p25p75CoveragePct: null, p10p90CoveragePct: null
+    p25p75CoveragePct: null, p25p75CoverageCiPct: null,
+    p10p90CoveragePct: null, p10p90CoverageCiPct: null
   };
   const eligible = subset.filter(row => Number(row.actual_return)!==0 && Number(row.median)!==0);
   const direction = eligible.length
@@ -349,16 +328,18 @@ function aggregateForecastSubset(subset) {
     : null;
   const signedErrors = subset.map(row => Number(row.actual_return)-Number(row.median)).filter(Number.isFinite);
   const errors = signedErrors.map(value => Math.abs(value)).sort((a,b)=>a-b);
-  const middle = subset.filter(row=>Number(row.p25)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p75)).length/subset.length*100;
-  const wide = subset.filter(row=>Number(row.p10)<=Number(row.actual_return)&&Number(row.actual_return)<=Number(row.p90)).length/subset.length*100;
+  const middle = coverageInterval(subset, 'p25', 'p75');
+  const wide = coverageInterval(subset, 'p10', 'p90');
   return {
     count: subset.length,
     sampleStatus: sampleStatus(subset.length),
     directionalAccuracyPct: direction==null?null:Number(direction.toFixed(2)),
     medianAbsoluteError: errors.length ? Number(errors[Math.floor((errors.length-1)*0.5)].toFixed(4)) : null,
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(4)) : null,
-    p25p75CoveragePct: Number(middle.toFixed(2)),
-    p10p90CoveragePct: Number(wide.toFixed(2)),
+    p25p75CoveragePct: middle.coveragePct,
+    p25p75CoverageCiPct: middle.lowerPct == null ? null : { lower: middle.lowerPct, upper: middle.upperPct },
+    p10p90CoveragePct: wide.coveragePct,
+    p10p90CoverageCiPct: wide.lowerPct == null ? null : { lower: wide.lowerPct, upper: wide.upperPct },
   };
 }
 
@@ -395,13 +376,8 @@ function forecastAnalytics(rows) {
   ).length;
   const aggregate = aggregateForecastSubset;
   const overall = aggregate(verified);
-  const calibrationVerdict = overall.count < 25 || overall.p25p75CoveragePct == null || overall.p10p90CoveragePct == null
-    ? 'insufficient'
-    : overall.p25p75CoveragePct < 40 && overall.p10p90CoveragePct < 70
-      ? 'too narrow'
-      : overall.p25p75CoveragePct > 60 && overall.p10p90CoveragePct > 90
-        ? 'too wide'
-        : 'well calibrated';
+  const calibrationVerdict = calibrationVerdictFromAggregate(overall);
+  const calibrationVerdictFromAggregate = summary => calibrationVerdict(summary.p25p75CoverageCiPct, summary.p10p90CoverageCiPct, summary.count);
   const grouped=(keyFn, decorate)=>{
     const map=new Map();
     for(const row of verified){
@@ -608,8 +584,11 @@ function forecastLearning(rows) {
     calibration: {
       p25p75TargetPct: 50,
       p10p90TargetPct: 80,
-      p25p75CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p25) && Number(row.actual_return) <= Number(row.p75)).length / verified.length * 100).toFixed(1)) : null,
-      p10p90CoveragePct: verified.length ? Number((verified.filter(row => Number(row.actual_return) >= Number(row.p10) && Number(row.actual_return) <= Number(row.p90)).length / verified.length * 100).toFixed(1)) : null,
+      p25p75CoveragePct: overall.p25p75CoveragePct,
+      p25p75CoverageCiPct: overall.p25p75CoverageCiPct,
+      p10p90CoveragePct: overall.p10p90CoveragePct,
+      p10p90CoverageCiPct: overall.p10p90CoverageCiPct,
+      verdict: calibrationVerdictFromAggregate(overall),
     },
     validationGate,
     recentLessons: withEvidence.slice(0, 10),
