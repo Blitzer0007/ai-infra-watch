@@ -4,9 +4,30 @@ import { AppConfig, formatPrice, formatPct, fetchLiveQuote, getOverviewFavorites
 import DecisionImpactCenter from './DecisionImpactCenter';
 import { STOCK_METADATA } from '../data';
 
+type OverviewLivePrice = {
+  price: number;
+  changePct: number;
+  provider?: string;
+  retrievedAt?: string;
+  marketTime?: string | null;
+  asOf?: string | null;
+  stale?: boolean;
+};
+
+type OverviewNews = {
+  title?: string;
+  url?: string;
+  source?: string;
+  date?: string | null;
+};
+
 interface OverviewProps {
   config: AppConfig;
   onNavigate: (view: string) => void;
+  livePrices?: Record<string, OverviewLivePrice>;
+  news?: OverviewNews[];
+  timestamp?: number;
+  evidenceAvailability?: Record<string, any>;
 }
 
 // Flowchart nodes dictionary with rich informational metrics
@@ -203,14 +224,16 @@ const FLOWCHART_NODES: Record<string, {
   }
 };
 
-export default function Overview({ config, onNavigate }: OverviewProps) {
+export default function Overview({ config, onNavigate, livePrices = {}, news = [], timestamp, evidenceAvailability = {} }: OverviewProps) {
   const overviewFavorites = getOverviewFavorites(config);
   const [quotes, setQuotes] = useState<Record<string, any>>({});
   const [loadingQuotes, setLoadingQuotes] = useState(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string>('all');
   const [flowFilter, setFlowFilter] = useState<'all' | 'hardware' | 'cloud' | 'enterprise'>('all');
 
-  // Load quotes on mount and update occasionally
+  // Prefer the app-wide quote feed and only fetch a missing symbol as a fallback.
+  // This avoids a second market-data truth while preserving standalone usage.
+
   useEffect(() => {
     let active = true;
     async function fetchAll() {
@@ -220,8 +243,13 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
       if (symbols.length === 0) symbols.push('NVDA', 'NBIS', 'DGXX');
 
       for (const sym of symbols) {
+        const shared = livePrices[sym];
+        if (shared && Number.isFinite(shared.price) && Number.isFinite(shared.changePct)) {
+          fetched[sym] = { ok: true, data: shared };
+          continue;
+        }
         try {
-          const res = await fetchLiveQuote(sym, config.finnhubKey);
+          const res = await fetchLiveQuote(sym, config.finnhubKey, true);
           fetched[sym] = { ok: true, data: res };
         } catch (err: any) {
           fetched[sym] = { ok: false, error: err.message || 'Error loading' };
@@ -234,12 +262,12 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
       }
     }
     fetchAll();
-    const interval = setInterval(fetchAll, 30000);
+    const interval = setInterval(fetchAll, 60000);
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [overviewFavorites.join(','), config.finnhubKey]);
+  }, [overviewFavorites.join(','), config.finnhubKey, livePrices]);
 
   // Selected relationships mapping for visual highlighting
   const getRelations = (id: string) => {
@@ -285,10 +313,15 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
           AI Infrastructure Ecosystem Overview
         </h1>
-        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
-          Live quotes and real-time build-out models tracking capital, chip, and physical capacity allocations. 
-          Powered by custom client-side configurations.
-        </p>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
+            Live quotes, contracts, policy, congressional disclosures and infrastructure relationships in one decision-oriented view.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
+            {timestamp && <span className="rounded-lg border border-white/10 bg-white/[.02] px-2.5 py-1.5">SYNCED {new Date(timestamp).toLocaleTimeString()}</span>}
+            <button type="button" onClick={() => onNavigate('health')} className="rounded-lg border border-cyan-400/15 bg-cyan-400/[.04] px-2.5 py-1.5 text-cyan-200 hover:bg-cyan-400/[.08]">Open data health</button>
+          </div>
+        </div>
       </div>
 
       <DecisionImpactCenter onNavigate={onNavigate} />
@@ -304,15 +337,20 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
           <button type="button" onClick={() => onNavigate('portfolio')} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-mono uppercase text-white/70 hover:text-white hover:bg-white/5">Open portfolio</button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-          {(Object.entries(quotes) as Array<[string, any]>).filter(([, item]) => item?.ok && Number.isFinite(item?.data?.changePct)).sort((a,b) => Math.abs(b[1].data.changePct) - Math.abs(a[1].data.changePct)).slice(0,3).map(([symbol,item]) => {
-            const move = Number(item.data.changePct);
-            return <div key={symbol} className="rounded-xl border border-white/10 bg-black/10 p-3">
-              <div className="flex items-center justify-between"><span className="text-sm font-black">{symbol}</span><span className="text-[11px] font-mono">{move >= 0 ? '▲ +' : '▼ −'}{Math.abs(move).toFixed(2)}%</span></div>
-              <div className="text-[10px] text-white/55 mt-1">Previous close → current quote</div>
-            </div>;
-          })}
+          {(Object.keys(livePrices).length
+            ? (Object.entries(livePrices) as Array<[string, OverviewLivePrice]>).filter(([, item]) => Number.isFinite(item?.changePct))
+            : (Object.entries(quotes) as Array<[string, any]>).filter(([, item]) => item?.ok && Number.isFinite(item?.data?.changePct)).map(([symbol, item]) => [symbol, item.data] as [string, OverviewLivePrice]))
+            .sort((a,b) => Math.abs(b[1].changePct) - Math.abs(a[1].changePct))
+            .slice(0,3)
+            .map(([symbol,item]) => {
+              const move = Number(item.changePct);
+              return <div key={symbol} className="rounded-xl border border-white/10 bg-black/10 p-3">
+                <div className="flex items-center justify-between"><span className="text-sm font-black">{symbol}</span><span className={move >= 0 ? 'text-[11px] font-mono text-emerald-300' : 'text-[11px] font-mono text-rose-300'}>{move >= 0 ? '▲ +' : '▼ −'}{Math.abs(move).toFixed(2)}%</span></div>
+                <div className="text-[10px] text-white/55 mt-1">{item.stale ? 'Last known quote' : 'Previous close → current quote'}</div>
+              </div>;
+            })}
         </div>
-        {!Object.values(quotes).some((item: any) => item?.ok) && <div className="mt-3 text-[11px] text-white/50">Waiting for the first live quote refresh.</div>}
+        {!Object.keys(livePrices).length && !Object.values(quotes).some((item: any) => item?.ok) && <div className="mt-3 text-[11px] text-white/50">Waiting for the first live quote refresh.</div>}
       </section>
 
       {/* Layman Connections & Benefits Master Guide */}
@@ -468,9 +506,10 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
                   } else if (filter === 'cloud') {
                     setSelectedNodeId('nbis');
                   } else if (filter === 'enterprise') {
-                    setSelectedNodeId('cere');
+                    setSelectedNodeId('meta');
                   }
                 }}
+                aria-pressed={flowFilter === filter}
                 className={`px-3 py-1.5 rounded border text-xs font-black uppercase tracking-wider transition cursor-pointer ${
                   flowFilter === filter
                     ? 'bg-white text-black border-white'
@@ -683,35 +722,32 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* News Headlines Card */}
         <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">Recent Market Signals</h3>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-white">Recent Market Signals</h3>
+            </div>
+            <button type="button" onClick={() => onNavigate('research')} className="text-[9px] font-mono uppercase tracking-wider text-cyan-200/80 hover:text-cyan-200">Open research</button>
           </div>
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Meta expands high-density data center lease with Nebius to $27B, securing Blackwell configurations
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">SEC Form 8-K · June 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Digi Power X rallies +29% following massive colocation lock with Cerebras Systems in Alabama
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">TipRanks Market Report · May 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Micron HBM3E qualifies for NVIDIA Blackwell, securing substantial DRAM wafer lines for 2026 training bounds
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">EE Times Technical Analysis · April 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                NVIDIA completes strategic $2B equity block backing Nebius Group N.V. to accelerate regional GPU neocloud scales
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Financial Times · March 2026</div>
-            </div>
+          <div className="space-y-3 pt-1">
+            {news.filter(item => item?.title && item?.url)
+              .slice()
+              .sort((a,b) => String(b.date || '').localeCompare(String(a.date || '')))
+              .slice(0,4)
+              .map((item, index) => {
+                const dateLabel = item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Date unavailable';
+                return <a key={item.url || index} href={item.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-white/5 bg-black/10 p-3 hover:border-emerald-400/20 hover:bg-emerald-400/[.03] transition">
+                  <div className="text-xs md:text-sm text-white/90 font-bold line-clamp-2">{item.title}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
+                    <span>{item.source || 'Web source'}</span><span>•</span><span>{dateLabel}</span>
+                  </div>
+                </a>;
+              })}
+            {!news.some(item => item?.title && item?.url) && (
+              <div className="rounded-xl border border-amber-400/10 bg-amber-400/[.025] p-3 text-[10px] leading-4 text-amber-100/70">
+                No current AI-infrastructure headlines are available from the live feed. Use AI Research for the latest evidence search.
+              </div>
+            )}
           </div>
         </div>
 
@@ -731,7 +767,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Contracts Ledger</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Check $48B+ in disclosures</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.contracts?.count ?? 0} live SEC records</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>
@@ -751,7 +787,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Congress Trades</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Audit politician buys/sells</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.congress?.count ?? 0} disclosure records</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>
@@ -761,7 +797,7 @@ export default function Overview({ config, onNavigate }: OverviewProps) {
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Geopolitical Signals</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Analyze supply risks</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.political?.count ?? 0} policy signals</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>

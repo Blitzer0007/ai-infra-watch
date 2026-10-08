@@ -1,6 +1,6 @@
 import DataTable from './DataTable';
 import { useState, useEffect } from 'react';
-import { ShieldAlert, RefreshCw, AlertCircle, Sparkles, Activity } from 'lucide-react';
+import { ShieldAlert, AlertCircle, Activity, RotateCcw, Minus, Plus, ExternalLink, Filter } from 'lucide-react';
 import { MacroRisk } from '../types';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings } from '../utils/portfolioApi';
@@ -14,6 +14,8 @@ interface MacroPoliticsProps {
   contracts?: any[];
   news?: any[];
   politicalSignals?: any[];
+  evidenceAvailability?: Record<string, any>;
+  onNavigate?: (view: string) => void;
 }
 
 function exposureClass(level: ExposureLevel) {
@@ -49,7 +51,13 @@ function PortfolioScenarioSensitivity({
 }) {
   const derivedExposure = derivePortfolioExposure(positions.map(position => position.symbol), contracts, news, positions);
   const validation = validatePortfolioExposure(derivedExposure);
-  const totalInvested = positions.reduce((sum, position) => sum + position.investedValue, 0);
+  const totalReferenceValue = positions.reduce((sum, position) => {
+    const live = livePrices[position.symbol];
+    const currentValue = live?.price != null && Number.isFinite(Number(live.price))
+      ? Number(live.price) * position.quantity
+      : position.investedValue;
+    return sum + Math.max(0, currentValue);
+  }, 0);
   const scenarioInputs = {
     taiwan: { value: taiwanProb, weight: 0.5 },
     power: { value: gridSeverity, weight: 0.25 },
@@ -61,7 +69,7 @@ function PortfolioScenarioSensitivity({
     const currentValue = live?.price != null && position
       ? live.price * position.quantity
       : position?.investedValue ?? 0;
-    const portfolioWeight = totalInvested ? ((position?.investedValue ?? 0) / totalInvested) * 100 : 0;
+    const portfolioWeight = totalReferenceValue ? (Math.max(0, currentValue) / totalReferenceValue) * 100 : 0;
     const calculateSensitivity = (worstCase: boolean) => Math.round(
       (Object.entries(scenarioInputs) as Array<[MacroScenarioKey, { value: number; weight: number }]>).reduce((sum, [scenario, input]) => {
         const dimension = exposure[scenario];
@@ -82,11 +90,16 @@ function PortfolioScenarioSensitivity({
       worstCaseSensitivity,
       weightedContribution: assessedSensitivity * (portfolioWeight / 100),
       worstCaseContribution: worstCaseSensitivity * (portfolioWeight / 100),
+      referenceCapitalSensitivity: currentValue * (assessedSensitivity / 100),
+      worstCaseReferenceCapitalSensitivity: currentValue * (worstCaseSensitivity / 100),
     };
   });
 
   const portfolioSensitivity = portfolioRows.reduce((sum, row) => sum + row.weightedContribution, 0);
   const portfolioWorstCaseSensitivity = portfolioRows.reduce((sum, row) => sum + row.worstCaseContribution, 0);
+  const portfolioReferenceCapitalSensitivity = portfolioRows.reduce((sum, row) => sum + row.referenceCapitalSensitivity, 0);
+  const portfolioWorstCaseReferenceCapitalSensitivity = portfolioRows.reduce((sum, row) => sum + row.worstCaseReferenceCapitalSensitivity, 0);
+  const topSensitivityRows = portfolioRows.slice().sort((a, b) => b.weightedContribution - a.weightedContribution).slice(0, 3);
 
   return (
     <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
@@ -105,6 +118,16 @@ function PortfolioScenarioSensitivity({
           <div className="grid grid-cols-2 gap-4 mt-1">
             <div><div className="text-[8px] text-white/30 font-mono uppercase">Assessed-only</div><div className="text-2xl font-black font-mono text-cyan-300">{Math.round(portfolioSensitivity)} / 100</div></div>
             <div><div className="text-[8px] text-white/30 font-mono uppercase">Worst case</div><div className="text-2xl font-black font-mono text-amber-300">{Math.round(portfolioWorstCaseSensitivity)} / 100</div></div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg border border-white/5 bg-black/10 px-2 py-2">
+              <div className="text-[8px] font-mono uppercase text-white/25">Reference capital sensitivity</div>
+              <div className="text-sm font-black font-mono text-cyan-200">${portfolioReferenceCapitalSensitivity.toFixed(0)}</div>
+            </div>
+            <div className="rounded-lg border border-white/5 bg-black/10 px-2 py-2">
+              <div className="text-[8px] font-mono uppercase text-white/25">Upper-bound reference</div>
+              <div className="text-sm font-black font-mono text-amber-200">${portfolioWorstCaseReferenceCapitalSensitivity.toFixed(0)}</div>
+            </div>
           </div>
           <div className="mt-2 text-[8px] font-mono uppercase tracking-wider text-white/35">
             Exposure validation: <span className={validation.status === 'VALIDATED' ? 'text-emerald-300' : validation.status === 'PARTIAL' ? 'text-amber-300' : 'text-white/45'}>{validation.status}</span>
@@ -132,8 +155,17 @@ function PortfolioScenarioSensitivity({
         />
       </div>
 
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+        {topSensitivityRows.map(row => (
+          <div key={row.symbol} className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
+            <div className="flex items-center justify-between gap-2"><span className="text-[9px] font-mono uppercase text-white/30">{row.symbol}</span><span className="text-[9px] font-mono text-cyan-200">{row.portfolioWeight.toFixed(1)}%</span></div>
+            <div className="mt-1 text-[9px] uppercase tracking-wider text-white/30">Top weighted scenario contributor</div>
+            <div className="mt-1 text-sm font-black font-mono text-white">${row.referenceCapitalSensitivity.toFixed(0)} reference</div>
+          </div>
+        ))}
+      </div>
       <div className="text-[9px] text-white/25 font-mono mt-3">
-        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Assessed-only excludes unassessed dimensions; worst case assumes unassessed = Direct. Portfolio weighting uses invested capital.
+        Formula: 50% TSMC + 25% power + 25% export, multiplied by Direct=1.00, Secondary=0.55, Limited=0.20. Reference capital sensitivity uses current value when available and invested value as fallback; it is not a forecasted loss.
       </div>
     </div>
   );
@@ -222,11 +254,29 @@ function ExecutiveSignalsPanel() {
   );
 }
 function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'primary' | 'secondary'>('all');
+  const [topicFilter, setTopicFilter] = useState('all');
+  const topicBuckets = ['all', 'AI / Technology', 'Trade Policy', 'Supply Chain', 'Infrastructure', 'Regulation'];
+
   const actorTone = (actor: string) => {
     if (actor === 'Donald Trump') return 'text-amber-300';
     if (actor === 'JD Vance') return 'text-cyan-300';
     return 'text-white/70';
   };
+
+  const matchesTopic = (signal: any) => {
+    if (topicFilter === 'all') return true;
+    const haystack = String(signal.topic || '') + ' ' + String(signal.eventType || '') + ' ' + String(signal.title || '');
+    if (topicFilter === 'AI / Technology') return /(ai|artificial intelligence|chip|gpu|semiconductor|technology)/i.test(haystack);
+    if (topicFilter === 'Trade Policy') return /(export|trade|tariff|sanction|embargo|restriction|control)/i.test(haystack);
+    if (topicFilter === 'Supply Chain') return /(supply|tsmc|taiwan|foundry|hbm|memory)/i.test(haystack);
+    if (topicFilter === 'Infrastructure') return /(power|grid|data.?center|energy|utility|infrastructure)/i.test(haystack);
+    return /(regulation|law|act|policy|rule|executive)/i.test(haystack);
+  };
+  const visibleSignals = signals.filter(signal =>
+    (sourceFilter === 'all' || String(signal.sourceType || '').toLowerCase() === sourceFilter) &&
+    matchesTopic(signal)
+  );
 
   return (
     <section className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5">
@@ -239,17 +289,31 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
           </p>
         </div>
         <div className="text-[9px] font-mono uppercase tracking-wider text-white/30">
-          {signals.length} signal{signals.length === 1 ? '' : 's'} · recent feed window
+          {visibleSignals.length} of {signals.length} signal{signals.length === 1 ? '' : 's'} · filtered recent feed
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4 rounded-xl border border-white/5 bg-black/10 p-2" aria-label="Political signal filters">
+        <span className="inline-flex items-center gap-1 text-[8px] font-mono uppercase tracking-wider text-white/25"><Filter className="w-3 h-3" /> Filter</span>
+        {topicBuckets.map(topic => (
+          <button type="button" key={topic} onClick={() => setTopicFilter(topic)} aria-pressed={topicFilter === topic} className={'px-2 py-1 rounded border text-[8px] font-mono uppercase tracking-wider ' + (topicFilter === topic ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/5 text-white/40 hover:text-white/70')}>
+            {topic === 'all' ? 'All topics' : topic}
+          </button>
+        ))}
+        <span className="h-4 w-px bg-white/10 mx-1" aria-hidden="true" />
+        {(['all', 'primary', 'secondary'] as const).map(source => (
+          <button type="button" key={source} onClick={() => setSourceFilter(source)} aria-pressed={sourceFilter === source} className={'px-2 py-1 rounded border text-[8px] font-mono uppercase tracking-wider ' + (sourceFilter === source ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-white/5 text-white/40 hover:text-white/70')}>
+            {source === 'all' ? 'All sources' : source}
+          </button>
+        ))}
+      </div>
 
-      {signals.length === 0 ? (
+      {visibleSignals.length === 0 ? (
         <div className="rounded-xl border border-white/5 bg-white/[.02] p-5 text-[10px] font-mono text-white/35">
           No recent political / AI policy signals were returned by the configured live feeds.
         </div>
       ) : (
         <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 aiw-scroll-region">
-          {signals.map((signal, index) => (
+          {visibleSignals.map((signal, index) => (
             <article
               key={signal.id || signal.url || signal.title || index}
               className="rounded-xl border border-white/5 bg-white/[.02] p-4"
@@ -270,7 +334,13 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
                       (signal.sourceType === 'primary'
                         ? 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300'
                         : 'border-amber-400/15 bg-amber-400/5 text-amber-300')}>
-                      {signal.sourceType === 'primary' ? 'PRIMARY' : 'SECONDARY'}
+                      {signal.sourceType === 'primary'
+                        ? String(signal.source || '').toLowerCase().includes('federalregister')
+                          ? 'FEDERAL REGISTER · PRIMARY'
+                          : String(signal.source || '').toLowerCase().includes('whitehouse')
+                            ? 'WHITE HOUSE · PRIMARY'
+                            : 'PRIMARY'
+                        : 'SECONDARY'}
                     </span>
                   </div>
 
@@ -318,13 +388,41 @@ function PoliticalSignalsFeed({ signals = [] }: { signals?: any[] }) {
       )}
 
       <div className="mt-4 pt-3 border-t border-white/5 text-[9px] text-white/25 font-mono">
-        Data source: GDELT document search, including a White House-focused query. Primary-source badges are limited to results whose returned domain is whitehouse.gov; secondary items require source verification.
+        Data source: GDELT document search with government-domain discovery. Primary-source badges distinguish returned government sources such as whitehouse.gov and federalregister.gov; secondary items require source verification.
       </div>
     </section>
   );
 }
 
-export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [] }: MacroPoliticsProps) {
+function scenarioBaselineFromRisks(risks: MacroRisk[] = []) {
+  let taiwan = 15;
+  let power = 30;
+  let exportBreadth = 25;
+  for (const risk of risks) {
+    const text = (String(risk.title || '') + ' ' + String(risk.description || '')).toLowerCase();
+    const score = risk.impactRating === 'high' ? 75 : risk.impactRating === 'medium' ? 45 : 15;
+    if (text.includes('taiwan') || text.includes('tsmc')) taiwan = score;
+    else if (text.includes('power') || text.includes('grid')) power = score;
+    else if (text.includes('export') || text.includes('embargo') || text.includes('prohibition')) exportBreadth = score;
+  }
+  return { taiwan, power, export: exportBreadth };
+}
+
+function feedStatus(item: any) {
+  if (!item) return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
+  if (item.conflictStatus === 'CONFLICT' || item.status === 'CONFLICT') return { label: 'CONFLICT', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
+  if (item.freshness?.status === 'VERY_STALE' || item.stale) return { label: 'STALE', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
+  if (item.freshness?.status === 'AGING') return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+  if (item.fallback) return { label: 'FALLBACK', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
+  if (item.status === 'AVAILABLE') return { label: 'HEALTHY', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' };
+  return { label: String(item.status || 'UNKNOWN').toUpperCase(), tone: 'text-white/45 border-white/10 bg-white/5' };
+}
+
+function evidenceCount(item: any) {
+  return Number.isFinite(Number(item?.count)) ? Number(item.count) : 0;
+}
+
+export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = [], news = [], politicalSignals = [], evidenceAvailability = {}, onNavigate }: MacroPoliticsProps) {
   const [taiwanProb, setTaiwanProb] = useState<number>(15);
   const [gridSeverity, setGridSeverity] = useState<number>(30);
   const [embargoBreadth, setEmbargoBreadth] = useState<number>(25);
@@ -354,25 +452,12 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
     return () => { cancelled = true; };
   }, []);
 
-  // Sync sliders dynamically if live risks are updated
+  // Sync scenario controls to the observed baseline risk framework.
   useEffect(() => {
-    if (liveRisks && liveRisks.length > 0) {
-      liveRisks.forEach((risk) => {
-        const cat = risk.category.toLowerCase();
-        const title = risk.title.toLowerCase();
-        const desc = risk.description.toLowerCase();
-        
-        const score = risk.impactRating === 'high' ? 75 : risk.impactRating === 'medium' ? 45 : 15;
-        
-        if (title.includes('taiwan') || desc.includes('taiwan') || desc.includes('tsmc')) {
-          setTaiwanProb(score);
-        } else if (title.includes('power') || title.includes('grid') || desc.includes('grid') || desc.includes('power')) {
-          setGridSeverity(score);
-        } else if (title.includes('export') || title.includes('embargo') || desc.includes('export') || desc.includes('embargo') || title.includes('prohibition')) {
-          setEmbargoBreadth(score);
-        }
-      });
-    }
+    const baseline = scenarioBaselineFromRisks(liveRisks || []);
+    setTaiwanProb(baseline.taiwan);
+    setGridSeverity(baseline.power);
+    setEmbargoBreadth(baseline.export);
   }, [liveRisks]);
 
   // Calculate customized threat coefficient
@@ -420,6 +505,39 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         </div>
       </div>
 
+      <section className="rounded-2xl border border-white/10 bg-[#15181E]/30 p-4" aria-labelledby="macro-evidence-heading">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Observed evidence status</div>
+            <h2 id="macro-evidence-heading" className="text-xs font-black uppercase tracking-widest text-white mt-1">What is actually changing</h2>
+            <p className="text-[9px] text-white/35 font-mono mt-1">Risk frameworks are separate from observed evidence. Counts below reflect the live feeds returned to this page.</p>
+          </div>
+          {onNavigate && <button type="button" onClick={() => onNavigate('health')} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-mono uppercase text-cyan-200 hover:bg-white/10"><ExternalLink className="w-3 h-3" /> Data health</button>}
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+          {[['News', 'news'], ['Political / Policy', 'political'], ['SEC Contracts', 'contracts'], ['Congress', 'congress']].map(([label, key]) => {
+            const item = evidenceAvailability[key] || { count: key === 'news' ? news.length : key === 'political' ? politicalSignals.length : key === 'contracts' ? contracts.length : 0, status: 'AVAILABLE' };
+            const status = feedStatus(item);
+            return <div key={key} className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[8px] font-mono uppercase tracking-wider text-white/30">{label}</span><span className={'px-1.5 py-0.5 rounded border text-[7px] font-mono uppercase ' + status.tone}>{status.label}</span></div><div className="mt-1 text-lg font-black font-mono text-white">{evidenceCount(item)}</div><div className="text-[8px] font-mono text-white/20">{item.freshness?.status || (item.retrievedAt ? 'retrieved' : 'current response')}</div></div>;
+          })}
+        </div>
+      </section>
+      <section className="rounded-2xl border border-white/10 bg-[#15181E]/30 p-4" aria-labelledby="macro-scenario-controls">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Scenario lab</div>
+            <h2 id="macro-scenario-controls" className="text-xs font-black uppercase tracking-widest text-white mt-1">Repeatable stress presets</h2>
+            <p className="text-[9px] text-white/35 font-mono mt-1">Baseline mirrors the current rule-based framework. Presets are stress-test inputs, not observed probabilities or return forecasts.</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => { const base = scenarioBaselineFromRisks(activeRisks); setTaiwanProb(base.taiwan); setGridSeverity(base.power); setEmbargoBreadth(base.export); }} className="inline-flex items-center gap-1.5 rounded border border-cyan-400/15 bg-cyan-400/[.04] px-2 py-1.5 text-[8px] font-mono uppercase text-cyan-200"><RotateCcw className="w-3 h-3" /> Live baseline</button>
+            <button type="button" onClick={() => { setTaiwanProb(75); setGridSeverity(30); setEmbargoBreadth(25); }} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-mono uppercase text-white/55 hover:text-white">Taiwan shock</button>
+            <button type="button" onClick={() => { setTaiwanProb(15); setGridSeverity(75); setEmbargoBreadth(25); }} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-mono uppercase text-white/55 hover:text-white">Power squeeze</button>
+            <button type="button" onClick={() => { setTaiwanProb(15); setGridSeverity(30); setEmbargoBreadth(75); }} className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-mono uppercase text-white/55 hover:text-white">Export controls</button>
+            <button type="button" onClick={() => { setTaiwanProb(100); setGridSeverity(100); setEmbargoBreadth(100); }} className="rounded border border-rose-400/15 bg-rose-400/[.04] px-2 py-1.5 text-[8px] font-mono uppercase text-rose-200">Combined stress</button>
+          </div>
+        </div>
+      </section>
       <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.03] p-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
@@ -475,8 +593,8 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
         title="Macro exposure review"
         state={{
           system_stress_score: threatScore,
-          taiwan_disruption_probability: taiwanProb,
-          power_grid_shortfall: gridSeverity,
+          taiwan_stress_level: taiwanProb,
+          power_grid_stress_level: gridSeverity,
           export_control_breadth: embargoBreadth,
           live_risks: activeRisks.slice(0, 8).map((risk) => ({
             id: risk.id,
@@ -498,7 +616,10 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risks Catalog Column */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-white">Current Risk Indicators (Live Feed)</h3>
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white">Risk Framework / Exposure Themes</h3>
+            <p className="text-[9px] text-white/30 font-mono mt-1">Structural monitoring themes. Observed policy/news events are shown separately below.</p>
+          </div>
           
           <div className="space-y-4">
             {activeRisks.map((r) => (
@@ -516,7 +637,7 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                         : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     }`}>
-                      {r.impactRating.toUpperCase()} IMPACT
+                      STRUCTURAL · {r.impactRating.toUpperCase()}
                     </span>
                     {r.impactSummary && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
@@ -538,8 +659,8 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
                 )}
 
                 <div className="flex justify-between text-[9px] font-mono text-white/30 border-t border-white/5 pt-2">
-                  <span>LAST REVIEW: {r.dateUpdated}</span>
-                  <span>IMPACT MATRIX: ACTIVE</span>
+                  <span>FRAMEWORK DATE: {r.dateUpdated}</span>
+                  <span>FRAMEWORK: ACTIVE</span>
                 </div>
               </div>
             ))}
@@ -562,47 +683,59 @@ export default function MacroPolitics({ liveRisks, livePrices = {}, contracts = 
             <div className="space-y-4 pt-2 font-mono text-xs">
               <div className="space-y-2">
                 <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>TSMC Disruption Probability</span>
+                  <span>Taiwan / TSMC Stress Level</span>
                   <span className="text-white font-black">{taiwanProb}%</span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={taiwanProb}
-                  onChange={(e) => setTaiwanProb(parseInt(e.target.value))}
-                  className="w-full accent-rose-500 cursor-pointer"
-                />
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Decrease Taiwan stress by 5" onClick={() => setTaiwanProb(v => Math.max(0, v - 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Minus className="w-3 h-3" /></button>
+                  <input aria-label="Taiwan TSMC stress level"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={taiwanProb}
+                    onChange={(e) => setTaiwanProb(parseInt(e.target.value))}
+                    className="w-full accent-rose-500 cursor-pointer"
+                  />
+                  <button type="button" aria-label="Increase Taiwan stress by 5" onClick={() => setTaiwanProb(v => Math.min(100, v + 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Plus className="w-3 h-3" /></button>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>Northeast Power Grid Shortfall</span>
+                  <span>Power Grid Stress Level</span>
                   <span className="text-white font-black">{gridSeverity}%</span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={gridSeverity}
-                  onChange={(e) => setGridSeverity(parseInt(e.target.value))}
-                  className="w-full accent-amber-500 cursor-pointer"
-                />
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Decrease power stress by 5" onClick={() => setGridSeverity(v => Math.max(0, v - 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Minus className="w-3 h-3" /></button>
+                  <input aria-label="Power grid stress level"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={gridSeverity}
+                    onChange={(e) => setGridSeverity(parseInt(e.target.value))}
+                    className="w-full accent-amber-500 cursor-pointer"
+                  />
+                  <button type="button" aria-label="Increase power stress by 5" onClick={() => setGridSeverity(v => Math.min(100, v + 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Plus className="w-3 h-3" /></button>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-[10px] text-white/40 font-bold uppercase tracking-wider">
-                  <span>AI Chip Export Prohibitions</span>
+                  <span>AI Chip Export-Control Breadth</span>
                   <span className="text-white font-black">{embargoBreadth}%</span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={embargoBreadth}
-                  onChange={(e) => setEmbargoBreadth(parseInt(e.target.value))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Decrease export-control breadth by 5" onClick={() => setEmbargoBreadth(v => Math.max(0, v - 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Minus className="w-3 h-3" /></button>
+                  <input aria-label="Export-control breadth"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={embargoBreadth}
+                    onChange={(e) => setEmbargoBreadth(parseInt(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                  <button type="button" aria-label="Increase export-control breadth by 5" onClick={() => setEmbargoBreadth(v => Math.min(100, v + 5))} className="rounded border border-white/10 bg-white/5 p-1 text-white/45 hover:text-white"><Plus className="w-3 h-3" /></button>
+                </div>
               </div>
             </div>
           </div>
