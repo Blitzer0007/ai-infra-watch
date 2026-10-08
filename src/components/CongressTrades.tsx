@@ -33,6 +33,8 @@ type TradeReaction = {
   excessDay20Pct: number | null;
   ownBaselineDay5Pct: number | null;
   ownBaselineGapDay5Pct: number | null;
+  ownBaselineDay20Pct: number | null;
+  ownBaselineGapDay20Pct: number | null;
 };
 
 type SourceStatus = {
@@ -67,10 +69,10 @@ function median(values: number[]): number | null {
   return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
 }
 
-function stockBaseline5(history: HistoryPoint[]): number | null {
+function stockBaseline(history: HistoryPoint[], horizon: 5 | 20): number | null {
   const values: number[] = [];
-  for (let i = 0; i + 5 < history.length; i++) {
-    const value = pct(history[i]?.price ?? null, history[i + 5]?.price ?? null);
+  for (let i = 0; i + horizon < history.length; i++) {
+    const value = pct(history[i]?.price ?? null, history[i + horizon]?.price ?? null);
     if (value != null) values.push(value);
   }
   return median(values);
@@ -98,7 +100,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
   const benchmarkDay5 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 5] : null;
   const benchmarkDay20 = benchmarkIndex >= 0 ? benchmarkHistory[benchmarkIndex + 20] : null;
 
-  const baseline5 = stockBaseline5(history);
+  const baseline5 = stockBaseline(history, 5);
+  const baseline20 = stockBaseline(history, 20);
   const nextPct = pct(event.price, next?.price ?? null);
   const day5Pct = pct(event.price, day5?.price ?? null);
   const day20Pct = pct(event.price, day20?.price ?? null);
@@ -124,6 +127,8 @@ function reactionFor(history: HistoryPoint[], benchmarkHistory: HistoryPoint[], 
     excessDay20Pct: day20Pct == null || benchmarkDay20Pct == null ? null : day20Pct - benchmarkDay20Pct,
     ownBaselineDay5Pct: baseline5,
     ownBaselineGapDay5Pct: day5Pct == null || baseline5 == null ? null : day5Pct - baseline5,
+    ownBaselineDay20Pct: baseline20,
+    ownBaselineGapDay20Pct: day20Pct == null || baseline20 == null ? null : day20Pct - baseline20,
   };
 }
 
@@ -386,7 +391,7 @@ export default function CongressTrades({ liveTrades = [] }: CongressTradesProps)
       .filter((trade) => trade.stockSymbol === symbolFilter)
       .map((trade) => ({
         trade,
-        reaction: reactionFor(history, benchmarkHistory, trade.filingDate || trade.date || trade.transactionDate),
+        reaction: reactionFor(history, benchmarkHistory, (trade.filingDate || trade.date || trade.transactionDate).filingDate || (trade.filingDate || trade.date || trade.transactionDate).transactionDate || (trade.filingDate || trade.date || trade.transactionDate).date),
       }))
       .filter((row) => row.reaction);
   }, [filtered, history, benchmarkHistory, symbolFilter]);
