@@ -721,35 +721,32 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* News Headlines Card */}
         <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">Recent Market Signals</h3>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-white">Recent Market Signals</h3>
+            </div>
+            <button type="button" onClick={() => onNavigate('research')} className="text-[9px] font-mono uppercase tracking-wider text-cyan-200/80 hover:text-cyan-200">Open research</button>
           </div>
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Meta expands high-density data center lease with Nebius to $27B, securing Blackwell configurations
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">SEC Form 8-K · June 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Digi Power X rallies +29% following massive colocation lock with Cerebras Systems in Alabama
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">TipRanks Market Report · May 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                Micron HBM3E qualifies for NVIDIA Blackwell, securing substantial DRAM wafer lines for 2026 training bounds
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">EE Times Technical Analysis · April 2026</div>
-            </div>
-            <div className="space-y-1.5 border-l-2 border-white/10 pl-3">
-              <a href="#" className="text-xs md:text-sm text-white/90 hover:text-emerald-400 font-bold transition line-clamp-2">
-                NVIDIA completes strategic $2B equity block backing Nebius Group N.V. to accelerate regional GPU neocloud scales
-              </a>
-              <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Financial Times · March 2026</div>
-            </div>
+          <div className="space-y-3 pt-1">
+            {news.filter(item => item?.title && item?.url)
+              .slice()
+              .sort((a,b) => String(b.date || '').localeCompare(String(a.date || '')))
+              .slice(0,4)
+              .map((item, index) => {
+                const dateLabel = item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Date unavailable';
+                return <a key={item.url || index} href={item.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-white/5 bg-black/10 p-3 hover:border-emerald-400/20 hover:bg-emerald-400/[.03] transition">
+                  <div className="text-xs md:text-sm text-white/90 font-bold line-clamp-2">{item.title}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
+                    <span>{item.source || 'Web source'}</span><span>•</span><span>{dateLabel}</span>
+                  </div>
+                </a>;
+              })}
+            {!news.some(item => item?.title && item?.url) && (
+              <div className="rounded-xl border border-amber-400/10 bg-amber-400/[.025] p-3 text-[10px] leading-4 text-amber-100/70">
+                No current AI-infrastructure headlines are available from the live feed. Use AI Research for the latest evidence search.
+              </div>
+            )}
           </div>
         </div>
 
@@ -769,7 +766,7 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Contracts Ledger</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Check $48B+ in disclosures</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.contracts?.count ?? 0} live SEC records</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>
@@ -789,7 +786,7 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Congress Trades</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Audit politician buys/sells</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.congress?.count ?? 0} disclosure records</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>
@@ -799,7 +796,7 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
             >
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-white">Geopolitical Signals</span>
-                <p className="text-[10px] font-mono text-white/40 mt-1">Analyze supply risks</p>
+                <p className="text-[10px] font-mono text-white/40 mt-1">{evidenceAvailability.political?.count ?? 0} policy signals</p>
               </div>
               <ArrowRight className="w-4 h-4 text-white/40" />
             </button>
