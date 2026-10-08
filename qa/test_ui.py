@@ -113,6 +113,47 @@ def test_core_navigation_and_page_mounts(page):
         page.get_by_test_id("nav-" + nav_id).click()
         page.get_by_test_id(testid).wait_for(state="visible", timeout=30000)
 
+def test_overview_live_signals_and_data_health(page):
+    mock_local_apis(page)
+
+    def overview_live_data(route):
+        if '/api/live-data' not in route.request.url:
+            return route.continue_()
+        route.fulfill(status=200, content_type='application/json', body=json.dumps({
+            'stockPrices': {
+                'NVDA': {'price': 210.0, 'changePct': 2.5, 'stale': False, 'provider': 'qa'},
+                'NBIS': {'price': 220.0, 'changePct': -3.2, 'stale': False, 'provider': 'qa'},
+            },
+            'news': [{
+                'title': 'QA live AI infrastructure headline',
+                'url': 'https://example.com/qa-ai-headline',
+                'source': 'QA Source',
+                'date': '2026-10-08T12:00:00Z',
+            }],
+            'evidenceAvailability': {
+                'market': {'status': 'AVAILABLE'},
+                'news': {'status': 'AVAILABLE', 'count': 1},
+                'contracts': {'status': 'AVAILABLE', 'count': 3},
+                'congress': {'status': 'AVAILABLE', 'count': 2},
+                'political': {'status': 'AVAILABLE', 'count': 4},
+            },
+            'timestamp': 1760000000000,
+            'contracts': [],
+            'congressTrades': [],
+            'macroRisks': [],
+            'politicalSignals': [],
+            'marketSentiment': 'QA mocked',
+        }))
+    page.route('**/api/live-data*', overview_live_data)
+    goto_app(page)
+    overview = page.locator('#overview-view')
+    overview.wait_for(state='visible', timeout=30000)
+    page.get_by_text('QA live AI infrastructure headline', exact=True).wait_for(state='visible', timeout=30000)
+    assert 'Meta expands high-density data center lease with Nebius to $27B' not in overview.inner_text()
+    page.get_by_role('button', name='Open data health', exact=True).click()
+    page.get_by_test_id('data-health').wait_for(state='visible', timeout=30000)
+
+
 def test_forecast_history_error_is_gone(page):
     mock_local_apis(page)
     goto_app(page)
