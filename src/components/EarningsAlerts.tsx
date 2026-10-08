@@ -130,7 +130,7 @@ export default function EarningsAlerts() {
           new Notification('AI Infra Watch · ' + event.symbol + ' earnings tomorrow', {
             body: [
               event.date + ' · ' + timingLabel(event.hour),
-              'Why it matters: ' + event.impact_reasons.slice(0, 2).join(' · '),
+              'Why it matters: ' + (event.impact_reasons || []).slice(0, 2).join(' · '),
             ].join('\n'),
             tag: event.id,
           });
