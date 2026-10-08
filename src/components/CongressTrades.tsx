@@ -396,11 +396,16 @@ export default function CongressTrades(_props: CongressTradesProps) {
       next: avg(rows.map(row => row.reaction?.nextPct)),
       day5: avg(rows.map(row => row.reaction?.day5Pct)),
       day20: avg(rows.map(row => row.reaction?.day20Pct)),
+      medianNext: median(rows.map(row => row.reaction?.nextPct).filter((v): v is number => v != null)),
+      medianDay5: median(rows.map(row => row.reaction?.day5Pct).filter((v): v is number => v != null)),
+      medianDay20: median(rows.map(row => row.reaction?.day20Pct).filter((v): v is number => v != null)),
       excessNext: avg(rows.map(row => row.reaction?.excessNextPct)),
       excessDay5: avg(rows.map(row => row.reaction?.excessDay5Pct)),
       excessDay20: avg(rows.map(row => row.reaction?.excessDay20Pct)),
-       ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
-       ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
+      medianExcessDay5: median(rows.map(row => row.reaction?.excessDay5Pct).filter((v): v is number => v != null)),
+      medianExcessDay20: median(rows.map(row => row.reaction?.excessDay20Pct).filter((v): v is number => v != null)),
+      ownBaselineDay5: avg(rows.map(row => row.reaction?.ownBaselineDay5Pct)),
+      ownBaselineGapDay5: avg(rows.map(row => row.reaction?.ownBaselineGapDay5Pct)),
     });
     const buys = reactions.filter(row => row.trade.transactionType === 'buy');
     const sells = reactions.filter(row => row.trade.transactionType === 'sell');
@@ -570,6 +575,12 @@ export default function CongressTrades(_props: CongressTradesProps) {
             <SummaryMetric label="Sell next" value={formatPct(reactionSummary.sell.next)} tone={reactionTone(reactionSummary.sell.next)} />
             <SummaryMetric label="Sell 5D" value={formatPct(reactionSummary.sell.day5)} tone={reactionTone(reactionSummary.sell.day5)} />
             <SummaryMetric label="Sell 20D" value={formatPct(reactionSummary.sell.day20)} tone={reactionTone(reactionSummary.sell.day20)} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+            <SummaryMetric label="All 5D mean" value={formatPct(reactionSummary.all.day5)} tone="text-white/70" />
+            <SummaryMetric label="All 5D median" value={formatPct(reactionSummary.all.medianDay5)} tone="text-white/70" />
+            <SummaryMetric label="All 20D mean" value={formatPct(reactionSummary.all.day20)} tone="text-white/70" />
+            <SummaryMetric label="All 20D median" value={formatPct(reactionSummary.all.medianDay20)} tone="text-white/70" />
           </div>
           <div className="mt-2 text-[9px] font-mono text-white/30">Benchmark = SPY price reaction over the same disclosure-anchored dates. Own-stock baseline also shows whether the event reaction exceeded the ticker's typical 5D move.</div>
           <div className="mt-2 rounded-lg border border-violet-400/10 bg-violet-400/[.025] px-3 py-2 text-[9px] font-mono text-violet-200/70">Own-stock baseline 5D: {formatPct(reactionSummary.all.ownBaselineDay5)} · event vs baseline: {formatPct(reactionSummary.all.ownBaselineGapDay5)} · unique event dates: {reactionSummary.uniqueEventDates}. Confidence uses matched reactions + unique event dates + source freshness; same-date trades remain correlated.</div>
