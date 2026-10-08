@@ -43,7 +43,6 @@ type SourceStatus = {
   upstreamError: string | null;
 };
 
-const TRACKED_SYMBOLS = ['DGXX', 'DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS', 'VIVO', 'META', 'NOW', 'PHVS'];
 const historyCache: Record<string, Promise<HistoryPoint[]>> = {};
 const benchmarkHistoryCache: Record<string, Promise<HistoryPoint[]>> = {};
 
@@ -164,7 +163,7 @@ const INITIAL_SOURCE: SourceStatus = {
   upstreamError: null,
 };
 
-export default function CongressTrades(_props: CongressTradesProps) {
+export default function CongressTrades({ liveTrades = [] }: CongressTradesProps) {
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('ct_q') || '');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'Senate' | 'House'>(() => {
     const value = new URLSearchParams(window.location.search).get('ct_chamber');
@@ -188,6 +187,12 @@ export default function CongressTrades(_props: CongressTradesProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceStatus, setSourceStatus] = useState<SourceStatus>(INITIAL_SOURCE);
+  const quickFilterSymbols = useMemo(() => {
+    const symbols = [...liveTrades, ...trades, ...searchTrades]
+      .map(trade => String(trade?.stockSymbol || '').trim().toUpperCase())
+      .filter(Boolean);
+    return [...new Set(symbols)].sort();
+  }, [liveTrades, trades, searchTrades]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -480,7 +485,7 @@ export default function CongressTrades(_props: CongressTradesProps) {
           >
             Latest Global
           </button>
-          {TRACKED_SYMBOLS.map((symbol) => (
+          {quickFilterSymbols.map((symbol) => (
             <button
               key={symbol}
               onClick={() => setSymbolFilter(symbol)}
