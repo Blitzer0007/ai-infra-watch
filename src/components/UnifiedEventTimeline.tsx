@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowUpRight, FileText, Globe2, Landmark, Newspaper, ShieldAlert } from 'lucide-react';
+import { deriveExposure, type MacroScenario } from '../utils/evidenceExposure';
 
 type HistoryPoint = { date: string; price: number };
 
@@ -156,50 +157,17 @@ function normalizePoliticalDate(value: unknown): string {
   return compact ? compact[1] + '-' + compact[2] + '-' + compact[3] : '';
 }
 
-function macroHolds(symbol: string, macroId: string): boolean {
+function macroHolds(symbol: string, macroId: string, contracts: any[] = [], news: any[] = []): boolean {
   const id = clean(macroId);
-  const holdings: Record<string, string[]> = {
-    taiwan: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-    export: ['DRAM', 'SOXL', 'NVDA', 'MSFT', 'NBIS'],
-    power: ['DGXX', 'NBIS', 'VIVO', 'META', 'NOW'],
-  };
-  const key = id.includes('taiwan') ? 'taiwan' : id.includes('power') || id.includes('grid') ? 'power' : 'export';
-  return holdings[key].includes(symbol);
+  const scenario: MacroScenario = id.includes('taiwan')
+    ? 'taiwan'
+    : id.includes('power') || id.includes('grid')
+      ? 'power'
+      : 'export';
+  const exposure = deriveExposure(symbol, scenario, contracts, news);
+  return exposure.assessment === 'assessed';
 }
 
-function normalizeEventTitle(value: string): string {
-  return clean(value).replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function eventDuplicate(a: TimelineEvent, b: TimelineEvent): boolean {
-  if (a.url && b.url && a.url === b.url) return true;
-  const dayA = Date.parse(a.date + 'T00:00:00Z');
-  const dayB = Date.parse(b.date + 'T00:00:00Z');
-  const withinOneDay = Number.isFinite(dayA) && Number.isFinite(dayB) && Math.abs(dayA - dayB) <= 86400000;
-  return withinOneDay && normalizeEventTitle(a.title) === normalizeEventTitle(b.title);
-}
-
-export function dedupeTimelineEvents(items: TimelineEvent[]): TimelineEvent[] {
-  const output: TimelineEvent[] = [];
-  for (const item of items) {
-    const existingIndex = output.findIndex(existing => eventDuplicate(existing, item));
-    if (existingIndex < 0) {
-      output.push(item);
-      continue;
-    }
-    const existing = output[existingIndex];
-    const mergedSource = existing.source === item.source
-      ? existing.source
-      : existing.source + ' + ' + item.source;
-    output[existingIndex] = {
-      ...existing,
-      source: mergedSource,
-      url: existing.url || item.url || null,
-      detail: existing.detail,
-    };
-  }
-  return output;
-}
 
 function sourceLevel(kind: TimelineEvent['kind']): TimelineEvent['sourceLevel'] {
   if (kind === 'SEC' || kind === 'Contract') return 'PRIMARY';
@@ -343,7 +311,7 @@ export default function UnifiedEventTimeline({
       .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item.date));
 
     const macroEvents: TimelineEvent[] = (macroRisks || [])
-      .filter(item => macroHolds(ticker, String(item?.id || item?.title || '')))
+      .filter(item => macroHolds(ticker, String(item?.id || item?.title || ''), contracts, news))
       .map(item => ({
         id: 'macro-' + String(item?.id || item?.dateUpdated || item?.title),
         kind: 'Macro' as const,
