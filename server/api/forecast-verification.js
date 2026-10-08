@@ -258,17 +258,54 @@ function independentValidationRows(rows) {
     .filter(row => hasCreationEvidence(row));
 }
 
+async function loadValidationGateState() {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/forecast_snapshots?select=ticker,horizon,status,created_at,target_date,evidence_snapshot&status=eq.verified&limit=2000',
+    { headers: headers() },
+  );
+  const rows = await response.json();
+  if (!response.ok || !Array.isArray(rows)) {
+    return { ready: false, independentOverall: 0, independent5D: 0, independent20D: 0 };
+  }
+  const eligible = rows.filter(row => hasCreationEvidence(row));
+  const independent = independentForecastRows(eligible);
+  const independent5D = independentForecastRows(independent.filter(row => Number(row.horizon) === 5)).length;
+  const independent20D = independentForecastRows(independent.filter(row => Number(row.horizon) === 20)).length;
+  return {
+    ready: independent.length >= 50 && independent5D >= 25 && independent20D >= 25,
+    independentOverall: independent.length,
+    independent5D,
+    independent20D,
+  };
+}
+
+async function loadActiveModels() {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/forecast_model_config?select=ticker,horizon,active_model',
+    { headers: headers() },
+  );
+  const rows = await response.json();
+  if (!response.ok || !Array.isArray(rows)) return new Map();
+  return new Map(rows.map(row => [String(row.ticker).toUpperCase() + '|' + Number(row.horizon), String(row.active_model || 'analogue-v1')]));
+}
+
 async function evaluateForecastModels() {
   const TICKERS = ['NVDA','MSFT','MU','AVGO','AMD','TSM','META','NBIS'];
   const HORIZONS = [5,20,60,120,252];
   const results = [];
+  const gate = await loadValidationGateState();
+  const activeModels = await loadActiveModels();
   for (const ticker of TICKERS) {
     const h = await modelHistory(ticker);
     for (const horizon of HORIZONS) {
       const v1 = runModelBacktest(h, horizon, 'analogue-v1');
       const v2 = runModelBacktest(h, horizon, 'analogue-v2');
       if (!v1 && !v2) continue;
-      const active = chooseModel(v1, v2);
+      const key = ticker.toUpperCase() + '|' + horizon;
+      const existingActive = activeModels.get(key);
+      const active = gate.ready
+        ? chooseModel(v1, v2)
+        : existingActive || 'analogue-v1';
       const selected = active === 'analogue-v2' ? v2 : v1;
       await upsertModelConfig({
         ticker, horizon, active_model: active,
@@ -283,6 +320,10 @@ async function evaluateForecastModels() {
         learning_summary: {
           source: 'rolling-verified-forecast-learning',
           selectedModel: active,
+          validationGateReady: gate.ready,
+          independentValidationSamples: gate.independentOverall,
+          independent5D: gate.independent5D,
+          independent20D: gate.independent20D,
           modelTypicalMiss: selected?.error ?? null,
           noChangeTypicalMiss: selected?.baselineError ?? null,
           improvementPct: selected?.improvementPct ?? null,
