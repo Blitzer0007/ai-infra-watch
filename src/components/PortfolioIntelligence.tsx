@@ -750,7 +750,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <div className="mt-3 text-[8px] font-mono text-white/20">Weighted stress measures observed moves and exposure concentration, not a forecast. P&L attribution is descriptive. Benchmark comparisons are descriptive matched-window measurements.</div>
               </section>
               )}
-      {(tab === 'overview' && viewMode === 'detailed') && (
+      {tab === 'overview' && (
               <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
                 <Metric label="Invest amount" value={formatPortfolioMoney(investedTotal)} suffix={currency === 'INR' ? 'home currency · USD basis' : 'position cost'} tone="neutral" icon={<WalletCards/>}/>
                 <Metric label="Current value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' fallback'} tone="up" icon={<TrendingUp/>}/>
