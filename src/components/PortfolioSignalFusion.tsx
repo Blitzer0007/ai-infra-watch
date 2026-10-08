@@ -36,11 +36,12 @@ function date(value?: string) {
 }
 
 function containsTerm(text: string, term: string) {
-  const escaped = term.replace(/[.*+?^${}()|[\\]\\]/g, '\\function newsSymbols(title: string) {
-  const text = title.toLowerCase();');
-  return new RegExp(term.includes(' ') ? escaped.replace(/\\s+/g, '\\s+') : '\\b' + escaped + '\\b', 'i').test(text);
+  const escaped = term.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  const pattern = term.includes(' ')
+    ? escaped.replace(/\\s+/g, '\\s+')
+    : '\\b' + escaped + '\\b';
+  return new RegExp(pattern, 'i').test(text);
 }
-
 function newsSymbols(title: string, allowed: string[]) {
   const text = title.toLowerCase();
   const aliases: Record<string, string[]> = {
@@ -198,7 +199,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       })),
     ...news
       .filter(x => x && x.title)
-      .map(x => ({ ...x, affected: newsSymbols(x.title || '') }))
+      .map(x => ({ ...x, affected: newsSymbols(x.title || '', portfolioSymbols) }))
       .filter(x => x.affected.length)
       .slice(0, 3)
       .map(x => ({
@@ -212,7 +213,7 @@ export default function PortfolioSignalFusion({ prices = {}, contracts = [], con
       })),
   ].sort((a, b) => String(b.when || '').localeCompare(String(a.when || ''))).slice(0, 8);
 
-  const touched = symbols(signals.flatMap(x => x.affected));
+  const touched = symbols(signals.flatMap(x => x.affected), portfolioSymbols);
 
   useEffect(() => {
     if (!signals.length) return;
