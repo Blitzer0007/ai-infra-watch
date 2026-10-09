@@ -752,8 +752,13 @@ function dedupeProjectEvents(rows, limit = 12) {
   const rank = { 'sec-primary': 6, 'official-company': 5, 'official-social': 4, 'syndicated-release': 3, 'secondary-news': 2, 'social-post': 1 };
   const byKey = new Map();
   for (const row of rows) {
-    const key = String(row.title || '').toLowerCase().replace(/https?:\/\/\S+/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-    if (!key) continue;
+    const titleKey = String(row.title || '').toLowerCase().replace(/https?:\/\/\S+/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!titleKey) continue;
+    // Keep distinct SEC accessions even when filings share a generic headline.
+    const dateKey = /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) ? row.date : '';
+    const key = row.sourceType === 'sec-primary'
+      ? 'sec:' + String(row.accession || row.id)
+      : titleKey + '|' + dateKey;
     const existing = byKey.get(key);
     if (!existing) {
       byKey.set(key, row);
@@ -767,8 +772,13 @@ function dedupeProjectEvents(rows, limit = 12) {
     const keep = (rank[row.sourceType] || 0) > (rank[existing.sourceType] || 0) ? row : existing;
     byKey.set(key, { ...keep, relatedSources: related.filter(item => item.url !== keep.url) });
   }
+  const eventTime = item => {
+    const sourceDate = item.publishedAt || (/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) ? item.date : null);
+    const parsed = sourceDate ? Date.parse(sourceDate) : NaN;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   return Array.from(byKey.values())
-    .sort((a, b) => String(b.publishedAt || b.date || '').localeCompare(String(a.publishedAt || a.date || '')))
+    .sort((a, b) => eventTime(b) - eventTime(a))
     .slice(0, limit);
 }
 
