@@ -136,6 +136,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return db - da;
   });
   const activeMilestone = stockMilestones.find((m) => m.id === activeMilestoneId) || stockMilestones[0];
+  const activeHistoryData = historySymbol === selectedStock ? historyData : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -212,7 +213,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return () => { cancelled = true; };
   }, [selectedStock]);
 
-  const activeHistoryData = historySymbol === selectedStock ? historyData : [];
   const chartHistory = livePrices?.[selectedStock]
     ? (() => {
         const liveObj = livePrices[selectedStock];
