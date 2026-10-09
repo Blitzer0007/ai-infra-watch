@@ -555,13 +555,20 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <button
             type="button"
             onClick={() => {
+              const requestedSymbol = selectedStock;
               setSecMilestoneLoading(true);
               setSecMilestoneError(null);
-              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12&refresh=true', { cache: 'no-store' })
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
                 .then(async response => {
                   const payload = await response.json().catch(() => ({}));
                   if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
-                  setSecMilestones(Array.isArray(payload.events) ? payload.events : []);
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' results instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
                   setMilestoneSourceStatus(payload.sourceStatus || null);
                   setMilestoneRetrievedAt(payload.retrievedAt || null);
                 })
@@ -717,10 +724,17 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                     {activeMilestone.date}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-white/40">Price at Event:</span>
-                  <span className="text-emerald-400 font-bold">${formatPrice(getAccuratePrice(activeMilestone))}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
                 </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded p-3.5">
@@ -739,7 +753,92 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
             <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
               <span className="inline-flex items-center space-x-1.5">
                 <Award className="w-4 h-4 text-emerald-400" />
-                <span>Current price: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: 
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
               </span>
               {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
             </span>
