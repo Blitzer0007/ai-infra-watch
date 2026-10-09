@@ -634,94 +634,416 @@ function titleFor(items) {
   return 'Material SEC event';
 }
 
+const PROJECT_SOURCE_PROFILES = {
+  DGXX: { name: 'Digi Power X', domains: ['digipowerx.com'], xHandle: 'DigipowerX' },
+  NBIS: { name: 'Nebius', domains: ['nebius.com'], xHandle: null },
+  NVDA: { name: 'NVIDIA', domains: ['nvidia.com'], xHandle: null },
+  AMD: { name: 'AMD', domains: ['amd.com'], xHandle: null },
+  MU: { name: 'Micron Technology', domains: ['micron.com'], xHandle: null },
+  MSFT: { name: 'Microsoft', domains: ['microsoft.com'], xHandle: null },
+  META: { name: 'Meta Platforms', domains: ['about.fb.com', 'meta.com'], xHandle: null },
+  GOOG: { name: 'Google', domains: ['blog.google', 'abc.xyz'], xHandle: null },
+  GOOGL: { name: 'Alphabet Google', domains: ['blog.google', 'abc.xyz'], xHandle: null },
+  NOW: { name: 'ServiceNow', domains: ['servicenow.com'], xHandle: null },
+  SNDK: { name: 'SanDisk', domains: ['sandisk.com'], xHandle: null },
+  VIVO: { name: 'VivoPower', domains: ['vivopower.com'], xHandle: null },
+  IREN: { name: 'IREN', domains: ['iren.com'], xHandle: null },
+  CIFR: { name: 'Cipher Mining', domains: ['ciphermining.com'], xHandle: null },
+  TSM: { name: 'TSMC', domains: ['tsmc.com'], xHandle: null },
+  AMZN: { name: 'Amazon', domains: ['aboutamazon.com'], xHandle: null },
+  PLTR: { name: 'Palantir', domains: ['palantir.com'], xHandle: null },
+  APLD: { name: 'Applied Digital', domains: ['applieddigital.com'], xHandle: null },
+  DELL: { name: 'Dell Technologies', domains: ['dell.com'], xHandle: null },
+  IBM: { name: 'IBM', domains: ['ibm.com'], xHandle: null },
+  QCOM: { name: 'Qualcomm', domains: ['qualcomm.com'], xHandle: null },
+  INTC: { name: 'Intel', domains: ['intel.com'], xHandle: null },
+  ONDS: { name: 'Ondas', domains: ['ondas.com'], xHandle: null },
+  AMPG: { name: 'AmpliTech Group', domains: ['amplitechgroup.com'], xHandle: null },
+};
+
+const PROJECT_UPDATE_TERMS = '(construction OR "Phase 1" OR "Phase 2" OR commissioning OR "ready for service" OR "data center" OR "data centre" OR campus OR "MW" OR capacity OR deployment OR GPU OR contract OR colocation OR power)';
+const PROJECT_UPDATE_CACHE = globalThis.__aiwProjectUpdateCache || (globalThis.__aiwProjectUpdateCache = new Map());
+const CONTRACT_DISCOVERY_CACHE = globalThis.__aiwContractDiscoveryCache || (globalThis.__aiwContractDiscoveryCache = { at: 0, data: null });
+
+function projectSourceProfile(symbol) {
+  return PROJECT_SOURCE_PROFILES[symbol] || { name: symbol, domains: [], xHandle: null };
+}
+
+function normalizeSourceDate(value) {
+  if (!value) return null;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function sourceTypeForUrl(url, profile = {}, sourceLabel = '') {
+  let parsed;
+  try { parsed = new URL(url); } catch { return 'secondary-news'; }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  if (host === 'sec.gov' || host.endsWith('.sec.gov')) return 'sec-primary';
+  if ((profile.domains || []).some(domain => host === domain || host.endsWith('.' + domain))) return 'official-company';
+  if (host === 'x.com' || host === 'twitter.com' || host === 'mobile.twitter.com') {
+    const username = parsed.pathname.split('/').filter(Boolean)[0] || '';
+    return profile.xHandle && username.toLowerCase() === profile.xHandle.toLowerCase()
+      ? 'official-social'
+      : 'social-post';
+  }
+  if (/prnewswire\.com|globenewswire\.com|businesswire\.com/.test(host)) return 'syndicated-release';
+  if (/nasdaq\.com/.test(host) && /press release|news/i.test(sourceLabel)) return 'syndicated-release';
+  return 'secondary-news';
+}
+
+function sourceVerificationLabel(sourceType) {
+  if (sourceType === 'sec-primary') return 'SEC filing';
+  if (sourceType === 'official-company') return 'Official company update';
+  if (sourceType === 'official-social') return 'Official company social post';
+  if (sourceType === 'syndicated-release') return 'Company release syndicated by a news service';
+  if (sourceType === 'social-post') return 'Social post — not independently confirmed';
+  return 'News lead — needs primary-source confirmation';
+}
+
+function projectEventCategory(text) {
+  const value = String(text || '').toLowerCase();
+  if (/contract|agreement|colocation|customer|client|lease|order/.test(value)) return 'Contract / commercial';
+  if (/construction|building shell|phase 1|phase 2|campus|commission|facility|groundbreak/.test(value)) return 'Construction / build-out';
+  if (/gpu|deployment|compute|cluster|rack|server/.test(value)) return 'Compute deployment';
+  if (/power|substation|grid|megawatt|\bmw\b/.test(value)) return 'Power / capacity';
+  return 'Company / project update';
+}
+
+function projectEventStatus(text) {
+  return /under construction|construction (?:is )?(?:underway|continues|progressing)|currently building|crews are|being built|on track|in progress|commissioning|installing|erecting/i.test(String(text || ''))
+    ? 'active'
+    : 'done';
+}
+
+function mapDiscoveredProjectEvent(symbol, row, profile, provider) {
+  const title = String(row?.title || '').replace(/\s+/g, ' ').trim();
+  const url = String(row?.url || '').trim();
+  if (!title || !/^https?:\/\//i.test(url)) return null;
+  const snippet = String(row?.snippet || row?.description || row?.content || '').replace(/\s+/g, ' ').trim();
+  const combined = title + ' ' + snippet;
+  if (!/(contract|agreement|construction|build(?:out)?|phase|facility|data.?cent(?:er|re)|campus|power|megawatt|\bmw\b|commission|capacity|gpu|deployment|infrastructure|operations|columbiana|project|progress|substation|equipment)/i.test(combined)) return null;
+  const sourceType = sourceTypeForUrl(url, profile, row?.source || provider);
+  const publishedAt = normalizeSourceDate(row?.published_at || row?.published || row?.date || row?.publishedAt);
+  let host = '';
+  try { host = new URL(url).hostname.replace(/^www\./i, ''); } catch {}
+  const source = String(row?.source || host || provider || 'Web search').trim();
+  return {
+    id: 'project-update-' + Buffer.from(url).toString('base64url').slice(0, 28),
+    stockSymbol: symbol,
+    date: publishedAt ? publishedAt.slice(0, 10) : 'Date not supplied',
+    publishedAt,
+    title: title.slice(0, 240),
+    category: projectEventCategory(combined),
+    description: snippet || 'Open the linked source to review the full announcement and confirm the reported details.',
+    status: projectEventStatus(combined),
+    source,
+    sourceUrl: url,
+    url,
+    sourceType,
+    verificationStatus: sourceVerificationLabel(sourceType),
+    provider: provider || 'web search',
+    evidenceClass: sourceType === 'official-company' || sourceType === 'official-social' || sourceType === 'sec-primary' ? 'primary-source' : 'discovery-lead',
+    relatedSources: [],
+  };
+}
+
+function dedupeProjectEvents(rows, limit = 12) {
+  const rank = { 'sec-primary': 6, 'official-company': 5, 'official-social': 4, 'syndicated-release': 3, 'secondary-news': 2, 'social-post': 1 };
+  const byKey = new Map();
+  for (const row of rows) {
+    const key = String(row.title || '').toLowerCase().replace(/https?:\/\/\S+/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!key) continue;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, row);
+      continue;
+    }
+    const related = [
+      ...(existing.relatedSources || []),
+      { source: existing.source, url: existing.url, sourceType: existing.sourceType },
+      { source: row.source, url: row.url, sourceType: row.sourceType },
+    ].filter((item, index, all) => item.url && all.findIndex(other => other.url === item.url) === index);
+    const keep = (rank[row.sourceType] || 0) > (rank[existing.sourceType] || 0) ? row : existing;
+    byKey.set(key, { ...keep, relatedSources: related.filter(item => item.url !== keep.url) });
+  }
+  return Array.from(byKey.values())
+    .sort((a, b) => String(b.publishedAt || b.date || '').localeCompare(String(a.publishedAt || a.date || '')))
+    .slice(0, limit);
+}
+
+async function fetchXProjectUpdates(symbol, profile, limit = 10) {
+  const token = String(process.env.X_BEARER_TOKEN || process.env.X_API_BEARER_TOKEN || '').trim();
+  if (!token) return { items: [], status: 'not-configured', configured: false, error: null };
+  const terms = '(construction OR "Phase 1" OR "Phase 2" OR Columbiana OR "data center" OR "15 MW" OR "40 MW" OR commissioning OR capacity OR GPU OR infrastructure)';
+  const query = profile.xHandle
+    ? 'from:' + profile.xHandle + ' ' + terms + ' -is:retweet'
+    : '("' + profile.name + '" OR $' + symbol + ') ' + terms + ' -is:retweet -is:reply';
+  const params = new URLSearchParams({
+    query,
+    max_results: String(Math.max(10, Math.min(100, limit * 2))),
+    'tweet.fields': 'author_id,created_at,lang,public_metrics',
+    expansions: 'author_id',
+    'user.fields': 'name,username,verified',
+  });
+  try {
+    const response = await fetch('https://api.x.com/2/tweets/search/recent?' + params.toString(), {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+      signal: AbortSignal.timeout(7000),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { items: [], status: response.status === 401 || response.status === 403 ? 'credentials-rejected' : response.status === 429 ? 'rate-limited' : 'unavailable', configured: true, error: 'X API HTTP ' + response.status };
+    }
+    const users = new Map((payload?.includes?.users || []).map(user => [String(user.id), user]));
+    const items = (payload?.data || []).map(post => {
+      const author = users.get(String(post.author_id)) || {};
+      const username = String(author.username || profile.xHandle || 'unknown').replace(/^@/, '');
+      const official = Boolean(profile.xHandle && username.toLowerCase() === profile.xHandle.toLowerCase());
+      const text = String(post.text || '').trim();
+      const publishedAt = normalizeSourceDate(post.created_at);
+      const url = 'https://x.com/' + username + '/status/' + String(post.id);
+      const sourceType = official ? 'official-social' : 'social-post';
+      return {
+        id: 'x-post-' + String(post.id),
+        stockSymbol: symbol,
+        date: publishedAt ? publishedAt.slice(0, 10) : 'Date not supplied',
+        publishedAt,
+        title: text.replace(/\s+/g, ' ').slice(0, 240),
+        category: projectEventCategory(text),
+        description: text,
+        status: projectEventStatus(text),
+        source: 'X @' + username,
+        sourceUrl: url,
+        url,
+        sourceType,
+        verificationStatus: sourceVerificationLabel(sourceType),
+        provider: 'x-api',
+        evidenceClass: official ? 'primary-source' : 'discovery-lead',
+        relatedSources: [],
+        authorName: String(author.name || ''),
+        publicMetrics: post.public_metrics || null,
+      };
+    }).filter(item => item.title);
+    return { items, status: 'available', configured: true, error: null };
+  } catch (error) {
+    return { items: [], status: 'unavailable', configured: true, error: String(error?.message || error) };
+  }
+}
+
+async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) {
+  const cacheKey = symbol + ':' + limit;
+  const cached = PROJECT_UPDATE_CACHE.get(cacheKey);
+  if (!forceRefresh && cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.data;
+  const profile = projectSourceProfile(symbol);
+  const searchTerms = '(construction OR "Phase 1" OR "Phase 2" OR "ready for service" OR commissioning OR "data center" OR capacity OR MW OR GPU OR deployment OR contract OR colocation OR power OR project)';
+  const queries = [
+    '"' + profile.name + '" ' + searchTerms,
+    ...(profile.domains || []).slice(0, 1).map(domain => 'site:' + domain + ' ' + searchTerms),
+    ...(profile.xHandle ? ['site:x.com/' + profile.xHandle + ' ' + searchTerms] : []),
+  ];
+  const settled = await Promise.allSettled(queries.map(query => searchWebProvider(query, 14, Math.min(10, Math.max(5, limit)))));
+  const webRows = [];
+  const providers = [];
+  const errors = [];
+  settled.forEach((result, index) => {
+    if (result.status !== 'fulfilled') {
+      errors.push(String(result.reason?.message || result.reason));
+      return;
+    }
+    providers.push(result.value.provider || 'web search');
+    for (const row of result.value.results || []) {
+      const item = mapDiscoveredProjectEvent(symbol, row, profile, result.value.provider || 'web search');
+      if (item) webRows.push(item);
+    }
+  });
+  const xResult = await fetchXProjectUpdates(symbol, profile, limit);
+  const items = dedupeProjectEvents([...xResult.items, ...webRows], Math.min(30, Math.max(limit, limit * 2)));
+  const data = {
+    items,
+    sourceStatus: {
+      sec: { status: 'checked-separately', count: 0 },
+      web: { status: items.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches', count: webRows.length, providers: [...new Set(providers)], errors: [...new Set(errors)].slice(0, 3) },
+      x: { status: xResult.status, count: xResult.items.length, configured: xResult.configured, error: xResult.error },
+    },
+  };
+  PROJECT_UPDATE_CACHE.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
+async function handleContractDiscovery(req, res) {
+  const forceRefresh = String(req.query?.refresh || '').toLowerCase() === 'true';
+  const limit = Math.min(Math.max(Number(req.query?.limit) || 24, 6), 40);
+  if (!forceRefresh && CONTRACT_DISCOVERY_CACHE.data && Date.now() - CONTRACT_DISCOVERY_CACHE.at < 10 * 60 * 1000) {
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+    return res.status(200).json({ ...CONTRACT_DISCOVERY_CACHE.data, cached: true });
+  }
+  const queries = [
+    '"Digi Power X" OR DGXX (contract OR colocation OR "Phase 1" OR construction OR "data center" OR Cerebras)',
+    '("Nebius" OR NBIS OR "Applied Digital" OR IREN OR "Cipher Mining" OR "Digi Power X") (agreement OR contract OR capacity OR "data center" OR power OR MW)',
+    '(NVIDIA OR AMD OR Micron OR TSMC OR Supermicro) ("supply agreement" OR "purchase order" OR contract OR GPU OR infrastructure)',
+    '("AI data center" OR "AI infrastructure") (contract OR agreement OR construction OR campus OR megawatts OR commissioning)',
+  ];
+  const settled = await Promise.allSettled(queries.map(query => searchWebProvider(query, 30, 8)));
+  const all = [];
+  const providers = [];
+  const errors = [];
+  settled.forEach(result => {
+    if (result.status !== 'fulfilled') {
+      errors.push(String(result.reason?.message || result.reason));
+      return;
+    }
+    providers.push(result.value.provider || 'web search');
+    for (const row of result.value.results || []) {
+      const title = String(row?.title || '').trim();
+      const url = String(row?.url || '').trim();
+      const summary = String(row?.snippet || row?.description || row?.content || '').replace(/\s+/g, ' ').trim();
+      if (!title || !/^https?:\/\//i.test(url)) continue;
+      if (!/(contract|agreement|colocation|award|purchase order|supply|construction|phase|data.?cent(?:er|re)|campus|megawatt|\bmw\b|power|GPU|capacity|commission|deployment|infrastructure)/i.test(title + ' ' + summary)) continue;
+      let host = '';
+      try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ''); } catch {}
+      let profile = { name: '', domains: [], xHandle: null };
+      for (const candidate of Object.values(PROJECT_SOURCE_PROFILES)) {
+        if ((candidate.domains || []).some(domain => host === domain || host.endsWith('.' + domain))) {
+          profile = candidate;
+          break;
+        }
+      }
+      const sourceType = sourceTypeForUrl(url, profile, row?.source || '');
+      const publishedAt = normalizeSourceDate(row?.published_at || row?.published || row?.date);
+      const kind = projectEventCategory(title + ' ' + summary);
+      all.push({
+        id: 'contract-lead-' + Buffer.from(url).toString('base64url').slice(0, 28),
+        title: title.slice(0, 240),
+        summary: summary || 'Open the source to review the announcement and confirm whether it represents a signed agreement.',
+        url,
+        source: String(row?.source || host || 'Web search'),
+        sourceType,
+        verificationStatus: sourceVerificationLabel(sourceType),
+        date: publishedAt ? publishedAt.slice(0, 10) : null,
+        publishedAt,
+        category: kind,
+        ticker: Object.keys(PROJECT_SOURCE_PROFILES).find(symbol => {
+          const candidate = PROJECT_SOURCE_PROFILES[symbol];
+          return (title + ' ' + summary).toLowerCase().includes(candidate.name.toLowerCase()) || new RegExp('(^|[^A-Z0-9])' + symbol + '([^A-Z0-9]|$)', 'i').test(title + ' ' + summary);
+        }) || null,
+        isConfirmedContract: false,
+      });
+    }
+  });
+  const byKey = new Map();
+  for (const row of all) {
+    const key = String(row.title).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!key) continue;
+    if (!byKey.has(key)) byKey.set(key, row);
+    else {
+      const current = byKey.get(key);
+      if ((row.sourceType === 'official-company' || row.sourceType === 'sec-primary') && !['official-company', 'sec-primary'].includes(current.sourceType)) byKey.set(key, row);
+    }
+  }
+  const leads = Array.from(byKey.values())
+    .sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')))
+    .slice(0, limit);
+  const data = {
+    leads,
+    sourceStatus: {
+      status: leads.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches',
+      providers: [...new Set(providers)],
+      queriesRun: queries.length,
+      failedQueries: errors.length,
+      errors: [...new Set(errors)].slice(0, 3),
+      note: 'These results are discovery leads. Confirm deal terms using the linked primary source before treating them as signed contracts.',
+    },
+    retrievedAt: new Date().toISOString(),
+  };
+  CONTRACT_DISCOVERY_CACHE.at = Date.now();
+  CONTRACT_DISCOVERY_CACHE.data = data;
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+  return res.status(200).json({ ...data, cached: false });
+}
+
+async function fetchSecMilestones(symbol, limit) {
+  const tickerMap = await loadTickerMap();
+  const company = tickerMap.get(symbol);
+  if (!company) return { events: [], status: 'not-found', error: 'Ticker not found in the SEC directory.' };
+  const payload = await fetchSec('https://data.sec.gov/submissions/CIK' + company.cik + '.json');
+  const recent = payload?.filings?.recent;
+  if (!recent) return { events: [], status: 'no-records', error: null };
+  const events = [];
+  const forms = recent.form || [];
+  for (let i = 0; i < forms.length && events.length < limit; i++) {
+    if (forms[i] !== '8-K') continue;
+    const filedDate = recent.filingDate?.[i];
+    const accession = recent.accessionNumber?.[i];
+    const primaryDocument = recent.primaryDocument?.[i];
+    if (!filedDate || !accession || !primaryDocument) continue;
+    const items = String(recent.items?.[i] || '').split(',').map(item => item.trim()).filter(Boolean);
+    const meaningfulItems = items.filter(item => ITEM_TITLES[item]);
+    const selectedItems = meaningfulItems.length ? meaningfulItems : items;
+    const accessionPath = accession.replaceAll('-', '');
+    const url = 'https://www.sec.gov/Archives/edgar/data/' + Number(company.cik) + '/' + accessionPath + '/' + primaryDocument;
+    const eventTitle = titleFor(selectedItems);
+    events.push({
+      id: 'sec-milestone-' + accession,
+      stockSymbol: symbol,
+      date: filedDate,
+      publishedAt: filedDate,
+      acceptedDateTime: recent.acceptanceDateTime?.[i] || null,
+      title: eventTitle,
+      category: categoryFor(selectedItems, eventTitle),
+      items: selectedItems,
+      description: selectedItems.length ? 'SEC 8-K disclosure · Items ' + selectedItems.join(', ') + ' · Accession ' + accession : 'SEC 8-K filing · Accession ' + accession,
+      status: 'done',
+      accession,
+      url,
+      sourceUrl: url,
+      source: 'SEC EDGAR',
+      sourceType: 'sec-primary',
+      verificationStatus: 'SEC filing',
+      evidenceClass: 'primary-source',
+      relatedSources: [],
+    });
+  }
+  return { events, status: 'available', error: null, issuer: company.title };
+}
+
 async function handleMilestones(req, res) {
   const symbol = cleanSymbol(req.query?.symbol);
   const limit = Math.min(Math.max(Number(req.query?.limit) || 12, 1), 20);
+  const forceRefresh = String(req.query?.refresh || '').toLowerCase() === 'true';
   if (!validMilestoneSymbol(symbol)) return res.status(400).json({ error: 'Valid stock symbol is required.' });
-
-  const ua = {
-    'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: dev@example.com)',
-    'Accept-Encoding': 'gzip, deflate'
+  const [secResult, projectResult] = await Promise.allSettled([
+    fetchSecMilestones(symbol, limit),
+    discoverProjectUpdates(symbol, limit, forceRefresh),
+  ]);
+  const sec = secResult.status === 'fulfilled'
+    ? secResult.value
+    : { events: [], status: 'unavailable', error: String(secResult.reason?.message || secResult.reason) };
+  const project = projectResult.status === 'fulfilled'
+    ? projectResult.value
+    : { items: [], sourceStatus: { web: { status: 'unavailable', count: 0, errors: [String(projectResult.reason?.message || projectResult.reason)] }, x: { status: 'unavailable', count: 0, configured: Boolean(process.env.X_BEARER_TOKEN || process.env.X_API_BEARER_TOKEN) } } };
+  const events = dedupeProjectEvents([...(sec.events || []), ...(project.items || [])], Math.min(40, limit + 12));
+  const sourceStatus = {
+    sec: { status: sec.status, count: (sec.events || []).length, error: sec.error || null },
+    web: project.sourceStatus?.web || { status: 'unavailable', count: 0, errors: [] },
+    x: project.sourceStatus?.x || { status: 'not-configured', count: 0, configured: false, error: null },
   };
-
-  try {
-    const tickerResponse = await fetch('https://www.sec.gov/files/company_tickers.json', { headers: ua });
-    if (!tickerResponse.ok) return res.status(502).json({ error: 'SEC ticker directory unavailable.' });
-
-    const tickerMap = await tickerResponse.json();
-    let cik = null;
-    for (const entry of Object.values(tickerMap)) {
-      if (entry && String(entry.ticker || '').toUpperCase() === symbol) {
-        cik = String(entry.cik_str).padStart(10, '0');
-        break;
-      }
-    }
-
-    if (!cik) {
-      return res.status(404).json({
-        symbol,
-        source: 'sec-edgar-primary',
-        events: [],
-        error: 'SEC issuer/ticker not found for ' + symbol
-      });
-    }
-
-    const response = await fetch('https://data.sec.gov/submissions/CIK' + cik + '.json', { headers: ua });
-    if (!response.ok) return res.status(502).json({ error: 'SEC submissions unavailable.' });
-
-    const payload = await response.json();
-    const recent = payload?.filings?.recent;
-    if (!recent) return res.status(200).json({ symbol, source: 'sec-edgar-primary', events: [] });
-
-    const events = [];
-    const forms = recent.form || [];
-    for (let i = 0; i < forms.length && events.length < limit; i++) {
-      if (forms[i] !== '8-K') continue;
-      const filedDate = recent.filingDate?.[i];
-      const accession = recent.accessionNumber?.[i];
-      const primaryDocument = recent.primaryDocument?.[i];
-      if (!filedDate || !accession || !primaryDocument) continue;
-
-      const items = String(recent.items?.[i] || '').split(',').map(item => item.trim()).filter(Boolean);
-      const meaningfulItems = items.filter(item => ITEM_TITLES[item]);
-      const selectedItems = meaningfulItems.length ? meaningfulItems : items;
-      const accessionPath = accession.replaceAll('-', '');
-      const url = 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + accessionPath + '/' + primaryDocument;
-      const eventTitle = titleFor(selectedItems);
-
-      events.push({
-        id: 'sec-milestone-' + accession,
-        stockSymbol: symbol,
-        date: filedDate,
-        acceptedDateTime: recent.acceptanceDateTime?.[i] || null,
-        title: eventTitle,
-        category: categoryFor(selectedItems, eventTitle),
-        items: selectedItems,
-        description: selectedItems.length
-          ? 'SEC 8-K disclosure · Items ' + selectedItems.join(', ') + ' · Accession ' + accession
-          : 'SEC 8-K filing · Accession ' + accession,
-        status: 'done',
-        accession,
-        url,
-        source: 'sec-edgar-primary'
-      });
-    }
-
-    return res.status(200).json({ symbol, issuer: payload?.name || symbol, source: 'sec-edgar-primary', events });
-  } catch (error) {
-    return res.status(502).json({
-      symbol,
-      source: 'sec-edgar-primary',
-      events: [],
-      error: 'SEC milestone lookup failed.'
-    });
-  }
+  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 's-maxage=300, stale-while-revalidate=900');
+  return res.status(200).json({
+    symbol,
+    issuer: sec.issuer || projectSourceProfile(symbol).name || symbol,
+    source: 'multi-source-project-updates',
+    events,
+    sourceStatus,
+    retrievedAt: new Date().toISOString(),
+  });
 }
 
 export default async function handler(req, res) {
   const action = String(req.query?.action || '').trim().toLowerCase();
   if (action === 'history') return handleHistory(req, res);
   if (action === 'milestones') return handleMilestones(req, res);
+  if (action === 'contract-discovery') return handleContractDiscovery(req, res);
   if (action === 'executive') return handleExecutiveSignals(req, res);
   if (action === 'analyst') return handleAnalyst(req, res);
   if (req.query?.sec) {
