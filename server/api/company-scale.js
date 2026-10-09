@@ -879,7 +879,7 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
     items,
     sourceStatus: {
       sec: { status: 'checked-separately', count: 0 },
-      web: { status: items.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches', count: webRows.length, providers: [...new Set(providers)], errors: [...new Set(errors)].slice(0, 3) },
+      web: { status: webRows.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches', count: webRows.length, providers: [...new Set(providers)], errors: [...new Set(errors)].slice(0, 3) },
       x: { status: xResult.status, count: xResult.items.length, configured: xResult.configured, error: xResult.error },
     },
   };
