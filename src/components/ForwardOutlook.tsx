@@ -445,6 +445,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevError, setJevError] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
   const [forecastAnalytics, setForecastAnalytics] = useState<ForecastAnalytics | null>(null);
+  const [forecastStorageError, setForecastStorageError] = useState<string | null>(null);
   const [showAllVerifiedResults, setShowAllVerifiedResults] = useState(false);
   const [verifiedSearch, setVerifiedSearch] = useState('');
   const [verifiedHorizonFilter, setVerifiedHorizonFilter] = useState('all');
@@ -559,26 +560,56 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     async function loadPersistentForecasts() {
       try {
         const response = await fetch('/api/forecast-verification', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Persistent forecast storage unavailable');
-        const body = await response.json();
-        const remote: ForecastSnapshot[] = Array.isArray(body.forecasts) ? body.forecasts : [];
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = typeof body?.error === 'string' ? body.error : 'Persistent forecast storage is unavailable.';
+          throw new Error(detail);
+        }
+        if (!Array.isArray(body?.forecasts)) {
+          throw new Error('Forecast API returned an unexpected response. Please retry; local browser data was not substituted.');
+        }
+        const remote: ForecastSnapshot[] = body.forecasts;
         if (!cancelled) {
           setForecasts(remote);
           setForecastAnalytics(body?.analytics || null);
+          setForecastStorageError(null);
           if (!remote.length) {
             const legacy = loadForecasts();
-            for (const item of legacy) {
-              fetch('/api/forecast-verification', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item)
-              }).catch(() => {});
+            if (legacy.length) {
+              // Migrate legacy browser-only forecasts only after a successful API read.
+              // Keep migration failures visible rather than silently treating local rows as persisted.
+              const migrationResults = await Promise.allSettled(legacy.map(item =>
+                fetch('/api/forecast-verification', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                }).then(async result => {
+                  if (!result.ok) throw new Error('Forecast migration request failed (' + result.status + ')');
+                  return result;
+                })
+              ));
+              const failedMigrations = migrationResults.filter(result => result.status === 'rejected').length;
+              const refreshed = await fetch('/api/forecast-verification', { cache: 'no-store' });
+              const refreshedBody = await refreshed.json().catch(() => ({}));
+              if (!refreshed.ok || !Array.isArray(refreshedBody?.forecasts)) {
+                throw new Error('Could not confirm that older browser forecasts were saved to the server.');
+              }
+              if (!cancelled) {
+                setForecasts(refreshedBody.forecasts);
+                setForecastAnalytics(refreshedBody?.analytics || null);
+                if (failedMigrations > 0) {
+                  setForecastStorageError(failedMigrations + ' older browser forecast(s) could not be migrated. Displayed results are the server-confirmed records only.');
+                }
+              }
             }
-            if (legacy.length) setForecasts(legacy);
           }
         }
-      } catch {
-        if (!cancelled) setForecasts(loadForecasts());
+      } catch (error) {
+        if (!cancelled) {
+          setForecasts([]);
+          setForecastAnalytics(null);
+          setForecastStorageError(error instanceof Error ? error.message : 'Could not load verified forecasts from the server. Please retry.');
+        }
       }
     }
     loadPersistentForecasts();
@@ -1564,6 +1595,17 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             {showAllVerifiedResults ? 'Show latest 10' : 'View all verified results'} <span aria-hidden="true">{showAllVerifiedResults ? '←' : '→'}</span>
           </button>
         </div>
+
+        {forecastStorageError && (
+          <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300/20 bg-amber-300/[.06] px-4 py-3 sm:flex-row sm:items-start">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-100">Verified results could not be fully loaded</p>
+              <p className="mt-1 break-words text-sm leading-5 text-amber-100/70">{forecastStorageError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-amber-200/20 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-100/[.06]">Retry loading</button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Verified forecast summary">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[.07] bg-white/[.025] px-3.5 py-3">
