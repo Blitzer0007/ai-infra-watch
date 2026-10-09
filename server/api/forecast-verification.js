@@ -520,6 +520,9 @@ function forecastLearning(rows) {
     .filter(row => Number.isFinite(Number(row.actual_return)) && Number.isFinite(Number(row.median)))
     .sort((a, b) => String(b.verified_at || b.created_at || '').localeCompare(String(a.verified_at || a.created_at || '')));
 
+  // Reuse the same aggregate used by forecast analytics for calibration metrics.
+  const overall = aggregateForecastSubset(verified);
+
   const errors = verified.map(row => Math.abs(Number(row.actual_return) - Number(row.median)));
   const baselineErrors = verified.map(row => Math.abs(Number(row.actual_return)));
   const modelError = errors.length ? percentile(errors, 0.5) : null;
@@ -630,7 +633,7 @@ function forecastLearning(rows) {
       p25p75CoverageCiPct: overall.p25p75CoverageCiPct,
       p10p90CoveragePct: overall.p10p90CoveragePct,
       p10p90CoverageCiPct: overall.p10p90CoverageCiPct,
-      verdict: calibrationVerdictFromAggregate(overall),
+      verdict: getCalibrationVerdict(overall.p25p75CoverageCiPct, overall.p10p90CoverageCiPct, overall.count),
     },
     validationGate,
     recentLessons: withEvidence.slice(0, 10),
