@@ -32,9 +32,10 @@ export function isProjectEventRelevant(symbol, row, profile = {}) {
   })) return true;
 
   const haystack = normalizeEntityText(title + ' ' + snippet);
+  const normalizedTicker = normalizeEntityText(ticker);
   const aliases = [profile.name, ...(Array.isArray(profile.aliases) ? profile.aliases : [])]
     .map(normalizeEntityText)
-    .filter(alias => alias.length >= 3);
+    .filter(alias => alias.length >= 3 && alias !== normalizedTicker);
   if (aliases.some(alias => (' ' + haystack + ' ').includes(' ' + alias + ' '))) return true;
 
   // Tickers are only matched in their uppercase ticker form. This avoids false
