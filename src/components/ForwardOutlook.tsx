@@ -445,6 +445,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevError, setJevError] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
   const [forecastAnalytics, setForecastAnalytics] = useState<ForecastAnalytics | null>(null);
+  const [showAllVerifiedResults, setShowAllVerifiedResults] = useState(false);
+  const [verifiedSearch, setVerifiedSearch] = useState('');
+  const [verifiedHorizonFilter, setVerifiedHorizonFilter] = useState('all');
+  const [verifiedOutcomeFilter, setVerifiedOutcomeFilter] = useState('all');
+  const [verifiedResultsPage, setVerifiedResultsPage] = useState(1);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const [backtestBusy, setBacktestBusy] = useState(false);
@@ -1145,11 +1150,23 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const validationReady = forecastValidationGate(verifiedForecastCount).ready;
   const forecastMethodLabel = modelVersion === 'analogue-v2' ? 'Enhanced historical comparison' : 'Historical comparison';
   const targetDateEstimate = addBusinessDays(new Date(), horizon);
-  const verifiedForecastResults = forecasts
+  const allVerifiedForecastResults = forecasts
     .filter(forecast => forecast.status === 'verified' && forecast.actualReturn != null && Number.isFinite(Number(forecast.actualReturn)))
     .slice()
-    .sort((a, b) => String(b.verifiedAt || b.actualDate || '').localeCompare(String(a.verifiedAt || a.actualDate || '')))
-    .slice(0, 10);
+    .sort((a, b) => String(b.verifiedAt || b.actualDate || '').localeCompare(String(a.verifiedAt || a.actualDate || '')));
+  const filteredVerifiedForecastResults = allVerifiedForecastResults.filter(forecast => {
+    const query = verifiedSearch.trim().toUpperCase();
+    const direction = forecastDirection(Number(forecast.actualReturn), Number(forecast.median));
+    return (!query || forecast.ticker.toUpperCase().includes(query))
+      && (verifiedHorizonFilter === 'all' || Number(forecast.horizon) === Number(verifiedHorizonFilter))
+      && (verifiedOutcomeFilter === 'all' || direction === verifiedOutcomeFilter);
+  });
+  const verifiedResultsPageSize = 10;
+  const verifiedResultsPageCount = Math.max(1, Math.ceil(filteredVerifiedForecastResults.length / verifiedResultsPageSize));
+  const safeVerifiedResultsPage = Math.min(verifiedResultsPage, verifiedResultsPageCount);
+  const verifiedForecastResults = showAllVerifiedResults
+    ? filteredVerifiedForecastResults.slice((safeVerifiedResultsPage - 1) * verifiedResultsPageSize, safeVerifiedResultsPage * verifiedResultsPageSize)
+    : allVerifiedForecastResults.slice(0, 10);
 
   return (
     <div className="space-y-6" id="forward-outlook-view" data-testid="forward-outlook">
@@ -1538,10 +1555,39 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
           <div>
             <h2 id="verified-forecast-results-title" className="text-base md:text-lg font-bold text-white">Verified forecast results</h2>
-            <p className="text-xs text-white/55 mt-1">Compare each saved forecast with the actual market return. Results below match the figures used in the Telegram forecast alert.</p>
+            <p className="text-xs text-white/55 mt-1">{showAllVerifiedResults ? 'Browse all verified forecasts with actual market returns.' : 'Your 10 most recent verified forecasts. Open the full history to search and filter older results.'} Figures match the Telegram forecast alert.</p>
           </div>
-          <span className="shrink-0 rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-white/60">{verifiedForecastResults.length} recent results</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="shrink-0 rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-white/60">{allVerifiedForecastResults.length} verified {allVerifiedForecastResults.length === 1 ? 'result' : 'results'}</span>
+            <button type="button" onClick={() => { setShowAllVerifiedResults(value => !value); setVerifiedResultsPage(1); }} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/15">
+              {showAllVerifiedResults ? 'Show latest 10' : 'View all verified results'} <span aria-hidden="true">{showAllVerifiedResults ? '←' : '→'}</span>
+            </button>
+          </div>
         </div>
+        {showAllVerifiedResults && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/10 p-3">
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
+              <Search className="h-4 w-4 shrink-0" />
+              <input aria-label="Search verified forecasts by ticker" value={verifiedSearch} onChange={event => { setVerifiedSearch(event.target.value); setVerifiedResultsPage(1); }} placeholder="Search ticker…" className="min-w-0 w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30" />
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
+              <span>Horizon</span>
+              <select aria-label="Filter by forecast horizon" value={verifiedHorizonFilter} onChange={event => { setVerifiedHorizonFilter(event.target.value); setVerifiedResultsPage(1); }} className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none">
+                <option value="all" className="bg-[#101216]">All horizons</option>
+                {[5, 20, 60, 120, 252].map(days => <option key={days} value={String(days)} className="bg-[#101216]">{days} trading days</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
+              <span>Outcome</span>
+              <select aria-label="Filter by forecast outcome" value={verifiedOutcomeFilter} onChange={event => { setVerifiedOutcomeFilter(event.target.value); setVerifiedResultsPage(1); }} className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none">
+                <option value="all" className="bg-[#101216]">All outcomes</option>
+                <option value="Direction right" className="bg-[#101216]">Direction right</option>
+                <option value="Direction wrong" className="bg-[#101216]">Direction wrong</option>
+                <option value="No clear direction" className="bg-[#101216]">No clear direction</option>
+              </select>
+            </label>
+          </div>
+        )}
         {verifiedForecastResults.length ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {verifiedForecastResults.map(forecast => {
@@ -1598,6 +1644,20 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         ) : (
           <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/50">
             No verified forecast results yet. Saved forecasts will appear here after their target dates and actual returns are available.
+          </div>
+        )}
+        {showAllVerifiedResults && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 pt-3">
+            <p className="text-xs text-white/45">
+              {filteredVerifiedForecastResults.length === 0
+                ? 'No verified results match these filters.'
+                : `Showing ${(safeVerifiedResultsPage - 1) * verifiedResultsPageSize + 1}–${Math.min(safeVerifiedResultsPage * verifiedResultsPageSize, filteredVerifiedForecastResults.length)} of ${filteredVerifiedForecastResults.length} matching results.`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={safeVerifiedResultsPage <= 1} onClick={() => setVerifiedResultsPage(page => Math.max(1, page - 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/80 disabled:cursor-not-allowed disabled:opacity-30">← Previous</button>
+              <span className="min-w-[5rem] text-center text-xs text-white/50">Page {safeVerifiedResultsPage} of {verifiedResultsPageCount}</span>
+              <button type="button" disabled={safeVerifiedResultsPage >= verifiedResultsPageCount} onClick={() => setVerifiedResultsPage(page => Math.min(verifiedResultsPageCount, page + 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/80 disabled:cursor-not-allowed disabled:opacity-30">Next →</button>
+            </div>
           </div>
         )}
         <p className="text-[11px] text-white/40 leading-relaxed">
