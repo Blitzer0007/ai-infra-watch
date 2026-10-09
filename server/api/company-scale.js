@@ -904,7 +904,17 @@ async function fetchXProjectUpdates(symbol, profile, limit = 10) {
         authorName: String(author.name || ''),
         publicMetrics: post.public_metrics || null,
       };
-    }).filter(item => item.title);
+    }).filter(item => {
+      if (!item.title) return false;
+      // Posts from the issuer's configured official handle are valid company-reported
+      // evidence; third-party posts must explicitly match the tracked issuer.
+      if (item.sourceType === 'official-social') return true;
+      return isProjectEventRelevant(symbol, {
+        title: item.title,
+        snippet: item.description,
+        url: item.url,
+      }, profile, PROJECT_SOURCE_PROFILES);
+    });
     return { items, status: 'available', configured: true, error: null };
   } catch (error) {
     return { items: [], status: 'unavailable', configured: true, error: String(error?.message || error) };
