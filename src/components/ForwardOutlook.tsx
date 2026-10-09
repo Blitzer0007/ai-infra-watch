@@ -1370,11 +1370,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 {portfolioContext.upcoming.length ? <div className="space-y-2">{portfolioContext.upcoming.map((event, index) => <div key={event.date + event.title + index} className="flex gap-3 rounded-lg border border-white/5 bg-black/10 p-2 text-[11px] font-mono"><span className="text-white/30 shrink-0">{event.date}</span><span className="text-white/60">{event.title}</span></div>)}</div> : <div className="text-[11px] text-white/35">No dated contract, news, or policy events in the next 20 trading days were found in the supplied evidence feeds.</div>}
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4">
-                <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[11px] font-mono uppercase tracking-widest text-white/40">Forecast reliability & invalidation</span></div>
+                <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-4 h-4 text-amber-300" /><span className="text-[11px] font-mono uppercase tracking-widest text-white/40">Forecast limitations and warning signs</span></div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Sample</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length}</div></div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Confidence</div><div className="text-sm font-mono font-bold mt-1">{analysis.confidence}</div></div>
-                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Current evidence</div><div className="text-sm font-mono font-bold mt-1">{evidenceCounts}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Historical outcomes used</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Historical sample size</div><div className="text-sm font-mono font-bold mt-1">{analysis.sample.length >= 20 ? 'Larger sample' : analysis.sample.length >= 8 ? 'Small sample' : 'Too little history'}</div></div>
+                  <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Available evidence items</div><div className="text-sm font-mono font-bold mt-1">{evidenceCounts}</div></div>
                   <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Macro risk score</div><div className="text-sm font-mono font-bold mt-1">{macroLoad}/100</div></div>
                 </div>
                 <p className="text-[11px] text-white/35 mt-3 leading-relaxed">Treat these historical outcomes as less relevant if your investment thesis changes, the evidence strongly disagrees, or a near-term event becomes more important than past price patterns. The system does not create an exit rule for you.</p>
@@ -1388,19 +1388,19 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   <span className="text-[11px] font-mono text-white/35">{analysis.analogueCount || analysis.allCount} observations</span>
                 </div>
                 <div className="relative h-16 rounded-lg bg-white/[.03] border border-white/5">
-                  <div className="absolute top-0 bottom-0 left-[10%] border-l border-white/10" />
-                  <div className="absolute top-0 bottom-0 left-1/2 border-l border-white/10" />
-                  <div className="absolute top-0 bottom-0 right-[10%] border-l border-white/10" />
-                  <div className="absolute top-1/2 left-[10%] right-[10%] h-2 -translate-y-1/2 rounded bg-emerald-400/20" />
-                  <div className="absolute top-1/2 left-1/4 right-1/4 h-4 -translate-y-1/2 rounded border border-emerald-400/30" />
-                  <div className="absolute top-1/2 left-1/2 w-2 h-6 -translate-y-1/2 -translate-x-1/2 bg-white rounded" />
+                  <div className="absolute top-0 bottom-0 border-l border-white/10" style={{ left: `${percentilePosition(analysis.p10)}%` }} />
+                  <div className="absolute top-0 bottom-0 border-l border-white/10" style={{ left: `${percentilePosition(analysis.median)}%` }} />
+                  <div className="absolute top-0 bottom-0 border-l border-white/10" style={{ left: `${percentilePosition(analysis.p90)}%` }} />
+                  <div className="absolute top-1/2 h-2 -translate-y-1/2 rounded bg-emerald-400/20" style={{ left: `${percentilePosition(analysis.p10)}%`, width: `${Math.max(0, percentilePosition(analysis.p90) - percentilePosition(analysis.p10))}%` }} />
+                  <div className="absolute top-1/2 h-4 -translate-y-1/2 rounded border border-emerald-400/30" style={{ left: `${percentilePosition(analysis.p25)}%`, width: `${Math.max(0, percentilePosition(analysis.p75) - percentilePosition(analysis.p25))}%` }} />
+                  <div className="absolute top-1/2 w-2 h-6 -translate-y-1/2 -translate-x-1/2 bg-white rounded" style={{ left: `${percentilePosition(analysis.median)}%` }} />
                 </div>
-                <div className="flex justify-between text-[10px] font-mono text-white/25 mt-1"><span>Downside tail</span><span>Historical median</span><span>Upside tail</span></div>
+                <div className="flex justify-between text-[10px] font-mono text-white/25 mt-1"><span>Lower outcomes</span><span>Median return</span><span>Higher outcomes</span></div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#0F1115] p-4 space-y-3 min-w-0">
                 <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><span className="text-[11px] font-mono uppercase tracking-widest text-white/40">Historical data summary</span></div>
                 <div className="text-sm font-bold">{analysis.sample.length >= 20 ? 'Larger sample' : analysis.sample.length >= 8 ? 'Small sample' : 'Too little historical data'}</div>
-                <div className="text-[10px] text-white/45">Positive historical outcomes: {(analysis.positive * 100).toFixed(0)}%</div>
+                <div className="text-[10px] text-white/45">Historical periods with gains: {(analysis.positive * 100).toFixed(0)}%</div>
                 <div className="text-[11px] text-white/45">Similar past periods: {analysis.analogueCount}</div>
                 <div className="text-[11px] text-white/45">All historical observations: {analysis.allCount}</div>
               </div>
@@ -1467,8 +1467,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Correctly predicted direction</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.directionalAccuracyPct == null ? '—' : forecastAnalytics.directionalAccuracyPct.toFixed(1) + '%'}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Forecast methods</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byModel.length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Scenarios tested</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.byScenario.length}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' pp'}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' percentage points'}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Bias</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics.meanSignedErrorPct == null ? '—' : (forecastAnalytics.meanSignedErrorPct >= 0 ? '+' : '') + forecastAnalytics.meanSignedErrorPct.toFixed(1) + ' percentage points'}</div></div>
           </div>
           <div className="text-[11px] font-mono text-white/35">{forecastAnalytics.validationGate?.verifiedCount || forecastAnalytics.sampleSize} verified forecasts · minimum validation sample: {forecastAnalytics.validationGate?.minimumRequired || FORECAST_VALIDATION_MINIMUM}</div>
           <div className="overflow-x-auto"><DataTable<any>
@@ -1526,7 +1526,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Validation-eligible</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.independentSampleSize ?? 0}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Pending</div><div className="text-sm font-mono font-bold mt-1">{forecasts.filter(f => f.status === 'pending').length}</div></div>
             <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Direction</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.directionalAccuracyPct == null ? '—' : forecastAnalytics.directionalAccuracyPct.toFixed(0) + '%'}</div></div>
-            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical forecast error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' pp'}</div></div>
+            <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical forecast error</div><div className="text-sm font-mono font-bold mt-1">{forecastAnalytics?.medianAbsoluteError == null ? '—' : forecastAnalytics.medianAbsoluteError.toFixed(1) + ' percentage points'}</div></div>
           </div>
           {forecastAnalytics?.evidenceCoverage && (
             <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
@@ -1559,8 +1559,8 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </span>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-              <div><div className="text-[10px] text-white/20 uppercase font-mono">Recent typical error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.recentMedianAbsError == null ? '—' : verificationDrift.recentMedianAbsError.toFixed(1) + ' pp'}</div></div>
-              <div><div className="text-[10px] text-white/20 uppercase font-mono">Previous typical error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.priorMedianAbsError == null ? '—' : verificationDrift.priorMedianAbsError.toFixed(1) + ' pp'}</div></div>
+              <div><div className="text-[10px] text-white/20 uppercase font-mono">Recent typical error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.recentMedianAbsError == null ? '—' : verificationDrift.recentMedianAbsError.toFixed(1) + ' percentage points'}</div></div>
+              <div><div className="text-[10px] text-white/20 uppercase font-mono">Previous typical error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.priorMedianAbsError == null ? '—' : verificationDrift.priorMedianAbsError.toFixed(1) + ' percentage points'}</div></div>
               <div><div className="text-[10px] text-white/20 uppercase font-mono">Change in typical error</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.errorChange == null ? '—' : (verificationDrift.errorChange >= 0 ? '+' : '') + verificationDrift.errorChange.toFixed(0) + '%'}</div></div>
               <div><div className="text-[10px] text-white/20 uppercase font-mono">Verified forecasts</div><div className="text-[10px] font-mono font-bold mt-1">{verificationDrift.sampleSize}</div></div>
             </div>
@@ -1604,15 +1604,15 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               <div className="text-[11px] font-mono text-violet-200/60 uppercase">Forecast method: {forecastMethodLabel}{modelConfig?.validation_tests ? ' · tested on ' + modelConfig.validation_tests + ' historical periods' : ''}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Correctly predicted direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical forecast error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Typical forecast error</div><div className="text-sm font-mono font-bold mt-1">{backtest.medianAbsoluteError.toFixed(1)} percentage points</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Results inside the typical range</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25p75Coverage*100).toFixed(0)}%</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Results inside the wider range</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p10p90Coverage*100).toFixed(0)}%</div></div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Simple comparison predicted direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Direction accuracy difference</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Forecast error improvement</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} pp</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Range coverage difference</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} pp</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Direction accuracy difference</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} percentage points</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Forecast error improvement</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} percentage points</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Range coverage difference</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} percentage points</div></div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
                 {backtest.rows.slice(-8).reverse().map(row => (
@@ -1643,11 +1643,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
 
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Tests</div><div className="text-sm font-mono font-bold mt-1">{matrix.tests}</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Average direction accuracy</div><div className="text-sm font-mono font-bold mt-1">{(matrix.direction*100).toFixed(0)}%</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Average forecast error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} pp</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Average forecast error</div><div className="text-sm font-mono font-bold mt-1">{matrix.error.toFixed(1)} percentage points</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Results inside the typical range</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage50*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Results inside the wider range</div><div className="text-sm font-mono font-bold mt-1">{(matrix.coverage80*100).toFixed(0)}%</div></div>
           <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Simple comparison predicted direction</div><div className="text-sm font-mono font-bold mt-1">{(matrix.baselineDirection*100).toFixed(0)}%</div></div>
-          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Simple comparison error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} pp</div></div>
+          <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Simple comparison error</div><div className="text-sm font-mono font-bold mt-1">{matrix.baselineError.toFixed(1)} percentage points</div></div>
           </div>
           <div className="overflow-x-auto"><DataTable<any>
             rows={matrix.details as any[]}
