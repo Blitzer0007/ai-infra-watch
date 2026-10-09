@@ -504,8 +504,10 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           {milestoneSourceStatus?.web?.status === 'unavailable' && (
             <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
           )}
-          {milestoneSourceStatus?.web?.status === 'no-matches' && Boolean(milestoneSourceStatus.web.errors?.length) && (
-            <span className="text-amber-200/80 normal-case tracking-normal">Some news searches failed; results may be incomplete.</span>
+          {Boolean(milestoneSourceStatus?.web?.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Backup news-search diagnostics: {milestoneSourceStatus?.web?.errors?.slice(0, 2).join(' · ')}
+            </span>
           )}
           {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
         </div>

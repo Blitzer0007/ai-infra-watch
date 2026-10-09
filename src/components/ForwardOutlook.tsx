@@ -445,6 +445,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [jevError, setJevError] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<ForecastSnapshot[]>([]);
   const [forecastAnalytics, setForecastAnalytics] = useState<ForecastAnalytics | null>(null);
+  const [forecastStorageError, setForecastStorageError] = useState<string | null>(null);
   const [showAllVerifiedResults, setShowAllVerifiedResults] = useState(false);
   const [verifiedSearch, setVerifiedSearch] = useState('');
   const [verifiedHorizonFilter, setVerifiedHorizonFilter] = useState('all');
@@ -559,26 +560,56 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     async function loadPersistentForecasts() {
       try {
         const response = await fetch('/api/forecast-verification', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Persistent forecast storage unavailable');
-        const body = await response.json();
-        const remote: ForecastSnapshot[] = Array.isArray(body.forecasts) ? body.forecasts : [];
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = typeof body?.error === 'string' ? body.error : 'Persistent forecast storage is unavailable.';
+          throw new Error(detail);
+        }
+        if (!Array.isArray(body?.forecasts)) {
+          throw new Error('Forecast API returned an unexpected response. Please retry; local browser data was not substituted.');
+        }
+        const remote: ForecastSnapshot[] = body.forecasts;
         if (!cancelled) {
           setForecasts(remote);
           setForecastAnalytics(body?.analytics || null);
+          setForecastStorageError(null);
           if (!remote.length) {
             const legacy = loadForecasts();
-            for (const item of legacy) {
-              fetch('/api/forecast-verification', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item)
-              }).catch(() => {});
+            if (legacy.length) {
+              // Migrate legacy browser-only forecasts only after a successful API read.
+              // Keep migration failures visible rather than silently treating local rows as persisted.
+              const migrationResults = await Promise.allSettled(legacy.map(item =>
+                fetch('/api/forecast-verification', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                }).then(async result => {
+                  if (!result.ok) throw new Error('Forecast migration request failed (' + result.status + ')');
+                  return result;
+                })
+              ));
+              const failedMigrations = migrationResults.filter(result => result.status === 'rejected').length;
+              const refreshed = await fetch('/api/forecast-verification', { cache: 'no-store' });
+              const refreshedBody = await refreshed.json().catch(() => ({}));
+              if (!refreshed.ok || !Array.isArray(refreshedBody?.forecasts)) {
+                throw new Error('Could not confirm that older browser forecasts were saved to the server.');
+              }
+              if (!cancelled) {
+                setForecasts(refreshedBody.forecasts);
+                setForecastAnalytics(refreshedBody?.analytics || null);
+                if (failedMigrations > 0) {
+                  setForecastStorageError(failedMigrations + ' older browser forecast(s) could not be migrated. Displayed results are the server-confirmed records only.');
+                }
+              }
             }
-            if (legacy.length) setForecasts(legacy);
           }
         }
-      } catch {
-        if (!cancelled) setForecasts(loadForecasts());
+      } catch (error) {
+        if (!cancelled) {
+          setForecasts([]);
+          setForecastAnalytics(null);
+          setForecastStorageError(error instanceof Error ? error.message : 'Could not load verified forecasts from the server. Please retry.');
+        }
       }
     }
     loadPersistentForecasts();
@@ -1551,118 +1582,154 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         ))}</div>
       </div>
 
-      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="verified-forecast-results" aria-labelledby="verified-forecast-results-title">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-          <div>
-            <h2 id="verified-forecast-results-title" className="text-base md:text-lg font-bold text-white">Verified forecast results</h2>
-            <p className="text-xs text-white/55 mt-1">{showAllVerifiedResults ? 'Browse all verified forecasts with actual market returns.' : 'Your 10 most recent verified forecasts. Open the full history to search and filter older results.'} Figures match the Telegram forecast alert.</p>
+      <section className="rounded-2xl border border-white/10 bg-[#0d1115] p-4 md:p-5 space-y-4" data-testid="verified-forecast-results" aria-labelledby="verified-forecast-results-title">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="verified-forecast-results-title" className="text-lg md:text-xl font-bold tracking-tight text-white">Forecast track record</h2>
+              <span className="rounded-full border border-white/10 bg-white/[.04] px-2.5 py-1 text-xs font-medium text-white/65">{allVerifiedForecastResults.length} verified</span>
+            </div>
+            <p className="mt-1 text-sm leading-5 text-white/55">See how forecasts compared with real market returns. Results are verified after the target date.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="shrink-0 rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-white/60">{allVerifiedForecastResults.length} verified {allVerifiedForecastResults.length === 1 ? 'result' : 'results'}</span>
-            <button type="button" onClick={() => { setShowAllVerifiedResults(value => !value); setVerifiedResultsPage(1); }} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/15">
-              {showAllVerifiedResults ? 'Show latest 10' : 'View all verified results'} <span aria-hidden="true">{showAllVerifiedResults ? '←' : '→'}</span>
-            </button>
+          <button type="button" onClick={() => { setShowAllVerifiedResults(value => !value); setVerifiedResultsPage(1); }} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300/[.08] px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/[.14] focus:outline-none focus:ring-2 focus:ring-cyan-300/50">
+            {showAllVerifiedResults ? 'Show latest 10' : 'View all verified results'} <span aria-hidden="true">{showAllVerifiedResults ? '←' : '→'}</span>
+          </button>
+        </div>
+
+        {forecastStorageError && (
+          <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300/20 bg-amber-300/[.06] px-4 py-3 sm:flex-row sm:items-start">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-100">Verified results could not be fully loaded</p>
+              <p className="mt-1 break-words text-sm leading-5 text-amber-100/70">{forecastStorageError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-amber-200/20 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-100/[.06]">Retry loading</button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Verified forecast summary">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[.07] bg-white/[.025] px-3.5 py-3">
+            <span className="text-sm text-white/55">Verified forecasts</span>
+            <strong className="text-lg font-semibold tabular-nums text-white">{allVerifiedForecastResults.length}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-300/10 bg-emerald-300/[.035] px-3.5 py-3">
+            <span className="text-sm text-white/55">Direction correct</span>
+            <strong className="text-lg font-semibold tabular-nums text-emerald-200">{allVerifiedForecastResults.filter(f => forecastDirection(Number(f.actualReturn), Number(f.median)) === 'Direction right').length}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-300/10 bg-rose-300/[.035] px-3.5 py-3">
+            <span className="text-sm text-white/55">Direction incorrect</span>
+            <strong className="text-lg font-semibold tabular-nums text-rose-200">{allVerifiedForecastResults.filter(f => forecastDirection(Number(f.actualReturn), Number(f.median)) === 'Direction wrong').length}</strong>
           </div>
         </div>
+
         {showAllVerifiedResults && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/10 p-3">
-            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-white/[.07] bg-black/10 p-3 md:grid-cols-[minmax(180px,1.4fr)_minmax(160px,1fr)_minmax(170px,1fr)]">
+            <label className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#101419] px-3 py-2.5 text-sm text-white/60 focus-within:border-cyan-300/40">
               <Search className="h-4 w-4 shrink-0" />
-              <input aria-label="Search verified forecasts by ticker" value={verifiedSearch} onChange={event => { setVerifiedSearch(event.target.value); setVerifiedResultsPage(1); }} placeholder="Search ticker…" className="min-w-0 w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30" />
+              <input aria-label="Search verified forecasts by ticker" value={verifiedSearch} onChange={event => { setVerifiedSearch(event.target.value); setVerifiedResultsPage(1); }} placeholder="Search by ticker…" className="min-w-0 w-full bg-transparent text-sm text-white outline-none placeholder:text-white/35" />
             </label>
-            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
-              <span>Horizon</span>
+            <label className="flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-[#101419] px-3 py-2.5 text-sm text-white/60 focus-within:border-cyan-300/40">
+              <span className="shrink-0">Horizon</span>
               <select aria-label="Filter by forecast horizon" value={verifiedHorizonFilter} onChange={event => { setVerifiedHorizonFilter(event.target.value); setVerifiedResultsPage(1); }} className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none">
                 <option value="all" className="bg-[#101216]">All horizons</option>
                 {[5, 20, 60, 120, 252].map(days => <option key={days} value={String(days)} className="bg-[#101216]">{days} trading days</option>)}
               </select>
             </label>
-            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#101216] px-3 py-2 text-xs text-white/50">
-              <span>Outcome</span>
+            <label className="flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-[#101419] px-3 py-2.5 text-sm text-white/60 focus-within:border-cyan-300/40">
+              <span className="shrink-0">Outcome</span>
               <select aria-label="Filter by forecast outcome" value={verifiedOutcomeFilter} onChange={event => { setVerifiedOutcomeFilter(event.target.value); setVerifiedResultsPage(1); }} className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none">
                 <option value="all" className="bg-[#101216]">All outcomes</option>
-                <option value="Direction right" className="bg-[#101216]">Direction right</option>
-                <option value="Direction wrong" className="bg-[#101216]">Direction wrong</option>
-                <option value="No clear direction" className="bg-[#101216]">No clear direction</option>
+                <option value="Direction right" className="bg-[#101216]">Direction correct</option>
+                <option value="Direction wrong" className="bg-[#101216]">Direction incorrect</option>
+                <option value="No clear direction" className="bg-[#101216]">Unclear direction</option>
               </select>
             </label>
           </div>
         )}
+
         {verifiedForecastResults.length ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {verifiedForecastResults.map(forecast => {
-              const actualReturn = Number(forecast.actualReturn);
-              const predictedMedian = Number(forecast.median);
-              const typicalMiss = forecast.medianError != null && Number.isFinite(Number(forecast.medianError))
-                ? Number(forecast.medianError)
-                : actualReturn - predictedMedian;
-              const matchPct = forecastAccuracyPct(actualReturn, predictedMedian);
-              const direction = forecastDirection(actualReturn, predictedMedian);
-              const directionClass = direction === 'Direction right'
-                ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200'
-                : direction === 'Direction wrong'
-                  ? 'border-rose-300/25 bg-rose-300/10 text-rose-200'
-                  : 'border-amber-300/25 bg-amber-300/10 text-amber-100';
-
-              return (
-                <article key={forecast.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-3" data-testid="verified-forecast-result">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm md:text-base font-bold text-white">{forecast.ticker} · {forecast.horizon}D forecast</h3>
-                      <p className="text-[11px] text-white/40 mt-1">Verified market outcome</p>
-                    </div>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${directionClass}`}>{direction}</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
-                      <div className="text-xs text-white/50">Predicted median</div>
-                      <div className="text-lg font-semibold font-mono text-white mt-1">{predictedMedian.toFixed(2)}%</div>
-                    </div>
-                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
-                      <div className="text-xs text-white/50">Actual return</div>
-                      <div className={`text-lg font-semibold font-mono mt-1 ${actualReturn > 0 ? 'text-emerald-200' : actualReturn < 0 ? 'text-rose-200' : 'text-white'}`}>{actualReturn.toFixed(2)}%</div>
-                    </div>
-                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
-                      <div className="text-xs text-white/50">Prediction match</div>
-                      <div className="text-base font-semibold font-mono text-white mt-1">{matchPct == null ? 'Not available' : matchPct.toFixed(1) + '%'}</div>
-                    </div>
-                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
-                      <div className="text-xs text-white/50">Typical miss</div>
-                      <div className={`text-base font-semibold font-mono mt-1 ${typicalMiss > 0 ? 'text-emerald-200' : typicalMiss < 0 ? 'text-rose-200' : 'text-white'}`}>{typicalMiss.toFixed(2)} percentage points</div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/5 pt-2 text-xs text-white/45">
-                    <span>Target: {forecast.targetDate || 'Not recorded'}</span>
-                    <span>Verified: {forecast.actualDate || forecast.verifiedAt?.slice(0, 10) || 'Date unavailable'}</span>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/50">
-            No verified forecast results yet. Saved forecasts will appear here after their target dates and actual returns are available.
-          </div>
-        )}
-        {showAllVerifiedResults && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 pt-3">
-            <p className="text-xs text-white/45">
-              {filteredVerifiedForecastResults.length === 0
-                ? 'No verified results match these filters.'
-                : `Showing ${(safeVerifiedResultsPage - 1) * verifiedResultsPageSize + 1}–${Math.min(safeVerifiedResultsPage * verifiedResultsPageSize, filteredVerifiedForecastResults.length)} of ${filteredVerifiedForecastResults.length} matching results.`}
-            </p>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={safeVerifiedResultsPage <= 1} onClick={() => setVerifiedResultsPage(page => Math.max(1, page - 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/80 disabled:cursor-not-allowed disabled:opacity-30">← Previous</button>
-              <span className="min-w-[5rem] text-center text-xs text-white/50">Page {safeVerifiedResultsPage} of {verifiedResultsPageCount}</span>
-              <button type="button" disabled={safeVerifiedResultsPage >= verifiedResultsPageCount} onClick={() => setVerifiedResultsPage(page => Math.min(verifiedResultsPageCount, page + 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/80 disabled:cursor-not-allowed disabled:opacity-30">Next →</button>
+          <div className="overflow-hidden rounded-xl border border-white/[.08]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-left" data-testid="verified-forecast-results-table">
+                <thead className="bg-white/[.035]">
+                  <tr className="border-b border-white/[.08] text-[11px] font-semibold uppercase tracking-[.08em] text-white/45">
+                    <th scope="col" className="px-4 py-3">Forecast</th>
+                    <th scope="col" className="px-4 py-3">Predicted</th>
+                    <th scope="col" className="px-4 py-3">Actual return</th>
+                    <th scope="col" className="px-4 py-3">Return match</th>
+                    <th scope="col" className="px-4 py-3">Outcome</th>
+                    <th scope="col" className="px-4 py-3">Dates</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[.06]">
+                  {verifiedForecastResults.map(forecast => {
+                    const actualReturn = Number(forecast.actualReturn);
+                    const predictedMedian = Number(forecast.median);
+                    const typicalMiss = forecast.medianError != null && Number.isFinite(Number(forecast.medianError))
+                      ? Number(forecast.medianError)
+                      : actualReturn - predictedMedian;
+                    const matchPct = forecastAccuracyPct(actualReturn, predictedMedian);
+                    const direction = forecastDirection(actualReturn, predictedMedian);
+                    const directionClass = direction === 'Direction right'
+                      ? 'border-emerald-300/20 bg-emerald-300/[.08] text-emerald-200'
+                      : direction === 'Direction wrong'
+                        ? 'border-rose-300/20 bg-rose-300/[.08] text-rose-200'
+                        : 'border-amber-300/20 bg-amber-300/[.08] text-amber-100';
+                    return (
+                      <tr key={forecast.id} className="group bg-transparent transition-colors hover:bg-white/[.025]" data-testid="verified-forecast-result">
+                        <th scope="row" className="whitespace-nowrap px-4 py-3.5 font-normal">
+                          <div className="font-semibold text-white">{forecast.ticker}</div>
+                          <div className="mt-1 text-xs text-white/45">{forecast.horizon} trading days</div>
+                        </th>
+                        <td className="whitespace-nowrap px-4 py-3.5">
+                          <span className="font-mono text-sm font-semibold tabular-nums text-white">{predictedMedian.toFixed(2)}%</span>
+                          <div className="mt-1 text-xs text-white/40">Forecast median</div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5">
+                          <span className={'font-mono text-sm font-semibold tabular-nums ' + (actualReturn > 0 ? 'text-emerald-200' : actualReturn < 0 ? 'text-rose-200' : 'text-white')}>{actualReturn.toFixed(2)}%</span>
+                          <div className="mt-1 text-xs text-white/40">Verified market return</div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5">
+                          <span className="font-mono text-sm font-semibold tabular-nums text-white">{matchPct == null ? '—' : matchPct.toFixed(1) + '%'}</span>
+                          <div className="mt-1 text-xs text-white/40">Typical miss: {typicalMiss.toFixed(2)} pp</div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5">
+                          <span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + directionClass}>{direction === 'Direction right' ? 'Direction correct' : direction === 'Direction wrong' ? 'Direction incorrect' : 'Unclear direction'}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-xs text-white/55">
+                          <div>Target {forecast.targetDate || '—'}</div>
+                          <div className="mt-1">Verified {forecast.actualDate || forecast.verifiedAt?.slice(0, 10) || '—'}</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-white/[.07] bg-white/[.02] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-white/45">
+                {showAllVerifiedResults
+                  ? (filteredVerifiedForecastResults.length === 0
+                    ? 'No verified results match these filters.'
+                    : 'Showing ' + ((safeVerifiedResultsPage - 1) * verifiedResultsPageSize + 1) + '–' + Math.min(safeVerifiedResultsPage * verifiedResultsPageSize, filteredVerifiedForecastResults.length) + ' of ' + filteredVerifiedForecastResults.length + ' matching results.')
+                  : 'Showing the 10 most recent verified results.'}
+              </p>
+              {showAllVerifiedResults && (
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button type="button" disabled={safeVerifiedResultsPage <= 1} onClick={() => setVerifiedResultsPage(page => Math.max(1, page - 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[.05] disabled:cursor-not-allowed disabled:opacity-30">← Previous</button>
+                  <span className="min-w-[5rem] text-center text-xs text-white/50">Page {safeVerifiedResultsPage} of {verifiedResultsPageCount}</span>
+                  <button type="button" disabled={safeVerifiedResultsPage >= verifiedResultsPageCount} onClick={() => setVerifiedResultsPage(page => Math.min(verifiedResultsPageCount, page + 1))} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-white/80 transition hover:bg-white/[.05] disabled:cursor-not-allowed disabled:opacity-30">Next →</button>
+                </div>
+              )}
             </div>
           </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[.015] px-4 py-8 text-center">
+            <div className="text-sm font-semibold text-white/80">No verified results found</div>
+            <p className="mt-1 text-sm text-white/45">Try changing your search or filters. New results appear once forecasts have passed their target dates.</p>
+          </div>
         )}
-        <p className="text-[11px] text-white/40 leading-relaxed">
-          Direction compares whether the predicted and actual returns were positive or negative. Prediction match measures how close the forecasted return was to the actual return; it uses the same calculation as Telegram and is separate from direction accuracy. A typical miss is actual return minus predicted median.
-        </p>
+        <p className="text-xs leading-5 text-white/40">Direction shows whether the forecast and actual return moved the same way. Return match measures how close the forecasted return was to the actual return; it is not the same as direction accuracy. “Typical miss” is the actual return minus the forecast median, in percentage points.</p>
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
