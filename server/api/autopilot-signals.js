@@ -116,16 +116,16 @@ async function googleNewsSearch(query, limit) {
       successfulResponses += 1;
       const xml = await response.text();
       const decode = value => String(value || '')
-        .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
         .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
       const rows = [];
-      for (const match of xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)) {
+      for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
         const block = match[1];
-        const title = decode(block.match(/<title>([\\s\\S]*?)<\\/title>/i)?.[1]);
-        const url = decode(block.match(/<link>([\\s\\S]*?)<\\/link>/i)?.[1]);
-        const published = decode(block.match(/<pubDate>([\\s\\S]*?)<\\/pubDate>/i)?.[1]) || null;
-        if (!title || !url || !/^https?:\\/\\//i.test(url)) continue;
+        const title = decode(block.match(/<title>([\s\S]*?)<\/title>/i)?.[1]);
+        const url = decode(block.match(/<link>([\s\S]*?)<\/link>/i)?.[1]);
+        const published = decode(block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1]) || null;
+        if (!title || !url || !/^https?:\/\//i.test(url)) continue;
         rows.push({ title, description: '', url, published });
         if (rows.length >= limit) break;
       }
@@ -140,7 +140,6 @@ async function googleNewsSearch(query, limit) {
   }
   return { ...lastResult, errors };
 }
-
 async function search(query, limit = 12) {
   const providers = [braveSearch, tavilySearch, gdeltSearch, googleNewsSearch];
   const errors = [];
