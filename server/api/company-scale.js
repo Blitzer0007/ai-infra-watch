@@ -14,16 +14,24 @@ function cleanSymbol(value) {
 }
 
 async function fetchSec(url) {
+  // SEC EDGAR requests should use the same configurable contact header as the gateway.
+  // This helps correct missing/stale User-Agent configuration, but cannot override an SEC-side block.
+  const userAgent = String(process.env.EDGAR_USER_AGENT || '').trim() ||
+    'AI Infra Watch/1.0 (research dashboard; contact: github-actions[bot]@users.noreply.github.com)';
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'AI Infra Watch/1.0 (research dashboard; contact: github-actions[bot]@users.noreply.github.com)',
+      'User-Agent': userAgent,
       'Accept-Encoding': 'gzip, deflate',
+      Accept: 'application/json',
     },
     signal: AbortSignal.timeout(8000),
   });
 
   if (!response.ok) {
-    throw new Error('SEC request failed: HTTP ' + response.status);
+    const detail = response.status === 403
+      ? ' (SEC denied the request; verify EDGAR_USER_AGENT and continue using independent company/news sources)'
+      : '';
+    throw new Error('SEC request failed: HTTP ' + response.status + detail);
   }
 
   return response.json();
@@ -578,23 +586,69 @@ async function fetchGoogleNewsSearch(query, days = 7, limit = 8) {
 }
 
 async function searchWebProvider(query, days = 7, limit = 8) {
+  // Do not let one configured provider take down all discovery queries.
+  // Try secondary providers and a public RSS source in order; carry diagnostics if a fallback succeeds.
+  const attempts = [];
   const brave = String(process.env.BRAVE_SEARCH_API_KEY || '').trim();
-  if (brave) {
-    const response = await fetch('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + limit + '&search_lang=en&country=us&freshness=' + (days <= 1 ? 'pd' : 'pm'), { headers: { Accept: 'application/json', 'X-Subscription-Token': brave }, signal: AbortSignal.timeout(6500) });
-    if (!response.ok) throw new Error('Brave Search HTTP ' + response.status);
-    const payload = await response.json();
-    return { provider: 'brave-web', results: (payload?.web?.results || []).slice(0, limit).map(row => ({ title: row.title || '', snippet: row.description || row.snippet || '', url: row.url || '', published_at: row.published || null, source: 'brave-web' })) };
-  }
   const tavily = String(process.env.TAVILY_API_KEY || '').trim();
-  if (tavily) {
-    const response = await fetch('https://api.tavily.com/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: tavily, query, search_depth: 'advanced', max_results: limit, include_answer: false, days: Math.min(Math.max(Number(days) || 7, 1), 30) }), signal: AbortSignal.timeout(6500) });
-    if (!response.ok) throw new Error('Tavily Search HTTP ' + response.status);
-    const payload = await response.json();
-    return { provider: 'tavily-web', results: (payload?.results || []).slice(0, limit).map(row => ({ title: row.title || '', snippet: row.content || row.snippet || '', url: row.url || '', published_at: row.published_date || null, source: 'tavily-web' })) };
-  }
-  return fetchGoogleNewsSearch(query, days, limit);
-}
 
+  if (brave) attempts.push({
+    name: 'brave-web',
+    run: async () => {
+      const response = await fetch('https://api.search.brave.com/res/v1/web/search?q=' + encodeURIComponent(query) + '&count=' + limit + '&search_lang=en&country=us&freshness=' + (days <= 1 ? 'pd' : 'pm'), {
+        headers: { Accept: 'application/json', 'X-Subscription-Token': brave },
+        signal: AbortSignal.timeout(6500),
+      });
+      if (!response.ok) throw new Error('Brave Search HTTP ' + response.status);
+      const payload = await response.json();
+      return { provider: 'brave-web', results: (payload?.web?.results || []).slice(0, limit).map(row => ({
+        title: row.title || '', snippet: row.description || row.snippet || '', url: row.url || '',
+        published_at: row.published || null, source: 'brave-web',
+      })) };
+    },
+  });
+
+  if (tavily) attempts.push({
+    name: 'tavily-web',
+    run: async () => {
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: tavily, query, search_depth: 'advanced', max_results: limit, include_answer: false, days: Math.min(Math.max(Number(days) || 7, 1), 30) }),
+        signal: AbortSignal.timeout(6500),
+      });
+      if (!response.ok) throw new Error('Tavily Search HTTP ' + response.status);
+      const payload = await response.json();
+      return { provider: 'tavily-web', results: (payload?.results || []).slice(0, limit).map(row => ({
+        title: row.title || '', snippet: row.content || row.snippet || '', url: row.url || '',
+        published_at: row.published_date || null, source: 'tavily-web',
+      })) };
+    },
+  });
+
+  attempts.push({ name: 'google-news-rss', run: () => fetchGoogleNewsSearch(query, days, limit) });
+
+  const providerNotes = [];
+  let lastSuccessful = null;
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt.run();
+      if (!result || !Array.isArray(result.results)) continue;
+      lastSuccessful = { ...result, results: result.results.slice(0, limit) };
+      if (lastSuccessful.results.length) {
+        return { ...lastSuccessful, providerNotes, degraded: providerNotes.length > 0 || lastSuccessful.provider === 'google-news-rss' };
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      providerNotes.push(detail + '; trying the next source');
+    }
+  }
+
+  if (lastSuccessful) {
+    return { ...lastSuccessful, providerNotes, degraded: providerNotes.length > 0 || lastSuccessful.provider === 'google-news-rss' };
+  }
+  throw new Error(providerNotes.join(' · ') || 'All configured news search sources failed.');
+}
 async function handleExecutiveSignals(req, res) {
   const days = Math.min(Math.max(Number(req.query?.days) || 7, 1), 14);
   const limit = Math.min(Math.max(Number(req.query?.limit) || 12, 1), 20);
@@ -603,6 +657,7 @@ async function handleExecutiveSignals(req, res) {
   const profiles = EXECUTIVE_UI_PROFILES.filter(profile => (!wantedExecutive || profile.name.toLowerCase().includes(wantedExecutive)) && (!wantedOrganization || profile.organizations.some(org => org.toLowerCase().includes(wantedOrganization))));
   const signals = [];
   const providerNotes = [];
+  const providersUsed = new Set();
   for (const profile of profiles) {
     const orgQuery = profile.organizations.map(org => '"' + org + '"').join(' OR ');
     const queries = ['"' + profile.name + '" (' + orgQuery + ') (AI OR chips OR GPU OR "data center" OR infrastructure OR cloud OR power)'];
@@ -611,6 +666,8 @@ async function handleExecutiveSignals(req, res) {
     for (const query of queries) {
       try {
         const result = await searchWebProvider(query, days, limit);
+        providersUsed.add(result.provider || 'web search');
+        providerNotes.push(...(result.providerNotes || []).map(note => note + ' (backup search: ' + result.provider + ')'));
         for (const row of result.results) {
           const lower = String(row.url || '').toLowerCase();
           const official = (profile.x_username && lower.startsWith('https://x.com/' + profile.x_username.toLowerCase())) || (profile.linkedin_profile && lower.startsWith(profile.linkedin_profile.toLowerCase())) || profile.official_domains.some(domain => { try { const host = new URL(row.url).hostname.toLowerCase().replace(/^www\\./, ''); return host === domain || host.endsWith('.' + domain); } catch { return false; } });
@@ -621,7 +678,10 @@ async function handleExecutiveSignals(req, res) {
   }
   const seen = new Set();
   const deduped = signals.filter(row => { const key = String(row.url || row.title || '').toLowerCase(); if (!key || seen.has(key)) return false; seen.add(key); return true; }).sort((a,b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
-  return res.status(200).json({ source: 'executive-signal-discovery', profiles, signals: deduped.slice(0, limit), configuredProvider: process.env.BRAVE_SEARCH_API_KEY ? 'brave-web' : process.env.TAVILY_API_KEY ? 'tavily-web' : 'none', degraded: providerNotes.length > 0, providerNotes: [...new Set(providerNotes)].slice(0, 5) });
+  const configuredProvider = providersUsed.size
+    ? [...providersUsed].join(' + ')
+    : (process.env.BRAVE_SEARCH_API_KEY || process.env.TAVILY_API_KEY) ? 'unavailable' : 'google-news-rss';
+  return res.status(200).json({ source: 'executive-signal-discovery', profiles, signals: deduped.slice(0, limit), configuredProvider, degraded: providerNotes.length > 0 || [...providersUsed].some(provider => provider === 'google-news-rss'), providerNotes: [...new Set(providerNotes)].slice(0, 5) });
 }
 function validMilestoneSymbol(symbol) {
   return /^[A-Z0-9.^=-]{1,20}$/.test(symbol);
@@ -862,12 +922,14 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
   const webRows = [];
   const providers = [];
   const errors = [];
+  const providerNotes = [];
   settled.forEach((result, index) => {
     if (result.status !== 'fulfilled') {
       errors.push(String(result.reason?.message || result.reason));
       return;
     }
     providers.push(result.value.provider || 'web search');
+    providerNotes.push(...(result.value.providerNotes || []));
     for (const row of result.value.results || []) {
       const item = mapDiscoveredProjectEvent(symbol, row, profile, result.value.provider || 'web search');
       if (item) webRows.push(item);
@@ -879,7 +941,7 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
     items,
     sourceStatus: {
       sec: { status: 'checked-separately', count: 0 },
-      web: { status: webRows.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches', count: webRows.length, providers: [...new Set(providers)], errors: [...new Set(errors)].slice(0, 3) },
+      web: { status: webRows.length ? 'available' : errors.length === settled.length ? 'unavailable' : 'no-matches', count: webRows.length, providers: [...new Set(providers)], errors: [...new Set([...errors, ...providerNotes])].slice(0, 4) },
       x: { status: xResult.status, count: xResult.items.length, configured: xResult.configured, error: xResult.error },
     },
   };
@@ -904,12 +966,14 @@ async function handleContractDiscovery(req, res) {
   const all = [];
   const providers = [];
   const errors = [];
+  const providerNotes = [];
   settled.forEach(result => {
     if (result.status !== 'fulfilled') {
       errors.push(String(result.reason?.message || result.reason));
       return;
     }
     providers.push(result.value.provider || 'web search');
+    providerNotes.push(...(result.value.providerNotes || []));
     for (const row of result.value.results || []) {
       const title = String(row?.title || '').trim();
       const url = String(row?.url || '').trim();
@@ -968,6 +1032,7 @@ async function handleContractDiscovery(req, res) {
       queriesRun: queries.length,
       failedQueries: errors.length,
       errors: [...new Set(errors)].slice(0, 3),
+      providerNotes: [...new Set(providerNotes)].slice(0, 3),
       note: 'These results are discovery leads. Confirm deal terms using the linked primary source before treating them as signed contracts.',
     },
     retrievedAt: new Date().toISOString(),
