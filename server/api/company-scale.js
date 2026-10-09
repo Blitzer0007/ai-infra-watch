@@ -661,7 +661,6 @@ const PROJECT_SOURCE_PROFILES = {
   AMPG: { name: 'AmpliTech Group', domains: ['amplitechgroup.com'], xHandle: null },
 };
 
-const PROJECT_UPDATE_TERMS = '(construction OR "Phase 1" OR "Phase 2" OR commissioning OR "ready for service" OR "data center" OR "data centre" OR campus OR "MW" OR capacity OR deployment OR GPU OR contract OR colocation OR power)';
 const PROJECT_UPDATE_CACHE = globalThis.__aiwProjectUpdateCache || (globalThis.__aiwProjectUpdateCache = new Map());
 const CONTRACT_DISCOVERY_CACHE = globalThis.__aiwContractDiscoveryCache || (globalThis.__aiwContractDiscoveryCache = { at: 0, data: null });
 
