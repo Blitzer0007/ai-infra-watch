@@ -330,7 +330,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   };
   const activeMilestonePrice = activeMilestone ? getAccuratePrice(activeMilestone) : undefined;
   const activeMilestonePriceApproximate = Boolean(
-    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{4}$/i.test(activeMilestone.date.trim())
+    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(activeMilestone.date.trim())
   );
 
   // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
