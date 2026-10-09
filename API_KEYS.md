@@ -44,6 +44,18 @@ LLM_MODEL=...
 
 The autonomous agent uses the selected LLM to choose MCP tools and synthesize retrieved evidence.
 
+## 3. Optional X project-update search
+
+The Progress Tracker can query recent public X posts for company and construction updates, including official-account posts such as `@DigipowerX`.
+
+Set this server-side Vercel environment variable to enable direct X API search:
+
+```text
+X_BEARER_TOKEN=...
+```
+
+Create the bearer token in the X Developer Portal and keep it server-side; do not expose it in Vite/browser variables or commit the token. Without this credential, the tracker still checks the configured web/news discovery providers, but direct X search is unavailable. Recent Search only covers the recent-post window supported by X; it is not a complete historical archive.
+
 ## 3. SEC EDGAR
 
 Live EDGAR access requires:
