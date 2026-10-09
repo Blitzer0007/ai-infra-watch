@@ -185,7 +185,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       setMilestoneRetrievedAt(null);
       setActiveMilestoneId(null);
       try {
-        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12', { cache: 'no-store' });
+        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12&refresh=true', { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'Milestone lookup failed');
         const responseSymbol = String(data?.symbol || '').trim().toUpperCase();
@@ -560,7 +560,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
           <div>
-            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates · {selectedStock}</h2>
             <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
               Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
             </p>
@@ -571,6 +571,10 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
               const requestedSymbol = selectedStock;
               setSecMilestoneLoading(true);
               setSecMilestoneError(null);
+              setMilestonesSymbol(null);
+              setSecMilestones([]);
+              setMilestoneSourceStatus(null);
+              setMilestoneRetrievedAt(null);
               fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
                 .then(async response => {
                   const payload = await response.json().catch(() => ({}));
@@ -579,6 +583,8 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   if (responseSymbol && responseSymbol !== requestedSymbol) {
                     throw new Error('Refresh returned ' + responseSymbol + ' instead of ' + requestedSymbol + '.');
                   }
+                  // Ignore a late refresh response if the user switched ticker meanwhile.
+                  if (selectedStock !== requestedSymbol) return;
                   const events = Array.isArray(payload.events) ? payload.events : [];
                   setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
                   setMilestonesSymbol(requestedSymbol);

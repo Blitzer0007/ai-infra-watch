@@ -276,7 +276,7 @@ async function handleHistory(req, res) {
 
   try {
     const data = await routedHistory(symbol, range);
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ symbol, yahooSymbol: providerSymbol(symbol), ...data });
   } catch (error) {
     return res.status(503).json({
@@ -791,7 +791,7 @@ function mapDiscoveredProjectEvent(symbol, row, profile, provider) {
   const combined = title + ' ' + snippet;
   // Search engines can return loosely related infrastructure stories. Never
   // attach one to a ticker unless the issuer name/ticker or official domain matches.
-  if (!isProjectEventRelevant(symbol, { ...row, title, snippet, url }, profile)) return null;
+  if (!isProjectEventRelevant(symbol, { ...row, title, snippet, url }, profile, PROJECT_SOURCE_PROFILES)) return null;
   if (!/(contract|agreement|construction|build(?:out)?|phase|facility|data.?cent(?:er|re)|campus|power|megawatt|\bmw\b|commission|capacity|gpu|deployment|infrastructure|operations|columbiana|project|progress|substation|equipment)/i.test(combined)) return null;
   const sourceType = sourceTypeForUrl(url, profile, row?.source || provider);
   const publishedAt = normalizeSourceDate(row?.published_at || row?.published || row?.date || row?.publishedAt);
@@ -904,7 +904,17 @@ async function fetchXProjectUpdates(symbol, profile, limit = 10) {
         authorName: String(author.name || ''),
         publicMetrics: post.public_metrics || null,
       };
-    }).filter(item => item.title);
+    }).filter(item => {
+      if (!item.title) return false;
+      // Posts from the issuer's configured official handle are valid company-reported
+      // evidence; third-party posts must explicitly match the tracked issuer.
+      if (item.sourceType === 'official-social') return true;
+      return isProjectEventRelevant(symbol, {
+        title: item.title,
+        snippet: item.description,
+        url: item.url,
+      }, profile, PROJECT_SOURCE_PROFILES);
+    });
     return { items, status: 'available', configured: true, error: null };
   } catch (error) {
     return { items: [], status: 'unavailable', configured: true, error: String(error?.message || error) };
@@ -1113,7 +1123,7 @@ async function handleMilestones(req, res) {
     web: project.sourceStatus?.web || { status: 'unavailable', count: 0, errors: [] },
     x: project.sourceStatus?.x || { status: 'not-configured', count: 0, configured: false, error: null },
   };
-  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 's-maxage=300, stale-while-revalidate=900');
+  res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
     symbol,
     issuer: sec.issuer || projectSourceProfile(symbol).name || symbol,
