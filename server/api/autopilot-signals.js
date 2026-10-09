@@ -99,17 +99,58 @@ async function gdeltSearch(query, limit) {
   };
 }
 
-async function search(query, limit = 12) {
-  const providers = [braveSearch, tavilySearch, gdeltSearch];
+async function googleNewsSearch(query, limit) {
+  const broaderQuery = '"joinautopilot" OR "joinautopilot.com" (portfolio OR holdings OR invested OR tracker OR positions)';
+  const queries = [query, broaderQuery];
   const errors = [];
+  let lastResult = { provider: 'google-news-rss', rows: [] };
+  for (const [index, currentQuery] of queries.entries()) {
+    try {
+      const rssUrl = 'https://news.google.com/rss/search?q=' + encodeURIComponent(currentQuery + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en';
+      const response = await fetch(rssUrl, {
+        headers: { 'User-Agent': 'ai-infra-watch/1.0', Accept: 'application/rss+xml, application/xml, text/xml' },
+        signal: AbortSignal.timeout(6500),
+      });
+      if (!response.ok) throw new Error('Google News RSS HTTP ' + response.status);
+      const xml = await response.text();
+      const decode = value => String(value || '')
+        .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')
+        .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+      const rows = [];
+      for (const match of xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)) {
+        const block = match[1];
+        const title = decode(block.match(/<title>([\\s\\S]*?)<\\/title>/i)?.[1]);
+        const url = decode(block.match(/<link>([\\s\\S]*?)<\\/link>/i)?.[1]);
+        const published = decode(block.match(/<pubDate>([\\s\\S]*?)<\\/pubDate>/i)?.[1]) || null;
+        if (!title || !url || !/^https?:\\/\\//i.test(url)) continue;
+        rows.push({ title, description: '', url, published });
+        if (rows.length >= limit) break;
+      }
+      lastResult = { provider: 'google-news-rss', rows, fallbackQuery: index === 1 };
+      if (rows.length) return { ...lastResult, errors };
+    } catch (error) {
+      errors.push((error instanceof Error ? error.message : String(error)) + '; trying the next source');
+    }
+  }
+  return { ...lastResult, errors };
+}
+
+async function search(query, limit = 12) {
+  const providers = [braveSearch, tavilySearch, gdeltSearch, googleNewsSearch];
+  const errors = [];
+  let lastSuccessful = null;
   for (const provider of providers) {
     try {
       const result = await provider(query, limit);
+      if (!result) continue;
+      lastSuccessful = result;
       if (result?.rows?.length) return { ...result, errors };
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      errors.push((error instanceof Error ? error.message : String(error)) + '; trying the next source');
     }
   }
+  if (lastSuccessful) return { ...lastSuccessful, errors, noMatches: true };
   return { provider: 'unavailable', rows: [], errors };
 }
 
@@ -139,7 +180,7 @@ export default async function handler(req, res) {
         platformUrl: 'https://joinautopilot.com',
       },
       provider: result.provider,
-      degraded: result.provider === 'gdelt-discovery' || result.provider === 'unavailable',
+      degraded: result.provider === 'gdelt-discovery' || result.provider === 'google-news-rss' || result.provider === 'unavailable',
       signals,
       tickers: [...new Set(signals.flatMap(row => row.tickers))].sort(),
       portfolioLinks: [...new Set(signals.flatMap(row => row.portfolioLinks))],
