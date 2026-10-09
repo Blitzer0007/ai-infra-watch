@@ -212,6 +212,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const externalProjectUpdates = secMilestones.filter(m => m.stockSymbol === selectedStock && Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
   const verifiedSecMilestoneCount = secMilestones.filter(m => m.stockSymbol === selectedStock && m.sourceType === 'sec-primary').length;
   const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
+  const projectDiscoveryDegraded = Boolean(secMilestoneError || milestoneSourceStatus?.sec?.error || milestoneSourceStatus?.web?.status === 'unavailable' || (milestoneSourceStatus?.web?.errors?.length || 0) > 0 || (milestoneSourceStatus?.x?.configured && milestoneSourceStatus?.x?.status !== 'available'));
   const updateDateLabel = (m: Milestone) => m.publishedAt
     ? new Date(m.publishedAt).toLocaleString()
     : (m.date && m.date !== 'Date not supplied' ? m.date : 'Publication date not supplied');
@@ -475,7 +476,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
-          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : projectDiscoveryDegraded ? <AlertCircle className="w-3.5 h-3.5 text-amber-300" /> : <CheckCircle className="w-3.5 h-3.5" />}
           <span>
             {secMilestoneLoading
               ? 'Checking SEC filings, company announcements, news and X…'
@@ -500,6 +501,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           )}
           {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
           {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {milestoneSourceStatus?.web?.status === 'unavailable' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
+          )}
+          {milestoneSourceStatus?.web?.status === 'no-matches' && Boolean(milestoneSourceStatus.web.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">Some news searches failed; results may be incomplete.</span>
+          )}
           {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
         </div>
       </div>
