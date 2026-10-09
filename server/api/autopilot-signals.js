@@ -103,6 +103,7 @@ async function googleNewsSearch(query, limit) {
   const broaderQuery = '"joinautopilot" OR "joinautopilot.com" (portfolio OR holdings OR invested OR tracker OR positions)';
   const queries = [query, broaderQuery];
   const errors = [];
+  let successfulResponses = 0;
   let lastResult = { provider: 'google-news-rss', rows: [] };
   for (const [index, currentQuery] of queries.entries()) {
     try {
@@ -112,6 +113,7 @@ async function googleNewsSearch(query, limit) {
         signal: AbortSignal.timeout(6500),
       });
       if (!response.ok) throw new Error('Google News RSS HTTP ' + response.status);
+      successfulResponses += 1;
       const xml = await response.text();
       const decode = value => String(value || '')
         .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')
@@ -132,6 +134,9 @@ async function googleNewsSearch(query, limit) {
     } catch (error) {
       errors.push((error instanceof Error ? error.message : String(error)) + '; trying the next source');
     }
+  }
+  if (successfulResponses === 0) {
+    throw new Error(errors.join(' · ') || 'Google News RSS did not return a successful response.');
   }
   return { ...lastResult, errors };
 }
