@@ -271,15 +271,15 @@ def test_forward_outlook_verified_forecast_results_match_telegram(page):
     card = results.get_by_test_id("verified-forecast-result").first
     card.wait_for(state="visible", timeout=30000)
 
-    card_text = card.inner_text()
-    assert "RKLB · 5D forecast" in card_text
-    assert "Direction wrong" in card_text
-    assert "Predicted median" in card_text and "1.13%" in card_text
-    assert "Actual return" in card_text and "-1.84%" in card_text
-    assert "Prediction match" in card_text and "0.0%" in card_text
-    assert "Typical miss" in card_text and "-2.97 percentage points" in card_text
-    assert "Target: 2026-10-08" in card_text
-    assert "Verified: 2026-10-08" in card_text
+    row_text = card.inner_text()
+    assert "RKLB" in row_text and "5 trading days" in row_text
+    assert "Direction incorrect" in row_text
+    assert "Forecast median" in row_text and "1.13%" in row_text
+    assert "Verified market return" in row_text and "-1.84%" in row_text
+    assert "0.0%" in row_text
+    assert "Typical miss: -2.97 pp" in row_text
+    assert "Target 2026-10-08" in row_text
+    assert "Verified 2026-10-08" in row_text
 
 
 def test_exploratory_sorting_portfolio_scenarios(page):
