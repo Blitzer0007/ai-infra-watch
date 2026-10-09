@@ -276,7 +276,7 @@ async function handleHistory(req, res) {
 
   try {
     const data = await routedHistory(symbol, range);
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ symbol, yahooSymbol: providerSymbol(symbol), ...data });
   } catch (error) {
     return res.status(503).json({
@@ -791,7 +791,7 @@ function mapDiscoveredProjectEvent(symbol, row, profile, provider) {
   const combined = title + ' ' + snippet;
   // Search engines can return loosely related infrastructure stories. Never
   // attach one to a ticker unless the issuer name/ticker or official domain matches.
-  if (!isProjectEventRelevant(symbol, { ...row, title, snippet, url }, profile)) return null;
+  if (!isProjectEventRelevant(symbol, { ...row, title, snippet, url }, profile, PROJECT_SOURCE_PROFILES)) return null;
   if (!/(contract|agreement|construction|build(?:out)?|phase|facility|data.?cent(?:er|re)|campus|power|megawatt|\bmw\b|commission|capacity|gpu|deployment|infrastructure|operations|columbiana|project|progress|substation|equipment)/i.test(combined)) return null;
   const sourceType = sourceTypeForUrl(url, profile, row?.source || provider);
   const publishedAt = normalizeSourceDate(row?.published_at || row?.published || row?.date || row?.publishedAt);
@@ -1113,7 +1113,7 @@ async function handleMilestones(req, res) {
     web: project.sourceStatus?.web || { status: 'unavailable', count: 0, errors: [] },
     x: project.sourceStatus?.x || { status: 'not-configured', count: 0, configured: false, error: null },
   };
-  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 's-maxage=300, stale-while-revalidate=900');
+  res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
     symbol,
     issuer: sec.issuer || projectSourceProfile(symbol).name || symbol,
