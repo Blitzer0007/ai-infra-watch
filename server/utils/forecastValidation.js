@@ -266,10 +266,10 @@ export function buildForecastValidationSummary(rows = []) {
       verifiedCount: independent.length,
       independent5D: independent.filter(row => Number(row.horizon) === 5).length,
       independent20D: independent.filter(row => Number(row.horizon) === 20).length,
-      ready: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+      ready: independent.length >= FORECAST_VALIDATION_MINIMUM &&
         independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
         independent.filter(row => Number(row.horizon) === 20).length >= 25,
-      status: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
+      status: independent.length >= FORECAST_VALIDATION_MINIMUM &&
         independent.filter(row => Number(row.horizon) === 5).length >= 25 &&
         independent.filter(row => Number(row.horizon) === 20).length >= 25
         ? '50+ independent validated forecasts with 25+ per horizon'
