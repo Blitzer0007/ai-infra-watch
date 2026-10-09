@@ -381,6 +381,592 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <p className="text-white font-bold">Stock Price: ${formatPrice(pt.price)}</p>
           {pt.milestone && (
             <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
+              ★ {pt.milestone} ({pt.milestonePrice == null || !Number.isFinite(pt.milestonePrice) ? 'Event price unavailable' : 'Price: 
+              {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6" id="tracker-view">
+      {/* Page Header */}
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 03 / Markets</span>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+          Build-Out &amp; Stock Price Progress Tracker
+        </h1>
+        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
+          Observe how concrete progression events—data center scaling, chip validation, and cloud leases—correlate with historical stock prices in real-time.
+        </p>
+      </div>
+
+      {/* Stock Selection + Arbitrary Ticker Search */}
+      <div className="space-y-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+              Track any public ticker
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
+                <input
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tickerInput.trim()) {
+                      void resolveAndTrack();
+                    }
+                  }}
+                  placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void resolveAndTrack();
+                }}
+                className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
+              >
+                {tickerResolving ? 'Resolving…' : 'Track'}
+              </button>
+            </div>
+            <p className="text-[9px] text-white/30 font-mono mt-1.5">
+              Enter a ticker or company name. Company names are resolved against the SEC public company ticker directory, then loaded from live market history and recent SEC 8-K milestones.
+            </p>
+            {resolvedIssuer && (
+              <p className="text-[9px] text-cyan-300/80 font-mono mt-1">
+                Resolved: {resolvedIssuer} → {selectedStock}
+              </p>
+            )}
+            {tickerResolveError && (
+              <p className="text-[9px] text-amber-300 font-mono mt-1">
+                {tickerResolveError}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Saved tracker tickers</span>
+            <button
+              type="button"
+              onClick={() => setCustomizeTracker(value => !value)}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-white/5 text-[9px] font-mono font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              aria-expanded={customizeTracker}
+            >
+              {customizeTracker ? 'Done' : 'Customize'}
+            </button>
+          </div>
+          {customizeTracker && (
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[.03] p-2.5 text-[9px] font-mono text-white/45">
+              Search any public ticker or company above to add it. Use × on a chip to remove it from your saved tracker list.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {trackerSymbols.map((symbol) => {
+              const isSelected = selectedStock === symbol;
+              const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+              return (
+                <div
+                  key={symbol}
+                  className={`inline-flex items-center rounded border transition ${
+                    isSelected
+                      ? 'bg-white text-black border-white'
+                      : 'bg-white/5 text-white/60 border-white/10'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(symbol);
+                      setTickerInput('');
+                      setActiveMilestoneId(null);
+                    }}
+                    className="px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer hover:opacity-90"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span>{symbol}</span>
+                    </span>
+                  </button>
+                  {customizeTracker && (
+                    <button
+                      type="button"
+                      onClick={() => removeTrackerSymbol(symbol)}
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 cursor-pointer"
+                      aria-label={`Remove ${symbol} from saved tracker tickers`}
+                      title={`Remove ${symbol}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : projectDiscoveryDegraded ? <AlertCircle className="w-3.5 h-3.5 text-amber-300" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          <span>
+            {secMilestoneLoading
+              ? 'Checking SEC filings, company announcements, news and X…'
+              : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
+          </span>
+          {!secMilestoneLoading && milestoneRetrievedAt && (
+            <span className="text-[10px] text-white/35 normal-case tracking-normal">
+              Last checked {new Date(milestoneRetrievedAt).toLocaleTimeString()}
+            </span>
+          )}
+          {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
+          {milestoneSourceStatus?.x?.status === 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Direct X API is not connected; available web/news search still runs.
+            </span>
+          )}
+          {milestoneSourceStatus?.x?.status === 'credentials-rejected' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X credentials were rejected; check X_BEARER_TOKEN in server settings.</span>
+          )}
+          {milestoneSourceStatus?.x?.error && milestoneSourceStatus.x.status !== 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X search: {milestoneSourceStatus.x.error}</span>
+          )}
+          {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
+          {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {milestoneSourceStatus?.web?.status === 'unavailable' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
+          )}
+          {Boolean(milestoneSourceStatus?.web?.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Backup news-search diagnostics: {milestoneSourceStatus?.web?.errors?.slice(0, 2).join(' · ')}
+            </span>
+          )}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+          <div>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const requestedSymbol = selectedStock;
+              setSecMilestoneLoading(true);
+              setSecMilestoneError(null);
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
+                .then(async response => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' results instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
+                  setMilestoneSourceStatus(payload.sourceStatus || null);
+                  setMilestoneRetrievedAt(payload.retrievedAt || null);
+                })
+                .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
+                .finally(() => setSecMilestoneLoading(false));
+            }}
+            disabled={secMilestoneLoading}
+            className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+            data-testid="tracker-refresh-project-updates"
+          >
+            {secMilestoneLoading ? 'Refreshing…' : 'Refresh updates'}
+          </button>
+        </div>
+        {externalProjectUpdates.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {externalProjectUpdates.slice(0, 8).map(item => {
+              const official = item.sourceType === 'official-company' || item.sourceType === 'official-social';
+              const social = item.sourceType === 'official-social' || item.sourceType === 'social-post';
+              const className = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-100'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const label = item.sourceType === 'official-company'
+                ? 'Official company update'
+                : item.sourceType === 'official-social'
+                  ? 'Official company X post'
+                  : item.sourceType === 'social-post'
+                    ? 'Social post · confirm source'
+                    : item.sourceType === 'syndicated-release'
+                      ? 'Syndicated release · verify original'
+                      : 'News lead · not confirmed';
+              return (
+                <article key={item.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + className}>{label}</span>
+                    {item.category && <span className="text-[10px] text-white/40">{item.category}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{item.description}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{item.source || 'Source not identified'} · {updateDateLabel(item)}</span>
+                    {(item.sourceUrl || item.url) && (
+                      <a href={item.sourceUrl || item.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                        Open source ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.relatedSources?.length ? (
+                    <div className="text-[10px] text-white/35">Additional matching sources: {item.relatedSources.length}</div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            {secMilestoneLoading ? 'Searching for recent updates…' : 'No recent company or social updates matched this ticker. SEC filing events and curated milestones remain available below.'}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35 leading-relaxed">
+          A company post is a reported update, not independent proof that construction is complete. We show dated sources and keep secondary news separate from official company evidence.
+        </p>
+      </section>
+
+      {/* Interactive Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart Column */}
+        <div className="lg:col-span-2 bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black uppercase italic tracking-tight text-white">{currentMeta.name} ({selectedStock})</h2>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase">{currentMeta.sector}</span>
+            </div>
+            <div className="text-right text-[10px] font-mono font-bold uppercase tracking-wider bg-white/5 border border-white/10 px-3 py-1.5 rounded text-white/60">
+              Interactive Milestone Overlay
+            </div>
+          </div>
+
+          {/* Recharts Wrapper */}
+          <div className="h-64 md:h-80 w-full bg-[#0F1115] rounded-xl p-2 border border-white/5">
+            {historyLoading && <div className="text-[10px] font-mono text-white/40 p-2">Loading verified daily market history…</div>}
+            {!historyLoading && historyError && <div className="text-[10px] font-mono text-amber-300 p-2">{historyError}</div>}
+            {!historyLoading && !historyError && chartHistory.length === 0 && <div className="text-[10px] font-mono text-white/40 p-2">No public market history is available for this symbol.</div>}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+                <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <YAxis stroke="#64748b" domain={['auto', 'auto']} style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={currentMeta.logoColor}
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6 }}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload.milestone) {
+                      const isActive = payload.milestoneId === activeMilestone?.id;
+                      return (
+                        <circle
+                          key={payload.date}
+                          cx={cx}
+                          cy={cy}
+                          r={isActive ? 8 : 5}
+                          fill="#15803d"
+                          stroke="#4ade80"
+                          strokeWidth={isActive ? 3 : 1.5}
+                          className="cursor-pointer animate-pulse"
+                          onClick={() => setActiveMilestoneId(payload.milestoneId)}
+                        />
+                      );
+                    }
+                    return <circle key={payload.date} cx={cx} cy={cy} r={2} fill={currentMeta.logoColor} />;
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 text-center">
+            ★ Click any green milestone dot on the chart to read event briefs and stock valuation impacts.
+          </p>
+        </div>
+
+        {/* Milestone Detail Sidebar */}
+        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4 min-h-0">
+          {activeMilestone ? (
+            <div className="space-y-4 max-h-[420px] lg:max-h-[520px] overflow-y-auto pr-2 aiw-scroll-region min-h-0">
+              <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Selected Progression</span>
+                  <h3 className="text-base font-black uppercase tracking-tight text-white mt-1 leading-tight">{activeMilestone.title}</h3>
+                </div>
+                <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded ${
+                  activeMilestone.status === 'done'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : activeMilestone.status === 'active'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-white/5 text-white/40 border border-white/10'
+                }`}>
+                  {activeMilestone.status === 'done' && 'DONE'}
+                  {activeMilestone.status === 'active' && 'IN PROGRESS'}
+                  {activeMilestone.status === 'planned' && 'PLANNED'}
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between">
+                  <span className="text-white/40">Milestone Date:</span>
+                  <span className="text-white font-bold flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-white/40 mr-1" />
+                    {activeMilestone.date}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
+                </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded p-3.5">
+                <p className="text-xs text-white/60 leading-relaxed">
+                  {activeMilestone.description}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-white/40 font-mono text-xs">
+              No milestones available for this stock.
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
+            <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
+              <span className="inline-flex items-center space-x-1.5">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: ' + '
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(price);
+  };
+  const activeMilestonePrice = activeMilestone ? getAccuratePrice(activeMilestone) : undefined;
+  const activeMilestonePriceApproximate = Boolean(
+    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(activeMilestone.date.trim())
+  );
+
+  // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
+  // and human-readable exact dates (e.g. "May 5, 2026") to the closest trading day.
+  const chartMilestoneDates = stockMilestones.map(milestone => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.date)) {
+      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null, approximate: false };
+    }
+    const monthYear = milestone.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
+    if (monthYear) {
+      const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+      const year = Number(monthYear[2]);
+      const monthPoints = chartHistory
+        .filter(point => {
+          const date = new Date(point.date + 'T00:00:00Z');
+          return date.getUTCFullYear() === year && date.getUTCMonth() === month;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null, approximate: true };
+    }
+    const parsed = Date.parse(milestone.date);
+    if (!Number.isFinite(parsed)) return { milestone, chartDate: null, approximate: false };
+    const requestedDate = new Date(parsed).toISOString().slice(0, 10);
+    const exactPoint = chartHistory.find(point => point.date === requestedDate);
+    if (exactPoint) return { milestone, chartDate: exactPoint.date, approximate: false };
+    const requestedMs = Date.parse(requestedDate + 'T00:00:00Z');
+    const nearby = chartHistory
+      .map(point => ({ point, distance: Math.abs(Date.parse(point.date + 'T00:00:00Z') - requestedMs) / 86400000 }))
+      .filter(item => item.distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0];
+    return { milestone, chartDate: nearby?.point.date || null, approximate: Boolean(nearby) };
+  }).filter(item => item.chartDate);
+  const chartData = chartHistory.map((pt) => {
+    const matchingEvents = chartMilestoneDates.filter(item => item.chartDate === pt.date);
+    const eventsAtDate = matchingEvents.map(item => item.milestone);
+    const milestone = eventsAtDate[0];
+    return {
+      ...pt,
+      milestone: milestone ? eventsAtDate.map(item => item.title).join(' · ') : null,
+      milestoneId: milestone ? milestone.id : null,
+      milestonePrice: milestone ? getAccuratePrice(milestone) : null,
+      milestoneApproximate: matchingEvents.some(item => item.approximate),
+      milestoneCount: eventsAtDate.length,
+    };
+  });
+
+
+  // Custom tool tip for chart
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const pt = payload[0].payload;
+      return (
+        <div className="bg-[#15181E] border border-white/15 p-3 rounded shadow-xl text-xs space-y-1 font-mono">
+          <p className="text-white/40">{pt.date}</p>
+          <p className="text-white font-bold">Stock Price: ${formatPrice(pt.price)}</p>
+          {pt.milestone && (
+            <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
               ★ {pt.milestone} (Price: ${formatPrice(pt.milestonePrice)})
               {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
             </div>
@@ -762,6 +1348,1994 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                 <Award className="w-4 h-4 text-emerald-400" />
                 <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: 
               </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(price);
+  };
+  const activeMilestonePrice = activeMilestone ? getAccuratePrice(activeMilestone) : undefined;
+  const activeMilestonePriceApproximate = Boolean(
+    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(activeMilestone.date.trim())
+  );
+
+  // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
+  // and human-readable exact dates (e.g. "May 5, 2026") to the closest trading day.
+  const chartMilestoneDates = stockMilestones.map(milestone => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.date)) {
+      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null, approximate: false };
+    }
+    const monthYear = milestone.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
+    if (monthYear) {
+      const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+      const year = Number(monthYear[2]);
+      const monthPoints = chartHistory
+        .filter(point => {
+          const date = new Date(point.date + 'T00:00:00Z');
+          return date.getUTCFullYear() === year && date.getUTCMonth() === month;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null, approximate: true };
+    }
+    const parsed = Date.parse(milestone.date);
+    if (!Number.isFinite(parsed)) return { milestone, chartDate: null, approximate: false };
+    const requestedDate = new Date(parsed).toISOString().slice(0, 10);
+    const exactPoint = chartHistory.find(point => point.date === requestedDate);
+    if (exactPoint) return { milestone, chartDate: exactPoint.date, approximate: false };
+    const requestedMs = Date.parse(requestedDate + 'T00:00:00Z');
+    const nearby = chartHistory
+      .map(point => ({ point, distance: Math.abs(Date.parse(point.date + 'T00:00:00Z') - requestedMs) / 86400000 }))
+      .filter(item => item.distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0];
+    return { milestone, chartDate: nearby?.point.date || null, approximate: Boolean(nearby) };
+  }).filter(item => item.chartDate);
+  const chartData = chartHistory.map((pt) => {
+    const matchingEvents = chartMilestoneDates.filter(item => item.chartDate === pt.date);
+    const eventsAtDate = matchingEvents.map(item => item.milestone);
+    const milestone = eventsAtDate[0];
+    return {
+      ...pt,
+      milestone: milestone ? eventsAtDate.map(item => item.title).join(' · ') : null,
+      milestoneId: milestone ? milestone.id : null,
+      milestonePrice: milestone ? getAccuratePrice(milestone) : null,
+      milestoneApproximate: matchingEvents.some(item => item.approximate),
+      milestoneCount: eventsAtDate.length,
+    };
+  });
+
+
+  // Custom tool tip for chart
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const pt = payload[0].payload;
+      return (
+        <div className="bg-[#15181E] border border-white/15 p-3 rounded shadow-xl text-xs space-y-1 font-mono">
+          <p className="text-white/40">{pt.date}</p>
+          <p className="text-white font-bold">Stock Price: ${formatPrice(pt.price)}</p>
+          {pt.milestone && (
+            <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
+              ★ {pt.milestone} (Price: ${formatPrice(pt.milestonePrice)})
+              {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6" id="tracker-view">
+      {/* Page Header */}
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 03 / Markets</span>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+          Build-Out &amp; Stock Price Progress Tracker
+        </h1>
+        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
+          Observe how concrete progression events—data center scaling, chip validation, and cloud leases—correlate with historical stock prices in real-time.
+        </p>
+      </div>
+
+      {/* Stock Selection + Arbitrary Ticker Search */}
+      <div className="space-y-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+              Track any public ticker
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
+                <input
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tickerInput.trim()) {
+                      void resolveAndTrack();
+                    }
+                  }}
+                  placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void resolveAndTrack();
+                }}
+                className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
+              >
+                {tickerResolving ? 'Resolving…' : 'Track'}
+              </button>
+            </div>
+            <p className="text-[9px] text-white/30 font-mono mt-1.5">
+              Enter a ticker or company name. Company names are resolved against the SEC public company ticker directory, then loaded from live market history and recent SEC 8-K milestones.
+            </p>
+            {resolvedIssuer && (
+              <p className="text-[9px] text-cyan-300/80 font-mono mt-1">
+                Resolved: {resolvedIssuer} → {selectedStock}
+              </p>
+            )}
+            {tickerResolveError && (
+              <p className="text-[9px] text-amber-300 font-mono mt-1">
+                {tickerResolveError}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Saved tracker tickers</span>
+            <button
+              type="button"
+              onClick={() => setCustomizeTracker(value => !value)}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-white/5 text-[9px] font-mono font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              aria-expanded={customizeTracker}
+            >
+              {customizeTracker ? 'Done' : 'Customize'}
+            </button>
+          </div>
+          {customizeTracker && (
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[.03] p-2.5 text-[9px] font-mono text-white/45">
+              Search any public ticker or company above to add it. Use × on a chip to remove it from your saved tracker list.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {trackerSymbols.map((symbol) => {
+              const isSelected = selectedStock === symbol;
+              const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+              return (
+                <div
+                  key={symbol}
+                  className={`inline-flex items-center rounded border transition ${
+                    isSelected
+                      ? 'bg-white text-black border-white'
+                      : 'bg-white/5 text-white/60 border-white/10'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(symbol);
+                      setTickerInput('');
+                      setActiveMilestoneId(null);
+                    }}
+                    className="px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer hover:opacity-90"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span>{symbol}</span>
+                    </span>
+                  </button>
+                  {customizeTracker && (
+                    <button
+                      type="button"
+                      onClick={() => removeTrackerSymbol(symbol)}
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 cursor-pointer"
+                      aria-label={`Remove ${symbol} from saved tracker tickers`}
+                      title={`Remove ${symbol}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : projectDiscoveryDegraded ? <AlertCircle className="w-3.5 h-3.5 text-amber-300" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          <span>
+            {secMilestoneLoading
+              ? 'Checking SEC filings, company announcements, news and X…'
+              : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
+          </span>
+          {!secMilestoneLoading && milestoneRetrievedAt && (
+            <span className="text-[10px] text-white/35 normal-case tracking-normal">
+              Last checked {new Date(milestoneRetrievedAt).toLocaleTimeString()}
+            </span>
+          )}
+          {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
+          {milestoneSourceStatus?.x?.status === 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Direct X API is not connected; available web/news search still runs.
+            </span>
+          )}
+          {milestoneSourceStatus?.x?.status === 'credentials-rejected' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X credentials were rejected; check X_BEARER_TOKEN in server settings.</span>
+          )}
+          {milestoneSourceStatus?.x?.error && milestoneSourceStatus.x.status !== 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X search: {milestoneSourceStatus.x.error}</span>
+          )}
+          {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
+          {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {milestoneSourceStatus?.web?.status === 'unavailable' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
+          )}
+          {Boolean(milestoneSourceStatus?.web?.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Backup news-search diagnostics: {milestoneSourceStatus?.web?.errors?.slice(0, 2).join(' · ')}
+            </span>
+          )}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+          <div>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const requestedSymbol = selectedStock;
+              setSecMilestoneLoading(true);
+              setSecMilestoneError(null);
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
+                .then(async response => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' results instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
+                  setMilestoneSourceStatus(payload.sourceStatus || null);
+                  setMilestoneRetrievedAt(payload.retrievedAt || null);
+                })
+                .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
+                .finally(() => setSecMilestoneLoading(false));
+            }}
+            disabled={secMilestoneLoading}
+            className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+            data-testid="tracker-refresh-project-updates"
+          >
+            {secMilestoneLoading ? 'Refreshing…' : 'Refresh updates'}
+          </button>
+        </div>
+        {externalProjectUpdates.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {externalProjectUpdates.slice(0, 8).map(item => {
+              const official = item.sourceType === 'official-company' || item.sourceType === 'official-social';
+              const social = item.sourceType === 'official-social' || item.sourceType === 'social-post';
+              const className = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-100'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const label = item.sourceType === 'official-company'
+                ? 'Official company update'
+                : item.sourceType === 'official-social'
+                  ? 'Official company X post'
+                  : item.sourceType === 'social-post'
+                    ? 'Social post · confirm source'
+                    : item.sourceType === 'syndicated-release'
+                      ? 'Syndicated release · verify original'
+                      : 'News lead · not confirmed';
+              return (
+                <article key={item.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + className}>{label}</span>
+                    {item.category && <span className="text-[10px] text-white/40">{item.category}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{item.description}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{item.source || 'Source not identified'} · {updateDateLabel(item)}</span>
+                    {(item.sourceUrl || item.url) && (
+                      <a href={item.sourceUrl || item.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                        Open source ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.relatedSources?.length ? (
+                    <div className="text-[10px] text-white/35">Additional matching sources: {item.relatedSources.length}</div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            {secMilestoneLoading ? 'Searching for recent updates…' : 'No recent company or social updates matched this ticker. SEC filing events and curated milestones remain available below.'}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35 leading-relaxed">
+          A company post is a reported update, not independent proof that construction is complete. We show dated sources and keep secondary news separate from official company evidence.
+        </p>
+      </section>
+
+      {/* Interactive Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart Column */}
+        <div className="lg:col-span-2 bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black uppercase italic tracking-tight text-white">{currentMeta.name} ({selectedStock})</h2>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase">{currentMeta.sector}</span>
+            </div>
+            <div className="text-right text-[10px] font-mono font-bold uppercase tracking-wider bg-white/5 border border-white/10 px-3 py-1.5 rounded text-white/60">
+              Interactive Milestone Overlay
+            </div>
+          </div>
+
+          {/* Recharts Wrapper */}
+          <div className="h-64 md:h-80 w-full bg-[#0F1115] rounded-xl p-2 border border-white/5">
+            {historyLoading && <div className="text-[10px] font-mono text-white/40 p-2">Loading verified daily market history…</div>}
+            {!historyLoading && historyError && <div className="text-[10px] font-mono text-amber-300 p-2">{historyError}</div>}
+            {!historyLoading && !historyError && chartHistory.length === 0 && <div className="text-[10px] font-mono text-white/40 p-2">No public market history is available for this symbol.</div>}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+                <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <YAxis stroke="#64748b" domain={['auto', 'auto']} style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={currentMeta.logoColor}
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6 }}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload.milestone) {
+                      const isActive = payload.milestoneId === activeMilestone?.id;
+                      return (
+                        <circle
+                          key={payload.date}
+                          cx={cx}
+                          cy={cy}
+                          r={isActive ? 8 : 5}
+                          fill="#15803d"
+                          stroke="#4ade80"
+                          strokeWidth={isActive ? 3 : 1.5}
+                          className="cursor-pointer animate-pulse"
+                          onClick={() => setActiveMilestoneId(payload.milestoneId)}
+                        />
+                      );
+                    }
+                    return <circle key={payload.date} cx={cx} cy={cy} r={2} fill={currentMeta.logoColor} />;
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 text-center">
+            ★ Click any green milestone dot on the chart to read event briefs and stock valuation impacts.
+          </p>
+        </div>
+
+        {/* Milestone Detail Sidebar */}
+        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4 min-h-0">
+          {activeMilestone ? (
+            <div className="space-y-4 max-h-[420px] lg:max-h-[520px] overflow-y-auto pr-2 aiw-scroll-region min-h-0">
+              <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Selected Progression</span>
+                  <h3 className="text-base font-black uppercase tracking-tight text-white mt-1 leading-tight">{activeMilestone.title}</h3>
+                </div>
+                <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded ${
+                  activeMilestone.status === 'done'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : activeMilestone.status === 'active'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-white/5 text-white/40 border border-white/10'
+                }`}>
+                  {activeMilestone.status === 'done' && 'DONE'}
+                  {activeMilestone.status === 'active' && 'IN PROGRESS'}
+                  {activeMilestone.status === 'planned' && 'PLANNED'}
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between">
+                  <span className="text-white/40">Milestone Date:</span>
+                  <span className="text-white font-bold flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-white/40 mr-1" />
+                    {activeMilestone.date}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
+                </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded p-3.5">
+                <p className="text-xs text-white/60 leading-relaxed">
+                  {activeMilestone.description}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-white/40 font-mono text-xs">
+              No milestones available for this stock.
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
+            <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
+              <span className="inline-flex items-center space-x-1.5">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: 
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(pt.milestonePrice)})
+              {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6" id="tracker-view">
+      {/* Page Header */}
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 03 / Markets</span>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+          Build-Out &amp; Stock Price Progress Tracker
+        </h1>
+        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
+          Observe how concrete progression events—data center scaling, chip validation, and cloud leases—correlate with historical stock prices in real-time.
+        </p>
+      </div>
+
+      {/* Stock Selection + Arbitrary Ticker Search */}
+      <div className="space-y-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+              Track any public ticker
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
+                <input
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tickerInput.trim()) {
+                      void resolveAndTrack();
+                    }
+                  }}
+                  placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void resolveAndTrack();
+                }}
+                className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
+              >
+                {tickerResolving ? 'Resolving…' : 'Track'}
+              </button>
+            </div>
+            <p className="text-[9px] text-white/30 font-mono mt-1.5">
+              Enter a ticker or company name. Company names are resolved against the SEC public company ticker directory, then loaded from live market history and recent SEC 8-K milestones.
+            </p>
+            {resolvedIssuer && (
+              <p className="text-[9px] text-cyan-300/80 font-mono mt-1">
+                Resolved: {resolvedIssuer} → {selectedStock}
+              </p>
+            )}
+            {tickerResolveError && (
+              <p className="text-[9px] text-amber-300 font-mono mt-1">
+                {tickerResolveError}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Saved tracker tickers</span>
+            <button
+              type="button"
+              onClick={() => setCustomizeTracker(value => !value)}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-white/5 text-[9px] font-mono font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              aria-expanded={customizeTracker}
+            >
+              {customizeTracker ? 'Done' : 'Customize'}
+            </button>
+          </div>
+          {customizeTracker && (
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[.03] p-2.5 text-[9px] font-mono text-white/45">
+              Search any public ticker or company above to add it. Use × on a chip to remove it from your saved tracker list.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {trackerSymbols.map((symbol) => {
+              const isSelected = selectedStock === symbol;
+              const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+              return (
+                <div
+                  key={symbol}
+                  className={`inline-flex items-center rounded border transition ${
+                    isSelected
+                      ? 'bg-white text-black border-white'
+                      : 'bg-white/5 text-white/60 border-white/10'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(symbol);
+                      setTickerInput('');
+                      setActiveMilestoneId(null);
+                    }}
+                    className="px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer hover:opacity-90"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span>{symbol}</span>
+                    </span>
+                  </button>
+                  {customizeTracker && (
+                    <button
+                      type="button"
+                      onClick={() => removeTrackerSymbol(symbol)}
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 cursor-pointer"
+                      aria-label={`Remove ${symbol} from saved tracker tickers`}
+                      title={`Remove ${symbol}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : projectDiscoveryDegraded ? <AlertCircle className="w-3.5 h-3.5 text-amber-300" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          <span>
+            {secMilestoneLoading
+              ? 'Checking SEC filings, company announcements, news and X…'
+              : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
+          </span>
+          {!secMilestoneLoading && milestoneRetrievedAt && (
+            <span className="text-[10px] text-white/35 normal-case tracking-normal">
+              Last checked {new Date(milestoneRetrievedAt).toLocaleTimeString()}
+            </span>
+          )}
+          {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
+          {milestoneSourceStatus?.x?.status === 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Direct X API is not connected; available web/news search still runs.
+            </span>
+          )}
+          {milestoneSourceStatus?.x?.status === 'credentials-rejected' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X credentials were rejected; check X_BEARER_TOKEN in server settings.</span>
+          )}
+          {milestoneSourceStatus?.x?.error && milestoneSourceStatus.x.status !== 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X search: {milestoneSourceStatus.x.error}</span>
+          )}
+          {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
+          {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {milestoneSourceStatus?.web?.status === 'unavailable' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
+          )}
+          {Boolean(milestoneSourceStatus?.web?.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Backup news-search diagnostics: {milestoneSourceStatus?.web?.errors?.slice(0, 2).join(' · ')}
+            </span>
+          )}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+          <div>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const requestedSymbol = selectedStock;
+              setSecMilestoneLoading(true);
+              setSecMilestoneError(null);
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
+                .then(async response => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' results instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
+                  setMilestoneSourceStatus(payload.sourceStatus || null);
+                  setMilestoneRetrievedAt(payload.retrievedAt || null);
+                })
+                .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
+                .finally(() => setSecMilestoneLoading(false));
+            }}
+            disabled={secMilestoneLoading}
+            className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+            data-testid="tracker-refresh-project-updates"
+          >
+            {secMilestoneLoading ? 'Refreshing…' : 'Refresh updates'}
+          </button>
+        </div>
+        {externalProjectUpdates.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {externalProjectUpdates.slice(0, 8).map(item => {
+              const official = item.sourceType === 'official-company' || item.sourceType === 'official-social';
+              const social = item.sourceType === 'official-social' || item.sourceType === 'social-post';
+              const className = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-100'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const label = item.sourceType === 'official-company'
+                ? 'Official company update'
+                : item.sourceType === 'official-social'
+                  ? 'Official company X post'
+                  : item.sourceType === 'social-post'
+                    ? 'Social post · confirm source'
+                    : item.sourceType === 'syndicated-release'
+                      ? 'Syndicated release · verify original'
+                      : 'News lead · not confirmed';
+              return (
+                <article key={item.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + className}>{label}</span>
+                    {item.category && <span className="text-[10px] text-white/40">{item.category}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{item.description}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{item.source || 'Source not identified'} · {updateDateLabel(item)}</span>
+                    {(item.sourceUrl || item.url) && (
+                      <a href={item.sourceUrl || item.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                        Open source ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.relatedSources?.length ? (
+                    <div className="text-[10px] text-white/35">Additional matching sources: {item.relatedSources.length}</div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            {secMilestoneLoading ? 'Searching for recent updates…' : 'No recent company or social updates matched this ticker. SEC filing events and curated milestones remain available below.'}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35 leading-relaxed">
+          A company post is a reported update, not independent proof that construction is complete. We show dated sources and keep secondary news separate from official company evidence.
+        </p>
+      </section>
+
+      {/* Interactive Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart Column */}
+        <div className="lg:col-span-2 bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black uppercase italic tracking-tight text-white">{currentMeta.name} ({selectedStock})</h2>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase">{currentMeta.sector}</span>
+            </div>
+            <div className="text-right text-[10px] font-mono font-bold uppercase tracking-wider bg-white/5 border border-white/10 px-3 py-1.5 rounded text-white/60">
+              Interactive Milestone Overlay
+            </div>
+          </div>
+
+          {/* Recharts Wrapper */}
+          <div className="h-64 md:h-80 w-full bg-[#0F1115] rounded-xl p-2 border border-white/5">
+            {historyLoading && <div className="text-[10px] font-mono text-white/40 p-2">Loading verified daily market history…</div>}
+            {!historyLoading && historyError && <div className="text-[10px] font-mono text-amber-300 p-2">{historyError}</div>}
+            {!historyLoading && !historyError && chartHistory.length === 0 && <div className="text-[10px] font-mono text-white/40 p-2">No public market history is available for this symbol.</div>}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+                <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <YAxis stroke="#64748b" domain={['auto', 'auto']} style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={currentMeta.logoColor}
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6 }}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload.milestone) {
+                      const isActive = payload.milestoneId === activeMilestone?.id;
+                      return (
+                        <circle
+                          key={payload.date}
+                          cx={cx}
+                          cy={cy}
+                          r={isActive ? 8 : 5}
+                          fill="#15803d"
+                          stroke="#4ade80"
+                          strokeWidth={isActive ? 3 : 1.5}
+                          className="cursor-pointer animate-pulse"
+                          onClick={() => setActiveMilestoneId(payload.milestoneId)}
+                        />
+                      );
+                    }
+                    return <circle key={payload.date} cx={cx} cy={cy} r={2} fill={currentMeta.logoColor} />;
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 text-center">
+            ★ Click any green milestone dot on the chart to read event briefs and stock valuation impacts.
+          </p>
+        </div>
+
+        {/* Milestone Detail Sidebar */}
+        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4 min-h-0">
+          {activeMilestone ? (
+            <div className="space-y-4 max-h-[420px] lg:max-h-[520px] overflow-y-auto pr-2 aiw-scroll-region min-h-0">
+              <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Selected Progression</span>
+                  <h3 className="text-base font-black uppercase tracking-tight text-white mt-1 leading-tight">{activeMilestone.title}</h3>
+                </div>
+                <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded ${
+                  activeMilestone.status === 'done'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : activeMilestone.status === 'active'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-white/5 text-white/40 border border-white/10'
+                }`}>
+                  {activeMilestone.status === 'done' && 'DONE'}
+                  {activeMilestone.status === 'active' && 'IN PROGRESS'}
+                  {activeMilestone.status === 'planned' && 'PLANNED'}
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between">
+                  <span className="text-white/40">Milestone Date:</span>
+                  <span className="text-white font-bold flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-white/40 mr-1" />
+                    {activeMilestone.date}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
+                </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded p-3.5">
+                <p className="text-xs text-white/60 leading-relaxed">
+                  {activeMilestone.description}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-white/40 font-mono text-xs">
+              No milestones available for this stock.
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
+            <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
+              <span className="inline-flex items-center space-x-1.5">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: ' + '
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(price);
+  };
+  const activeMilestonePrice = activeMilestone ? getAccuratePrice(activeMilestone) : undefined;
+  const activeMilestonePriceApproximate = Boolean(
+    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(activeMilestone.date.trim())
+  );
+
+  // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
+  // and human-readable exact dates (e.g. "May 5, 2026") to the closest trading day.
+  const chartMilestoneDates = stockMilestones.map(milestone => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.date)) {
+      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null, approximate: false };
+    }
+    const monthYear = milestone.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
+    if (monthYear) {
+      const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+      const year = Number(monthYear[2]);
+      const monthPoints = chartHistory
+        .filter(point => {
+          const date = new Date(point.date + 'T00:00:00Z');
+          return date.getUTCFullYear() === year && date.getUTCMonth() === month;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null, approximate: true };
+    }
+    const parsed = Date.parse(milestone.date);
+    if (!Number.isFinite(parsed)) return { milestone, chartDate: null, approximate: false };
+    const requestedDate = new Date(parsed).toISOString().slice(0, 10);
+    const exactPoint = chartHistory.find(point => point.date === requestedDate);
+    if (exactPoint) return { milestone, chartDate: exactPoint.date, approximate: false };
+    const requestedMs = Date.parse(requestedDate + 'T00:00:00Z');
+    const nearby = chartHistory
+      .map(point => ({ point, distance: Math.abs(Date.parse(point.date + 'T00:00:00Z') - requestedMs) / 86400000 }))
+      .filter(item => item.distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0];
+    return { milestone, chartDate: nearby?.point.date || null, approximate: Boolean(nearby) };
+  }).filter(item => item.chartDate);
+  const chartData = chartHistory.map((pt) => {
+    const matchingEvents = chartMilestoneDates.filter(item => item.chartDate === pt.date);
+    const eventsAtDate = matchingEvents.map(item => item.milestone);
+    const milestone = eventsAtDate[0];
+    return {
+      ...pt,
+      milestone: milestone ? eventsAtDate.map(item => item.title).join(' · ') : null,
+      milestoneId: milestone ? milestone.id : null,
+      milestonePrice: milestone ? getAccuratePrice(milestone) : null,
+      milestoneApproximate: matchingEvents.some(item => item.approximate),
+      milestoneCount: eventsAtDate.length,
+    };
+  });
+
+
+  // Custom tool tip for chart
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const pt = payload[0].payload;
+      return (
+        <div className="bg-[#15181E] border border-white/15 p-3 rounded shadow-xl text-xs space-y-1 font-mono">
+          <p className="text-white/40">{pt.date}</p>
+          <p className="text-white font-bold">Stock Price: ${formatPrice(pt.price)}</p>
+          {pt.milestone && (
+            <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
+              ★ {pt.milestone} (Price: ${formatPrice(pt.milestonePrice)})
+              {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6" id="tracker-view">
+      {/* Page Header */}
+      <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 03 / Markets</span>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+          Build-Out &amp; Stock Price Progress Tracker
+        </h1>
+        <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
+          Observe how concrete progression events—data center scaling, chip validation, and cloud leases—correlate with historical stock prices in real-time.
+        </p>
+      </div>
+
+      {/* Stock Selection + Arbitrary Ticker Search */}
+      <div className="space-y-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+              Track any public ticker
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
+                <input
+                  value={tickerInput}
+                  onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tickerInput.trim()) {
+                      void resolveAndTrack();
+                    }
+                  }}
+                  placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void resolveAndTrack();
+                }}
+                className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider hover:bg-emerald-400 transition cursor-pointer"
+              >
+                {tickerResolving ? 'Resolving…' : 'Track'}
+              </button>
+            </div>
+            <p className="text-[9px] text-white/30 font-mono mt-1.5">
+              Enter a ticker or company name. Company names are resolved against the SEC public company ticker directory, then loaded from live market history and recent SEC 8-K milestones.
+            </p>
+            {resolvedIssuer && (
+              <p className="text-[9px] text-cyan-300/80 font-mono mt-1">
+                Resolved: {resolvedIssuer} → {selectedStock}
+              </p>
+            )}
+            {tickerResolveError && (
+              <p className="text-[9px] text-amber-300 font-mono mt-1">
+                {tickerResolveError}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">Saved tracker tickers</span>
+            <button
+              type="button"
+              onClick={() => setCustomizeTracker(value => !value)}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-white/5 text-[9px] font-mono font-bold uppercase tracking-wider text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              aria-expanded={customizeTracker}
+            >
+              {customizeTracker ? 'Done' : 'Customize'}
+            </button>
+          </div>
+          {customizeTracker && (
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/[.03] p-2.5 text-[9px] font-mono text-white/45">
+              Search any public ticker or company above to add it. Use × on a chip to remove it from your saved tracker list.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {trackerSymbols.map((symbol) => {
+              const isSelected = selectedStock === symbol;
+              const color = STOCK_METADATA[symbol]?.logoColor || '#94a3b8';
+              return (
+                <div
+                  key={symbol}
+                  className={`inline-flex items-center rounded border transition ${
+                    isSelected
+                      ? 'bg-white text-black border-white'
+                      : 'bg-white/5 text-white/60 border-white/10'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStock(symbol);
+                      setTickerInput('');
+                      setActiveMilestoneId(null);
+                    }}
+                    className="px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer hover:opacity-90"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span>{symbol}</span>
+                    </span>
+                  </button>
+                  {customizeTracker && (
+                    <button
+                      type="button"
+                      onClick={() => removeTrackerSymbol(symbol)}
+                      className="mr-1 p-1 rounded text-white/30 hover:text-rose-300 hover:bg-rose-300/10 cursor-pointer"
+                      aria-label={`Remove ${symbol} from saved tracker tickers`}
+                      title={`Remove ${symbol}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : projectDiscoveryDegraded ? <AlertCircle className="w-3.5 h-3.5 text-amber-300" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          <span>
+            {secMilestoneLoading
+              ? 'Checking SEC filings, company announcements, news and X…'
+              : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
+          </span>
+          {!secMilestoneLoading && milestoneRetrievedAt && (
+            <span className="text-[10px] text-white/35 normal-case tracking-normal">
+              Last checked {new Date(milestoneRetrievedAt).toLocaleTimeString()}
+            </span>
+          )}
+          {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
+          {milestoneSourceStatus?.x?.status === 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Direct X API is not connected; available web/news search still runs.
+            </span>
+          )}
+          {milestoneSourceStatus?.x?.status === 'credentials-rejected' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X credentials were rejected; check X_BEARER_TOKEN in server settings.</span>
+          )}
+          {milestoneSourceStatus?.x?.error && milestoneSourceStatus.x.status !== 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X search: {milestoneSourceStatus.x.error}</span>
+          )}
+          {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
+          {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {milestoneSourceStatus?.web?.status === 'unavailable' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">News and company-site search is unavailable; SEC results remain separate.</span>
+          )}
+          {Boolean(milestoneSourceStatus?.web?.errors?.length) && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Backup news-search diagnostics: {milestoneSourceStatus?.web?.errors?.slice(0, 2).join(' · ')}
+            </span>
+          )}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+          <div>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const requestedSymbol = selectedStock;
+              setSecMilestoneLoading(true);
+              setSecMilestoneError(null);
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
+                .then(async response => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' results instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
+                  setMilestoneSourceStatus(payload.sourceStatus || null);
+                  setMilestoneRetrievedAt(payload.retrievedAt || null);
+                })
+                .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
+                .finally(() => setSecMilestoneLoading(false));
+            }}
+            disabled={secMilestoneLoading}
+            className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+            data-testid="tracker-refresh-project-updates"
+          >
+            {secMilestoneLoading ? 'Refreshing…' : 'Refresh updates'}
+          </button>
+        </div>
+        {externalProjectUpdates.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {externalProjectUpdates.slice(0, 8).map(item => {
+              const official = item.sourceType === 'official-company' || item.sourceType === 'official-social';
+              const social = item.sourceType === 'official-social' || item.sourceType === 'social-post';
+              const className = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-100'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const label = item.sourceType === 'official-company'
+                ? 'Official company update'
+                : item.sourceType === 'official-social'
+                  ? 'Official company X post'
+                  : item.sourceType === 'social-post'
+                    ? 'Social post · confirm source'
+                    : item.sourceType === 'syndicated-release'
+                      ? 'Syndicated release · verify original'
+                      : 'News lead · not confirmed';
+              return (
+                <article key={item.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + className}>{label}</span>
+                    {item.category && <span className="text-[10px] text-white/40">{item.category}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{item.description}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{item.source || 'Source not identified'} · {updateDateLabel(item)}</span>
+                    {(item.sourceUrl || item.url) && (
+                      <a href={item.sourceUrl || item.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                        Open source ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.relatedSources?.length ? (
+                    <div className="text-[10px] text-white/35">Additional matching sources: {item.relatedSources.length}</div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            {secMilestoneLoading ? 'Searching for recent updates…' : 'No recent company or social updates matched this ticker. SEC filing events and curated milestones remain available below.'}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35 leading-relaxed">
+          A company post is a reported update, not independent proof that construction is complete. We show dated sources and keep secondary news separate from official company evidence.
+        </p>
+      </section>
+
+      {/* Interactive Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart Column */}
+        <div className="lg:col-span-2 bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black uppercase italic tracking-tight text-white">{currentMeta.name} ({selectedStock})</h2>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase">{currentMeta.sector}</span>
+            </div>
+            <div className="text-right text-[10px] font-mono font-bold uppercase tracking-wider bg-white/5 border border-white/10 px-3 py-1.5 rounded text-white/60">
+              Interactive Milestone Overlay
+            </div>
+          </div>
+
+          {/* Recharts Wrapper */}
+          <div className="h-64 md:h-80 w-full bg-[#0F1115] rounded-xl p-2 border border-white/5">
+            {historyLoading && <div className="text-[10px] font-mono text-white/40 p-2">Loading verified daily market history…</div>}
+            {!historyLoading && historyError && <div className="text-[10px] font-mono text-amber-300 p-2">{historyError}</div>}
+            {!historyLoading && !historyError && chartHistory.length === 0 && <div className="text-[10px] font-mono text-white/40 p-2">No public market history is available for this symbol.</div>}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+                <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <YAxis stroke="#64748b" domain={['auto', 'auto']} style={{ fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 700 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={currentMeta.logoColor}
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6 }}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload.milestone) {
+                      const isActive = payload.milestoneId === activeMilestone?.id;
+                      return (
+                        <circle
+                          key={payload.date}
+                          cx={cx}
+                          cy={cy}
+                          r={isActive ? 8 : 5}
+                          fill="#15803d"
+                          stroke="#4ade80"
+                          strokeWidth={isActive ? 3 : 1.5}
+                          className="cursor-pointer animate-pulse"
+                          onClick={() => setActiveMilestoneId(payload.milestoneId)}
+                        />
+                      );
+                    }
+                    return <circle key={payload.date} cx={cx} cy={cy} r={2} fill={currentMeta.logoColor} />;
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-[10px] font-mono uppercase tracking-wider text-white/40 text-center">
+            ★ Click any green milestone dot on the chart to read event briefs and stock valuation impacts.
+          </p>
+        </div>
+
+        {/* Milestone Detail Sidebar */}
+        <div className="bg-[#15181E]/40 border border-white/10 rounded-2xl p-5 flex flex-col justify-between space-y-4 min-h-0">
+          {activeMilestone ? (
+            <div className="space-y-4 max-h-[420px] lg:max-h-[520px] overflow-y-auto pr-2 aiw-scroll-region min-h-0">
+              <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Selected Progression</span>
+                  <h3 className="text-base font-black uppercase tracking-tight text-white mt-1 leading-tight">{activeMilestone.title}</h3>
+                </div>
+                <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded ${
+                  activeMilestone.status === 'done'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : activeMilestone.status === 'active'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-white/5 text-white/40 border border-white/10'
+                }`}>
+                  {activeMilestone.status === 'done' && 'DONE'}
+                  {activeMilestone.status === 'active' && 'IN PROGRESS'}
+                  {activeMilestone.status === 'planned' && 'PLANNED'}
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between">
+                  <span className="text-white/40">Milestone Date:</span>
+                  <span className="text-white font-bold flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-white/40 mr-1" />
+                    {activeMilestone.date}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
+                </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded p-3.5">
+                <p className="text-xs text-white/60 leading-relaxed">
+                  {activeMilestone.description}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-white/40 font-mono text-xs">
+              No milestones available for this stock.
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-white/10 bg-white/5 p-3 rounded border border-white/10">
+            <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
+              <span className="inline-flex items-center space-x-1.5">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: 
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  aria-pressed={isActive}
+                  className={`group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 ${
+                    isActive ? 'bg-white/[.045] text-emerald-400' : 'text-white/60 hover:bg-white/[.025] hover:text-white'
+                  }`}
+                >
+                  <span className={`absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
+              </span>
+              {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
+
+      {/* Timeline of All Stock Milestones */}
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+          {stockMilestones.length === 0 ? (
+            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+          ) : (
+            stockMilestones.map((m) => {
+              const isActive = m.id === activeMilestone?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setActiveMilestoneId(m.id)}
+                  className={`group relative pl-2 cursor-pointer transition ${
+                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {/* Timeline Node Ring */}
+                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
+                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
+                  }`}>
+                    {m.status === 'done' ? (
+                      <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : m.status === 'active' ? (
+                      <Clock className="w-2.5 h-2.5 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="w-2.5 h-2.5 text-white/20" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="text-white/40 font-bold">{m.date}</span>
+                      <span className="text-[10px] text-white/20">|</span>
+                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
+                    </div>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
+                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
+                      {m.description.slice(0, 110)}...
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+
+    </div>
+  );
+} + formatPrice(currentTickerPrice)}</span>
               {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
             </span>
           </div>
