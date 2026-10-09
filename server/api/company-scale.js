@@ -680,7 +680,7 @@ async function handleExecutiveSignals(req, res) {
   const deduped = signals.filter(row => { const key = String(row.url || row.title || '').toLowerCase(); if (!key || seen.has(key)) return false; seen.add(key); return true; }).sort((a,b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
   const configuredProvider = providersUsed.size
     ? [...providersUsed].join(' + ')
-    : (process.env.BRAVE_SEARCH_API_KEY || process.env.TAVILY_API_KEY) ? 'unavailable' : 'google-news-rss';
+    : (providerNotes.length || process.env.BRAVE_SEARCH_API_KEY || process.env.TAVILY_API_KEY) ? 'unavailable' : 'google-news-rss';
   return res.status(200).json({ source: 'executive-signal-discovery', profiles, signals: deduped.slice(0, limit), configuredProvider, degraded: providerNotes.length > 0 || [...providersUsed].some(provider => provider === 'google-news-rss'), providerNotes: [...new Set(providerNotes)].slice(0, 5) });
 }
 function validMilestoneSymbol(symbol) {
