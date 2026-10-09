@@ -47,6 +47,26 @@ describe('forecast validation integration contract', () => {
     assert.equal(summary.directionalAccuracyPct, 100);
     assert.equal(summary.medianAbsoluteError, 2);
     assert.equal(summary.p25p75CoveragePct, 100);
+    const fullSummary = buildForecastValidationSummary([verifiedRow()]);
+    assert.equal(fullSummary.validationGate.verifiedCount, fullSummary.overall.independentCount);
+    assert.equal(fullSummary.validationGate.verifiedCount, 1);
+    assert.equal(fullSummary.validationGate.ready, false);
+  });
+
+  it('opens the API validation gate only when independent total and each horizon threshold are met', () => {
+    const rows = Array.from({ length: 50 }, (_, index) => {
+      const horizon = index < 25 ? 5 : 20;
+      return verifiedRow({
+        ticker: 'TKR' + String(index + 1).padStart(2, '0'),
+        horizon,
+        target_date: horizon === 5 ? '2026-10-08' : '2026-10-29',
+      });
+    });
+    const summary = buildForecastValidationSummary(rows);
+    assert.equal(summary.validationGate.verifiedCount, 50);
+    assert.equal(summary.validationGate.independent5D, 25);
+    assert.equal(summary.validationGate.independent20D, 25);
+    assert.equal(summary.validationGate.ready, true);
   });
 
   it('groups validation by ticker and horizon and returns matching alert context', () => {
