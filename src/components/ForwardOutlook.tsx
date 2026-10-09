@@ -5,7 +5,7 @@ import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfol
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
 import { authHeaders } from '../utils/apiAuth';
-import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
+import { summarizeRange calibration, summarizeValidationMatrix, type Range calibrationBucket } from '../utils/measurement';
 import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { createForecastEvidenceSnapshot, type ForecastEvidenceSnapshot } from '../utils/forecastEvidence';
@@ -258,14 +258,14 @@ type BacktestSummary = {
   baselineMedianAbsoluteError: number;
   directionalLift: number;
   errorLift: number;
-  p25CalibrationGap: number;
-  p90CalibrationGap: number;
-  calibration: CalibrationBucket[];
+  p25Range calibrationGap: number;
+  p90Range calibrationGap: number;
+  calibration: Range calibrationBucket[];
 };
 
 function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSummary {
   if (history.length < 220 + horizon) {
-    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0, baselineDirectionalAccuracy: 0, baselineMedianAbsoluteError: 0, directionalLift: 0, errorLift: 0, p25CalibrationGap: 0, p90CalibrationGap: 0, calibration: [] };
+    return { rows: [], directionalAccuracy: 0, medianAbsoluteError: 0, p25p75Coverage: 0, p10p90Coverage: 0, baselineDirectionalAccuracy: 0, baselineMedianAbsoluteError: 0, directionalLift: 0, errorLift: 0, p25Range calibrationGap: 0, p90Range calibrationGap: 0, calibration: [] };
   }
 
   const regimes = history.map((_, i) => {
@@ -350,9 +350,9 @@ function historicalBacktest(history: PricePoint[], horizon: Horizon): BacktestSu
     baselineMedianAbsoluteError: baseError,
     directionalLift: modelDirectional - baseDirectional,
     errorLift: baseError - modelError,
-    p25CalibrationGap: (rows.length ? middleCovered.length / rows.length : 0) - 0.5,
-    p90CalibrationGap: (rows.length ? wideCovered.length / rows.length : 0) - 0.8,
-    calibration: summarizeCalibration(rows.map(row => ({ confidence: row.positiveProbability, positive: row.actual > 0, excessReturnPct: row.actual - row.median })))
+    p25Range calibrationGap: (rows.length ? middleCovered.length / rows.length : 0) - 0.5,
+    p90Range calibrationGap: (rows.length ? wideCovered.length / rows.length : 0) - 0.8,
+    calibration: summarizeRange calibration(rows.map(row => ({ confidence: row.positiveProbability, positive: row.actual > 0, excessReturnPct: row.actual - row.median })))
   };
 }
 
@@ -437,7 +437,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const [backtest, setBacktest] = useState<BacktestSummary | null>(null);
   const [backtestMessage, setBacktestMessage] = useState<string | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
-  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;calibration:CalibrationBucket[];details:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number}>} | null>(null);
+  const [matrix, setMatrix] = useState<{tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number;calibration:Range calibrationBucket[];details:Array<{ticker:string;horizon:number;tests:number;direction:number;error:number;coverage50:number;coverage80:number;baselineDirection:number;baselineError:number}>} | null>(null);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [jevValidationBusy, setJevValidationBusy] = useState(false);
   const [jevValidation, setJevValidation] = useState<{summary:string; choice?:string; evidenceGate?:string; confidence?:number|string; answerSource?:string} | null>(null);
@@ -1045,7 +1045,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       const summaryRows = histories.flatMap(item => HORIZONS.map(h => ({ ticker: item.ticker, horizon: h.days, summary: historicalBacktest(item.points, h.days) })));
       const summary = summarizeValidationMatrix(summaryRows);
       setMatrix(summary);
-      setMatrixMessage('Validation matrix complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. Results are descriptive averages across valid ticker/horizon backtests.');
+      setMatrixMessage('Stock comparison complete: ' + histories.length + ' tickers × ' + HORIZONS.length + ' horizons. These are descriptive averages across valid stock and forecast-period tests.');
     } catch (err: any) {
       setMatrixMessage(err?.message || 'Validation matrix failed.');
     } finally {
@@ -1085,7 +1085,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Correctly predicted direction: ' + (backtest.directionalAccuracy * 100).toFixed(1) + '%',
         'Typical forecast error: ' + backtest.medianAbsoluteError.toFixed(1) + ' percentage points',
         'Results inside the typical range: ' + (backtest.p25p75Coverage * 100).toFixed(1) + '%',
-        'Calibration buckets: ' + JSON.stringify(backtest.calibration),
+        'Range calibration buckets: ' + JSON.stringify(backtest.calibration),
         'Results inside the wider range: ' + (backtest.p10p90Coverage * 100).toFixed(1) + '%',
         'Recent test rows: ' + JSON.stringify(compactRows),
         'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
@@ -1478,7 +1478,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           initialSort={{ key: 'ticker', direction: 'asc' }}
           columns={[
             { key: 'ticker', header: 'Ticker', accessor: row => row.ticker || '' },
-            { key: 'horizon', header: 'Horizon', accessor: row => row.horizon ?? null, type: 'number', render: row => row.horizon ? (HORIZONS.find(item => item.days === row.horizon)?.label || row.horizon + ' trading days') : '—' },
+            { key: 'horizon', header: 'Forecast period', accessor: row => row.horizon ?? null, type: 'number', render: row => row.horizon ? (HORIZONS.find(item => item.days === row.horizon)?.label || row.horizon + ' trading days') : '—' },
             { key: 'count', header: 'Forecasts', accessor: row => row.count, type: 'number' },
             { key: 'direction', header: 'Direction accuracy', accessor: row => row.directionalAccuracyPct ?? null, type: 'percent', align: 'right', render: row => row.directionalAccuracyPct == null ? '—' : row.directionalAccuracyPct.toFixed(1) + '%' },
             { key: 'error', header: 'Typical forecast error', accessor: row => row.medianAbsoluteError ?? null, type: 'percent', align: 'right', render: row => row.medianAbsoluteError == null ? '—' : row.medianAbsoluteError.toFixed(2) + '%' },
@@ -1499,7 +1499,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         {verificationMessage && <div className="text-[10px] font-mono text-cyan-200/80 border border-cyan-300/10 rounded-xl p-2">{verificationMessage}</div>}
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1 aiw-scroll-region">{forecasts.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 10).map(f => (
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[11px] font-mono">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status}</span></div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status === 'verified' ? 'Verified' : 'Awaiting outcome'}</span></div>
             <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Likely range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
             {f.evidenceSnapshot && <div className="mt-1 text-white/30">
               Saved evidence: {forecastEvidenceState(f.evidenceSnapshot) === 'CAPTURED' ? 'Captured when this forecast was created' : 'Needs review'} · {f.evidenceSnapshot.analystConsensus?.status === 'available' ? 'analyst evidence available' : f.evidenceSnapshot.analystConsensus?.status === 'partial' ? 'analyst evidence partly available' : f.evidenceSnapshot.analystConsensus?.status === 'failed' ? 'analyst data could not be loaded' : 'analyst data not available'} · {
@@ -1600,7 +1600,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                   </div>
                 </div>}
               </div>
-              <div className="text-[11px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · base regime</div>
+              <div className="text-[11px] font-mono text-white/35 uppercase">{selectedStock} · {HORIZONS.find(h => h.days === horizon)?.label} · {backtest.rows.length} historical tests · current market conditions</div>
               <div className="text-[11px] font-mono text-violet-200/60 uppercase">Forecast method: {forecastMethodLabel}{modelConfig?.validation_tests ? ' · tested on ' + modelConfig.validation_tests + ' historical periods' : ''}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Correctly predicted direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.directionalAccuracy*100).toFixed(0)}%</div></div>
@@ -1612,7 +1612,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Simple comparison predicted direction</div><div className="text-sm font-mono font-bold mt-1">{(backtest.baselineDirectionalAccuracy*100).toFixed(0)}%</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Direction accuracy difference</div><div className="text-sm font-mono font-bold mt-1">{backtest.directionalLift >= 0 ? '+' : ''}{(backtest.directionalLift*100).toFixed(0)} percentage points</div></div>
                 <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Forecast error improvement</div><div className="text-sm font-mono font-bold mt-1">{backtest.errorLift >= 0 ? '+' : ''}{backtest.errorLift.toFixed(1)} percentage points</div></div>
-                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Range coverage difference</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25CalibrationGap*100).toFixed(0)} / {(backtest.p90CalibrationGap*100).toFixed(0)} percentage points</div></div>
+                <div className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/25 uppercase font-mono">Range coverage difference</div><div className="text-sm font-mono font-bold mt-1">{(backtest.p25Range calibrationGap*100).toFixed(0)} / {(backtest.p90Range calibrationGap*100).toFixed(0)} percentage points</div></div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
                 {backtest.rows.slice(-8).reverse().map(row => (
@@ -1656,15 +1656,15 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             initialSort={{ key: 'ticker', direction: 'asc' }}
             columns={[
               { key: 'ticker', header: 'Ticker', accessor: row => row.ticker },
-              { key: 'horizon', header: 'Horizon', accessor: row => row.horizon, type: 'number', render: row => HORIZONS.find(item => item.days === row.horizon)?.label || row.horizon + ' trading days' },
+              { key: 'horizon', header: 'Forecast period', accessor: row => row.horizon, type: 'number', render: row => HORIZONS.find(item => item.days === row.horizon)?.label || row.horizon + ' trading days' },
               { key: 'tests', header: 'Tests', accessor: row => row.tests, type: 'number', align: 'right' },
               { key: 'direction', header: 'Direction', accessor: row => row.direction, type: 'percent', align: 'right', render: row => (row.direction * 100).toFixed(0) + '%' },
-              { key: 'baseline', header: 'Baseline', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
+              { key: 'baseline', header: 'Simple comparison', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
               { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
               { key: 'coverage', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
             ]}
           /></div>
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[10px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[10px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' percentage points'}</div></div>)}</div>
         </div>}
       </div>
 
@@ -1672,7 +1672,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4">
           <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-300" /><div><div className="text-[11px] font-mono uppercase tracking-widest text-cyan-200/80">Forecast reliability · calibration</div><div className="text-[10px] text-white/40 mt-1">The confidence range is compared with actual historical outcomes. This measures how well past estimates matched results; it does not change the current forecast.</div></div></div>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-3">
-            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[10px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' pp'}</div></div>)}
+            {backtest.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] font-mono text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'} <span className="text-white/30">vs {bucket.predictedPct.toFixed(0)}%</span></div><div className="text-[10px] text-white/35 mt-1">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' percentage points'}</div></div>)}
           </div>
         </div>
       )}
