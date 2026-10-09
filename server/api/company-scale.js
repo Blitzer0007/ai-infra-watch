@@ -710,9 +710,16 @@ function projectEventCategory(text) {
 }
 
 function projectEventStatus(text) {
-  return /under construction|construction (?:is )?(?:underway|continues|progressing)|currently building|crews are|being built|on track|in progress|commissioning|installing|erecting/i.test(String(text || ''))
-    ? 'active'
-    : 'done';
+  const value = String(text || '');
+  // Only mark completion when the wording explicitly says work is complete or operational.
+  if (/\b(completed|completion of construction|fully operational|operations began|commenced operations|commissioned|facility opened|phase\s+[12]\s+(?:was\s+)?delivered|connected capacity reached|construction completed)\b/i.test(value)) {
+    return 'done';
+  }
+  // Ambiguous headlines must not be shown as completed; use active only when work is explicitly underway.
+  if (/under construction|construction (?:is )?(?:underway|continues|progressing)|construction update|currently building|building shell|crews are|being built|on track|in progress|progressing|work continues|commissioning|installing|erecting|groundbreaking|ground broken/i.test(value)) {
+    return 'active';
+  }
+  return 'planned';
 }
 
 function mapDiscoveredProjectEvent(symbol, row, profile, provider) {
