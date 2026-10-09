@@ -263,7 +263,7 @@ export function buildForecastValidationSummary(rows = []) {
       minimumRequired: FORECAST_VALIDATION_MINIMUM,
       minimum5D: 25,
       minimum20D: 25,
-      verifiedCount: overall.independentSampleSize,
+      verifiedCount: independent.length,
       independent5D: independent.filter(row => Number(row.horizon) === 5).length,
       independent20D: independent.filter(row => Number(row.horizon) === 20).length,
       ready: overall.independentSampleSize >= FORECAST_VALIDATION_MINIMUM &&
