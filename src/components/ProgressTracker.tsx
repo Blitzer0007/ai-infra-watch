@@ -209,8 +209,8 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
     ? historyData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
     : null;
-  const externalProjectUpdates = secMilestones.filter(m => Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
-  const verifiedSecMilestoneCount = secMilestones.filter(m => m.sourceType === 'sec-primary').length;
+  const externalProjectUpdates = secMilestones.filter(m => m.stockSymbol === selectedStock && Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
+  const verifiedSecMilestoneCount = secMilestones.filter(m => m.stockSymbol === selectedStock && m.sourceType === 'sec-primary').length;
   const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
   const updateDateLabel = (m: Milestone) => m.publishedAt
     ? new Date(m.publishedAt).toLocaleString()
