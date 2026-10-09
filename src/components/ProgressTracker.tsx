@@ -80,9 +80,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [milestones] = useState<Milestone[]>(INITIAL_MILESTONES);
   const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<{ date: string; price: number }[]>([]);
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [secMilestones, setSecMilestones] = useState<Milestone[]>([]);
+  const [milestonesSymbol, setMilestonesSymbol] = useState<string | null>(null);
   const [secMilestoneLoading, setSecMilestoneLoading] = useState(false);
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
   const [milestoneSourceStatus, setMilestoneSourceStatus] = useState<{
@@ -125,7 +127,9 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   // Combine the curated timeline with live SEC milestones for the selected symbol.
   const stockMilestones = [
     ...milestones.filter((m) => m.stockSymbol === selectedStock),
-    ...secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+    ...(milestonesSymbol === selectedStock
+      ? secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+      : [])
   ].sort((a, b) => {
     const da = Date.parse(a.date) || 0;
     const db = Date.parse(b.date) || 0;
@@ -138,14 +142,25 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     async function loadHistory() {
       setHistoryLoading(true);
       setHistoryError(null);
+      setHistorySymbol(null);
+      setHistoryData([]);
       try {
-        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y');
+        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y', { cache: 'no-store' });
         if (!res.ok) throw new Error('History request failed: HTTP ' + res.status);
         const data = await res.json();
-        if (!cancelled) setHistoryData(Array.isArray(data.points) ? data.points : []);
+        const responseSymbol = String(data?.symbol || '').trim().toUpperCase();
+        if (responseSymbol && responseSymbol !== selectedStock) {
+          throw new Error('Historical data returned for ' + responseSymbol + ' instead of ' + selectedStock + '.');
+        }
+        if (!Array.isArray(data?.points)) throw new Error('Historical data response is missing price points.');
+        if (!cancelled) {
+          setHistoryData(data.points);
+          setHistorySymbol(selectedStock);
+        }
       } catch (err: any) {
         if (!cancelled) {
           setHistoryData([]);
+          setHistorySymbol(null);
           setHistoryError(err?.message || 'Historical market data unavailable');
         }
       } finally {
@@ -163,20 +178,31 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     async function loadSecMilestones() {
       setSecMilestoneLoading(true);
       setSecMilestoneError(null);
+      setMilestonesSymbol(null);
+      setSecMilestones([]);
+      setMilestoneSourceStatus(null);
+      setMilestoneRetrievedAt(null);
+      setActiveMilestoneId(null);
       try {
-        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12');
+        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12', { cache: 'no-store' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'SEC milestone lookup failed');
+        if (!res.ok) throw new Error(data?.error || 'Milestone lookup failed');
+        const responseSymbol = String(data?.symbol || '').trim().toUpperCase();
+        if (responseSymbol && responseSymbol !== selectedStock) {
+          throw new Error('Milestone results returned for ' + responseSymbol + ' instead of ' + selectedStock + '.');
+        }
         if (!cancelled) {
           const events = Array.isArray(data.events) ? data.events : [];
-          setSecMilestones(events);
+          setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === selectedStock));
+          setMilestonesSymbol(selectedStock);
           setMilestoneSourceStatus(data.sourceStatus || null);
           setMilestoneRetrievedAt(data.retrievedAt || null);
         }
       } catch (err: any) {
         if (!cancelled) {
           setSecMilestones([]);
-          setSecMilestoneError(err?.message || 'Live SEC milestones unavailable');
+          setMilestonesSymbol(null);
+          setSecMilestoneError(err?.message || 'Milestones unavailable');
         }
       } finally {
         if (!cancelled) setSecMilestoneLoading(false);
@@ -186,31 +212,33 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return () => { cancelled = true; };
   }, [selectedStock]);
 
+  const activeHistoryData = historySymbol === selectedStock ? historyData : [];
   const chartHistory = livePrices?.[selectedStock]
     ? (() => {
         const liveObj = livePrices[selectedStock];
         const quoteTimestamp = liveObj.asOf || liveObj.marketTime;
         const parsedQuoteTime = quoteTimestamp ? Date.parse(quoteTimestamp) : NaN;
         // Never place a delayed quote on today's date. Only use a quote when its market date is known.
-        if (liveObj.stale || !Number.isFinite(parsedQuoteTime)) return [...historyData];
+        if (liveObj.stale || !Number.isFinite(parsedQuoteTime)) return [...activeHistoryData];
         const quoteDate = new Date(parsedQuoteTime).toISOString().slice(0, 10);
-        const updated = historyData.map((point) =>
+        const updated = activeHistoryData.map((point) =>
           point.date === quoteDate ? { ...point, price: liveObj.price } : point
         );
         if (updated.some((point) => point.date === quoteDate)) return updated;
-        const lastHistoryDate = historyData[historyData.length - 1]?.date;
+        const lastHistoryDate = activeHistoryData[activeHistoryData.length - 1]?.date;
         return !lastHistoryDate || quoteDate > lastHistoryDate
-          ? [...historyData, { date: quoteDate, price: liveObj.price }].sort((a, b) => a.date.localeCompare(b.date))
-          : [...historyData];
+          ? [...activeHistoryData, { date: quoteDate, price: liveObj.price }].sort((a, b) => a.date.localeCompare(b.date))
+          : [...activeHistoryData];
       })()
-    : [...historyData];
+    : [...activeHistoryData];
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
   const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
-    ? historyData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
+    ? historySymbol === selectedStock && activeHistoryData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
     : null;
-  const externalProjectUpdates = secMilestones.filter(m => m.stockSymbol === selectedStock && Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
-  const verifiedSecMilestoneCount = secMilestones.filter(m => m.stockSymbol === selectedStock && m.sourceType === 'sec-primary').length;
+  const currentTickerMilestones = milestonesSymbol === selectedStock ? secMilestones.filter(m => m.stockSymbol === selectedStock) : [];
+  const externalProjectUpdates = currentTickerMilestones.filter(m => Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
+  const verifiedSecMilestoneCount = currentTickerMilestones.filter(m => m.sourceType === 'sec-primary').length;
   const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
   const projectDiscoveryDegraded = Boolean(secMilestoneError || milestoneSourceStatus?.sec?.error || milestoneSourceStatus?.web?.status === 'unavailable' || (milestoneSourceStatus?.web?.errors?.length || 0) > 0 || (milestoneSourceStatus?.x?.configured && milestoneSourceStatus?.x?.status !== 'available'));
   const updateDateLabel = (m: Milestone) => m.publishedAt
@@ -266,9 +294,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   };
 
   const getAccuratePrice = (m: Milestone) => {
+    // A milestone is only priced from the selected ticker's confirmed history.
+    // If either dataset belongs to another ticker or is still loading, never reuse it.
+    if (m.stockSymbol !== selectedStock || historySymbol !== selectedStock) return undefined;
+
     // Prefer an exact trading-day match. For month-only milestones, use the
-    // nearest available trading day to the middle of that month so the UI
-    // still shows a real market price instead of a missing/static value.
+    // nearest available trading day to the middle of that month and identify it as an estimate.
     const exact = chartHistory.find((pt) => matchesDate(m.date, pt.date));
     if (exact) return exact.price;
 
