@@ -85,6 +85,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [secMilestones, setSecMilestones] = useState<Milestone[]>([]);
   const [secMilestoneLoading, setSecMilestoneLoading] = useState(false);
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
+  const [milestoneSourceStatus, setMilestoneSourceStatus] = useState<{
+    sec?: { status?: string; count?: number; error?: string | null };
+    web?: { status?: string; count?: number; providers?: string[]; errors?: string[] };
+    x?: { status?: string; count?: number; configured?: boolean; error?: string | null };
+  } | null>(null);
   const [tickerInput, setTickerInput] = useState('');
   const [tickerResolving, setTickerResolving] = useState(false);
   const [tickerResolveError, setTickerResolveError] = useState<string | null>(null);
@@ -164,6 +169,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         if (!cancelled) {
           const events = Array.isArray(data.events) ? data.events : [];
           setSecMilestones(events);
+          setMilestoneSourceStatus(data.sourceStatus || null);
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -195,6 +201,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
     ? historyData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
     : null;
+  const externalProjectUpdates = secMilestones.filter(m => Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
+  const verifiedSecMilestoneCount = secMilestones.filter(m => m.sourceType === 'sec-primary').length;
+  const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
+  const updateDateLabel = (m: Milestone) => m.publishedAt
+    ? new Date(m.publishedAt).toLocaleString()
+    : (m.date && m.date !== 'Date not supplied' ? m.date : 'Publication date not supplied');
 
   const resolveAndTrack = async () => {
     const rawInput = tickerInput.trim();
@@ -267,15 +279,32 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return undefined;
   };
 
-  // Prepare chart data by merging stock history with milestone flags
+  // Pin dated milestones to their exact day; pin month-only milestones to the middle trading day.
+  const chartMilestoneDates = stockMilestones.map(milestone => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.date)) {
+      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null };
+    }
+    const monthYear = milestone.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
+    if (!monthYear) return { milestone, chartDate: null };
+    const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+    const year = Number(monthYear[2]);
+    const monthPoints = chartHistory
+      .filter(point => {
+        const date = new Date(point.date + 'T00:00:00Z');
+        return date.getUTCFullYear() === year && date.getUTCMonth() === month;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null };
+  }).filter(item => item.chartDate);
   const chartData = chartHistory.map((pt) => {
-    // Find milestone at matching month/date
-    const m = stockMilestones.find((mil) => matchesDate(mil.date, pt.date) && /^\d{4}-\d{2}-\d{2}$/.test(mil.date));
+    const eventsAtDate = chartMilestoneDates.filter(item => item.chartDate === pt.date).map(item => item.milestone);
+    const milestone = eventsAtDate[0];
     return {
       ...pt,
-      milestone: m ? m.title : null,
-      milestoneId: m ? m.id : null,
-      milestonePrice: m ? getAccuratePrice(m) : null
+      milestone: milestone ? eventsAtDate.map(item => item.title).join(' · ') : null,
+      milestoneId: milestone ? milestone.id : null,
+      milestonePrice: milestone ? getAccuratePrice(milestone) : null,
+      milestoneCount: eventsAtDate.length,
     };
   });
 
@@ -422,13 +451,112 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-cyan-300">
-          {secMilestoneLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-          <span>{secMilestoneLoading ? 'Discovering SEC milestones' : `${secMilestones.length} live SEC milestones found`}</span>
-          {secMilestoneError && <span className="text-amber-300 normal-case tracking-normal">· {secMilestoneError}</span>}
-          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>· NBIS tracker verification: {nbisVerification} (market history + SEC milestone path)</span>}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-100/80">
+          {secMilestoneLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          <span>
+            {secMilestoneLoading
+              ? 'Checking SEC filings, company announcements, news and X…'
+              : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
+          </span>
+          {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
+          {milestoneSourceStatus?.x?.status === 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">
+              Direct X API is not connected; available web/news search still runs.
+            </span>
+          )}
+          {milestoneSourceStatus?.x?.status === 'credentials-rejected' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X credentials were rejected; check X_BEARER_TOKEN in server settings.</span>
+          )}
+          {milestoneSourceStatus?.x?.error && milestoneSourceStatus.x.status !== 'not-configured' && (
+            <span className="text-amber-200/80 normal-case tracking-normal">X search: {milestoneSourceStatus.x.error}</span>
+          )}
+          {secMilestoneError && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {secMilestoneError}</span>}
+          {milestoneSourceStatus?.sec?.error && <span className="text-amber-200/80 normal-case tracking-normal">SEC lookup: {milestoneSourceStatus.sec.error}</span>}
+          {nbisVerification && <span className={nbisVerification === 'PASS' ? 'text-emerald-300' : 'text-amber-300'}>NBIS data-path check: {nbisVerification}</span>}
         </div>
       </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="tracker-company-updates" aria-labelledby="tracker-company-updates-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+          <div>
+            <h2 id="tracker-company-updates-title" className="text-base md:text-lg font-bold text-white">Latest company and X project updates</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Recent announcements and social posts related to construction, capacity, equipment delivery and deployment. Company posts are company-reported evidence; news leads still need confirmation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSecMilestoneLoading(true);
+              setSecMilestoneError(null);
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12&refresh=true', { cache: 'no-store' })
+                .then(async response => {
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
+                  setSecMilestones(Array.isArray(payload.events) ? payload.events : []);
+                  setMilestoneSourceStatus(payload.sourceStatus || null);
+                })
+                .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
+                .finally(() => setSecMilestoneLoading(false));
+            }}
+            disabled={secMilestoneLoading}
+            className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+            data-testid="tracker-refresh-project-updates"
+          >
+            {secMilestoneLoading ? 'Refreshing…' : 'Refresh updates'}
+          </button>
+        </div>
+        {externalProjectUpdates.length ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {externalProjectUpdates.slice(0, 8).map(item => {
+              const official = item.sourceType === 'official-company' || item.sourceType === 'official-social';
+              const social = item.sourceType === 'official-social' || item.sourceType === 'social-post';
+              const className = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-100'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const label = item.sourceType === 'official-company'
+                ? 'Official company update'
+                : item.sourceType === 'official-social'
+                  ? 'Official company X post'
+                  : item.sourceType === 'social-post'
+                    ? 'Social post · confirm source'
+                    : item.sourceType === 'syndicated-release'
+                      ? 'Syndicated release · verify original'
+                      : 'News lead · not confirmed';
+              return (
+                <article key={item.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + className}>{label}</span>
+                    {item.category && <span className="text-[10px] text-white/40">{item.category}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{item.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{item.description}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{item.source || 'Source not identified'} · {updateDateLabel(item)}</span>
+                    {(item.sourceUrl || item.url) && (
+                      <a href={item.sourceUrl || item.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                        Open source ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.relatedSources?.length ? (
+                    <div className="text-[10px] text-white/35">Additional matching sources: {item.relatedSources.length}</div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            {secMilestoneLoading ? 'Searching for recent updates…' : 'No recent company or social updates matched this ticker. SEC filing events and curated milestones remain available below.'}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35 leading-relaxed">
+          A company post is a reported update, not independent proof that construction is complete. We show dated sources and keep secondary news separate from official company evidence.
+        </p>
+      </section>
 
       {/* Interactive Chart Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -550,83 +678,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         </div>
       </div>
 
-      {/* Target Metrics Cards (Nebius / Digi Power X) */}
-      {(selectedStock === 'NBIS' || selectedStock === 'DGXX') && (
-        <div className="space-y-4">
-          <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Physical Capacity Build-Out Metrics</h3>
-          {selectedStock === 'NBIS' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Connected Capacity</span>
-                <div className="flex justify-between text-xs font-mono text-white/80 font-bold">
-                  <span>170MW (Active)</span>
-                  <span className="text-emerald-400">800MW-1GW Target</span>
-                </div>
-                <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/5">
-                  <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '22%' }}></div>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono">~22% of long-term target reached under guidance</p>
-              </div>
-
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Contracted Power capacity</span>
-                <div className="flex justify-between text-xs font-mono text-white/80 font-bold">
-                  <span>2GW (Secured)</span>
-                  <span className="text-emerald-400">3.5GW+ Target</span>
-                </div>
-                <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/5">
-                  <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '57%' }}></div>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono">75%+ of contracted capacity is corporate-owned</p>
-              </div>
-
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Backlog-to-Revenue Gap</span>
-                <div className="flex justify-between items-baseline pt-1">
-                  <span className="text-lg font-mono font-black text-white">$46B+ Backlog</span>
-                  <span className="text-white/40 text-[9px]">vs $530M Revenues</span>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono">Reflects capacity conversion over 2027-2031 bounds</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">FY Revenue Guidance</span>
-                <div className="flex justify-between text-xs font-mono text-white/80 font-bold">
-                  <span>$9.35M (Actual)</span>
-                  <span className="text-blue-400">$250M-300M Target</span>
-                </div>
-                <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/5">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '6%' }}></div>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono">Contingent on Cerebras and SubQ delivery</p>
-              </div>
-
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Columbiana AL Campus buildout</span>
-                <div className="flex justify-between text-xs font-mono text-white/80 font-bold">
-                  <span>0MW (Active)</span>
-                  <span className="text-blue-400">40MW Target</span>
-                </div>
-                <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/5">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '8%' }}></div>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono">Phase 1 (15MW) actively under construction</p>
-              </div>
-
-              <div className="bg-[#15181E]/40 border border-white/10 p-4 rounded-xl space-y-2.5">
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Total Power Grid Procurement</span>
-                <div className="flex justify-between items-baseline pt-1">
-                  <span className="text-lg font-mono font-black text-white">~400MW</span>
-                  <span className="text-white/40 text-[9px]">Across 3 States</span>
-                </div>
-                <p className="text-[10px] text-white/40 font-mono font-medium">Secured footprint across Alabama, NC, and NY</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Source-backed project updates replace the previous fixed capacity percentages. */}
 
       {/* Timeline of All Stock Milestones */}
       <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
