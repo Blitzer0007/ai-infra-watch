@@ -32,6 +32,7 @@ interface ContractDiscoveryState {
   queriesRun?: number;
   failedQueries?: number;
   errors?: string[];
+  providerNotes?: string[];
   note?: string;
 }
 
@@ -148,6 +149,7 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
             <p className="text-[11px] text-white/40 mt-1">
               Sources: {(discoveryStatus?.providers || []).length ? (discoveryStatus?.providers || []).join(' + ') : 'public news search'}
               {discoveryStatus?.failedQueries ? ' · ' + discoveryStatus.failedQueries + ' search(es) unavailable' : ''}
+              {discoveryStatus?.status === 'unavailable' ? ' · backup search unavailable' : discoveryStatus?.providerNotes?.length ? ' · backup search used' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -167,10 +169,16 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
         </div>
 
         {discoveryError && (
-          <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-amber-100">
+          <div role="alert" className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-amber-100">
             {discoveryError} The SEC-linked records below remain available independently.
           </div>
         )}
+
+        {discoveryStatus?.providerNotes?.length ? (
+          <div className="rounded-lg border border-amber-300/15 bg-amber-300/[.035] px-3 py-2 text-[11px] leading-relaxed text-amber-100/70">
+            A backup search source was tried because another provider was unavailable. {discoveryStatus.providerNotes.slice(0, 2).join(' · ')}
+          </div>
+        ) : null}
 
         {discoveryLoading && discoveryLeads.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-black/10 p-4 text-sm text-white/45">
@@ -178,9 +186,16 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
           </div>
         )}
 
-        {!discoveryLoading && !discoveryError && discoveryLeads.length === 0 && (
+        {!discoveryLoading && !discoveryError && discoveryLeads.length === 0 && discoveryStatus?.status === 'unavailable' && (
+          <div role="alert" className="rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4 text-sm text-amber-100/80">
+            News searches could not reach a working provider, so this check cannot determine whether recent announcements exist. SEC-linked records remain available independently.
+            {discoveryStatus.errors?.length ? <p className="mt-2 text-xs text-amber-100/55">{discoveryStatus.errors.slice(0, 2).join(' · ')}</p> : null}
+          </div>
+        )}
+
+        {!discoveryLoading && !discoveryError && discoveryLeads.length === 0 && discoveryStatus?.status !== 'unavailable' && (
           <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
-            No recent matching announcements were found by the configured search sources. This does not mean that no contracts exist.
+            No recent matching announcements were returned by the available search sources. This does not mean that no contracts exist.
           </div>
         )}
 
