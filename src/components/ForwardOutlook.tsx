@@ -595,7 +595,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       setError(null);
       try {
         const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=5y');
-        if (!res.ok) throw new Error('Historical market data request failed (HTTP ' + res.status + ')');
+        if (!res.ok) throw new Error('We couldn’t load price history for ' + selectedStock + '. Please try again shortly. (HTTP ' + res.status + ')');
         const data = await res.json();
         if (!cancelled) setHistory(Array.isArray(data.points) ? data.points : []);
       } catch (err: any) {
@@ -1128,7 +1128,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     return Math.min(100, Math.max(0, ((value - analysis.p10) / span) * 100));
   };
   const verifiedForecastCount = forecastAnalytics?.validationGate?.verifiedCount ?? forecastAnalytics?.sampleSize ?? 0;
-  const validationReady = Boolean(forecastAnalytics?.validationGate?.ready) || verifiedForecastCount >= FORECAST_VALIDATION_MINIMUM;
+  const validationReady = forecastValidationGate(verifiedForecastCount).ready;
   const forecastMethodLabel = modelVersion === 'analogue-v2' ? 'Enhanced historical comparison' : 'Historical comparison';
   const targetDateEstimate = addBusinessDays(new Date(), horizon);
 
@@ -1156,7 +1156,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               </div>
             </div>
             <div className="text-right text-[10px] font-mono text-white/40">
-              <div>CURRENT SHARE PRICE</div>
+              <div>LATEST AVAILABLE PRICE</div>
               <div className="text-lg text-white font-bold">{currentPrice != null ? '$' + formatPrice(currentPrice) : '—'}</div>
             </div>
           </div>
@@ -1176,7 +1176,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         </div>
 
         <div className="bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
-          <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-400" /><span className="text-xs font-mono font-black uppercase tracking-widest">Scenario</span></div>
+          <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-400" /><span className="text-xs font-mono font-black uppercase tracking-widest">Choose a scenario</span></div>
           {SCENARIOS.map(s => (
             <button key={s.id} onClick={() => setScenarioId(s.id)} className={`w-full text-left p-3 rounded-xl border transition cursor-pointer ${scenarioId === s.id ? 'border-emerald-400/40 bg-emerald-400/5' : 'border-white/10 bg-white/[.02]'}`}>
               <div className="flex items-center justify-between"><span className="text-xs font-bold">{s.label}</span>{scenarioId === s.id && <ChevronRight className="w-4 h-4 text-emerald-400" />}</div>
@@ -1184,7 +1184,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
             </button>
           ))}
           <div className="border-t border-white/10 pt-3 text-[11px] font-mono text-white/35">
-            Current evidence available: {evidenceCounts} current feed items · {macroRisks.length} macro risks
+            Sources currently available: {evidenceCounts} news, contract or policy items · {macroRisks.length} macro risk signals
           </div>
         </div>
       </div>
