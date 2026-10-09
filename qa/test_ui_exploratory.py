@@ -54,6 +54,27 @@ def test_exploratory_sorting_forward_outlook(page):
     _assert_sort_control(_table_with_header(page, "Ticker"), "Ticker")
 
 
+def test_forward_outlook_plain_language_summary(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.goto("/outlook", wait_until="domcontentloaded")
+    summary = page.get_by_test_id("forecast-summary")
+    summary.wait_for(state="visible", timeout=30000)
+
+    text = summary.inner_text()
+    assert "What past market periods suggest" in text
+    assert "Past periods with gains" in text
+    assert "not a calibrated probability" in text
+    assert "Weekdays only; exchange holidays not included" in text
+    assert "24 of 50 verified forecasts" in text
+    assert "Still building" in text
+
+    range_chart = summary.locator('[role="img"]')
+    assert range_chart.is_visible()
+    assert "10th" in (range_chart.get_attribute("aria-label") or "")
+    assert "90th" in (range_chart.get_attribute("aria-label") or "")
+
+
 def test_exploratory_sorting_portfolio_scenarios(page):
     mock_local_apis(page)
     goto_app(page)
