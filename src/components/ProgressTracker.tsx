@@ -90,6 +90,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     web?: { status?: string; count?: number; providers?: string[]; errors?: string[] };
     x?: { status?: string; count?: number; configured?: boolean; error?: string | null };
   } | null>(null);
+  const [milestoneRetrievedAt, setMilestoneRetrievedAt] = useState<string | null>(null);
   const [tickerInput, setTickerInput] = useState('');
   const [tickerResolving, setTickerResolving] = useState(false);
   const [tickerResolveError, setTickerResolveError] = useState<string | null>(null);
@@ -170,6 +171,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           const events = Array.isArray(data.events) ? data.events : [];
           setSecMilestones(events);
           setMilestoneSourceStatus(data.sourceStatus || null);
+          setMilestoneRetrievedAt(data.retrievedAt || null);
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -187,13 +189,19 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const chartHistory = livePrices?.[selectedStock]
     ? (() => {
         const liveObj = livePrices[selectedStock];
-        const today = new Date().toISOString().slice(0, 10);
+        const quoteTimestamp = liveObj.asOf || liveObj.marketTime;
+        const parsedQuoteTime = quoteTimestamp ? Date.parse(quoteTimestamp) : NaN;
+        // Never place a delayed quote on today's date. Only use a quote when its market date is known.
+        if (liveObj.stale || !Number.isFinite(parsedQuoteTime)) return [...historyData];
+        const quoteDate = new Date(parsedQuoteTime).toISOString().slice(0, 10);
         const updated = historyData.map((point) =>
-          point.date === today ? { ...point, price: liveObj.price } : point
+          point.date === quoteDate ? { ...point, price: liveObj.price } : point
         );
-        return updated.some((point) => point.date === today)
-          ? updated
-          : [...updated, { date: today, price: liveObj.price }];
+        if (updated.some((point) => point.date === quoteDate)) return updated;
+        const lastHistoryDate = historyData[historyData.length - 1]?.date;
+        return !lastHistoryDate || quoteDate > lastHistoryDate
+          ? [...historyData, { date: quoteDate, price: liveObj.price }].sort((a, b) => a.date.localeCompare(b.date))
+          : [...historyData];
       })()
     : [...historyData];
 
@@ -308,7 +316,6 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     };
   });
 
-  const monthOnlyMilestones = stockMilestones.filter(m => !/^\d{4}-\d{2}-\d{2}$/.test(m.date));
 
   // Custom tool tip for chart
   const CustomTooltip = ({ active, payload }: any) => {
@@ -458,6 +465,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
               ? 'Checking SEC filings, company announcements, news and X…'
               : verifiedSecMilestoneCount + ' SEC filings · ' + externalProjectUpdates.length + ' company/news/social updates'}
           </span>
+          {!secMilestoneLoading && milestoneRetrievedAt && (
+            <span className="text-[10px] text-white/35 normal-case tracking-normal">
+              Last checked {new Date(milestoneRetrievedAt).toLocaleTimeString()}
+            </span>
+          )}
           {socialUpdateCount > 0 && <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px]">{socialUpdateCount} social posts</span>}
           {milestoneSourceStatus?.x?.status === 'not-configured' && (
             <span className="text-amber-200/80 normal-case tracking-normal">
@@ -495,6 +507,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
                   setSecMilestones(Array.isArray(payload.events) ? payload.events : []);
                   setMilestoneSourceStatus(payload.sourceStatus || null);
+                  setMilestoneRetrievedAt(payload.retrievedAt || null);
                 })
                 .catch(error => setSecMilestoneError(error instanceof Error ? error.message : 'Project updates could not be refreshed.'))
                 .finally(() => setSecMilestoneLoading(false));
