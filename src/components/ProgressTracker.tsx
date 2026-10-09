@@ -287,31 +287,46 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     return undefined;
   };
 
-  // Pin dated milestones to their exact day; pin month-only milestones to the middle trading day.
+  // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
+  // and human-readable exact dates (e.g. "May 5, 2026") to the closest trading day.
   const chartMilestoneDates = stockMilestones.map(milestone => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.date)) {
-      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null };
+      return { milestone, chartDate: chartHistory.some(point => point.date === milestone.date) ? milestone.date : null, approximate: false };
     }
     const monthYear = milestone.date.trim().match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})$/i);
-    if (!monthYear) return { milestone, chartDate: null };
-    const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
-    const year = Number(monthYear[2]);
-    const monthPoints = chartHistory
-      .filter(point => {
-        const date = new Date(point.date + 'T00:00:00Z');
-        return date.getUTCFullYear() === year && date.getUTCMonth() === month;
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null };
+    if (monthYear) {
+      const month = new Date(monthYear[1] + ' 1, ' + monthYear[2]).getMonth();
+      const year = Number(monthYear[2]);
+      const monthPoints = chartHistory
+        .filter(point => {
+          const date = new Date(point.date + 'T00:00:00Z');
+          return date.getUTCFullYear() === year && date.getUTCMonth() === month;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return { milestone, chartDate: monthPoints.length ? monthPoints[Math.floor((monthPoints.length - 1) / 2)].date : null, approximate: true };
+    }
+    const parsed = Date.parse(milestone.date);
+    if (!Number.isFinite(parsed)) return { milestone, chartDate: null, approximate: false };
+    const requestedDate = new Date(parsed).toISOString().slice(0, 10);
+    const exactPoint = chartHistory.find(point => point.date === requestedDate);
+    if (exactPoint) return { milestone, chartDate: exactPoint.date, approximate: false };
+    const requestedMs = Date.parse(requestedDate + 'T00:00:00Z');
+    const nearby = chartHistory
+      .map(point => ({ point, distance: Math.abs(Date.parse(point.date + 'T00:00:00Z') - requestedMs) / 86400000 }))
+      .filter(item => item.distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0];
+    return { milestone, chartDate: nearby?.point.date || null, approximate: Boolean(nearby) };
   }).filter(item => item.chartDate);
   const chartData = chartHistory.map((pt) => {
-    const eventsAtDate = chartMilestoneDates.filter(item => item.chartDate === pt.date).map(item => item.milestone);
+    const matchingEvents = chartMilestoneDates.filter(item => item.chartDate === pt.date);
+    const eventsAtDate = matchingEvents.map(item => item.milestone);
     const milestone = eventsAtDate[0];
     return {
       ...pt,
       milestone: milestone ? eventsAtDate.map(item => item.title).join(' · ') : null,
       milestoneId: milestone ? milestone.id : null,
       milestonePrice: milestone ? getAccuratePrice(milestone) : null,
+      milestoneApproximate: matchingEvents.some(item => item.approximate),
       milestoneCount: eventsAtDate.length,
     };
   });
@@ -328,6 +343,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           {pt.milestone && (
             <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
               ★ {pt.milestone} (Price: ${formatPrice(pt.milestonePrice)})
+              {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
             </div>
           )}
         </div>
