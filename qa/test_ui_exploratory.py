@@ -32,6 +32,130 @@ def _assert_sort_control(table, label: str):
         assert button.get_attribute("aria-sort") == before
 
 
+
+def test_contracts_page_surfaces_multi_source_discovery_leads(page):
+    import json as _json
+
+    mock_local_apis(page)
+
+    payload = {
+        "leads": [{
+            "id": "qa-contract-lead-dgxx",
+            "title": "Digi Power X provides a construction update for Phase 1",
+            "summary": "Company and news discovery lead. Review the source to confirm the reported project status.",
+            "url": "https://www.digipowerx.com/press-releases",
+            "source": "digipowerx.com",
+            "sourceType": "official-company",
+            "verificationStatus": "Official company update",
+            "date": "2026-10-06",
+            "publishedAt": "2026-10-06T12:00:00Z",
+            "category": "Construction / build-out",
+            "ticker": "DGXX",
+            "isConfirmedContract": False,
+        }],
+        "sourceStatus": {
+            "status": "available",
+            "providers": ["google-news-rss"],
+            "queriesRun": 4,
+            "failedQueries": 0,
+            "errors": [],
+            "note": "Discovery leads require source verification.",
+        },
+        "retrievedAt": "2026-10-09T12:00:00Z",
+        "cached": False,
+    }
+
+    def route_discovery(route):
+        if "action=contract-discovery" in route.request.url:
+            route.fulfill(status=200, content_type="application/json", body=_json.dumps(payload))
+        else:
+            route.fallback()
+
+    page.route("**/api/company-scale*", route_discovery)
+    goto_app(page)
+    page.get_by_test_id("nav-contracts").click()
+
+    panel = page.get_by_test_id("contract-announcement-discovery")
+    panel.wait_for(state="visible", timeout=30000)
+    assert "Latest contract and infrastructure announcements" in panel.inner_text()
+    assert "Digi Power X provides a construction update for Phase 1" in panel.inner_text()
+    assert "Primary source" in panel.inner_text()
+    assert "not proof of a signed agreement" in panel.inner_text()
+    panel.get_by_role("link", name="Open source").wait_for(state="visible", timeout=30000)
+
+
+def test_progress_tracker_displays_official_x_project_update(page):
+    import json as _json
+
+    mock_local_apis(page)
+
+    payload = {
+        "symbol": "DGXX",
+        "issuer": "Digi Power X",
+        "source": "multi-source-project-updates",
+        "events": [
+            {
+                "id": "sec-milestone-qa",
+                "stockSymbol": "DGXX",
+                "date": "2026-10-01",
+                "publishedAt": "2026-10-01T12:00:00Z",
+                "title": "Material definitive agreement",
+                "category": "Contract / commercial",
+                "description": "SEC 8-K filing",
+                "status": "done",
+                "url": "https://www.sec.gov/Archives/edgar/data/example",
+                "sourceUrl": "https://www.sec.gov/Archives/edgar/data/example",
+                "source": "SEC EDGAR",
+                "sourceType": "sec-primary",
+                "verificationStatus": "SEC filing",
+                "evidenceClass": "primary-source",
+                "relatedSources": [],
+            },
+            {
+                "id": "x-post-qa-dgxx",
+                "stockSymbol": "DGXX",
+                "date": "2026-10-06",
+                "publishedAt": "2026-10-06T13:30:00Z",
+                "title": "Phase 1 construction update at the Columbiana campus",
+                "category": "Construction / build-out",
+                "description": "Digi Power X reports that the first-phase building shell work is progressing.",
+                "status": "active",
+                "url": "https://x.com/DigipowerX/status/123456789",
+                "sourceUrl": "https://x.com/DigipowerX/status/123456789",
+                "source": "X @DigipowerX",
+                "sourceType": "official-social",
+                "verificationStatus": "Official company social post",
+                "evidenceClass": "primary-source",
+                "relatedSources": [],
+            },
+        ],
+        "sourceStatus": {
+            "sec": {"status": "available", "count": 1, "error": None},
+            "web": {"status": "available", "count": 0, "providers": ["google-news-rss"], "errors": []},
+            "x": {"status": "available", "count": 1, "configured": True, "error": None},
+        },
+        "retrievedAt": "2026-10-09T12:00:00Z",
+    }
+
+    def route_milestones(route):
+        if "action=milestones" in route.request.url:
+            route.fulfill(status=200, content_type="application/json", body=_json.dumps(payload))
+        else:
+            route.fallback()
+
+    page.route("**/api/company-scale*", route_milestones)
+    goto_app(page)
+    page.get_by_test_id("nav-tracker").click()
+    page.get_by_role("button", name="DGXX", exact=True).click()
+
+    panel = page.get_by_test_id("tracker-company-updates")
+    panel.wait_for(state="visible", timeout=30000)
+    assert "Latest company and X project updates" in panel.inner_text()
+    assert "Official company X post" in panel.inner_text()
+    assert "Phase 1 construction update at the Columbiana campus" in panel.inner_text()
+    assert "X @DigipowerX" in panel.inner_text()
+    panel.get_by_role("link", name="Open source").wait_for(state="visible", timeout=30000)
+
 def test_exploratory_sorting_congress(page):
     mock_local_apis(page)
     goto_app(page)

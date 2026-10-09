@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Search, Info, ShieldCheck, DollarSign } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { Contract } from '../types';
@@ -12,10 +12,64 @@ interface ContractsLedgerProps {
   portfolioSymbols?: string[];
 }
 
+interface ContractDiscoveryLead {
+  id: string;
+  title: string;
+  summary: string;
+  url: string;
+  source: string;
+  sourceType: string;
+  verificationStatus: string;
+  date: string | null;
+  publishedAt?: string | null;
+  category: string;
+  ticker?: string | null;
+}
+
+interface ContractDiscoveryState {
+  status?: string;
+  providers?: string[];
+  queriesRun?: number;
+  failedQueries?: number;
+  errors?: string[];
+  note?: string;
+}
+
 export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }: ContractsLedgerProps) {
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [filterStatusLevel, setFilterStatusLevel] = useState<string>('all');
   const [search, setSearch] = useState('');
+
+  const [discoveryLeads, setDiscoveryLeads] = useState<ContractDiscoveryLead[]>([]);
+  const [discoveryStatus, setDiscoveryStatus] = useState<ContractDiscoveryState | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+
+  const loadContractDiscovery = useCallback(async (forceRefresh = false, signal?: AbortSignal) => {
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    try {
+      const response = await fetch('/api/company-scale?action=contract-discovery' + (forceRefresh ? '&refresh=true' : ''), {
+        cache: 'no-store',
+        signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || 'Announcement discovery is temporarily unavailable.');
+      setDiscoveryLeads(Array.isArray(payload?.leads) ? payload.leads : []);
+      setDiscoveryStatus(payload?.sourceStatus || null);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setDiscoveryError(error instanceof Error ? error.message : 'Announcement discovery is temporarily unavailable.');
+    } finally {
+      if (!signal?.aborted) setDiscoveryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadContractDiscovery(false, controller.signal);
+    return () => controller.abort();
+  }, [loadContractDiscovery]);
 
   const activeContracts = liveContracts || [];
 
@@ -83,6 +137,94 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
           </div>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="contract-announcement-discovery" aria-labelledby="contract-announcement-discovery-title">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+          <div>
+            <h2 id="contract-announcement-discovery-title" className="text-base md:text-lg font-bold text-white">Latest contract and infrastructure announcements</h2>
+            <p className="text-xs text-white/55 mt-1 max-w-3xl leading-relaxed">
+              Additional discovery from company updates, press releases and business news—not just SEC filings. Treat these as leads until the linked source confirms the agreement and its terms.
+            </p>
+            <p className="text-[11px] text-white/40 mt-1">
+              Sources: {(discoveryStatus?.providers || []).length ? (discoveryStatus?.providers || []).join(' + ') : 'public news search'}
+              {discoveryStatus?.failedQueries ? ' · ' + discoveryStatus.failedQueries + ' search(es) unavailable' : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-white/55">
+              {discoveryLoading ? 'Searching…' : discoveryLeads.length + ' recent leads'}
+            </span>
+            <button
+              type="button"
+              onClick={() => void loadContractDiscovery(true)}
+              disabled={discoveryLoading}
+              className="rounded-lg border border-cyan-300/20 bg-cyan-300/5 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:opacity-50"
+              data-testid="contract-discovery-refresh"
+            >
+              {discoveryLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {discoveryError && (
+          <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-amber-100">
+            {discoveryError} The SEC-linked records below remain available independently.
+          </div>
+        )}
+
+        {discoveryLoading && discoveryLeads.length === 0 && (
+          <div className="rounded-xl border border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            Searching recent company announcements and contract-related news…
+          </div>
+        )}
+
+        {!discoveryLoading && !discoveryError && discoveryLeads.length === 0 && (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/45">
+            No recent matching announcements were found by the configured search sources. This does not mean that no contracts exist.
+          </div>
+        )}
+
+        {discoveryLeads.length > 0 && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto pr-1 aiw-scroll-region">
+            {discoveryLeads.map(lead => {
+              const official = lead.sourceType === 'official-company' || lead.sourceType === 'sec-primary';
+              const social = lead.sourceType === 'official-social';
+              const badgeClass = official
+                ? 'border-emerald-300/20 bg-emerald-300/5 text-emerald-200'
+                : social
+                  ? 'border-cyan-300/20 bg-cyan-300/5 text-cyan-100'
+                  : 'border-amber-300/20 bg-amber-300/5 text-amber-100';
+              const badgeText = official
+                ? 'Primary source'
+                : social
+                  ? 'Company social post'
+                  : lead.sourceType === 'syndicated-release'
+                    ? 'Syndicated release · verify original'
+                    : 'News lead · not yet confirmed';
+              return (
+                <article key={lead.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={'rounded border px-2 py-1 text-[10px] font-semibold ' + badgeClass}>{badgeText}</span>
+                    {lead.ticker && <span className="text-[10px] font-mono text-white/40">{lead.ticker}</span>}
+                    {lead.date && <span className="text-[10px] text-white/35">{lead.date}</span>}
+                  </div>
+                  <h3 className="text-sm font-semibold leading-snug text-white">{lead.title}</h3>
+                  <p className="text-xs leading-relaxed text-white/55">{lead.summary}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <span className="text-[10px] text-white/35">{lead.source || 'Discovery source'}</span>
+                    <a href={lead.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-200 underline underline-offset-2 hover:text-cyan-100">
+                      Open source <span aria-hidden="true">↗</span>
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[11px] text-white/35">
+          A news article, syndicated release, or social post is a discovery lead—not proof of a signed agreement. Contract amounts and terms are only treated as confirmed when supported by an appropriate primary source.
+        </p>
+      </section>
 
       <JevDecisionPanel
         kind="contracts"
@@ -157,8 +299,19 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
       {/* Contracts Cards List */}
       <div className="space-y-4 max-h-[760px] overflow-y-auto pr-1 aiw-scroll-region">
         {filteredContracts.length === 0 ? (
-          <div className="text-center py-12 border border-white/10 rounded text-white/40 text-xs font-mono">
-            No live SEC-linked contracts are available for the current data refresh.
+          <div className="text-center py-12 border border-white/10 rounded text-white/40 text-sm">
+            {activeContracts.length > 0
+              ? 'No agreements match your current search and filters. Clear the filters or change the search terms.'
+              : 'No SEC-linked contract records were returned in the latest refresh. Review the announcements above for additional discovery leads.'}
+            {(search || filterCompany !== 'all' || filterStatusLevel !== 'all') && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setFilterCompany('all'); setFilterStatusLevel('all'); }}
+                className="ml-2 mt-2 rounded border border-white/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-white/5"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           filteredContracts.map((c) => {

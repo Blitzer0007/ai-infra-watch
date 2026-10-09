@@ -6,6 +6,15 @@ export interface Milestone {
   description: string;
   priceAtTime?: number;
   sourceUrl?: string;
+  url?: string;
+  source?: string;
+  sourceType?: 'sec-primary' | 'official-company' | 'official-social' | 'syndicated-release' | 'secondary-news' | 'social-post' | string;
+  verificationStatus?: string;
+  evidenceClass?: 'primary-source' | 'discovery-lead' | string;
+  publishedAt?: string | null;
+  category?: string;
+  provider?: string;
+  relatedSources?: { source?: string; url?: string; sourceType?: string }[];
   status: 'done' | 'active' | 'planned';
 }
 
