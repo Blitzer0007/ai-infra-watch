@@ -40,6 +40,10 @@ describe('project event company matching', () => {
       title: 'Now construction begins at data center',
       url: 'https://example.com/story',
     }, { name: 'ServiceNow', domains: ['servicenow.com'] }), false);
+    assert.equal(isProjectEventRelevant('NOW', {
+      title: 'Now construction begins at data center',
+      url: 'https://example.com/story',
+    }, { name: 'NOW', domains: [] }), false);
   });
 
   it('accepts Nebius headlines for NBIS', () => {
