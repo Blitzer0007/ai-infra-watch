@@ -54,6 +54,110 @@ def test_exploratory_sorting_forward_outlook(page):
     _assert_sort_control(_table_with_header(page, "Ticker"), "Ticker")
 
 
+def test_forward_outlook_plain_language_summary(page):
+    mock_local_apis(page)
+    goto_app(page)
+    page.goto("/outlook", wait_until="domcontentloaded")
+    summary = page.get_by_test_id("forecast-summary")
+    summary.wait_for(state="visible", timeout=30000)
+
+    text = summary.inner_text()
+    assert "What past market periods suggest" in text
+    assert "Past periods with gains" in text
+    assert "not a calibrated probability" in text
+    assert "Weekdays only; exchange holidays not included" in text
+    assert "24 of 50 verified forecasts" in text
+    assert "Still building" in text
+
+    range_chart = summary.locator('[role="img"]')
+    assert range_chart.is_visible()
+    assert "10th" in (range_chart.get_attribute("aria-label") or "")
+    assert "90th" in (range_chart.get_attribute("aria-label") or "")
+
+
+def test_forward_outlook_verified_forecast_results_match_telegram(page):
+    import json as _json
+
+    mock_local_apis(page)
+
+    verified_forecast = {
+        "id": "qa-rklb-verified-forecast",
+        "ticker": "RKLB",
+        "createdAt": "2026-10-03T09:00:00Z",
+        "targetDate": "2026-10-08",
+        "actualDate": "2026-10-08",
+        "verifiedAt": "2026-10-08T22:18:00Z",
+        "horizon": 5,
+        "scenarioId": "base",
+        "entryPrice": 50.0,
+        "median": 1.13,
+        "p25": -2.0,
+        "p75": 3.0,
+        "p10": -5.0,
+        "p90": 6.0,
+        "status": "verified",
+        "actualReturn": -1.84,
+        "medianError": -2.97,
+        "modelVersion": "analogue-v1",
+    }
+
+    def forecast_verification_route(route):
+        if "/api/forecast-verification" not in route.request.url:
+            return route.continue_()
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=_json.dumps({
+                "model": "analogue-v1",
+                "config": {"horizon": 20},
+                "forecasts": [verified_forecast],
+                "analytics": {
+                    "sampleSize": 1,
+                    "sampleStatus": "insufficient",
+                    "directionalAccuracyPct": 0,
+                    "medianAbsoluteError": 2.97,
+                    "meanSignedErrorPct": -2.97,
+                    "p25p75CoveragePct": 0,
+                    "p10p90CoveragePct": 0,
+                    "byTickerHorizon": [],
+                    "byScenario": [],
+                    "byModel": [],
+                    "byDirection": [],
+                    "validationGate": {
+                        "minimumRequired": 50,
+                        "verifiedCount": 1,
+                        "ready": False,
+                        "status": "building validation sample",
+                    },
+                    "longTerm": {
+                        "verifiedCount": 1,
+                        "oldestVerifiedAt": "2026-10-08T22:18:00Z",
+                        "newestVerifiedAt": "2026-10-08T22:18:00Z",
+                    },
+                },
+            }),
+        )
+
+    page.route("**/api/forecast-verification*", forecast_verification_route)
+    goto_app(page)
+    page.goto("/outlook", wait_until="domcontentloaded")
+
+    results = page.get_by_test_id("verified-forecast-results")
+    results.wait_for(state="visible", timeout=30000)
+    card = results.get_by_test_id("verified-forecast-result").first
+    card.wait_for(state="visible", timeout=30000)
+
+    card_text = card.inner_text()
+    assert "RKLB · 5D forecast" in card_text
+    assert "Direction wrong" in card_text
+    assert "Predicted median" in card_text and "1.13%" in card_text
+    assert "Actual return" in card_text and "-1.84%" in card_text
+    assert "Prediction match" in card_text and "0.0%" in card_text
+    assert "Typical miss" in card_text and "-2.97 percentage points" in card_text
+    assert "Target: 2026-10-08" in card_text
+    assert "Verified: 2026-10-08" in card_text
+
+
 def test_exploratory_sorting_portfolio_scenarios(page):
     mock_local_apis(page)
     goto_app(page)
