@@ -90,6 +90,12 @@ export default function AutopilotSignalsPanel() {
             <Metric label="Portfolio links" value={String((data.portfolioLinks || []).length)} />
           </div>
 
+          {data.providerNotes?.length ? (
+            <div role="status" className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.035] p-3 text-[9px] leading-relaxed text-amber-200/70">
+              One or more search providers failed. Backup sources were tried; results may be incomplete. {data.providerNotes.slice(0, 3).join(' · ')}
+            </div>
+          ) : null}
+
           {(data.tickers || []).length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {(data.tickers || []).slice(0, 16).map(ticker => (
@@ -115,7 +121,13 @@ export default function AutopilotSignalsPanel() {
                 </div>
               </a>
             ))}
-            {!data.signals?.length && <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[9px] font-mono text-white/30">No recent Autopilot X signals were returned.</div>}
+            {!data.signals?.length && (
+              <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[9px] leading-relaxed font-mono text-white/40">
+                {data.provider === 'unavailable'
+                  ? 'Search providers could not retrieve recent public activity. This is a source outage, not evidence that no posts exist.'
+                  : 'No recent matching public activity was returned by the available search sources. This does not confirm that the account has no activity.'}
+              </div>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[8px] font-mono text-white/25">
