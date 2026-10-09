@@ -93,6 +93,20 @@ function forecastEvidenceState(snapshot?: ForecastEvidenceSnapshot) {
   return 'LEGACY_NO_SNAPSHOT';
 }
 
+/** Keep the per-forecast match score consistent with the Telegram forecast result. */
+function forecastAccuracyPct(actualReturn?: number, predictedReturn?: number): number | null {
+  const actual = Number(actualReturn);
+  const predicted = Number(predictedReturn);
+  if (!Number.isFinite(actual) || !Number.isFinite(predicted)) return null;
+  const denominator = Math.max(Math.abs(actual), 1);
+  return Number(Math.max(0, 100 - (Math.abs(actual - predicted) / denominator) * 100).toFixed(1));
+}
+
+function forecastDirection(actualReturn: number, predictedReturn: number): 'Direction right' | 'Direction wrong' | 'No clear direction' {
+  if (actualReturn === 0 || predictedReturn === 0) return 'No clear direction';
+  return Math.sign(actualReturn) === Math.sign(predictedReturn) ? 'Direction right' : 'Direction wrong';
+}
+
 function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
 
 function percentile(values: number[], p: number): number {
@@ -1131,6 +1145,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
   const validationReady = forecastValidationGate(verifiedForecastCount).ready;
   const forecastMethodLabel = modelVersion === 'analogue-v2' ? 'Enhanced historical comparison' : 'Historical comparison';
   const targetDateEstimate = addBusinessDays(new Date(), horizon);
+  const verifiedForecastResults = forecasts
+    .filter(forecast => forecast.status === 'verified' && forecast.actualReturn != null && Number.isFinite(Number(forecast.actualReturn)))
+    .slice()
+    .sort((a, b) => String(b.verifiedAt || b.actualDate || '').localeCompare(String(a.verifiedAt || a.actualDate || '')))
+    .slice(0, 10);
 
   return (
     <div className="space-y-6" id="forward-outlook-view" data-testid="forward-outlook">
@@ -1514,6 +1533,77 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           </div>
         ))}</div>
       </div>
+
+      <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.025] p-4 md:p-5 space-y-3" data-testid="verified-forecast-results" aria-labelledby="verified-forecast-results-title">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div>
+            <h2 id="verified-forecast-results-title" className="text-base md:text-lg font-bold text-white">Verified forecast results</h2>
+            <p className="text-xs text-white/55 mt-1">Compare each saved forecast with the actual market return. Results below match the figures used in the Telegram forecast alert.</p>
+          </div>
+          <span className="shrink-0 rounded-full border border-white/10 bg-black/10 px-3 py-1 text-xs text-white/60">{verifiedForecastResults.length} recent results</span>
+        </div>
+        {verifiedForecastResults.length ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {verifiedForecastResults.map(forecast => {
+              const actualReturn = Number(forecast.actualReturn);
+              const predictedMedian = Number(forecast.median);
+              const typicalMiss = forecast.medianError != null && Number.isFinite(Number(forecast.medianError))
+                ? Number(forecast.medianError)
+                : actualReturn - predictedMedian;
+              const matchPct = forecastAccuracyPct(actualReturn, predictedMedian);
+              const direction = forecastDirection(actualReturn, predictedMedian);
+              const directionClass = direction === 'Direction right'
+                ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200'
+                : direction === 'Direction wrong'
+                  ? 'border-rose-300/25 bg-rose-300/10 text-rose-200'
+                  : 'border-amber-300/25 bg-amber-300/10 text-amber-100';
+
+              return (
+                <article key={forecast.id} className="rounded-xl border border-white/10 bg-[#101216] p-3 md:p-4 space-y-3" data-testid="verified-forecast-result">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm md:text-base font-bold text-white">{forecast.ticker} · {forecast.horizon}D forecast</h3>
+                      <p className="text-[11px] text-white/40 mt-1">Verified market outcome</p>
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${directionClass}`}>{direction}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
+                      <div className="text-xs text-white/50">Predicted median</div>
+                      <div className="text-lg font-semibold font-mono text-white mt-1">{predictedMedian.toFixed(2)}%</div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
+                      <div className="text-xs text-white/50">Actual return</div>
+                      <div className={`text-lg font-semibold font-mono mt-1 ${actualReturn > 0 ? 'text-emerald-200' : actualReturn < 0 ? 'text-rose-200' : 'text-white'}`}>{actualReturn.toFixed(2)}%</div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
+                      <div className="text-xs text-white/50">Prediction match</div>
+                      <div className="text-base font-semibold font-mono text-white mt-1">{matchPct == null ? 'Not available' : matchPct.toFixed(1) + '%'}</div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-white/[.025] p-3">
+                      <div className="text-xs text-white/50">Typical miss</div>
+                      <div className={`text-base font-semibold font-mono mt-1 ${typicalMiss > 0 ? 'text-emerald-200' : typicalMiss < 0 ? 'text-rose-200' : 'text-white'}`}>{typicalMiss.toFixed(2)} percentage points</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/5 pt-2 text-xs text-white/45">
+                    <span>Target: {forecast.targetDate || 'Not recorded'}</span>
+                    <span>Verified: {forecast.actualDate || forecast.verifiedAt?.slice(0, 10) || 'Date unavailable'}</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/50">
+            No verified forecast results yet. Saved forecasts will appear here after their target dates and actual returns are available.
+          </div>
+        )}
+        <p className="text-[11px] text-white/40 leading-relaxed">
+          Direction compares whether the predicted and actual returns were positive or negative. Prediction match measures how close the forecasted return was to the actual return; it uses the same calculation as Telegram and is separate from direction accuracy. A typical miss is actual return minus predicted median.
+        </p>
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
