@@ -11,12 +11,14 @@ createRoot(document.getElementById('root')!).render(
 );
 
 if ('serviceWorker' in navigator) {
+  // The first controllerchange is normal on initial install and must not
+  // interrupt route navigation. Reload only when a previously controlled tab
+  // receives a replacement worker after an application update.
+  const hadControllerAtLoad = Boolean(navigator.serviceWorker.controller);
   let refreshingForNewWorker = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshingForNewWorker) return;
+    if (!hadControllerAtLoad || refreshingForNewWorker) return;
     refreshingForNewWorker = true;
-    // Reload once when a new app shell takes control, so already-open tabs
-    // don't keep displaying JavaScript from the previous production release.
     window.location.reload();
   });
 
