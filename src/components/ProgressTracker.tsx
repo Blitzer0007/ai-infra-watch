@@ -80,9 +80,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [milestones] = useState<Milestone[]>(INITIAL_MILESTONES);
   const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<{ date: string; price: number }[]>([]);
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [secMilestones, setSecMilestones] = useState<Milestone[]>([]);
+  const [milestonesSymbol, setMilestonesSymbol] = useState<string | null>(null);
   const [secMilestoneLoading, setSecMilestoneLoading] = useState(false);
   const [secMilestoneError, setSecMilestoneError] = useState<string | null>(null);
   const [milestoneSourceStatus, setMilestoneSourceStatus] = useState<{
@@ -125,27 +127,41 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   // Combine the curated timeline with live SEC milestones for the selected symbol.
   const stockMilestones = [
     ...milestones.filter((m) => m.stockSymbol === selectedStock),
-    ...secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+    ...(milestonesSymbol === selectedStock
+      ? secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+      : [])
   ].sort((a, b) => {
     const da = Date.parse(a.date) || 0;
     const db = Date.parse(b.date) || 0;
     return db - da;
   });
   const activeMilestone = stockMilestones.find((m) => m.id === activeMilestoneId) || stockMilestones[0];
+  const activeHistoryData = historySymbol === selectedStock ? historyData : [];
 
   useEffect(() => {
     let cancelled = false;
     async function loadHistory() {
       setHistoryLoading(true);
       setHistoryError(null);
+      setHistorySymbol(null);
+      setHistoryData([]);
       try {
-        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y');
+        const res = await fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(selectedStock) + '&range=2y', { cache: 'no-store' });
         if (!res.ok) throw new Error('History request failed: HTTP ' + res.status);
         const data = await res.json();
-        if (!cancelled) setHistoryData(Array.isArray(data.points) ? data.points : []);
+        const responseSymbol = String(data?.symbol || '').trim().toUpperCase();
+        if (responseSymbol && responseSymbol !== selectedStock) {
+          throw new Error('Historical data returned for ' + responseSymbol + ' instead of ' + selectedStock + '.');
+        }
+        if (!Array.isArray(data?.points)) throw new Error('Historical data response is missing price points.');
+        if (!cancelled) {
+          setHistoryData(data.points);
+          setHistorySymbol(selectedStock);
+        }
       } catch (err: any) {
         if (!cancelled) {
           setHistoryData([]);
+          setHistorySymbol(null);
           setHistoryError(err?.message || 'Historical market data unavailable');
         }
       } finally {
@@ -163,20 +179,31 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
     async function loadSecMilestones() {
       setSecMilestoneLoading(true);
       setSecMilestoneError(null);
+      setMilestonesSymbol(null);
+      setSecMilestones([]);
+      setMilestoneSourceStatus(null);
+      setMilestoneRetrievedAt(null);
+      setActiveMilestoneId(null);
       try {
-        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12');
+        const res = await fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12', { cache: 'no-store' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'SEC milestone lookup failed');
+        if (!res.ok) throw new Error(data?.error || 'Milestone lookup failed');
+        const responseSymbol = String(data?.symbol || '').trim().toUpperCase();
+        if (responseSymbol && responseSymbol !== selectedStock) {
+          throw new Error('Milestone results returned for ' + responseSymbol + ' instead of ' + selectedStock + '.');
+        }
         if (!cancelled) {
           const events = Array.isArray(data.events) ? data.events : [];
-          setSecMilestones(events);
+          setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === selectedStock));
+          setMilestonesSymbol(selectedStock);
           setMilestoneSourceStatus(data.sourceStatus || null);
           setMilestoneRetrievedAt(data.retrievedAt || null);
         }
       } catch (err: any) {
         if (!cancelled) {
           setSecMilestones([]);
-          setSecMilestoneError(err?.message || 'Live SEC milestones unavailable');
+          setMilestonesSymbol(null);
+          setSecMilestoneError(err?.message || 'Milestones unavailable');
         }
       } finally {
         if (!cancelled) setSecMilestoneLoading(false);
@@ -192,25 +219,31 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         const quoteTimestamp = liveObj.asOf || liveObj.marketTime;
         const parsedQuoteTime = quoteTimestamp ? Date.parse(quoteTimestamp) : NaN;
         // Never place a delayed quote on today's date. Only use a quote when its market date is known.
-        if (liveObj.stale || !Number.isFinite(parsedQuoteTime)) return [...historyData];
+        if (liveObj.stale || !Number.isFinite(parsedQuoteTime)) return [...activeHistoryData];
         const quoteDate = new Date(parsedQuoteTime).toISOString().slice(0, 10);
-        const updated = historyData.map((point) =>
+        const updated = activeHistoryData.map((point) =>
           point.date === quoteDate ? { ...point, price: liveObj.price } : point
         );
         if (updated.some((point) => point.date === quoteDate)) return updated;
-        const lastHistoryDate = historyData[historyData.length - 1]?.date;
+        const lastHistoryDate = activeHistoryData[activeHistoryData.length - 1]?.date;
         return !lastHistoryDate || quoteDate > lastHistoryDate
-          ? [...historyData, { date: quoteDate, price: liveObj.price }].sort((a, b) => a.date.localeCompare(b.date))
-          : [...historyData];
+          ? [...activeHistoryData, { date: quoteDate, price: liveObj.price }].sort((a, b) => a.date.localeCompare(b.date))
+          : [...activeHistoryData];
       })()
-    : [...historyData];
+    : [...activeHistoryData];
+
+  const liveSelectedPrice = livePrices?.[selectedStock]?.price;
+  const currentTickerPrice = typeof liveSelectedPrice === 'number' && Number.isFinite(liveSelectedPrice) && liveSelectedPrice > 0
+    ? liveSelectedPrice
+    : activeHistoryData[activeHistoryData.length - 1]?.price;
 
   const currentMeta = STOCK_METADATA[selectedStock] || { name: selectedStock, sector: 'Live Market', desc: 'Tracking this public ticker from live market and SEC feeds.', logoColor: '#22c55e' };
   const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
-    ? historyData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
+    ? historySymbol === selectedStock && activeHistoryData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
     : null;
-  const externalProjectUpdates = secMilestones.filter(m => m.stockSymbol === selectedStock && Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
-  const verifiedSecMilestoneCount = secMilestones.filter(m => m.stockSymbol === selectedStock && m.sourceType === 'sec-primary').length;
+  const currentTickerMilestones = milestonesSymbol === selectedStock ? secMilestones.filter(m => m.stockSymbol === selectedStock) : [];
+  const externalProjectUpdates = currentTickerMilestones.filter(m => Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
+  const verifiedSecMilestoneCount = currentTickerMilestones.filter(m => m.sourceType === 'sec-primary').length;
   const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
   const projectDiscoveryDegraded = Boolean(secMilestoneError || milestoneSourceStatus?.sec?.error || milestoneSourceStatus?.web?.status === 'unavailable' || (milestoneSourceStatus?.web?.errors?.length || 0) > 0 || (milestoneSourceStatus?.x?.configured && milestoneSourceStatus?.x?.status !== 'available'));
   const updateDateLabel = (m: Milestone) => m.publishedAt
@@ -266,9 +299,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   };
 
   const getAccuratePrice = (m: Milestone) => {
+    // Do not price a milestone with stale history from a previously selected ticker.
+    if (m.stockSymbol !== selectedStock || historySymbol !== selectedStock) return undefined;
+
     // Prefer an exact trading-day match. For month-only milestones, use the
-    // nearest available trading day to the middle of that month so the UI
-    // still shows a real market price instead of a missing/static value.
+    // nearest available trading day to the middle of that month and label it as approximate.
     const exact = chartHistory.find((pt) => matchesDate(m.date, pt.date));
     if (exact) return exact.price;
 
@@ -287,6 +322,15 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
     return undefined;
   };
+
+  const formatEventPrice = (price: number | undefined, approximate = false) => {
+    if (price == null || !Number.isFinite(price) || price <= 0) return 'Unavailable';
+    return (approximate ? '≈ ' : '') + String.fromCharCode(36) + formatPrice(price);
+  };
+  const activeMilestonePrice = activeMilestone ? getAccuratePrice(activeMilestone) : undefined;
+  const activeMilestonePriceApproximate = Boolean(
+    activeMilestone && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(activeMilestone.date.trim())
+  );
 
   // Pin exact-day milestones to their date, month-only milestones to the middle trading day,
   // and human-readable exact dates (e.g. "May 5, 2026") to the closest trading day.
@@ -343,7 +387,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <p className="text-white font-bold">Stock Price: ${formatPrice(pt.price)}</p>
           {pt.milestone && (
             <div className="mt-1 pt-1.5 border-t border-white/10 text-emerald-400 font-bold">
-              ★ {pt.milestone} (Price: ${formatPrice(pt.milestonePrice)})
+              ★ {pt.milestone} ({pt.milestonePrice == null || !Number.isFinite(pt.milestonePrice) ? 'Event price unavailable' : 'Price: ' + String.fromCharCode(36) + formatPrice(pt.milestonePrice)})
               {pt.milestoneApproximate && <span className="block mt-1 text-[10px] font-normal text-amber-200/80">Approximate chart date; see the timeline for the reported date.</span>}
             </div>
           )}
@@ -524,13 +568,20 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
           <button
             type="button"
             onClick={() => {
+              const requestedSymbol = selectedStock;
               setSecMilestoneLoading(true);
               setSecMilestoneError(null);
-              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(selectedStock) + '&limit=12&refresh=true', { cache: 'no-store' })
+              fetch('/api/company-scale?action=milestones&symbol=' + encodeURIComponent(requestedSymbol) + '&limit=12&refresh=true', { cache: 'no-store' })
                 .then(async response => {
                   const payload = await response.json().catch(() => ({}));
                   if (!response.ok) throw new Error(payload?.error || 'Project updates could not be refreshed.');
-                  setSecMilestones(Array.isArray(payload.events) ? payload.events : []);
+                  const responseSymbol = String(payload?.symbol || '').trim().toUpperCase();
+                  if (responseSymbol && responseSymbol !== requestedSymbol) {
+                    throw new Error('Refresh returned ' + responseSymbol + ' instead of ' + requestedSymbol + '.');
+                  }
+                  const events = Array.isArray(payload.events) ? payload.events : [];
+                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  setMilestonesSymbol(requestedSymbol);
                   setMilestoneSourceStatus(payload.sourceStatus || null);
                   setMilestoneRetrievedAt(payload.retrievedAt || null);
                 })
@@ -686,10 +737,17 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                     {activeMilestone.date}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-white/40">Price at Event:</span>
-                  <span className="text-emerald-400 font-bold">${formatPrice(getAccuratePrice(activeMilestone))}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Event-date price</span>
+                  <span className={activeMilestonePrice == null ? 'font-semibold text-white/40' : 'font-bold text-emerald-300'}>
+                    {formatEventPrice(activeMilestonePrice, activeMilestonePriceApproximate)}
+                  </span>
                 </div>
+                {activeMilestonePrice == null && (
+                  <p className="rounded-lg border border-white/[.07] bg-white/[.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
+                    No historical quote for {selectedStock} was found for this event date. A price from another ticker will not be substituted.
+                  </p>
+                )}
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded p-3.5">
@@ -708,7 +766,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
             <span className="text-[10px] font-mono text-white/60 flex items-center flex-wrap gap-2">
               <span className="inline-flex items-center space-x-1.5">
                 <Award className="w-4 h-4 text-emerald-400" />
-                <span>Current price: ${formatPrice(livePrices?.[selectedStock]?.price ?? historyData[historyData.length - 1]?.price)}</span>
+                <span>{currentTickerPrice == null ? 'Current price unavailable' : 'Current price: ' + String.fromCharCode(36) + formatPrice(currentTickerPrice)}</span>
               </span>
               {livePrices?.[selectedStock] && <FreshnessBadge {...livePrices[selectedStock]} showAge />}
             </span>
@@ -719,26 +777,49 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       {/* Source-backed project updates replace the previous fixed capacity percentages. */}
 
       {/* Timeline of All Stock Milestones */}
-      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-5 md:p-6 space-y-6">
-        <h3 className="text-xs font-black uppercase tracking-widest text-white">Milestone Chronology ({selectedStock})</h3>
-        <div className="relative border-l-2 border-white/10 pl-4 space-y-6 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
+      <div className="bg-[#15181E]/30 border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-white">Milestone chronology · {selectedStock}</h3>
+          <p className="text-xs leading-relaxed text-white/45">Only company-matched events are shown. Prices come from {selectedStock} historical data for the event date; unavailable prices are not guessed.</p>
+        </div>
+        <div className="relative border-l-2 border-white/10 pl-4 space-y-3 ml-2 font-mono min-h-[280px] max-h-[55vh] overflow-y-auto pr-2 aiw-scroll-region">
           {stockMilestones.length === 0 ? (
-            <p className="text-xs text-white/40">No SEC events were returned for this ticker yet.</p>
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm text-white/50">
+              {secMilestoneLoading
+                ? 'Checking SEC filings and company-matched news for ' + selectedStock + '…'
+                : 'No matching milestones were found for ' + selectedStock + '. Other companies’ headlines are excluded from this timeline.'}
+            </div>
           ) : (
             stockMilestones.map((m) => {
               const isActive = m.id === activeMilestone?.id;
+              const eventPrice = getAccuratePrice(m);
+              const eventPriceApproximate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(m.date.trim());
+              const sourceLabel = m.sourceType === 'sec-primary'
+                ? 'SEC filing'
+                : m.sourceType === 'official-company'
+                  ? 'Official company'
+                  : m.sourceType === 'official-social'
+                    ? 'Official social'
+                    : m.sourceType === 'syndicated-release'
+                      ? 'Syndicated release'
+                      : m.sourceType === 'secondary-news'
+                        ? 'News lead'
+                        : m.sourceType === 'social-post'
+                          ? 'Social post'
+                          : 'Curated milestone';
               return (
-                <div
+                <button
+                  type="button"
                   key={m.id}
                   onClick={() => setActiveMilestoneId(m.id)}
-                  className={`group relative pl-2 cursor-pointer transition ${
-                    isActive ? 'text-emerald-400' : 'text-white/60 hover:text-white'
-                  }`}
+                  aria-pressed={isActive}
+                  className={isActive
+                    ? 'group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition bg-white/[.045] text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50'
+                    : 'group relative block w-full rounded-xl pl-2 pr-3 py-3 text-left transition text-white/60 hover:bg-white/[.025] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50'}
                 >
-                  {/* Timeline Node Ring */}
-                  <div className={`absolute -left-[27px] w-4 h-4 rounded-full border-2 bg-[#0F1115] flex items-center justify-center transition ${
-                    isActive ? 'border-emerald-400 scale-110' : 'border-white/10 group-hover:border-white/40'
-                  }`}>
+                  <span className={isActive
+                    ? 'absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] border-emerald-400 scale-110'
+                    : 'absolute -left-[27px] top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-[#0F1115] border-white/10 group-hover:border-white/40'}>
                     {m.status === 'done' ? (
                       <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
                     ) : m.status === 'active' ? (
@@ -746,20 +827,21 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                     ) : (
                       <AlertCircle className="w-2.5 h-2.5 text-white/20" />
                     )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-                      <span className="text-white/40 font-bold">{m.date}</span>
-                      <span className="text-[10px] text-white/20">|</span>
-                      <span className="text-emerald-400 font-bold">Price: ${formatPrice(getAccuratePrice(m))}</span>
-                    </div>
-                    <h4 className="text-sm font-black uppercase tracking-tight text-white group-hover:underline">{m.title}</h4>
-                    <p className="text-xs text-white/60 max-w-2xl font-sans mt-1">
-                      {m.description.slice(0, 110)}...
-                    </p>
-                  </div>
-                </div>
+                  </span>
+                  <span className="block space-y-1.5">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-white/50">{m.date}</span>
+                      <span className={eventPrice == null ? 'text-white/35' : 'font-semibold text-emerald-300'}>
+                        {eventPrice == null ? 'Price unavailable' : formatEventPrice(eventPrice, eventPriceApproximate)}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[.025] px-2 py-0.5 text-[10px] text-white/50">{sourceLabel}</span>
+                    </span>
+                    <span className="block text-sm font-bold leading-5 text-white group-hover:underline">{m.title}</span>
+                    <span className="block max-w-2xl font-sans text-xs leading-5 text-white/55">
+                      {m.description.slice(0, 150)}{m.description.length > 150 ? '…' : ''}
+                    </span>
+                  </span>
+                </button>
               );
             })
           )}

@@ -1,3 +1,4 @@
+import { isProjectEventRelevant } from '../utils/projectEventRelevance.js';
 import { history as routedHistory, providerSymbol, quote as routedQuote } from '../../api/_market-data.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
@@ -695,8 +696,8 @@ function titleFor(items) {
 }
 
 const PROJECT_SOURCE_PROFILES = {
-  DGXX: { name: 'Digi Power X', domains: ['digipowerx.com'], xHandle: 'DigipowerX' },
-  NBIS: { name: 'Nebius', domains: ['nebius.com'], xHandle: null },
+  DGXX: { name: 'Digi Power X', aliases: ['DigiPower X', 'DGXX', 'Digihost Technology'], domains: ['digipowerx.com'], xHandle: 'DigipowerX' },
+  NBIS: { name: 'Nebius', aliases: ['Nebius Group', 'NBIS'], domains: ['nebius.com'], xHandle: null },
   NVDA: { name: 'NVIDIA', domains: ['nvidia.com'], xHandle: null },
   AMD: { name: 'AMD', domains: ['amd.com'], xHandle: null },
   MU: { name: 'Micron Technology', domains: ['micron.com'], xHandle: null },
@@ -788,6 +789,9 @@ function mapDiscoveredProjectEvent(symbol, row, profile, provider) {
   if (!title || !/^https?:\/\//i.test(url)) return null;
   const snippet = String(row?.snippet || row?.description || row?.content || '').replace(/\s+/g, ' ').trim();
   const combined = title + ' ' + snippet;
+  // Search engines can return loosely related infrastructure stories. Never
+  // attach one to a ticker unless the issuer name/ticker or official domain matches.
+  if (!isProjectEventRelevant(symbol, { ...row, title, snippet, url }, profile)) return null;
   if (!/(contract|agreement|construction|build(?:out)?|phase|facility|data.?cent(?:er|re)|campus|power|megawatt|\bmw\b|commission|capacity|gpu|deployment|infrastructure|operations|columbiana|project|progress|substation|equipment)/i.test(combined)) return null;
   const sourceType = sourceTypeForUrl(url, profile, row?.source || provider);
   const publishedAt = normalizeSourceDate(row?.published_at || row?.published || row?.date || row?.publishedAt);
