@@ -1,7 +1,7 @@
 import type { Milestone } from '../types';
 
 const TRACKER_ALIASES: Record<string, string[]> = {
-  DGXX: ['Digi Power X', 'DigiPower X', 'Digihost Technology'],
+  DGXX: ['Digi Power X', 'DigiPower X', 'DigiPowerX', 'Digihost Technology'],
   NBIS: ['Nebius', 'Nebius Group'],
   NVDA: ['NVIDIA', 'Nvidia Corporation'],
   MU: ['Micron', 'Micron Technology'],
