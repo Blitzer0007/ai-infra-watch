@@ -696,7 +696,7 @@ function titleFor(items) {
 }
 
 const PROJECT_SOURCE_PROFILES = {
-  DGXX: { name: 'Digi Power X', aliases: ['DigiPower X', 'DGXX', 'Digihost Technology'], domains: ['digipowerx.com'], xHandle: 'DigipowerX' },
+  DGXX: { name: 'Digi Power X', aliases: ['DigiPower X', 'DigiPowerX', 'DGXX', 'Digihost Technology'], domains: ['digipowerx.com'], xHandle: 'DigipowerX' },
   NBIS: { name: 'Nebius', aliases: ['Nebius Group', 'NBIS'], domains: ['nebius.com'], xHandle: null },
   NVDA: { name: 'NVIDIA', domains: ['nvidia.com'], xHandle: null },
   AMD: { name: 'AMD', domains: ['amd.com'], xHandle: null },
