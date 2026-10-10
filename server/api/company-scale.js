@@ -968,7 +968,11 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
     evidenceClass: 'primary-source',
     relatedSources: [],
   }] : [];
-  const items = dedupeProjectEvents([...partnerEvidence, ...xResult.items, ...webRows], Math.min(30, Math.max(limit, limit * 2)));
+  const items = dedupeProjectEvents([...xResult.items, ...webRows], Math.min(30, Math.max(limit, limit * 2)));
+  // Keep this known primary partner source even when newer dated leads fill the cap.
+  for (const evidence of partnerEvidence) {
+    if (!items.some(item => item.url === evidence.url)) items.push(evidence);
+  }
   const data = {
     items,
     sourceStatus: {
