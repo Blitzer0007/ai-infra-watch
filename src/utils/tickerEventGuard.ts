@@ -84,23 +84,20 @@ export function isTrackerEventRelevantToTicker(
   const selectedTicker = String(ticker || '').trim().toUpperCase();
   if (!selectedTicker || String(event.stockSymbol || '').trim().toUpperCase() !== selectedTicker) return false;
 
-  // SEC filings and verified posts from the tracked issuer can be generic in title.
-  if (event.sourceType === 'sec-primary' ||
-      event.sourceType === 'official-company' ||
-      event.sourceType === 'official-social') return true;
-
   const title = String(event.title || '');
   const description = String(event.description || '');
   const titleMatches = mentionsCompany(title, selectedTicker, companyName);
   const bodyMatches = mentionsCompany(description, selectedTicker, companyName);
 
-  // A missing sourceType is normally reserved for curated milestones. However,
-  // some cached/legacy discovery rows lack metadata; never let a clearly
-  // different issuer's headline leak into the selected ticker's timeline.
-  if (!event.sourceType) {
-    if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
-    return true;
-  }
+  // A source label alone is not proof that a headline belongs to the selected
+  // issuer. Legacy/cached rows can be mis-tagged, so reject another known
+  // company's headline before honoring the official-source shortcut.
+  if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
+
+  // SEC filings and verified posts from the tracked issuer can be generic in title.
+  if (event.sourceType === 'sec-primary' ||
+      event.sourceType === 'official-company' ||
+      event.sourceType === 'official-social') return true;
 
   if (!titleMatches && !bodyMatches) return false;
 
