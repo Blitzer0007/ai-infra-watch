@@ -48,6 +48,15 @@ describe('Progress Tracker client-side company relevance guard', () => {
     }, 'NOW', 'ServiceNow Inc.'), false);
   });
 
+  it('does not match a lowercase ticker collision for an unknown company', () => {
+    assert.equal(isTrackerEventRelevantToTicker({
+      stockSymbol: 'XYZ',
+      sourceType: 'secondary-news',
+      title: 'The x y z construction process',
+      description: 'A general construction story.',
+    }, 'XYZ', 'XYZ'), false);
+  });
+
   it('allows curated milestones assigned to the ticker when sourceType is absent', () => {
     assert.equal(isTrackerEventRelevantToTicker({
       stockSymbol: 'DGXX',
