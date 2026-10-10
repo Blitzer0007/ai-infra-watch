@@ -855,7 +855,7 @@ function dedupeProjectEvents(rows, limit = 12) {
 async function fetchXProjectUpdates(symbol, profile, limit = 10) {
   const token = String(process.env.X_BEARER_TOKEN || process.env.X_API_BEARER_TOKEN || '').trim();
   if (!token) return { items: [], status: 'not-configured', configured: false, error: null };
-  const terms = '(construction OR "Phase 1" OR "Phase 2" OR Columbiana OR "data center" OR "15 MW" OR "40 MW" OR commissioning OR capacity OR GPU OR infrastructure)';
+  const terms = '(construction OR "Phase 1" OR "Phase 2" OR Columbiana OR "data center" OR "15 MW" OR "40 MW" OR commissioning OR capacity OR GPU OR infrastructure OR Supermicro OR Blackwell OR NeoCloudz OR partnership OR "bare-metal")';
   const query = profile.xHandle
     ? 'from:' + profile.xHandle + ' ' + terms + ' -is:retweet'
     : '("' + profile.name + '" OR $' + symbol + ') ' + terms + ' -is:retweet -is:reply';
@@ -926,7 +926,7 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
   const cached = PROJECT_UPDATE_CACHE.get(cacheKey);
   if (!forceRefresh && cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.data;
   const profile = projectSourceProfile(symbol);
-  const searchTerms = '(construction OR "Phase 1" OR "Phase 2" OR "ready for service" OR commissioning OR "data center" OR capacity OR MW OR GPU OR deployment OR contract OR colocation OR power OR project)';
+  const searchTerms = '(construction OR "Phase 1" OR "Phase 2" OR "ready for service" OR commissioning OR "data center" OR capacity OR MW OR GPU OR deployment OR contract OR colocation OR power OR project OR Supermicro OR Blackwell OR NeoCloudz OR partnership OR "bare-metal")';
   const queries = [
     '"' + profile.name + '" ' + searchTerms,
     ...(profile.domains || []).slice(0, 1).map(domain => 'site:' + domain + ' ' + searchTerms),
@@ -950,7 +950,25 @@ async function discoverProjectUpdates(symbol, limit = 10, forceRefresh = false) 
     }
   });
   const xResult = await fetchXProjectUpdates(symbol, profile, limit);
-  const items = dedupeProjectEvents([...xResult.items, ...webRows], Math.min(30, Math.max(limit, limit * 2)));
+  const partnerEvidence = symbol === 'DGXX' ? [{
+    id: 'project-update-dgxx-supermicro-case-study',
+    stockSymbol: 'DGXX',
+    date: 'Date not supplied',
+    publishedAt: null,
+    title: 'Supermicro Powers DigiPowerX Full-Stack AI with NVIDIA Blackwell',
+    category: 'AI Infrastructure / Partnership',
+    description: 'Supermicro’s official case study describes DigiPowerX’s NeoCloudz platform, dedicated bare-metal NVIDIA Blackwell infrastructure, and Supermicro GPU-optimized systems. The page confirms the partner relationship; it is not a dated construction milestone.',
+    status: 'done',
+    source: 'Supermicro official case study',
+    sourceUrl: 'https://www.supermicro.com/en/success-story/digipowerx',
+    url: 'https://www.supermicro.com/en/success-story/digipowerx',
+    sourceType: 'partner-primary',
+    verificationStatus: 'Official technology-partner case study',
+    provider: 'curated-primary-source',
+    evidenceClass: 'primary-source',
+    relatedSources: [],
+  }] : [];
+  const items = dedupeProjectEvents([...partnerEvidence, ...xResult.items, ...webRows], Math.min(30, Math.max(limit, limit * 2)));
   const data = {
     items,
     sourceStatus: {
