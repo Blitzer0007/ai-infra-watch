@@ -6,6 +6,7 @@ import { STOCK_METADATA, INITIAL_MILESTONES } from '../data';
 import { Milestone } from '../types';
 import { formatPrice } from '../utils';
 import FreshnessBadge from './FreshnessBadge';
+import { isTrackerEventRelevantToTicker } from '../utils/tickerEventGuard';
 
 function matchesDate(milestoneDate: string, historyDate: string): boolean {
   const m = milestoneDate.trim().toLowerCase();
@@ -125,10 +126,15 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
 
 
   // Combine the curated timeline with live SEC milestones for the selected symbol.
+  const selectedIssuerName = STOCK_METADATA[selectedStock]?.name || selectedStock;
   const stockMilestones = [
-    ...milestones.filter((m) => m.stockSymbol === selectedStock),
+    ...milestones.filter((m) => m.stockSymbol === selectedStock && isTrackerEventRelevantToTicker(m, selectedStock, selectedIssuerName)),
     ...(milestonesSymbol === selectedStock
-      ? secMilestones.filter((m) => m.stockSymbol === selectedStock && !milestones.some(existing => existing.id === m.id))
+      ? secMilestones.filter((m) =>
+          m.stockSymbol === selectedStock &&
+          isTrackerEventRelevantToTicker(m, selectedStock, selectedIssuerName) &&
+          !milestones.some(existing => existing.id === m.id)
+        )
       : [])
   ].sort((a, b) => {
     const da = Date.parse(a.date) || 0;
@@ -194,7 +200,10 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
         }
         if (!cancelled) {
           const events = Array.isArray(data.events) ? data.events : [];
-          setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === selectedStock));
+          setSecMilestones(events.filter((event: Milestone) =>
+            event.stockSymbol === selectedStock &&
+            isTrackerEventRelevantToTicker(event, selectedStock, selectedIssuerName)
+          ));
           setMilestonesSymbol(selectedStock);
           setMilestoneSourceStatus(data.sourceStatus || null);
           setMilestoneRetrievedAt(data.retrievedAt || null);
@@ -241,7 +250,12 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const nbisVerification = selectedStock === 'NBIS' && !historyLoading && !secMilestoneLoading
     ? historySymbol === selectedStock && activeHistoryData.length > 0 && !historyError && !secMilestoneError ? 'PASS' : 'WAIT'
     : null;
-  const currentTickerMilestones = milestonesSymbol === selectedStock ? secMilestones.filter(m => m.stockSymbol === selectedStock) : [];
+  const currentTickerMilestones = milestonesSymbol === selectedStock
+    ? secMilestones.filter(m =>
+        m.stockSymbol === selectedStock &&
+        isTrackerEventRelevantToTicker(m, selectedStock, selectedIssuerName)
+      )
+    : [];
   const externalProjectUpdates = currentTickerMilestones.filter(m => Boolean(m.sourceType) && m.sourceType !== 'sec-primary');
   const verifiedSecMilestoneCount = currentTickerMilestones.filter(m => m.sourceType === 'sec-primary').length;
   const socialUpdateCount = externalProjectUpdates.filter(m => m.sourceType === 'official-social' || m.sourceType === 'social-post').length;
@@ -586,7 +600,11 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                   // Ignore a late refresh response if the user switched ticker meanwhile.
                   if (selectedStock !== requestedSymbol) return;
                   const events = Array.isArray(payload.events) ? payload.events : [];
-                  setSecMilestones(events.filter((event: Milestone) => event.stockSymbol === requestedSymbol));
+                  const issuerName = STOCK_METADATA[requestedSymbol]?.name || requestedSymbol;
+                  setSecMilestones(events.filter((event: Milestone) =>
+                    event.stockSymbol === requestedSymbol &&
+                    isTrackerEventRelevantToTicker(event, requestedSymbol, issuerName)
+                  ));
                   setMilestonesSymbol(requestedSymbol);
                   setMilestoneSourceStatus(payload.sourceStatus || null);
                   setMilestoneRetrievedAt(payload.retrievedAt || null);
