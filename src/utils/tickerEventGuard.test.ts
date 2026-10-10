@@ -38,6 +38,15 @@ describe('Progress Tracker client-side company relevance guard', () => {
     }, 'DGXX', 'Digi Power X Inc.'), true);
   });
 
+  it('accepts the official Supermicro DigiPowerX partner case study on DGXX', () => {
+    assert.equal(isTrackerEventRelevantToTicker({
+      stockSymbol: 'DGXX',
+      sourceType: 'partner-primary',
+      title: 'Supermicro Powers DigiPowerX Full-Stack AI with NVIDIA Blackwell',
+      description: 'DigiPowerX NeoCloudz platform delivers dedicated bare-metal NVIDIA Blackwell infrastructure.',
+    }, 'DGXX', 'Digi Power X Inc.'), true);
+  });
+
   it('keeps a Nebius story on the NBIS timeline', () => {
     assert.equal(isTrackerEventRelevantToTicker({
       stockSymbol: 'NBIS',
