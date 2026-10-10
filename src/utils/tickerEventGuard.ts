@@ -89,14 +89,19 @@ export function isTrackerEventRelevantToTicker(
       event.sourceType === 'official-company' ||
       event.sourceType === 'official-social') return true;
 
-  // Curated milestones are explicitly assigned to a ticker in our source data.
-  // Apply the stricter text requirement to external discovery/news/social leads only.
-  if (!event.sourceType) return true;
-
   const title = String(event.title || '');
   const description = String(event.description || '');
   const titleMatches = mentionsCompany(title, selectedTicker, companyName);
   const bodyMatches = mentionsCompany(description, selectedTicker, companyName);
+
+  // A missing sourceType is normally reserved for curated milestones. However,
+  // some cached/legacy discovery rows lack metadata; never let a clearly
+  // different issuer's headline leak into the selected ticker's timeline.
+  if (!event.sourceType) {
+    if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
+    return true;
+  }
+
   if (!titleMatches && !bodyMatches) return false;
 
   // If the headline identifies a different known company, a mention buried only
