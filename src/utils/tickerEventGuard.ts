@@ -52,10 +52,11 @@ function mentionsTicker(text: string, ticker: string): boolean {
 
 function mentionsCompany(text: string, ticker: string, companyName = ''): boolean {
   const haystack = ' ' + normalizeWords(text) + ' ';
+  const normalizedTicker = normalizeWords(ticker);
   const aliases = [
     ...(TRACKER_ALIASES[ticker] || []),
     companyName,
-  ].map(normalizeWords).filter(alias => alias.length >= 3);
+  ].map(normalizeWords).filter(alias => alias.length >= 3 && alias !== normalizedTicker);
 
   if (aliases.some(alias => haystack.includes(' ' + alias + ' '))) return true;
   return mentionsTicker(text, ticker);
