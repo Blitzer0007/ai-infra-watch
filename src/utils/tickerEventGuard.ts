@@ -35,11 +35,13 @@ const KNOWN_COMPANIES: Record<string, string[]> = {
 };
 
 function normalizeWords(value: string): string {
-  return String(value || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
+  return String(value || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+  return value.split('').map(character =>
+    /[A-Z0-9]/i.test(character) ? character : String.fromCharCode(92) + character
+  ).join('');
 }
 
 function mentionsTicker(text: string, ticker: string): boolean {
@@ -59,14 +61,12 @@ function mentionsCompany(text: string, ticker: string, companyName = ''): boolea
   return mentionsTicker(text, ticker);
 }
 
-function headlineNamesAnotherCompany(title: string, ticker: string, companyName = ''): boolean {
+function headlineNamesAnotherCompany(title: string, ticker: string): boolean {
   const normalizedTicker = ticker.toUpperCase();
+  const haystack = ' ' + normalizeWords(title) + ' ';
   return Object.entries(KNOWN_COMPANIES).some(([otherTicker, aliases]) => {
     if (otherTicker === normalizedTicker) return false;
-    return aliases.some(alias => {
-      const haystack = ' ' + normalizeWords(title) + ' ';
-      return haystack.includes(' ' + normalizeWords(alias) + ' ');
-    });
+    return aliases.some(alias => haystack.includes(' ' + normalizeWords(alias) + ' '));
   });
 }
 
@@ -100,7 +100,7 @@ export function isTrackerEventRelevantToTicker(
 
   // If the headline identifies a different known company, a mention buried only
   // in the summary isn't sufficient. Require the tracked ticker/company in title.
-  if (headlineNamesAnotherCompany(title, selectedTicker, companyName) && !titleMatches) return false;
+  if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
 
   return true;
 }
