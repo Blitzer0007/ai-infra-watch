@@ -39,7 +39,7 @@ export default function JevAutonomousPortfolioLab() {
     setHistoryError('');
     try {
       const symbols = [...new Set([...selected, 'SPY', 'QQQ'])];
-      const response = await fetch('/api/jev-lab-history?range=2y&symbols=' + encodeURIComponent(symbols.join(',')));
+      const response = await authFetch('/api/jev-lab-history?range=2y&symbols=' + encodeURIComponent(symbols.join(',')));
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(body.results)) throw new Error(body.error || 'Could not load historical data coverage.');
       setHistoryCoverage(body);
