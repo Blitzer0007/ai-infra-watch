@@ -178,7 +178,7 @@ export function runHistoricalPaperBacktest(args: {
   for (const row of prices) {
     if (!symbols.includes(row.symbol)) continue;
     const t = Date.parse(row.date), available = Date.parse(row.availableAt);
-    if (!row.symbol || !/^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    if (!row.symbol || !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
     if (row.adjusted === false) throw new Error('Adjusted closes are required for strategy and benchmark return calculations.');
     const cutoff = args.decisionCutoffByDate?.[row.date];
     if (cutoff && (!finite(Date.parse(cutoff)) || available > Date.parse(cutoff) || t > Date.parse(cutoff))) throw new Error('Look-ahead data rejected by historical backtest.');
