@@ -86,8 +86,7 @@ async function weeklyReview(req, res) {
   if (!botToken || !chatId) return res.status(503).json({ ok: false, error: 'Telegram is not configured.' });
   if (!proposal) return res.status(200).json({ ok: true, skipped: true, reason: 'No saved paper proposal exists yet.' });
 
-  const dedupeKey = 'jev-weekly-review:' + new Date().toISOString().slice(0, 10);
-  const eventKey = 'notification:' + dedupeKey;
+  const eventKey = 'notification:jev-weekly-review';
   const existing = await supabase('server_alert_state?event_key=eq.' + encodeURIComponent(eventKey) + '&select=last_triggered_at&limit=1');
   const last = Date.parse(existing?.[0]?.last_triggered_at || '');
   if (Number.isFinite(last) && Date.now() - last < 6 * 24 * 60 * 60 * 1000) {
@@ -126,7 +125,7 @@ async function weeklyReview(req, res) {
       active: true,
       last_seen_at: new Date().toISOString(),
       last_triggered_at: new Date().toISOString(),
-      metadata: { source: 'jev-lab-weekly-review', proposalId: proposal.id, symbols: targetSymbols },
+      metadata: { source: 'jev-lab-weekly-review', proposalId: proposal.id, symbols: targetSymbols, reviewDate: new Date().toISOString().slice(0, 10) },
     }]),
   });
   return res.status(200).json({ ok: true, sent: 1, proposalId: proposal.id });
