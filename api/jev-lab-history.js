@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       const result = await history(symbol, range);
       const points = Array.isArray(result.points) ? result.points : [];
       const datedPoints = points
-        .filter(point => /^\\d{4}-\\d{2}-\\d{2}$/.test(String(point.date || '')) && Number.isFinite(point.price) && point.price > 0)
+        .filter(point => /^\d{4}-\d{2}-\d{2}$/.test(String(point.date || '')) && Number.isFinite(point.price) && point.price > 0)
         .sort((a, b) => a.date.localeCompare(b.date));
       const adjustedPoints = datedPoints.filter(point => point.adjusted === true && Number.isFinite(point.adjustedPrice) && point.adjustedPrice > 0);
       const adjusted = datedPoints.length > 0 && adjustedPoints.length === datedPoints.length;
