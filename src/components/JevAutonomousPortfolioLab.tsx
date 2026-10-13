@@ -11,8 +11,6 @@ const candidates = [
   { symbol: 'TEAM', sector: 'software', label: 'Atlassian' },
   { symbol: 'NVDA', sector: 'semiconductors', label: 'NVIDIA' },
   { symbol: 'GOOGL', sector: 'internet', label: 'Alphabet' },
-  { symbol: 'SPY', sector: 'broad-market', label: 'S&P 500 ETF' },
-  { symbol: 'QQQ', sector: 'growth-index', label: 'Nasdaq-100 ETF' },
 ];
 
 export default function JevAutonomousPortfolioLab() {
@@ -87,7 +85,14 @@ export default function JevAutonomousPortfolioLab() {
         mode: 'paper', reviewFrequency: 'weekly', universe: 'US equities', benchmarks: ['SPY', 'QQQ'],
         targetHoldings: target, capital, transactionCostBps: costBps,
         riskLimits: { maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05 },
-        evidenceQualityInput: { required: ['market data', 'peer comparison', 'fundamental evidence', 'valuation'], observed: [], stale: [], missing: ['evidence-backed candidate ranking not connected'], conflictCount: 0 },
+        evidenceQualityInput: {
+          evidence_availability: {
+            usable_families: [],
+            missing: ['market data', 'peer comparison', 'fundamental evidence', 'valuation', 'evidence-backed candidate ranking'],
+          },
+          evidence_freshness: [],
+          conflict_count: 0,
+        },
       }} />
       <div className="rounded-lg border border-white/10 p-3 text-sm">
         <p className="font-medium">Forecast validation threshold</p>
