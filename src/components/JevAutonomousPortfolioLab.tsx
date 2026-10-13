@@ -50,6 +50,7 @@ export default function JevAutonomousPortfolioLab() {
       localStorage.setItem(key, JSON.stringify([snapshot, ...previous].slice(0, 100)));
       setReview(snapshot.createdAt);
       setMessage('Paper proposal saved locally. No real order was sent.');
+      void fetch('/api/alert-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: { type: 'catalyst', severity: 'info', symbol: 'JEV', title: 'Weekly paper portfolio proposal saved', message: `A manual paper review was saved with ${target.length} holdings, ${Math.round(preview.cashWeight * 100)}% cash, estimated costs ${preview.totalCost.toFixed(2)}, and SPY/QQQ benchmarks. Evidence-ranked recommendations are not yet connected. No live trade was placed.` } }) }).then(async response => { if (!response.ok) throw new Error('Telegram alert was not delivered'); setMessage('Paper proposal saved locally. Telegram alert sent. No real order was sent.'); }).catch(() => setMessage('Paper proposal saved locally; Telegram alert could not be confirmed. No real order was sent.'));
     } catch { setMessage('Could not save paper proposal in this browser.'); }
   };
   return <div className="space-y-6 text-white">
