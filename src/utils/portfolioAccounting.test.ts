@@ -81,7 +81,7 @@ describe('portfolio trading P&L accounting', () => {
     assert.equal(result.status, 'quotes-incomplete');
     assert.equal(result.currentValue, null);
     assert.equal(result.unrealizedPnl, null);
-    assert.equal(result.realizedPnl, null);
+    assert.equal(result.realizedPnl, 0);
     assert.equal(result.totalTradingPnl, null);
   });
 
