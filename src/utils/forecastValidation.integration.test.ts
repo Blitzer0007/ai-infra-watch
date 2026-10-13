@@ -53,6 +53,24 @@ describe('forecast validation integration contract', () => {
     assert.equal(fullSummary.validationGate.ready, false);
   });
 
+  it('includes completed Forward Outlook forecasts in the verified sample without a source restriction', () => {
+    const rows = [
+      verifiedRow({ ticker: 'DELL', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-09' }),
+      verifiedRow({ ticker: 'NOVT', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-08' }),
+      verifiedRow({ ticker: 'RKLB', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-08' }),
+      verifiedRow({ ticker: 'META', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-07' }),
+      verifiedRow({ ticker: 'DGXX', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-07' }),
+      verifiedRow({ ticker: 'NBIS', horizon: 5, created_source: 'forward_outlook', target_date: '2026-10-07' }),
+    ];
+    const summary = buildForecastValidationSummary(rows);
+    assert.equal(summary.overall.count, 6);
+    assert.equal(summary.overall.independentCount, 6);
+    assert.equal(summary.validationGate.verifiedCount, 6);
+    assert.equal(summary.validationGate.independent5D, 6);
+    assert.equal(summary.validationGate.independent20D, 0);
+    assert.equal(summary.validationGate.ready, false);
+  });
+
   it('opens the API validation gate only when independent total and each horizon threshold are met', () => {
     const rows = Array.from({ length: 50 }, (_, index) => {
       const horizon = index < 25 ? 5 : 20;
