@@ -29,6 +29,9 @@ export default function JevAutonomousPortfolioLab() {
   const [candidateResearch, setCandidateResearch] = useState<any>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchError, setResearchError] = useState('');
+  const [savedProposals, setSavedProposals] = useState<any[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState('');
   const selectedKey = selected.join(',');
 
   const loadHistoryCoverage = async () => {
@@ -47,6 +50,23 @@ export default function JevAutonomousPortfolioLab() {
     }
   };
 
+  const loadSavedProposals = async () => {
+    setLedgerLoading(true);
+    setLedgerError('');
+    try {
+      const response = await authFetch('/api/jev-lab?limit=10', { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body.ok !== true || !Array.isArray(body.proposals)) {
+        throw new Error(body.error || 'Server-side paper ledger is unavailable.');
+      }
+      setSavedProposals(body.proposals);
+    } catch (error) {
+      setLedgerError(error instanceof Error ? error.message : 'Server-side paper ledger is unavailable.');
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadHistoryCoverage();
     setBacktest(null);
@@ -54,6 +74,10 @@ export default function JevAutonomousPortfolioLab() {
     setCandidateResearch(null);
     setResearchError('');
   }, [selectedKey]);
+
+  useEffect(() => {
+    void loadSavedProposals();
+  }, []);
 
   const runHistoricalBacktest = async () => {
     setBacktestLoading(true);
@@ -127,23 +151,78 @@ export default function JevAutonomousPortfolioLab() {
       });
     } catch { return null; }
   }, [capital, costBps, target]);
-  const approvePaperReview = () => {
+  const approvePaperReview = async () => {
     if (!preview) { setMessage('Target rejected by risk controls. Reduce weights or sector concentration.'); return; }
+    const createdAt = new Date().toISOString();
+    const clientId = `paper-${Date.now()}`;
+    const availability = candidateResearch?.jev?.evidence_availability || {};
+    const gate = candidateResearch?.jev?.evidence_gate || {};
+    const missing = Array.isArray(availability.missing) ? availability.missing : [];
+    const conflicts = Number(gate?.conflict_detection?.count || 0);
+    const action = String(gate.action || candidateResearch?.jev?.action || '').toLowerCase();
+    const evidenceStatus = !candidateResearch || candidateResearch?.ok === false
+      ? 'insufficient'
+      : missing.length || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)
+        ? 'partial'
+        : Number(gate.evidence_quality) >= 0.8 ? 'strong' : 'usable';
+    const researchSnapshot = candidateResearch ? {
+      capturedAt: createdAt,
+      summary: String(candidateResearch.summary || '').slice(0, 4000),
+      answerSource: candidateResearch.answer_source || null,
+      evidenceGate: gate,
+      evidenceAvailability: availability,
+      hallucination: candidateResearch.hallucination || null,
+    } : {};
     const snapshot = {
-      id: `paper-${Date.now()}`, createdAt: new Date().toISOString(),
-      mode: 'paper', decisionSource: 'manual approval', capital, costBps,
-      target, preview, benchmarkSymbols: ['SPY', 'QQQ'],
-      jevEvidenceGate: 'not run — evidence-backed candidate ranking is not yet connected',
-      note: 'This is a paper-trading proposal, not a live quote-backed recommendation.',
+      clientId, createdAt, mode: 'paper', universe: 'US', reviewFrequency: 'weekly',
+      decisionSource: 'manual approval', capital, costBps, target, preview,
+      benchmarkSymbols: ['SPY', 'QQQ'], evidenceStatus, researchSnapshot,
+      backtestSnapshot: backtest || {},
+      note: 'Manual paper proposal only. No broker integration or live order was used.',
     };
     try {
-      const key = 'aiw-jev-paper-portfolio-v1';
-      const previous = JSON.parse(localStorage.getItem(key) || '[]');
-      localStorage.setItem(key, JSON.stringify([snapshot, ...previous].slice(0, 100)));
-      setReview(snapshot.createdAt);
-      setMessage('Paper proposal saved locally. No real order was sent.');
-      void fetch('/api/alert-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: { type: 'catalyst', severity: 'info', symbol: 'JEV', title: 'Weekly paper portfolio proposal saved', message: `A manual paper review was saved with ${target.length} holdings, ${Math.round(preview.cashWeight * 100)}% cash, estimated costs ${preview.totalCost.toFixed(2)}, and SPY/QQQ benchmarks. Evidence-ranked recommendations are not yet connected. No live trade was placed.` } }) }).then(async response => { if (!response.ok) throw new Error('Telegram alert was not delivered'); setMessage('Paper proposal saved locally. Telegram alert sent. No real order was sent.'); }).catch(() => setMessage('Paper proposal saved locally; Telegram alert could not be confirmed. No real order was sent.'));
-    } catch { setMessage('Could not save paper proposal in this browser.'); }
+      const response = await authFetch('/api/jev-lab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId, mode: 'paper', universe: 'US', reviewFrequency: 'weekly',
+          capital, costBps, target, benchmarks: ['SPY', 'QQQ'], preview,
+          researchSnapshot, backtestSnapshot: backtest || {}, evidenceStatus,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok !== true || body?.persisted !== true) {
+        throw new Error(body?.error || 'Server-side save failed.');
+      }
+      try {
+        const key = 'aiw-jev-paper-portfolio-v1';
+        const previous = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem(key, JSON.stringify([snapshot, ...previous].slice(0, 100)));
+      } catch { /* The server ledger remains authoritative when browser storage is unavailable. */ }
+      setReview(createdAt);
+      setMessage('Paper proposal saved to the server ledger. No real order was sent.');
+      await loadSavedProposals();
+
+      const dedupeKey = 'jev-paper-proposal:' + [...target.map(item => item.symbol)].sort().join('-');
+      try {
+        const alertResponse = await authFetch('/api/alert-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: {
+            type: 'catalyst', severity: evidenceStatus === 'insufficient' ? 'medium' : 'info',
+            symbol: 'JEV', title: 'Weekly paper portfolio proposal saved',
+            message: `A manual paper review was saved with ${target.length} holdings, ${Math.round(preview.cashWeight * 100)}% cash, estimated costs $${preview.totalCost.toFixed(2)}, and SPY/QQQ benchmarks. Evidence status: ${evidenceStatus}. No live trade was placed.`,
+            dedupeKey, dedupeMinutes: 10080,
+          } }),
+        });
+        if (!alertResponse.ok) throw new Error('Telegram delivery was not confirmed.');
+        setMessage('Paper proposal saved to the server ledger. Telegram alert sent; no real order was sent.');
+      } catch {
+        setMessage('Paper proposal saved to the server ledger; Telegram delivery could not be confirmed. No real order was sent.');
+      }
+    } catch (error) {
+      setMessage('Server-side save failed: ' + (error instanceof Error ? error.message : 'paper proposal could not be saved') + '. No Telegram alert was sent.');
+    }
   };
   return <div className="space-y-6 text-white">
     <header className="rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6">
@@ -201,6 +280,18 @@ export default function JevAutonomousPortfolioLab() {
         <p className="text-xs text-amber-200/80">Adjusted closes and benchmark dates were aligned. Provider availability is currently assumed after the UTC calendar day, not independently verified; this result is not a validated forecast, evidence-backed JEV strategy, or proof of alpha.</p>
       </div>
       <p role="status" className="text-sm text-white/60">{message}{review ? ' Last saved: ' + new Date(review).toLocaleString() : ''}</p>
+      <div className="mt-3 border-t border-white/10 pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Server-side proposal history</h3>
+          <button type="button" onClick={() => void loadSavedProposals()} disabled={ledgerLoading} className="rounded-lg border border-white/15 px-2 py-1 text-xs disabled:opacity-50">{ledgerLoading ? 'Loading…' : 'Refresh'}</button>
+        </div>
+        {ledgerError && <p role="status" className="mt-2 text-xs text-amber-200">{ledgerError} Sign in with your access token and ensure the proposal-table migration has been applied.</p>}
+        {!ledgerError && savedProposals.length === 0 && <p className="mt-2 text-xs text-white/40">No server-side paper proposals saved yet.</p>}
+        {savedProposals.slice(0, 5).map(item => <div key={item.client_id} className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-xs">
+          <div><p className="font-medium">{(item.target || []).map((holding: any) => holding.symbol).join(', ') || 'No holdings'}</p><p className="mt-1 text-white/40">{item.created_at ? new Date(item.created_at).toLocaleString() : 'Date unavailable'} · {item.review_frequency || 'weekly'} · {item.benchmarks?.join?.(' / ') || 'SPY / QQQ'}</p></div>
+          <div className="text-right"><p>${Number(item.capital || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="mt-1 text-white/45">Evidence: {item.evidence_status || 'insufficient'}</p></div>
+        </div>)}
+      </div>
     </section>
     <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
