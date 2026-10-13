@@ -56,12 +56,12 @@ export function calculateAccountCashFlowPerformance(holdings: CashFlowHolding[],
   }
   const netContributionsUsd = deposits - withdrawals;
   if (!(deposits > 0) || !cashFlows.length) return { ...base, status: 'external-flows-missing', netContributionsUsd, dividendsUsd: dividends, feesUsd: fees, rewardsUsd: rewards,
-    note: 'Add the account’s opening deposit and record later deposits/withdrawals, dividends and fees before using account-level performance.' };
+    note: 'Add the account’s opening deposit and record later deposits/withdrawals, dividends, reward credits and fees before using account-level performance.' };
 
   const allQuotes = quoteCoverageComplete && holdings.every(row => Number(row.currentPrice) > 0 && Number.isFinite(Number(row.currentPrice)));
   const holdingsValueUsd = allQuotes ? holdings.reduce((sum, row) => sum + Number(row.currentPrice) * Number(row.quantity), 0) : null;
   const cashBalanceUsd = flowCashUsd + tradeCashUsd;
-  if (!allQuotes || holdingsValueUsd == null) return { ...base, status: 'quotes-incomplete', cashBalanceUsd, netContributionsUsd, dividendsUsd: dividends, feesUsd: fees,
+  if (!allQuotes || holdingsValueUsd == null) return { ...base, status: 'quotes-incomplete', cashBalanceUsd, netContributionsUsd, dividendsUsd: dividends, feesUsd: fees, rewardsUsd: rewards,
     note: 'Cash balance is calculated, but account value and P&L are withheld until every holding has a fresh quote.' };
   const accountValueUsd = holdingsValueUsd + cashBalanceUsd, totalPnlUsd = accountValueUsd - netContributionsUsd;
   return {
