@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveHoldingLedgerCostBasis, getHoldingReturnThresholdTransitions, getHoldingReturnGivebackTransition, getHoldingReviewTransition } from '../../server/api/portfolio-holding-return-alerts.js';
+import { deriveHoldingLedgerCostBasis, getHoldingReturnThresholdTransitions, getHoldingReturnGivebackTransition, getHoldingReviewTransition, buildHoldingThesisContext } from '../../server/api/portfolio-holding-return-alerts.js';
 
 describe('per-holding ledger cost basis', () => {
   it('keeps open cost basis and realized gains consistent after a partial sale', () => {
@@ -113,5 +113,41 @@ describe('profitable thesis review transitions', () => {
     const result = getHoldingReviewTransition('NOW', 20, [], [{ symbol: 'NOW', date: '2026-10-20', daysUntil: 3 }], null);
     assert.equal(result.trigger, true);
     assert.match(result.signature, /EARNINGS:2026-10-20/);
+  });
+});
+
+
+describe('holding digest add-opportunity and thesis explanation', () => {
+  it('does not infer an add opportunity from a profit milestone alone', () => {
+    const lines = buildHoldingThesisContext('MSFT', { decision_thesis: 'Long-term cloud and productivity growth' }, []);
+    assert.match(lines[0], /ADD OPPORTUNITY: INSUFFICIENT EVIDENCE/);
+    assert.match(lines[1], /profit milestone alone does not establish/);
+    assert.match(lines[2], /Long-term cloud and productivity growth/);
+  });
+
+  it('includes saved thesis, exit rules, allocation limits, and symbol-specific review evidence', () => {
+    const lines = buildHoldingThesisContext('NOW', {
+      decision_thesis: 'Enterprise workflow expansion',
+      practical_notes: 'Watch remaining performance obligations',
+      loss_limit_pct: 12,
+      exit_rule_type: 'thesis break',
+      exit_rule_text: 'Reassess if growth decelerates materially',
+      target_allocation_pct: 5,
+      max_allocation_pct: 8,
+    }, [{ symbol: 'NOW', severity: 'WATCH', title: 'Earnings approaching', detail: 'Verify guidance and growth.' }]);
+    const text = lines.join('\\n');
+    assert.match(text, /Enterprise workflow expansion/);
+    assert.match(text, /Earnings approaching/);
+    assert.match(text, /Watch remaining performance obligations/);
+    assert.match(text, /12%/);
+    assert.match(text, /Reassess if growth decelerates materially/);
+    assert.match(text, /Target portfolio weight: 5%/);
+    assert.match(text, /Maximum portfolio weight: 8%/);
+  });
+
+  it('marks missing saved thesis explicitly rather than inventing one', () => {
+    const lines = buildHoldingThesisContext('DGXX', null, []);
+    assert.match(lines[2], /not recorded for this holding/);
+    assert.match(lines.join('\\n'), /not proof that the thesis is intact/);
   });
 });
