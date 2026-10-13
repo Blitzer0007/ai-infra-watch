@@ -16,15 +16,18 @@ function headers() {
   };
 }
 
-async function loadVerifiedForecasts({ ticker, horizon, createdSource = 'auto_portfolio' } = {}) {
+async function loadVerifiedForecasts({ ticker, horizon, createdSource = null } = {}) {
   const params = new URLSearchParams();
-  params.set('select', 'ticker,horizon,status,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot,created_source');
+  // created_at and target_date are required by independentForecastRows to identify non-overlapping samples.
+  params.set('select', 'ticker,horizon,status,created_at,target_date,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot,created_source');
   params.set('status', 'eq.verified');
   if (createdSource) params.set('created_source', 'eq.' + encodeURIComponent(createdSource));
   params.set('order', 'verified_at.desc');
   params.set('limit', String(MAX_ROWS));
   if (ticker) params.set('ticker', 'eq.' + String(ticker).trim().toUpperCase());
-  if (Number.isFinite(Number(horizon))) params.set('horizon', 'eq.' + String(Number(horizon)));
+  if (horizon !== null && horizon !== undefined && horizon !== '' && Number.isFinite(Number(horizon))) {
+    params.set('horizon', 'eq.' + String(Number(horizon)));
+  }
 
   const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?' + params.toString(), {
     headers: headers(),
