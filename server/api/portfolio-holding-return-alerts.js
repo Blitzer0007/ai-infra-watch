@@ -197,131 +197,163 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
   return result;
 }
 
+export function getHoldingReturnGivebackTransition(returnPct, peakPct, active = false) {
+  if (returnPct == null || peakPct == null || returnPct === '' || peakPct === '') return { peakPct: null, trigger: false, reset: false, givebackPct: null };
+  const current = Number(returnPct), peak = Number(peakPct);
+  if (!Number.isFinite(current) || !Number.isFinite(peak)) return { peakPct: null, trigger: false, reset: false, givebackPct: null };
+  const nextPeak = Math.max(current, peak), givebackPct = nextPeak - current;
+  return { peakPct: nextPeak, trigger: !active && nextPeak >= 30 && givebackPct >= 10, reset: Boolean(active) && givebackPct <= 5, givebackPct };
+}
+
+export function getHoldingReviewTransition(symbol, returnPct, actionItems = [], earnings = [], oldState = null) {
+  const normalizedSymbol = String(symbol || '').trim().toUpperCase(), value = Number(returnPct);
+  if (!normalizedSymbol || !Number.isFinite(value) || value < 15) return { trigger: false, reset: Boolean(oldState?.active), signature: null, items: [], earnings: [] };
+  const items = (Array.isArray(actionItems) ? actionItems : [])
+    .filter(item => String(item?.symbol || '').trim().toUpperCase() === normalizedSymbol && ['ACT', 'WATCH'].includes(String(item?.severity || '').toUpperCase()))
+    .slice(0, 3).map(item => ({ severity: String(item.severity).toUpperCase(), title: String(item.title || 'Saved rule'), detail: String(item.detail || 'Review the recorded holding thesis and rules.') }));
+  const upcoming = (Array.isArray(earnings) ? earnings : [])
+    .filter(item => String(item?.symbol || '').trim().toUpperCase() === normalizedSymbol && Number(item?.daysUntil) >= 0 && Number(item?.daysUntil) <= 7)
+    .map(item => ({ date: String(item.date || ''), daysUntil: Number(item.daysUntil) }));
+  if (!items.length && !upcoming.length) return { trigger: false, reset: Boolean(oldState?.active), signature: null, items, earnings: upcoming };
+  const signature = [...items.map(item => item.severity + ':' + item.title), ...upcoming.map(item => 'EARNINGS:' + item.date)].sort().join('|');
+  return { trigger: !oldState?.active || String(oldState?.metadata?.signature || '') !== signature, reset: false, signature, items, earnings: upcoming };
+}
+
+function formatGroupedHoldingAlerts(events) {
+  const bySymbol = new Map();
+  for (const event of events) {
+    const symbol = String(event.symbol || '').toUpperCase();
+    if (!bySymbol.has(symbol)) bySymbol.set(symbol, []);
+    bySymbol.get(symbol).push(event);
+  }
+  const lines = ['📊 AI Infra Watch · Holding Review Digest', new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST', '', 'Review alerts only — no automatic buy/sell instructions.'];
+  for (const [symbol, symbolEvents] of bySymbol) {
+    const row = symbolEvents.find(event => event.row)?.row;
+    const returnPct = row ? Number(row.pnlPct) : null;
+    lines.push('', '━━ ' + symbol + (Number.isFinite(returnPct) ? ' · ' + signedPct(returnPct) + ' from average buy price' : '') + ' ━━');
+    for (const event of symbolEvents) {
+      if (event.type === 'milestone') lines.push('📈 ' + event.threshold + '% profit milestone crossed.');
+      else if (event.type === 'giveback') lines.push('⚠️ Profit give-back: ' + Number(event.givebackPct).toFixed(1) + ' percentage points below the ' + Number(event.peakPct).toFixed(1) + '% peak.');
+      else if (event.type === 'review') {
+        lines.push('🧭 Thesis review:');
+        event.items.slice(0, 2).forEach(item => lines.push('• [' + item.severity + '] ' + item.title + ': ' + item.detail));
+        event.earnings.slice(0, 2).forEach(item => lines.push('• Earnings ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd') + (item.date ? ' (' + item.date + ')' : '') + '.'));
+      }
+    }
+    if (row) {
+      lines.push('Avg buy ' + money(row.averageCost) + ' · quote ' + money(row.price) + ' · open cost ' + money(row.openCostBasis) + ' · unrealized ' + signedMoney(row.pnl) + ' · realized ' + signedMoney(Number(row.realizedPnl || 0)));
+      if (Number(row.positionReview || 0) > 0) lines.push('Cost-basis note: ' + Number(row.positionReview) + ' transaction(s) use derived values; verify broker records.');
+    }
+    lines.push('Review the saved thesis, exit rules, valuation and concentration before acting.');
+  }
+  const maxLength = 3900;
+  if (lines.join('\n').length > maxLength) {
+    while (lines.join('\n').length > maxLength && lines.length > 8) lines.splice(lines.length - 2, 2);
+    lines.push('', 'Additional lower-priority details were omitted to fit Telegram message limits.');
+  }
+  return lines.join('\n');
+}
+
 export async function evaluatePortfolioHoldingReturnAlerts(digest) {
   const rows = Array.isArray(digest?.rows) ? digest.rows : [];
   let transactionRows = [];
   try {
-    transactionRows = await supabase(
-      'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc'
-    ) || [];
+    transactionRows = await supabase('portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc') || [];
   } catch (error) {
     return { evaluated: false, reason: 'transaction ledger unavailable; refusing to estimate holding return from stored average-cost snapshots', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [error instanceof Error ? error.message : String(error)] };
   }
-
   const ledger = deriveHoldingLedgerCostBasis(transactionRows, rows);
   const eligible = rows.flatMap(row => {
-    const symbol = String(row?.symbol || '').trim().toUpperCase();
-    const position = ledger.get(symbol);
-    if (
-      String(row?.quoteStatus || '') !== 'fresh' ||
-      !symbol ||
-      !(Number(row?.quantity) > 0) ||
-      !(Number(row?.price) > 0) ||
-      !position?.valid ||
-      Math.abs(Number(row.quantity) - Number(position.quantity)) > Math.max(0.00001, Math.abs(Number(row.quantity)) * 0.0001)
-    ) return [];
+    const symbol = String(row?.symbol || '').trim().toUpperCase(), position = ledger.get(symbol);
+    if (String(row?.quoteStatus || '') !== 'fresh' || !symbol || !(Number(row?.quantity) > 0) || !(Number(row?.price) > 0) || !position?.valid ||
+      Math.abs(Number(row.quantity) - Number(position.quantity)) > Math.max(0.00001, Math.abs(Number(row.quantity)) * 0.0001)) return [];
     const averageCost = Number(position.averageCost);
     if (!(averageCost > 0)) return [];
-    const value = Number(row.price) * Number(row.quantity);
-    const openCostBasis = Number(position.openCostBasis);
-    return [{
-      ...row,
-      symbol,
-      averageCost,
-      openCostBasis,
-      pnl: value - openCostBasis,
-      pnlPct: (Number(row.price) / averageCost - 1) * 100,
-      realizedPnl: Number(position.realizedPnl || 0),
-      positionReview: Number(position.derivedCount || 0),
-    }];
+    const value = Number(row.price) * Number(row.quantity), openCostBasis = Number(position.openCostBasis);
+    return [{ ...row, symbol, averageCost, openCostBasis, pnl: value - openCostBasis, pnlPct: (Number(row.price) / averageCost - 1) * 100,
+      realizedPnl: Number(position.realizedPnl || 0), positionReview: Number(position.derivedCount || 0) }];
   });
-  if (!eligible.length) {
-    return { evaluated: false, reason: 'no fresh, ledger-reconciled holdings with reliable cost basis', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [] };
-  }
+  if (!eligible.length) return { evaluated: false, reason: 'no fresh, ledger-reconciled holdings with reliable cost basis', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [] };
 
-  const keys = eligible.flatMap(row => THRESHOLDS.map(threshold => holdingStateKey(row.symbol, threshold)));
+  const keys = eligible.flatMap(row => [...THRESHOLDS.map(threshold => holdingStateKey(row.symbol, threshold)),
+    'holding-peak-return:' + row.symbol, 'holding-giveback:' + row.symbol, 'holding-review:' + row.symbol]);
   const inFilter = 'event_key=in.' + encodeURIComponent('(' + keys.map(key => '"' + key + '"').join(',') + ')');
-  const previousRows = await supabase('server_alert_state?select=event_key,active,last_triggered_at,metadata&' + inFilter + '&limit=200');
+  const previousRows = await supabase('server_alert_state?select=event_key,active,last_triggered_at,metadata&' + inFilter + '&limit=300');
   const previous = new Map((previousRows || []).map(row => [String(row.event_key), row]));
-  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
-  if (!botToken || !chatId) {
-    return { evaluated: true, evaluatedHoldings: eligible.length, triggered: [], sent: 0, errors: ['Telegram credentials are not configured; threshold state was not changed.'] };
-  }
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim(), chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!botToken || !chatId) return { evaluated: true, evaluatedHoldings: eligible.length, triggered: [], sent: 0, errors: ['Telegram credentials are not configured; alert state was not changed.'] };
 
-  const timestamp = new Date().toISOString();
-  const updates = [];
-  const triggered = [];
-  const errors = [];
-  let sent = 0;
-
+  const timestamp = new Date().toISOString(), updates = [], events = [], triggered = [], errors = [];
+  const review = digest?.returnReview || {}, actionItems = Array.isArray(review.actionItems) ? review.actionItems : [], earnings = Array.isArray(review.earnings) ? review.earnings : [];
   for (const row of eligible) {
-    const symbol = String(row.symbol).trim().toUpperCase();
-    const transitions = getHoldingReturnThresholdTransitions(symbol, row.pnlPct, previous);
+    const symbol = row.symbol, transitions = getHoldingReturnThresholdTransitions(symbol, row.pnlPct, previous);
     for (const threshold of transitions.reset) {
-      const key = holdingStateKey(symbol, threshold);
-      const old = previous.get(key);
-      updates.push({
-        event_key: key,
-        active: false,
-        last_seen_at: timestamp,
-        last_triggered_at: old?.last_triggered_at || null,
-        metadata: { symbol, thresholdPct: threshold, lastObservedReturnPct: Number(row.pnlPct), resetAt: timestamp },
-      });
+      const key = holdingStateKey(symbol, threshold), old = previous.get(key);
+      updates.push({ event_key: key, active: false, last_seen_at: timestamp, last_triggered_at: old?.last_triggered_at || null,
+        metadata: { symbol, thresholdPct: threshold, lastObservedReturnPct: Number(row.pnlPct), resetAt: timestamp } });
+    }
+    for (const threshold of transitions.trigger) {
+      events.push({ type: 'milestone', symbol, threshold, row });
+      triggered.push({ type: 'milestone', symbol, threshold });
     }
 
-    for (const threshold of transitions.trigger) {
-      const key = holdingStateKey(symbol, threshold);
-      const text = formatHoldingAlert(row, threshold, digest);
-      try {
-        const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            disable_web_page_preview: true,
-            reply_markup: { inline_keyboard: [[
-              { text: 'Review ' + symbol, url: 'https://ai-infra-watch-theta.vercel.app/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) },
-              { text: 'Open Decision Center', url: 'https://ai-infra-watch-theta.vercel.app/overview' },
-            ]] },
-          }),
-          signal: AbortSignal.timeout(10000),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || body?.ok === false) throw new Error(String(body?.description || 'Telegram HTTP ' + response.status));
+    const peakKey = 'holding-peak-return:' + symbol, oldPeakState = previous.get(peakKey), oldPeak = Number(oldPeakState?.metadata?.peakReturnPct);
+    const peakTransition = getHoldingReturnGivebackTransition(row.pnlPct, Number.isFinite(oldPeak) ? oldPeak : Number(row.pnlPct), false);
+    const peakPct = peakTransition.peakPct == null ? Number(row.pnlPct) : peakTransition.peakPct;
+    updates.push({ event_key: peakKey, active: true, last_seen_at: timestamp, last_triggered_at: oldPeakState?.last_triggered_at || null,
+      metadata: { symbol, peakReturnPct: peakPct, lastObservedReturnPct: Number(row.pnlPct), updatedAt: timestamp } });
 
-        sent++;
-        triggered.push({ symbol, threshold });
-        updates.push({
-          event_key: key,
-          active: true,
-          last_seen_at: timestamp,
-          last_triggered_at: timestamp,
-          metadata: {
-            symbol,
-            thresholdPct: threshold,
-            returnPct: Number(row.pnlPct),
-            price: Number(row.price),
-            averageCost: Number(row.averageCost),
-            quantity: Number(row.quantity),
-            unrealizedPnl: Number(row.pnl),
-            quoteCoverage: row.quoteStatus,
-          },
-        });
-      } catch (error) {
-        errors.push(symbol + ' +' + threshold + '%: ' + (error instanceof Error ? error.message : 'Telegram delivery failed'));
+    const givebackKey = 'holding-giveback:' + symbol, oldGiveback = previous.get(givebackKey);
+    const giveback = getHoldingReturnGivebackTransition(row.pnlPct, peakPct, Boolean(oldGiveback?.active));
+    if (giveback.reset) updates.push({ event_key: givebackKey, active: false, last_seen_at: timestamp, last_triggered_at: oldGiveback?.last_triggered_at || null,
+      metadata: { symbol, peakReturnPct: peakPct, lastObservedReturnPct: Number(row.pnlPct), resetAt: timestamp } });
+    if (giveback.trigger) {
+      events.push({ type: 'giveback', symbol, row, peakPct, givebackPct: giveback.givebackPct });
+      triggered.push({ type: 'giveback', symbol, peakPct, givebackPct: giveback.givebackPct });
+      updates.push({ event_key: givebackKey, active: true, last_seen_at: timestamp, last_triggered_at: timestamp,
+        metadata: { symbol, peakReturnPct: peakPct, lastObservedReturnPct: Number(row.pnlPct), givebackPct: giveback.givebackPct } });
+    }
+
+    const reviewKey = 'holding-review:' + symbol, oldReview = previous.get(reviewKey);
+    const reviewTransition = getHoldingReviewTransition(symbol, row.pnlPct, actionItems, earnings, oldReview);
+    if (reviewTransition.reset) updates.push({ event_key: reviewKey, active: false, last_seen_at: timestamp, last_triggered_at: oldReview?.last_triggered_at || null,
+      metadata: { symbol, resetAt: timestamp } });
+    if (reviewTransition.trigger) {
+      events.push({ type: 'review', symbol, row, items: reviewTransition.items, earnings: reviewTransition.earnings, signature: reviewTransition.signature });
+      triggered.push({ type: 'review', symbol, signature: reviewTransition.signature });
+      updates.push({ event_key: reviewKey, active: true, last_seen_at: timestamp, last_triggered_at: timestamp,
+        metadata: { symbol, signature: reviewTransition.signature, returnPct: Number(row.pnlPct) } });
+    }
+  }
+
+  if (events.length) {
+    const text = formatGroupedHoldingAlerts(events), dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
+    const symbols = [...new Set(events.map(event => event.symbol))];
+    const keyboard = symbols.slice(0, 4).map(symbol => [{ text: 'Review ' + symbol, url: dashboardBase + '/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) }]);
+    keyboard.push([{ text: 'Open Decision Center', url: dashboardBase + '/overview' }]);
+    try {
+      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true, reply_markup: { inline_keyboard: keyboard } }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok === false) throw new Error(String(body?.description || 'Telegram HTTP ' + response.status));
+      for (const event of events) if (event.type === 'milestone') {
+        const key = holdingStateKey(event.symbol, event.threshold);
+        updates.push({ event_key: key, active: true, last_seen_at: timestamp, last_triggered_at: timestamp,
+          metadata: { symbol: event.symbol, thresholdPct: event.threshold, returnPct: Number(event.row.pnlPct), price: Number(event.row.price),
+            averageCost: Number(event.row.averageCost), quantity: Number(event.row.quantity), unrealizedPnl: Number(event.row.pnl), quoteCoverage: event.row.quoteStatus } });
+      }
+    } catch (error) {
+      errors.push('grouped holding alert: ' + (error instanceof Error ? error.message : 'Telegram delivery failed'));
+      for (const event of events) {
+        const key = event.type === 'milestone' ? holdingStateKey(event.symbol, event.threshold) : event.type === 'giveback' ? 'holding-giveback:' + event.symbol : 'holding-review:' + event.symbol;
+        const index = updates.findIndex(item => item.event_key === key && item.active === true);
+        if (index >= 0) updates.splice(index, 1);
       }
     }
   }
-
-  if (updates.length) {
-    await supabase('server_alert_state', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(updates),
-    });
-  }
-
-  return { evaluated: true, evaluatedHoldings: eligible.length, triggered, sent, errors };
+  if (updates.length) await supabase('server_alert_state', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(updates) });
+  return { evaluated: true, evaluatedHoldings: eligible.length, triggered, sent: events.length && !errors.length ? 1 : 0, errors };
 }

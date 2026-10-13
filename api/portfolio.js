@@ -173,6 +173,11 @@ function normalizeTransaction(row) {
   };
 }
 
+function normalizeCashFlow(row) {
+  return { id: row.id, eventDate: row.event_date, flowType: row.flow_type, amount: Number(row.amount),
+    currency: String(row.currency || 'USD').toUpperCase(), fxToUsd: Number(row.fx_to_usd), notes: row.notes || '', createdAt: row.created_at };
+}
+
 function normalize(row) {
   return {
     id: row.id,
@@ -201,6 +206,10 @@ export default async function handler(req, res) {
   if (!requireAccess(req, res)) return;
   try {
     if (req.method === 'GET') {
+      if (String(req.query?.includeCashFlows || '') === 'true') {
+        const rows = await supabase('portfolio_cash_flows?select=*&order=event_date.asc,created_at.asc', { method: 'GET' });
+        return res.status(200).json({ cashFlows: rows.map(normalizeCashFlow), persistent: true, source: 'supabase' });
+      }
       const holdingId = String(req.query?.holdingId || '').trim();
       if (holdingId) {
         const rows = await supabase(
@@ -288,6 +297,21 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = req.body || {};
+      if (body.action === 'cashFlow') {
+        const flowType = String(body.flowType || '').trim().toLowerCase(), amount = Number(body.amount);
+        const currency = String(body.currency || 'USD').trim().toUpperCase(), fxToUsd = Number(body.fxToUsd), eventDate = String(body.eventDate || '').trim();
+        if (!['deposit', 'withdrawal', 'dividend', 'fee'].includes(flowType)) return res.status(400).json({ error: 'flowType must be deposit, withdrawal, dividend or fee' });
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'amount must be positive' });
+        if (!/^[A-Z]{3}$/.test(currency)) return res.status(400).json({ error: 'currency must be a 3-letter currency code' });
+        if (!Number.isFinite(fxToUsd) || fxToUsd <= 0) return res.status(400).json({ error: 'fxToUsd must be positive USD per 1 unit of the selected currency' });
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || Number.isNaN(Date.parse(eventDate))) return res.status(400).json({ error: 'eventDate must be YYYY-MM-DD' });
+        if (currency === 'USD' && Math.abs(fxToUsd - 1) > 0.000001) return res.status(400).json({ error: 'USD cash flows must use an FX rate of 1' });
+        const rows = await supabase('portfolio_cash_flows', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ event_date: eventDate, flow_type: flowType, amount, currency, fx_to_usd: fxToUsd, notes: String(body.notes || '').trim() || null }),
+        });
+        return res.status(201).json({ cashFlow: normalizeCashFlow(rows?.[0]), persistent: true });
+      }
 
       if (body.action === 'purchase') {
         const holdingId = String(body.holdingId || '').trim();
@@ -413,6 +437,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
+      const cashFlowId = String(req.query?.cashFlowId || '').trim();
+      if (cashFlowId) {
+        await supabase('portfolio_cash_flows?id=eq.' + encodeURIComponent(cashFlowId), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        return res.status(204).end();
+      }
       const id = String(req.query?.id || '');
       if (!id) return res.status(400).json({ error: 'id is required' });
       await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(id), {

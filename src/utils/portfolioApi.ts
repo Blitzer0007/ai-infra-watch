@@ -66,6 +66,11 @@ export type PortfolioTransaction = {
   createdAt?: string;
 };
 
+export type PortfolioCashFlow = {
+  id: string; eventDate: string; flowType: 'deposit' | 'withdrawal' | 'dividend' | 'fee';
+  amount: number; currency: string; fxToUsd: number; notes: string; createdAt?: string;
+};
+
 export type PortfolioPurchaseLot = {
   id: string;
   holdingId: string;
@@ -78,6 +83,32 @@ export type PortfolioPurchaseLot = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export async function fetchPortfolioCashFlows(): Promise<PortfolioCashFlow[]> {
+  const response = await authFetch('/api/portfolio?includeCashFlows=true', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Portfolio cash-flow service unavailable');
+  const data = await response.json();
+  if (!Array.isArray(data?.cashFlows)) throw new Error('Portfolio cash-flow service returned invalid records');
+  return data.cashFlows;
+}
+export async function addPortfolioCashFlow(input: {
+  eventDate: string; flowType: PortfolioCashFlow['flowType']; amount: number; currency: string; fxToUsd: number; notes?: string;
+}) {
+  const response = await authFetch('/api/portfolio', {
+    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action: 'cashFlow', ...input }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || 'Unable to save cash flow');
+  return data.cashFlow as PortfolioCashFlow;
+}
+export async function deletePortfolioCashFlow(id: string) {
+  const response = await authFetch('/api/portfolio?cashFlowId=' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.error || 'Unable to delete cash flow');
+  }
+}
 
 export async function fetchPortfolioTransactions(): Promise<PortfolioTransaction[]> {
   const response = await authFetch('/api/portfolio?includeTransactions=true', { cache: 'no-store' });
