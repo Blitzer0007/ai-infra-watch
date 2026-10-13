@@ -130,11 +130,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
     const quantity = Number(tx.quantity);
     const amount = Number(tx.amount);
     const brokerage = Math.max(0, Number(tx.brokerage) || 0);
-    if (!symbol || !(quantity > 0) || !(amount > 0) || !['BUY', 'SELL'].includes(tx.transaction_type)) {
-      if (symbol) inventory.set(symbol, { ...(inventory.get(symbol) || {}), invalid: true });
-      continue;
-    }
-
+    if (!symbol) continue;
     const position = inventory.get(symbol) || {
       quantity: 0,
       costBasis: 0,
@@ -143,6 +139,11 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
       currencies: new Set(),
       invalid: false,
     };
+    if (!(quantity > 0) || !(amount > 0) || !['BUY', 'SELL'].includes(tx.transaction_type)) {
+      position.invalid = true;
+      inventory.set(symbol, position);
+      continue;
+    }
     position.currencies.add(String(tx.currency || 'USD').trim().toUpperCase());
     if (tx.quantity_derived || tx.price_derived) position.derivedCount++;
 
