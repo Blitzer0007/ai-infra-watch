@@ -131,3 +131,34 @@ test('historical backtest enforces the same position, sector, and cash guardrail
     ], startCapital: 10000,
   }), /minimum cash reserve/i);
 });
+
+
+test('weekly historical backtest rebalances on five-session cadence, not every day', () => {
+  const dates = ['2026-01-05','2026-01-06','2026-01-07','2026-01-08','2026-01-09','2026-01-12','2026-01-13'];
+  const rows: HistoricalPrice[] = [];
+  const series: Record<string, number[]> = {
+    MSFT: [100, 105, 110, 115, 120, 125, 130],
+    SPY: [100, 101, 102, 103, 104, 105, 106],
+    QQQ: [100, 102, 104, 106, 108, 110, 112],
+  };
+  for (const symbol of Object.keys(series)) dates.forEach((date, i) => rows.push({
+    symbol, date, close: series[symbol][i], availableAt: date + 'T23:59:59.999Z',
+    adjusted: true, availabilityStatus: 'assumed',
+  }));
+  const result = runHistoricalPaperBacktest({
+    prices: rows, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, costBps: 10, minimumObservations: 2,
+  });
+  assert.equal(result.rebalanceCount, 2);
+  assert.equal(result.adjustedPricesComplete, true);
+  assert.equal(result.availabilityStatus, 'assumed');
+  assert.equal(result.evidenceStatus, 'insufficient');
+  assert.ok(result.totalTransactionCostsPct > 0);
+});
+
+test('historical backtest rejects explicitly unadjusted prices', () => {
+  const prices = history().map(row => ({ ...row, adjusted: false }));
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
+  }), /Adjusted closes are required/);
+});
