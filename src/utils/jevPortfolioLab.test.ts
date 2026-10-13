@@ -55,3 +55,54 @@ test('charges costs on traded notional and reports cost transparently', () => {
 test('net returns deduct transaction costs', () => {
   assert.equal(netReturnPct(10, 5000, 10000, 20), 9.9);
 });
+
+
+import { runHistoricalPaperBacktest, type HistoricalPrice } from './jevPortfolioLab';
+
+function history(): HistoricalPrice[] {
+  const rows: HistoricalPrice[] = [];
+  const series: Record<string, number[]> = { MSFT: [100, 110, 121], SPY: [100, 105, 110.25], QQQ: [100, 106, 112.36] };
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  for (const symbol of Object.keys(series)) dates.forEach((date, i) => rows.push({
+    symbol, date, close: series[symbol][i], availableAt: date + 'T22:00:00Z',
+  }));
+  return rows;
+}
+
+test('historical backtest compares strategy with both benchmarks and applies costs', () => {
+  const result = runHistoricalPaperBacktest({
+    prices: history(), target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }],
+    startCapital: 10000, costBps: 10, minimumObservations: 50,
+  });
+  assert.equal(result.startDate, '2026-01-01');
+  assert.equal(result.endDate, '2026-01-15');
+  assert.equal(result.observations, 3);
+  assert.ok(result.strategyReturnPct < 21);
+  assert.ok(result.spyReturnPct > 10);
+  assert.ok(result.qqqReturnPct > result.spyReturnPct);
+  assert.ok(result.totalTransactionCostsPct > 0);
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('historical backtest rejects data unavailable at the decision cutoff', () => {
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: history(), target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }],
+    startCapital: 10000,
+    decisionCutoffByDate: { '2026-01-08': '2026-01-08T21:00:00Z' },
+  }), /Look-ahead data rejected/);
+});
+
+test('historical backtest rejects duplicate symbol/date rows', () => {
+  const prices = history();
+  prices.push({ ...prices[0] });
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }], startCapital: 10000,
+  }), /Duplicate historical price/);
+});
+
+test('historical backtest requires common dates for portfolio and both benchmarks', () => {
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: history().filter(row => !(row.symbol === 'QQQ' && row.date === '2026-01-08')),
+    target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }], startCapital: 10000,
+  }), /common historical dates/);
+});
