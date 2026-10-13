@@ -85,22 +85,120 @@ function simulateSameCash(transactions, benchmarkHistory, benchmarkCurrent) {
 }
 
 function calculateActualPortfolio(holdings, transactionRows, quotes, histories = {}) {
-  let currentValue=0, liveQuotes=0, staleFallbacks=0, missingQuotes=0;
-  for(const holding of holdings){
-    const symbol=String(holding.symbol).toUpperCase();
-    const live=Number(quotes[symbol]?.price);
-    if(live>0){currentValue+=live*Number(holding.quantity);liveQuotes++;continue;}
-    const last=sortedHistoryPoints(histories[symbol]).at(-1);
-    if(Number(last?.price)>0){currentValue+=Number(last.price)*Number(holding.quantity);staleFallbacks++;}else missingQuotes++;
+  let currentValue = 0, liveQuotes = 0, staleFallbacks = 0, missingQuotes = 0;
+  for (const holding of holdings) {
+    const symbol = String(holding.symbol).toUpperCase();
+    const live = Number(quotes[symbol]?.price);
+    if (live > 0) {
+      currentValue += live * Number(holding.quantity);
+      liveQuotes++;
+      continue;
+    }
+    const last = sortedHistoryPoints(histories[symbol]).at(-1);
+    if (Number(last?.price) > 0) {
+      currentValue += Number(last.price) * Number(holding.quantity);
+      staleFallbacks++;
+    } else missingQuotes++;
   }
-  let buyCash=0,saleCash=0;
-  for(const tx of transactionRows){if(tx.transaction_type==='BUY')buyCash+=transactionNetCash(tx);else saleCash+=transactionNetCash(tx);}
-  const netContributed=buyCash-saleCash;
-  return {currentValue,buyCash,saleCash,netContributed,pnl:currentValue-netContributed,quoteCoverage:{
-    totalHoldings:holdings.length,liveQuotes,staleFallbacks,missingQuotes,
-    coveragePct:holdings.length?(liveQuotes+staleFallbacks)/holdings.length*100:100,
-    status:missingQuotes?'partial':staleFallbacks?'stale-fallback':'complete'
-  }};
+
+  let buyCash = 0, saleCash = 0, realizedFromLedger = 0;
+  const holdingsOpenCostBasis = holdings.reduce((sum, holding) =>
+    sum + Math.max(0, Number(holding.quantity) || 0) * Math.max(0, Number(holding.average_cost) || 0), 0);
+  const holdingsBySymbol = new Map();
+  for (const holding of holdings) {
+    const symbol = String(holding.symbol || '').trim().toUpperCase();
+    holdingsBySymbol.set(symbol, (holdingsBySymbol.get(symbol) || 0) + Number(holding.quantity || 0));
+  }
+
+  const ledgerBySymbol = new Map();
+  const inventory = new Map();
+  const invalidSequenceSymbols = new Set();
+  for (const tx of transactionRows) {
+    const symbol = String(tx.symbol || '').trim().toUpperCase();
+    const quantity = Number(tx.quantity) || 0;
+    const signedQuantity = tx.transaction_type === 'SELL' ? -quantity : quantity;
+    ledgerBySymbol.set(symbol, (ledgerBySymbol.get(symbol) || 0) + signedQuantity);
+    const position = inventory.get(symbol) || { quantity: 0, costBasis: 0 };
+    const netCash = transactionNetCash(tx);
+
+    if (tx.transaction_type === 'BUY') {
+      buyCash += netCash;
+      position.quantity += quantity;
+      position.costBasis += netCash;
+    } else {
+      saleCash += netCash;
+      const tolerance = Math.max(0.00001, Math.abs(position.quantity) * 0.0001);
+      if (position.quantity <= 0 || position.quantity + tolerance < quantity) {
+        invalidSequenceSymbols.add(symbol);
+      } else {
+        const averageCost = position.costBasis / position.quantity;
+        const soldCostBasis = averageCost * quantity;
+        realizedFromLedger += netCash - soldCostBasis;
+        position.quantity -= quantity;
+        position.costBasis -= soldCostBasis;
+        if (position.quantity <= tolerance) {
+          position.quantity = 0;
+          position.costBasis = 0;
+        }
+      }
+    }
+    inventory.set(symbol, position);
+  }
+
+  const netContributed = buyCash - saleCash;
+  const currencies = [...new Set(transactionRows.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
+  const symbols = new Set([...holdingsBySymbol.keys(), ...ledgerBySymbol.keys()]);
+  const quantityMismatchSymbols = [...symbols].filter(symbol => {
+    const holdingQuantity = holdingsBySymbol.get(symbol) || 0;
+    const ledgerQuantity = ledgerBySymbol.get(symbol) || 0;
+    const tolerance = Math.max(0.00001, Math.abs(holdingQuantity) * 0.0001);
+    return Math.abs(holdingQuantity - ledgerQuantity) > tolerance || invalidSequenceSymbols.has(symbol);
+  }).sort();
+  const derivedTransactionCount = transactionRows.filter(row => row.quantity_derived || row.price_derived).length;
+
+  const quoteCoverage = {
+    totalHoldings: holdings.length,
+    liveQuotes,
+    staleFallbacks,
+    missingQuotes,
+    coveragePct: holdings.length ? (liveQuotes + staleFallbacks) / holdings.length * 100 : 100,
+    status: missingQuotes ? 'partial' : staleFallbacks ? 'stale-fallback' : 'complete',
+  };
+  const ledgerUsable = transactionRows.length > 0 && currencies.length === 1 && quantityMismatchSymbols.length === 0;
+  const markToMarketComplete = quoteCoverage.status === 'complete';
+  const ledgerOpenCostBasis = [...inventory.values()].reduce((sum, position) => sum + position.costBasis, 0);
+  const openCostBasis = ledgerUsable ? ledgerOpenCostBasis : holdingsOpenCostBasis;
+  const unrealizedPnl = markToMarketComplete ? currentValue - openCostBasis : null;
+  const realizedPnl = ledgerUsable ? realizedFromLedger : null;
+  const totalTradingPnl = ledgerUsable && markToMarketComplete && unrealizedPnl != null
+    ? realizedFromLedger + unrealizedPnl
+    : null;
+
+  let accountingStatus = 'complete';
+  if (!transactionRows.length) accountingStatus = 'transaction-ledger-unavailable';
+  else if (currencies.length !== 1) accountingStatus = 'mixed-currency';
+  else if (quantityMismatchSymbols.length) accountingStatus = 'quantity-mismatch';
+  else if (!markToMarketComplete) accountingStatus = 'quotes-incomplete';
+  else if (derivedTransactionCount) accountingStatus = 'review-transactions';
+
+  return {
+    currentValue,
+    buyCash,
+    grossPurchaseCost: buyCash,
+    saleCash,
+    netSaleProceeds: saleCash,
+    netContributed,
+    openCostBasis,
+    unrealizedPnl,
+    realizedPnl,
+    totalTradingPnl,
+    pnl: totalTradingPnl,
+    returnVsGrossPurchaseCostPct: totalTradingPnl != null && buyCash > 0 ? totalTradingPnl / buyCash * 100 : null,
+    accountingStatus,
+    quantityMismatchSymbols,
+    derivedTransactionCount,
+    quoteCoverage,
+  };
 }
 
 function sortedHistoryPoints(history) {
@@ -405,7 +503,7 @@ export default async function handler(req, res) {
       'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,broker_alerts,broker_alerts_review_required,rule_stages,rule_stage_state,target_allocation_pct,max_allocation_pct,risk_group,risk_beta,risk_leverage,scenario_shock_pct&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
-      'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row&order=trade_date.asc,source_row.asc',
+      'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc',
     );
 
     const symbols = holdingRows.map(row => String(row.symbol).toUpperCase());
@@ -632,8 +730,19 @@ export default async function handler(req, res) {
       portfolio: {
         holdings: holdingRows.length,
         currentValue: money(actual.currentValue),
+        holdingsValue: money(actual.currentValue),
         netContributed: money(actual.netContributed),
+        grossPurchaseCost: money(actual.grossPurchaseCost),
+        netSaleProceeds: money(actual.netSaleProceeds),
+        openCostBasis: money(actual.openCostBasis),
+        unrealizedPnl: money(actual.unrealizedPnl),
+        realizedPnl: money(actual.realizedPnl),
+        totalTradingPnl: money(actual.totalTradingPnl),
         cashFlowPnl: money(actual.pnl),
+        returnVsGrossPurchaseCostPct: pct(actual.returnVsGrossPurchaseCostPct),
+        accountingStatus: actual.accountingStatus,
+        quantityMismatchSymbols: actual.quantityMismatchSymbols,
+        derivedTransactionCount: actual.derivedTransactionCount,
         concentrationTop3Pct: pct(concentrationPct),
         semiconductorShock15Pct: money(totalScenarioShock),
         scenarioShockTotal: money(totalScenarioShock),
