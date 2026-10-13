@@ -54,7 +54,7 @@ export function calculatePortfolioTradingPerformance(
   transactions: PortfolioAccountingTransaction[],
   quoteCoverageComplete: boolean,
 ): PortfolioTradingPerformance {
-  const openCostBasis = holdings.every(row =>
+  const holdingsOpenCostBasis = holdings.every(row =>
     Number.isFinite(Number(row.quantity)) &&
     Number(row.quantity) >= 0 &&
     Number.isFinite(Number(row.averageCost)) &&
@@ -62,22 +62,18 @@ export function calculatePortfolioTradingPerformance(
   )
     ? holdings.reduce((sum, row) => sum + Number(row.quantity) * Number(row.averageCost), 0)
     : null;
-
   const allPricesAvailable = quoteCoverageComplete && holdings.every(row =>
     isFinitePositive(row.currentPrice)
   );
   const currentValue = allPricesAvailable
     ? holdings.reduce((sum, row) => sum + Number(row.currentPrice) * Number(row.quantity), 0)
     : null;
-  const unrealizedPnl = currentValue != null && openCostBasis != null
-    ? currentValue - openCostBasis
-    : null;
 
   const base: PortfolioTradingPerformance = {
     status: 'transaction-ledger-unavailable',
     currentValue,
-    openCostBasis,
-    unrealizedPnl,
+    openCostBasis: holdingsOpenCostBasis,
+    unrealizedPnl: currentValue != null && holdingsOpenCostBasis != null ? currentValue - holdingsOpenCostBasis : null,
     realizedPnl: null,
     totalTradingPnl: null,
     grossPurchaseCost: null,
@@ -87,7 +83,6 @@ export function calculatePortfolioTradingPerformance(
     derivedTransactionCount: 0,
     currency: null,
   };
-
   if (!transactions.length) return base;
 
   const currencies = [...new Set(transactions.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
@@ -110,10 +105,47 @@ export function calculatePortfolioTradingPerformance(
   }
 
   const ledgerBySymbol = new Map<string, number>();
-  for (const row of transactions) {
+  const inventory = new Map<string, { quantity: number; costBasis: number }>();
+  const orderedTransactions = [...transactions].sort((a, b) =>
+    String(a.tradeDate || '').localeCompare(String(b.tradeDate || '')) ||
+    Number(a.sourceRow || 0) - Number(b.sourceRow || 0)
+  );
+  let grossPurchaseCost = 0;
+  let netSaleProceeds = 0;
+  let realizedFromLedger = 0;
+  const invalidSequenceSymbols = new Set<string>();
+
+  for (const row of orderedTransactions) {
     const symbol = String(row.symbol).trim().toUpperCase();
-    const signedQuantity = Number(row.quantity) * (row.transactionType === 'SELL' ? -1 : 1);
+    const quantity = Number(row.quantity);
+    const signedQuantity = quantity * (row.transactionType === 'SELL' ? -1 : 1);
     ledgerBySymbol.set(symbol, (ledgerBySymbol.get(symbol) || 0) + signedQuantity);
+    const holding = inventory.get(symbol) || { quantity: 0, costBasis: 0 };
+    const brokerage = Number(row.brokerage || 0);
+    if (row.transactionType === 'BUY') {
+      const buyCost = Number(row.amount) + brokerage;
+      grossPurchaseCost += buyCost;
+      holding.quantity += quantity;
+      holding.costBasis += buyCost;
+    } else {
+      const proceeds = Math.max(0, Number(row.amount) - brokerage);
+      netSaleProceeds += proceeds;
+      const tolerance = Math.max(0.00001, Math.abs(holding.quantity) * 0.0001);
+      if (holding.quantity + tolerance < quantity || holding.quantity <= 0) {
+        invalidSequenceSymbols.add(symbol);
+      } else {
+        const averageCost = holding.costBasis / holding.quantity;
+        const soldCostBasis = averageCost * quantity;
+        realizedFromLedger += proceeds - soldCostBasis;
+        holding.quantity -= quantity;
+        holding.costBasis -= soldCostBasis;
+        if (holding.quantity <= tolerance) {
+          holding.quantity = 0;
+          holding.costBasis = 0;
+        }
+      }
+    }
+    inventory.set(symbol, holding);
   }
 
   const symbols = new Set([...holdingsBySymbol.keys(), ...ledgerBySymbol.keys()]);
@@ -121,41 +153,53 @@ export function calculatePortfolioTradingPerformance(
     const holdingQuantity = holdingsBySymbol.get(symbol) || 0;
     const ledgerQuantity = ledgerBySymbol.get(symbol) || 0;
     const tolerance = Math.max(0.00001, Math.abs(holdingQuantity) * 0.0001);
-    return Math.abs(holdingQuantity - ledgerQuantity) > tolerance;
+    return Math.abs(holdingQuantity - ledgerQuantity) > tolerance || invalidSequenceSymbols.has(symbol);
   }).sort();
-
-  const grossPurchaseCost = transactions.reduce((sum, row) =>
-    sum + (row.transactionType === 'BUY' ? Number(row.amount) + Number(row.brokerage || 0) : 0), 0);
-  const netSaleProceeds = transactions.reduce((sum, row) =>
-    sum + (row.transactionType === 'SELL' ? Math.max(0, Number(row.amount) - Number(row.brokerage || 0)) : 0), 0);
-  const derivedTransactionCount = transactions.filter(row =>
+  const ledgerOpenCostBasis = [...inventory.values()].reduce((sum, row) => sum + row.costBasis, 0);
+  const derivedTransactionCount = orderedTransactions.filter(row => row.quantityDerived || row.priceDerived).length;
+  const reviewTransactionCount = orderedTransactions.filter(row =>
     row.quantityDerived || row.priceDerived || row.dataQuality === 'review'
   ).length;
-
   const common = {
     ...base,
     grossPurchaseCost,
     netSaleProceeds,
     quantityMismatchSymbols,
     derivedTransactionCount,
+    reviewTransactionCount,
     currency: currencies[0],
   };
 
-  if (!allPricesAvailable || currentValue == null || unrealizedPnl == null) {
-    return { ...common, status: 'quotes-incomplete' };
+  if (quantityMismatchSymbols.length) {
+    return {
+      ...common,
+      status: 'quantity-mismatch',
+      openCostBasis: holdingsOpenCostBasis,
+      unrealizedPnl: currentValue != null && holdingsOpenCostBasis != null ? currentValue - holdingsOpenCostBasis : null,
+    };
   }
-  if (quantityMismatchSymbols.length) return { ...common, status: 'quantity-mismatch' };
 
-  const totalTradingPnl = currentValue - grossPurchaseCost + netSaleProceeds;
-  const realizedPnl = totalTradingPnl - unrealizedPnl;
+  const unrealizedPnl = currentValue != null ? currentValue - ledgerOpenCostBasis : null;
+  if (!allPricesAvailable || currentValue == null || unrealizedPnl == null) {
+    return {
+      ...common,
+      status: 'quotes-incomplete',
+      openCostBasis: ledgerOpenCostBasis,
+      unrealizedPnl,
+      realizedPnl: realizedFromLedger,
+    };
+  }
+
+  const totalTradingPnl = realizedFromLedger + unrealizedPnl;
   const returnVsGrossPurchaseCostPct = grossPurchaseCost > 0
     ? totalTradingPnl / grossPurchaseCost * 100
     : null;
-
   return {
     ...common,
-    status: derivedTransactionCount ? 'review-transactions' : 'complete',
-    realizedPnl,
+    status: reviewTransactionCount ? 'review-transactions' : 'complete',
+    openCostBasis: ledgerOpenCostBasis,
+    unrealizedPnl,
+    realizedPnl: realizedFromLedger,
     totalTradingPnl,
     returnVsGrossPurchaseCostPct,
   };
