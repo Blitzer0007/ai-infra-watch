@@ -104,5 +104,5 @@ test('historical backtest requires common dates for portfolio and both benchmark
   assert.throws(() => runHistoricalPaperBacktest({
     prices: history().filter(row => !(row.symbol === 'QQQ' && row.date === '2026-01-08')),
     target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }], startCapital: 10000,
-  }), /common historical dates/);
+  }), /common dates for portfolio and both benchmarks/);
 });
