@@ -126,14 +126,43 @@ export function runHistoricalPaperBacktest(args: {
   costBps?: number;
   decisionCutoffByDate?: Record<string, string>;
   minimumObservations?: number;
+  maxPositionWeight?: number;
+  maxSectorWeight?: number;
+  minCashWeight?: number;
 }): HistoricalBacktestResult {
   const { prices, target, startCapital } = args;
   const costBps = args.costBps ?? 10;
   const minimumObservations = args.minimumObservations ?? 50;
   if (!finite(startCapital) || startCapital <= 0) throw new Error('Starting capital must be positive.');
   if (!finite(costBps) || costBps < 0 || costBps > 500) throw new Error('Cost assumption must be between 0 and 500 basis points.');
-  if (!target.length || target.some(h => !h.symbol || !finite(h.weight) || h.weight < 0) || target.reduce((s,h)=>s+h.weight,0) > 0.95 + 1e-9) throw new Error('Invalid target weights or cash reserve.');
-  const symbols = [...new Set([...target.map(h=>h.symbol), 'SPY', 'QQQ'])];
+  const maxPositionWeight = args.maxPositionWeight ?? PAPER_LAB_DEFAULTS.maxPositionWeight;
+  const maxSectorWeight = args.maxSectorWeight ?? PAPER_LAB_DEFAULTS.maxSectorWeight;
+  const minCashWeight = args.minCashWeight ?? PAPER_LAB_DEFAULTS.minCashWeight;
+  if (![maxPositionWeight, maxSectorWeight, minCashWeight].every(finite) ||
+      maxPositionWeight <= 0 || maxPositionWeight > 1 ||
+      maxSectorWeight <= 0 || maxSectorWeight > 1 ||
+      minCashWeight < 0 || minCashWeight >= 1) {
+    throw new Error('Invalid historical backtest risk limits.');
+  }
+  if (!target.length) throw new Error('Target holdings are required.');
+  const seenSymbols = new Set<string>();
+  const sectorWeights = new Map<string, number>();
+  for (const holding of target) {
+    const symbol = String(holding.symbol || '').trim().toUpperCase();
+    const sector = String(holding.sector || '').trim().toLowerCase();
+    if (!symbol || !sector || seenSymbols.has(symbol)) throw new Error('Target holdings require unique symbols and sectors.');
+    seenSymbols.add(symbol);
+    if (!finite(holding.weight) || holding.weight < 0 || holding.weight > maxPositionWeight + 1e-9) {
+      throw new Error('Historical backtest position limit exceeded.');
+    }
+    sectorWeights.set(sector, (sectorWeights.get(sector) ?? 0) + holding.weight);
+  }
+  for (const weight of sectorWeights.values()) {
+    if (weight > maxSectorWeight + 1e-9) throw new Error('Historical backtest sector concentration limit exceeded.');
+  }
+  const investedWeight = target.reduce((sum, holding) => sum + holding.weight, 0);
+  if (investedWeight > 1 - minCashWeight + 1e-9) throw new Error('Historical backtest minimum cash reserve breached.');
+  const symbols = [...new Set([...target.map(h=>h.symbol.toUpperCase()), 'SPY', 'QQQ'])];
   const byDate = new Map<string, Map<string, HistoricalPrice>>();
   for (const row of prices) {
     if (!symbols.includes(row.symbol)) continue;
