@@ -115,7 +115,7 @@ const ITEMS: GuideItem[] = [
     title: 'Forward Outlook & Forecast Verification',
     question: 'How do I test whether the historical forecast actually works?',
     meaning: 'Forward Outlook uses historical market regimes to build return distributions for 5D, 20D, 60D, 6M and 12M forecast periods. It is scenario analysis and historical evidence, not a guaranteed price prediction. Forecast Verification stores a forecast and later compares it with the observed market return.',
-    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. Middle historical range is the middle historical range. After the target date, actual return and median error show what happened.',
+    example: 'For a 20D forecast, Median +20% means the historical analogue distribution had a +20% median—not that the stock will reach +20%. The middle historical range contains the middle half of past outcomes. After the target date, actual return and median error show what happened.',
     screenshot: 'Screenshot reference: Forward Outlook / forecast verification / validation matrix',
     view: 'outlook',
     icon: TrendingUp
