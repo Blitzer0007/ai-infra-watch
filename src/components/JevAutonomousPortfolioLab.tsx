@@ -296,7 +296,7 @@ export default function JevAutonomousPortfolioLab() {
           <div><p className="text-xs text-white/45">Max drawdown</p><p className="text-lg font-semibold">{backtest.maxDrawdownPct.toFixed(2)}%</p><p className="text-xs text-white/40">Trading costs: {backtest.totalTransactionCostsPct.toFixed(3)}% of starting capital</p></div>
         </div>
         <p className="text-xs text-amber-200/80">Adjusted closes and benchmark dates were aligned. Provider availability is currently assumed after the UTC calendar day, not independently verified; this result is not a validated forecast, evidence-backed JEV strategy, or proof of alpha.</p>
-      </div>
+      </div>}
       <p role="status" className="text-sm text-white/60">{message}{review ? ' Last saved: ' + new Date(review).toLocaleString() : ''}</p>
       <div className="mt-3 border-t border-white/10 pt-3">
         <div className="flex items-center justify-between gap-2">
