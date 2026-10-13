@@ -90,4 +90,23 @@ describe('Progress Tracker client-side company relevance guard', () => {
       description: '',
     }, 'DGXX', 'Digi Power X Inc.'), false);
   });
+
+  it('rejects a Nebius headline even if a stale cache labels it official-company', () => {
+    assert.equal(isTrackerEventRelevantToTicker({
+      stockSymbol: 'DGXX',
+      sourceType: 'official-company',
+      title: 'Managing applications with the Virtual machine deployment option - Nebius',
+      description: 'Virtual machine deployment documentation.',
+    }, 'DGXX', 'Digi Power X Inc.'), false);
+  });
+
+  it('rejects a Nebius headline even if stale metadata labels it official-social', () => {
+    assert.equal(isTrackerEventRelevantToTicker({
+      stockSymbol: 'DGXX',
+      sourceType: 'official-social',
+      title: 'Nebius announces new virtual machine deployment option',
+      description: 'Infrastructure update.',
+    }, 'DGXX', 'Digi Power X Inc.'), false);
+  });
+
 });

@@ -84,29 +84,28 @@ export function isTrackerEventRelevantToTicker(
   const selectedTicker = String(ticker || '').trim().toUpperCase();
   if (!selectedTicker || String(event.stockSymbol || '').trim().toUpperCase() !== selectedTicker) return false;
 
+  const title = String(event.title || '');
+  const description = String(event.description || '');
+  const titleMatches = mentionsCompany(title, selectedTicker, companyName);
+  const bodyMatches = mentionsCompany(description, selectedTicker, companyName);
+  const namesAnotherCompany = headlineNamesAnotherCompany(title, selectedTicker);
+
+  // A source label alone is not proof that a headline belongs to the selected
+  // issuer. Legacy/cached rows can be mis-tagged, so reject another known
+  // company's headline before honoring the official-source shortcut.
+  if (namesAnotherCompany && !titleMatches) return false;
+
   // SEC filings and verified posts from the tracked issuer can be generic in title.
   if (event.sourceType === 'sec-primary' ||
       event.sourceType === 'official-company' ||
       event.sourceType === 'official-social') return true;
 
-  const title = String(event.title || '');
-  const description = String(event.description || '');
-  const titleMatches = mentionsCompany(title, selectedTicker, companyName);
-  const bodyMatches = mentionsCompany(description, selectedTicker, companyName);
+  if (titleMatches || bodyMatches) return true;
 
-  // A missing sourceType is normally reserved for curated milestones. However,
-  // some cached/legacy discovery rows lack metadata; never let a clearly
-  // different issuer's headline leak into the selected ticker's timeline.
-  if (!event.sourceType) {
-    if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
-    return true;
-  }
+  // Legacy curated milestones can omit sourceType. The ticker assignment is
+  // accepted only when the headline does not identify a different known issuer.
+  // This keeps curated rows visible without allowing stale Nebius rows into DGXX.
+  if (!event.sourceType && !namesAnotherCompany) return true;
 
-  if (!titleMatches && !bodyMatches) return false;
-
-  // If the headline identifies a different known company, a mention buried only
-  // in the summary isn't sufficient. Require the tracked ticker/company in title.
-  if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
-
-  return true;
+  return false;
 }
