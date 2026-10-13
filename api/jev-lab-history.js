@@ -1,10 +1,12 @@
 import { history } from './_market-data.js';
+import { requireAccess } from './_access-auth.js';
 
 const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.^-]{0,9}$/;
 const ALLOWED_RANGES = new Set(['1y', '2y', '5y']);
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (!requireAccess(req, res)) return;
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ ok: false, error: 'Method not allowed' });
