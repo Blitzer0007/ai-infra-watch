@@ -14,12 +14,16 @@ function signedMoney(value) {
 function formatAlert(threshold, review) {
   const portfolio = review.portfolio || {};
   const lines = [
-    threshold === 30 ? '🚨 AI Infra Watch · +30% Portfolio Milestone' : '📈 AI Infra Watch · +25% Portfolio Milestone',
+    threshold === 30 ? '🚨 AI Infra Watch · +30% Trading P&L Milestone' : '📈 AI Infra Watch · +25% Trading P&L Milestone',
     '',
-    'Return on net contributions: ' + Number(review.returnPct).toFixed(2) + '%',
-    'Current portfolio value: ' + money(portfolio.currentValue),
-    'Portfolio P&L: ' + signedMoney(portfolio.cashFlowPnl),
-    'Net contributions: ' + money(portfolio.netContributed),
+    'Total trading P&L / cumulative purchase cost: ' + Number(review.returnPct).toFixed(2) + '%',
+    'Current holdings value (cash not included): ' + money(portfolio.currentValue),
+    'Total trading P&L: ' + (portfolio.totalTradingPnl == null ? 'unavailable' : signedMoney(portfolio.totalTradingPnl)),
+    'Gross cumulative buy cost: ' + (portfolio.grossPurchaseCost == null ? 'unavailable' : money(portfolio.grossPurchaseCost)),
+    'Net trading cash outlay (buys less net sale proceeds): ' + (portfolio.netContributed == null ? 'unavailable' : money(portfolio.netContributed)),
+    'Realized P&L: ' + (portfolio.realizedPnl == null ? 'unavailable' : signedMoney(portfolio.realizedPnl)),
+    'Unrealized P&L: ' + (portfolio.unrealizedPnl == null ? 'unavailable' : signedMoney(portfolio.unrealizedPnl)),
+    'Accounting status: ' + String(portfolio.accountingStatus || 'unknown'),
     'Quote coverage: ' + String(portfolio.quoteCoverage?.status || 'unknown'),
     '',
     'REVIEW BEFORE ACTING',
@@ -79,7 +83,7 @@ function formatAlert(threshold, review) {
     threshold === 30
       ? 'Suggested next step: review profit protection, concentration and saved exit rules.'
       : 'Suggested next step: review thesis strength, concentration and saved exit rules.',
-    'Metric = portfolio P&L ÷ net contributions; it is not a time-weighted return.',
+    'Metric = total trading P&L ÷ cumulative gross purchase cost. It is not time-weighted return and excludes untracked cash deposits/withdrawals.',
     'Review trigger only — no automatic buy/sell instruction.',
   );
   return lines.join('\n');
