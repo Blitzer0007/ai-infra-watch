@@ -525,9 +525,11 @@ async function buildDigest(decisionJournal) {
       returnReview: (() => {
         const portfolio = decision?.portfolio || {};
         const accountingStatus = String(portfolio.accountingStatus || 'unknown');
-        const returnVsPurchaseCost = Number(portfolio.returnVsGrossPurchaseCostPct);
+        const returnVsPurchaseCost = portfolio.returnVsGrossPurchaseCostPct == null
+          ? null
+          : Number(portfolio.returnVsGrossPurchaseCostPct);
         const returnEligible = ['complete', 'review-transactions'].includes(accountingStatus) &&
-          Number.isFinite(returnVsPurchaseCost);
+          returnVsPurchaseCost != null && Number.isFinite(returnVsPurchaseCost);
         return {
           returnPct: returnEligible ? returnVsPurchaseCost : null,
           portfolio,
