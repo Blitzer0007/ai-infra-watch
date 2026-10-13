@@ -35,8 +35,8 @@ test('rejects sector concentration above 35 percent', () => {
 test('enforces a minimum cash reserve', () => {
   assert.throws(() => buildPaperRebalance({
     current: [], target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }, { symbol: 'META', weight: 0.15, sector: 'internet' },
-      { symbol: 'NVDA', weight: 0.15, sector: 'semiconductors' }, { symbol: 'NOW', weight: 0.15, sector: 'software' },
-      { symbol: 'TEAM', weight: 0.15, sector: 'software' }, { symbol: 'GOOGL', weight: 0.15, sector: 'internet' }],
+      { symbol: 'NVDA', weight: 0.15, sector: 'semiconductors' }, { symbol: 'NOW', weight: 0.15, sector: 'platforms' },
+      { symbol: 'TEAM', weight: 0.15, sector: 'collaboration' }, { symbol: 'GOOGL', weight: 0.15, sector: 'search' }],
     portfolioValue: 10000, decisionAt, executionAt,
   }), /Minimum cash reserve/);
 });
