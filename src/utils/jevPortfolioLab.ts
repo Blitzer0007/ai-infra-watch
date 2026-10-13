@@ -150,19 +150,26 @@ export function runHistoricalPaperBacktest(args: {
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
   let strategyValue=startCapital, spyValue=startCapital, qqqValue=startCapital, peak=startCapital, maxDrawdown=0, costsDollars=0;
-  let previousWeights = new Map<string,number>();
+  let driftedWeights = new Map<string,number>();
   for(let i=1;i<dates.length;i++){
     const prior=byDate.get(dates[i-1])!, current=byDate.get(dates[i])!;
-    const turnover=target.reduce((sum,h)=>sum+Math.abs(h.weight-(previousWeights.get(h.symbol)??0)),0)*strategyValue;
+    const turnover=target.reduce((sum,h)=>sum+Math.abs(h.weight-(driftedWeights.get(h.symbol)??0)),0)*strategyValue;
     const cost=turnover*costBps/10000;
     costsDollars += cost;
     strategyValue -= cost;
-    let periodReturn=0;
-    for(const h of target) periodReturn += h.weight*(current.get(h.symbol)!.close/prior.get(h.symbol)!.close-1);
-    strategyValue *= 1+periodReturn;
+    let grossMultiplier=1;
+    const nextWeights = new Map<string,number>();
+    for(const h of target){
+      const periodMultiplier=current.get(h.symbol)!.close/prior.get(h.symbol)!.close;
+      grossMultiplier += h.weight*(periodMultiplier-1);
+      nextWeights.set(h.symbol,h.weight*periodMultiplier);
+    }
+    strategyValue *= grossMultiplier;
+    const investedAfterReturn=[...nextWeights.values()].reduce((sum,w)=>sum+w,0);
+    if(investedAfterReturn>0) for(const [symbol,weight] of nextWeights) nextWeights.set(symbol,weight/investedAfterReturn);
+    driftedWeights=nextWeights;
     spyValue *= current.get('SPY')!.close/prior.get('SPY')!.close;
     qqqValue *= current.get('QQQ')!.close/prior.get('QQQ')!.close;
-    previousWeights=new Map(target.map(h=>[h.symbol,h.weight]));
     peak=Math.max(peak,strategyValue);
     maxDrawdown=Math.min(maxDrawdown,(strategyValue/peak-1)*100);
   }
