@@ -89,3 +89,94 @@ export const PAPER_LAB_DEFAULTS = {
   maxSectorWeight: 0.35,
   minCashWeight: 0.05,
 };
+
+
+export type HistoricalPrice = {
+  symbol: string;
+  date: string;
+  close: number;
+  availableAt: string;
+};
+
+export type HistoricalBacktestResult = {
+  startDate: string;
+  endDate: string;
+  observations: number;
+  strategyReturnPct: number;
+  spyReturnPct: number;
+  qqqReturnPct: number;
+  strategyNetReturnPct: number;
+  excessVsSpyPct: number;
+  excessVsQqqPct: number;
+  totalTransactionCostsPct: number;
+  maxDrawdownPct: number;
+  evidenceStatus: 'insufficient' | 'ready';
+};
+
+/**
+ * Deterministic point-in-time backtest over caller-supplied adjusted close history.
+ * Input must use the same dates for every held symbol and both benchmarks.
+ * Rebalances to target weights at each close; costs apply to changes in weights.
+ * This intentionally does not fetch prices or manufacture missing observations.
+ */
+export function runHistoricalPaperBacktest(args: {
+  prices: HistoricalPrice[];
+  target: PaperHolding[];
+  startCapital: number;
+  costBps?: number;
+  decisionCutoffByDate?: Record<string, string>;
+  minimumObservations?: number;
+}): HistoricalBacktestResult {
+  const { prices, target, startCapital } = args;
+  const costBps = args.costBps ?? 10;
+  const minimumObservations = args.minimumObservations ?? 50;
+  if (!finite(startCapital) || startCapital <= 0) throw new Error('Starting capital must be positive.');
+  if (!finite(costBps) || costBps < 0 || costBps > 500) throw new Error('Cost assumption must be between 0 and 500 basis points.');
+  if (!target.length || target.some(h => !h.symbol || !finite(h.weight) || h.weight < 0) || target.reduce((s,h)=>s+h.weight,0) > 0.95 + 1e-9) throw new Error('Invalid target weights or cash reserve.');
+  const symbols = [...new Set([...target.map(h=>h.symbol), 'SPY', 'QQQ'])];
+  const byDate = new Map<string, Map<string, HistoricalPrice>>();
+  for (const row of prices) {
+    if (!symbols.includes(row.symbol)) continue;
+    const t = Date.parse(row.date), available = Date.parse(row.availableAt);
+    if (!row.symbol || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    const cutoff = args.decisionCutoffByDate?.[row.date];
+    if (cutoff && (!finite(Date.parse(cutoff)) || available > Date.parse(cutoff) || t > Date.parse(cutoff))) throw new Error('Look-ahead data rejected by historical backtest.');
+    if (!byDate.has(row.date)) byDate.set(row.date, new Map());
+    const day = byDate.get(row.date)!;
+    if (day.has(row.symbol)) throw new Error('Duplicate historical price for symbol/date.');
+    day.set(row.symbol, row);
+  }
+  const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b)).filter(date => symbols.every(symbol=>byDate.get(date)?.has(symbol)));
+  if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
+  for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
+  let strategyValue=startCapital, spyValue=startCapital, qqqValue=startCapital, peak=startCapital, maxDrawdown=0, costsDollars=0;
+  let previousWeights = new Map<string,number>();
+  for(let i=1;i<dates.length;i++){
+    const prior=byDate.get(dates[i-1])!, current=byDate.get(dates[i])!;
+    const turnover=target.reduce((sum,h)=>sum+Math.abs(h.weight-(previousWeights.get(h.symbol)??0)),0)*strategyValue;
+    const cost=turnover*costBps/10000;
+    costsDollars += cost;
+    strategyValue -= cost;
+    let periodReturn=0;
+    for(const h of target) periodReturn += h.weight*(current.get(h.symbol)!.close/prior.get(h.symbol)!.close-1);
+    strategyValue *= 1+periodReturn;
+    spyValue *= current.get('SPY')!.close/prior.get('SPY')!.close;
+    qqqValue *= current.get('QQQ')!.close/prior.get('QQQ')!.close;
+    previousWeights=new Map(target.map(h=>[h.symbol,h.weight]));
+    peak=Math.max(peak,strategyValue);
+    maxDrawdown=Math.min(maxDrawdown,(strategyValue/peak-1)*100);
+  }
+  const strategyReturnPct=(strategyValue/startCapital-1)*100;
+  const spyReturnPct=(spyValue/startCapital-1)*100;
+  const qqqReturnPct=(qqqValue/startCapital-1)*100;
+  return {
+    startDate:dates[0], endDate:dates[dates.length-1], observations:dates.length,
+    strategyReturnPct, spyReturnPct, qqqReturnPct,
+    strategyNetReturnPct:strategyReturnPct,
+    excessVsSpyPct:strategyReturnPct-spyReturnPct,
+    excessVsQqqPct:strategyReturnPct-qqqReturnPct,
+    totalTransactionCostsPct:costsDollars/startCapital*100,
+    maxDrawdownPct:maxDrawdown,
+    evidenceStatus: dates.length-1 >= minimumObservations ? 'ready' : 'insufficient',
+  };
+}
