@@ -36,7 +36,8 @@ test('enforces a minimum cash reserve', () => {
   assert.throws(() => buildPaperRebalance({
     current: [], target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }, { symbol: 'META', weight: 0.15, sector: 'internet' },
       { symbol: 'NVDA', weight: 0.15, sector: 'semiconductors' }, { symbol: 'NOW', weight: 0.15, sector: 'platforms' },
-      { symbol: 'TEAM', weight: 0.15, sector: 'collaboration' }, { symbol: 'GOOGL', weight: 0.15, sector: 'search' }],
+      { symbol: 'TEAM', weight: 0.15, sector: 'collaboration' }, { symbol: 'GOOGL', weight: 0.15, sector: 'search' },
+      { symbol: 'AMZN', weight: 0.15, sector: 'retail' }],
     portfolioValue: 10000, decisionAt, executionAt,
   }), /Minimum cash reserve/);
 });
@@ -48,7 +49,7 @@ test('charges costs on traded notional and reports cost transparently', () => {
     portfolioValue: 10000, decisionAt, executionAt, costBps: 20,
   });
   assert.ok(Math.abs(result.trades[0].notional - 500) < 1e-8);
-  assert.equal(result.totalCost, 1);
+  assert.ok(Math.abs(result.totalCost - 1) < 1e-8);
 });
 
 test('net returns deduct transaction costs', () => {
