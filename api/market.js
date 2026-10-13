@@ -10,6 +10,7 @@ import autopilotSignalsHandler from '../server/api/autopilot-signals.js';
 import decisionCenterHandler from '../server/api/decision-center.js';
 import decisionJournalHandler from '../server/api/decision-journal.js';
 import reentryAlertsHandler from '../server/api/reentry-alerts.js';
+import jevLabHandler from '../server/api/jev-lab.js';
 
 const routes = {
   quote: quoteHandler,
@@ -24,6 +25,7 @@ const routes = {
   'decision-center': decisionCenterHandler,
   'decision-journal': decisionJournalHandler,
   'reentry-alerts': reentryAlertsHandler,
+  'jev-lab': jevLabHandler,
 };
 
 export default async function handler(req, res) {
