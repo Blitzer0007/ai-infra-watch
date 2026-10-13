@@ -1,5 +1,6 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
+import { evaluatePortfolioReturnAlerts } from './portfolio-return-alerts.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -509,6 +510,25 @@ async function buildDigest(decisionJournal) {
       decisionLayerError: decisionResult.error || null,
       earningsStatus: decision?.earningsStatus || null,
       earningsError: decision?.earningsError || null,
+      returnReview: (() => {
+        const portfolio = decision?.portfolio || {};
+        const netContributed = Number(portfolio.netContributed);
+        const cashFlowPnl = Number(portfolio.cashFlowPnl);
+        return {
+          returnPct: Number.isFinite(netContributed) && netContributed > 0 && Number.isFinite(cashFlowPnl)
+            ? cashFlowPnl / netContributed * 100 : null,
+          portfolio,
+          actionItems: Array.isArray(decision?.actionItems) ? decision.actionItems : [],
+          actionItemsAvailable: Array.isArray(decision?.actionItems),
+          rules: decision?.rules || {},
+          benchmark: decision?.benchmark || {},
+          earnings: Array.isArray(decision?.earnings) ? decision.earnings : [],
+          earningsStatus: decision?.earningsStatus || null,
+          earningsError: decision?.earningsError || null,
+          forecast: decision?.forecast || {},
+          signalGate: decision?.signalGate || {},
+        };
+      })(),
     };
   }
 
@@ -666,6 +686,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
       }
 
+      let returnAlerts = { evaluated: false, reason: 'not a scheduled run', triggered: [], sent: 0, errors: [] };
+      if (cron) {
+        try {
+          returnAlerts = await evaluatePortfolioReturnAlerts(digest);
+        } catch (error) {
+          returnAlerts = { evaluated: false, reason: 'evaluation failed', triggered: [], sent: 0, errors: [error instanceof Error ? error.message : String(error)] };
+        }
+      }
+
       const requested = req.method === 'POST'
         ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
         : [];
@@ -675,14 +704,15 @@ export default async function handler(req, res) {
       await finishDigestSlot(
         slotKey,
         failed ? 'failed' : 'completed',
-        delivery,
-        delivery.errors.length ? delivery.errors.join(' · ') : null,
+        { ...delivery, returnAlerts },
+        [...delivery.errors, ...returnAlerts.errors].length ? [...delivery.errors, ...returnAlerts.errors].join(' · ') : null,
       );
 
       return res.status(failed ? 502 : 200).json({
         ok: true,
         ...digest,
         delivery,
+        returnAlerts,
         slotKey,
       });
     } catch (error) {
