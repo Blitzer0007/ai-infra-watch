@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Activity, ShieldCheck, Clock3, CircleDollarSign, RefreshCw } from 'lucide-react';
 import { buildPaperRebalance, PAPER_LAB_DEFAULTS, type PaperHolding } from '../utils/jevPortfolioLab';
+import JevDecisionPanel from './JevDecisionPanel';
+import { forecastValidationGate } from '../utils/forecastValidation';
 
 const candidates = [
   { symbol: 'MSFT', sector: 'software', label: 'Microsoft' },
@@ -72,10 +74,24 @@ export default function JevAutonomousPortfolioLab() {
           <input className="mt-2 w-full rounded-lg border border-white/15 bg-black/20 p-2 text-white" type="number" min="0" max="500" value={costBps} onChange={event => setCostBps(Math.max(0, Math.min(500, Number(event.target.value) || 0)))}/>
         </label>
       </div>
-      <div><p className="mb-2 text-sm text-white/70">Candidate universe (illustrative setup, not a JEV-ranked list)</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{candidates.map(item => <label key={item.symbol} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-sm"><input type="checkbox" checked={selected.includes(item.symbol)} onChange={event => setSelected(old => event.target.checked ? [...old, item.symbol] : old.filter(symbol => symbol !== item.symbol)}/><span>{item.symbol}</span><span className="ml-auto text-xs text-white/40">{item.sector}</span></label>)}</div></div>
+      <div><p className="mb-2 text-sm text-white/70">Candidate universe (illustrative setup, not a JEV-ranked list)</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{candidates.map(item => <label key={item.symbol} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-sm"><input type="checkbox" checked={selected.includes(item.symbol)} onChange={event => setSelected(old => event.target.checked ? [...old, item.symbol] : old.filter(symbol => symbol !== item.symbol))}/><span>{item.symbol}</span><span className="ml-auto text-xs text-white/40">{item.sector}</span></label>)}</div></div>
       <div className="rounded-lg bg-black/20 p-4 text-sm"><p>Target allocation: {target.reduce((sum, item) => sum + item.weight, 0).toLocaleString(undefined, { style: 'percent', maximumFractionDigits: 1 })}</p><p>Cash reserve: {preview ? (preview.cashWeight * 100).toFixed(1) + '%' : 'Risk controls blocked this allocation'}</p><p>Estimated transaction costs: {preview ? '$' + preview.totalCost.toFixed(2) : 'Unavailable'}</p><p className="mt-2 text-xs text-white/40">Current stage: manual paper proposal. Returns are not shown until timestamped market history and benchmark histories are wired in.</p></div>
       <button onClick={approvePaperReview} disabled={!preview || selected.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40"><RefreshCw size={16}/> Save approved paper proposal</button>
       <p role="status" className="text-sm text-white/60">{message}{review ? ' Last saved: ' + new Date(review).toLocaleString() : ''}</p>
+    </section>
+    <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <h2 className="text-lg font-semibold">JEV review & forecast-validation guard</h2>
+      <p className="text-sm text-white/55">JEV can assess the portfolio context through the existing authenticated assessment endpoint. This is not yet a stock-discovery ranking: insufficient or missing evidence must remain insufficient.</p>
+      <JevDecisionPanel kind="portfolio" title="JEV portfolio assessment" subtitle="Reviews the proposed paper allocation and its supplied context; it does not change weights or place orders." state={{
+        mode: 'paper', reviewFrequency: 'weekly', universe: 'US equities', benchmarks: ['SPY', 'QQQ'],
+        targetHoldings: target, capital, transactionCostBps: costBps,
+        riskLimits: { maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05 },
+        evidenceQualityInput: { required: ['market data', 'peer comparison', 'fundamental evidence', 'valuation'], observed: [], stale: [], missing: ['evidence-backed candidate ranking not connected'], conflictCount: 0 },
+      }} />
+      <div className="rounded-lg border border-white/10 p-3 text-sm">
+        <p className="font-medium">Forecast validation threshold</p>
+        <p className="mt-1 text-white/60">Existing forecast-verification gate: {forecastValidationGate(0).minimumRequired} verified forecasts before the sample is considered ready. This lab has not yet recorded a verified sample.</p>
+      </div>
     </section>
   </div>;
 }
