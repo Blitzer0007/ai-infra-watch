@@ -12,6 +12,8 @@ export type PortfolioAccountingTransaction = {
   amount: number;
   brokerage?: number | null;
   currency?: string | null;
+  tradeDate?: string;
+  sourceRow?: number;
   quantityDerived?: boolean;
   priceDerived?: boolean;
   dataQuality?: string;
@@ -37,6 +39,7 @@ export type PortfolioTradingPerformance = {
   returnVsGrossPurchaseCostPct: number | null;
   quantityMismatchSymbols: string[];
   derivedTransactionCount: number;
+  reviewTransactionCount?: number;
   currency: string | null;
 };
 
