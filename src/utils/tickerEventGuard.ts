@@ -88,22 +88,24 @@ export function isTrackerEventRelevantToTicker(
   const description = String(event.description || '');
   const titleMatches = mentionsCompany(title, selectedTicker, companyName);
   const bodyMatches = mentionsCompany(description, selectedTicker, companyName);
+  const namesAnotherCompany = headlineNamesAnotherCompany(title, selectedTicker);
 
   // A source label alone is not proof that a headline belongs to the selected
   // issuer. Legacy/cached rows can be mis-tagged, so reject another known
   // company's headline before honoring the official-source shortcut.
-  if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
+  if (namesAnotherCompany && !titleMatches) return false;
 
   // SEC filings and verified posts from the tracked issuer can be generic in title.
   if (event.sourceType === 'sec-primary' ||
       event.sourceType === 'official-company' ||
       event.sourceType === 'official-social') return true;
 
-  if (!titleMatches && !bodyMatches) return false;
+  if (titleMatches || bodyMatches) return true;
 
-  // If the headline identifies a different known company, a mention buried only
-  // in the summary isn't sufficient. Require the tracked ticker/company in title.
-  if (headlineNamesAnotherCompany(title, selectedTicker) && !titleMatches) return false;
+  // Legacy curated milestones can omit sourceType. The ticker assignment is
+  // accepted only when the headline does not identify a different known issuer.
+  // This keeps curated rows visible without allowing stale Nebius rows into DGXX.
+  if (!event.sourceType && !namesAnotherCompany) return true;
 
-  return true;
+  return false;
 }
