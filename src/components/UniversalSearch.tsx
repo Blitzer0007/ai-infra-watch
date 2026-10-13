@@ -105,6 +105,8 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
     addTickerShortcut(symbol, Object.keys(STOCK_METADATA));
     setShortcuts(loadTickerShortcuts(Object.keys(STOCK_METADATA)));
     onNavigate('tracker');
+    // The tracker may mount after navigation, so dispatch once more after React renders.
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent('aiw-ticker-shortcuts-changed', { detail: { symbol } })), 50);
     setOpen(false);
   };
 
