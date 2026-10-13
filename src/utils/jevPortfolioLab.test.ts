@@ -126,7 +126,8 @@ test('historical backtest enforces the same position, sector, and cash guardrail
       { symbol: 'NVDA', weight: 0.15, sector: 'semiconductors' },
       { symbol: 'NOW', weight: 0.15, sector: 'platforms' },
       { symbol: 'TEAM', weight: 0.15, sector: 'collaboration' },
-      { symbol: 'GOOGL', weight: 0.10, sector: 'search' },
+      { symbol: 'GOOGL', weight: 0.15, sector: 'search' },
+      { symbol: 'AMZN', weight: 0.15, sector: 'retail' },
     ], startCapital: 10000,
   }), /minimum cash reserve/i);
 });
