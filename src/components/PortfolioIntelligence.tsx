@@ -411,7 +411,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const investedTotal = analyses.reduce((sum, h) => sum + h.investedValue, 0);
   const livePositions = analyses.filter(h => h.livePrice != null && !h.liveStale);
   const stalePositions = analyses.filter(h => h.livePrice != null && h.liveStale);
-  const allQuotesFresh = analyses.length > 0 && livePositions.length === analyses.length;
+  const allQuotesFresh = analyses.length === 0 ? portfolioTransactions.length > 0 : livePositions.length === analyses.length;
   const liveCurrentTotal = allQuotesFresh
     ? analyses.reduce((sum, h) => sum + (h.currentValue ?? 0), 0)
     : null;
