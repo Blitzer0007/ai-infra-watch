@@ -1,6 +1,7 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
 import { evaluatePortfolioReturnAlerts } from './portfolio-return-alerts.js';
+import { evaluatePortfolioHoldingReturnAlerts } from './portfolio-holding-return-alerts.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -512,11 +513,12 @@ async function buildDigest(decisionJournal) {
       earningsError: decision?.earningsError || null,
       returnReview: (() => {
         const portfolio = decision?.portfolio || {};
-        const netContributed = Number(portfolio.netContributed);
-        const cashFlowPnl = Number(portfolio.cashFlowPnl);
+        const accountingStatus = String(portfolio.accountingStatus || 'unknown');
+        const returnVsPurchaseCost = Number(portfolio.returnVsGrossPurchaseCostPct);
+        const returnEligible = ['complete', 'review-transactions'].includes(accountingStatus) &&
+          Number.isFinite(returnVsPurchaseCost);
         return {
-          returnPct: Number.isFinite(netContributed) && netContributed > 0 && Number.isFinite(cashFlowPnl)
-            ? cashFlowPnl / netContributed * 100 : null,
+          returnPct: returnEligible ? returnVsPurchaseCost : null,
           portfolio,
           actionItems: Array.isArray(decision?.actionItems) ? decision.actionItems : [],
           actionItemsAvailable: Array.isArray(decision?.actionItems),
@@ -687,11 +689,17 @@ export default async function handler(req, res) {
       }
 
       let returnAlerts = { evaluated: false, reason: 'not a scheduled run', triggered: [], sent: 0, errors: [] };
+      let holdingReturnAlerts = { evaluated: false, reason: 'not a scheduled run', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [] };
       if (cron) {
         try {
           returnAlerts = await evaluatePortfolioReturnAlerts(digest);
         } catch (error) {
           returnAlerts = { evaluated: false, reason: 'evaluation failed', triggered: [], sent: 0, errors: [error instanceof Error ? error.message : String(error)] };
+        }
+        try {
+          holdingReturnAlerts = await evaluatePortfolioHoldingReturnAlerts(digest);
+        } catch (error) {
+          holdingReturnAlerts = { evaluated: false, reason: 'evaluation failed', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [error instanceof Error ? error.message : String(error)] };
         }
       }
 
@@ -704,8 +712,10 @@ export default async function handler(req, res) {
       await finishDigestSlot(
         slotKey,
         failed ? 'failed' : 'completed',
-        { ...delivery, returnAlerts },
-        [...delivery.errors, ...returnAlerts.errors].length ? [...delivery.errors, ...returnAlerts.errors].join(' · ') : null,
+        { ...delivery, returnAlerts, holdingReturnAlerts },
+        [...delivery.errors, ...returnAlerts.errors, ...holdingReturnAlerts.errors].length
+          ? [...delivery.errors, ...returnAlerts.errors, ...holdingReturnAlerts.errors].join(' · ')
+          : null,
       );
 
       return res.status(failed ? 502 : 200).json({
@@ -713,6 +723,7 @@ export default async function handler(req, res) {
         ...digest,
         delivery,
         returnAlerts,
+        holdingReturnAlerts,
         slotKey,
       });
     } catch (error) {
