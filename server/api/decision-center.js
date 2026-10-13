@@ -101,38 +101,60 @@ function calculateActualPortfolio(holdings, transactionRows, quotes, histories =
     } else missingQuotes++;
   }
 
-  let buyCash = 0, saleCash = 0;
-  for (const tx of transactionRows) {
-    if (tx.transaction_type === 'BUY') buyCash += transactionNetCash(tx);
-    else saleCash += transactionNetCash(tx);
-  }
-  const netContributed = buyCash - saleCash;
-  const openCostBasis = holdings.reduce((sum, holding) =>
+  let buyCash = 0, saleCash = 0, realizedFromLedger = 0;
+  const holdingsOpenCostBasis = holdings.reduce((sum, holding) =>
     sum + Math.max(0, Number(holding.quantity) || 0) * Math.max(0, Number(holding.average_cost) || 0), 0);
-
   const holdingsBySymbol = new Map();
   for (const holding of holdings) {
     const symbol = String(holding.symbol || '').trim().toUpperCase();
     holdingsBySymbol.set(symbol, (holdingsBySymbol.get(symbol) || 0) + Number(holding.quantity || 0));
   }
+
   const ledgerBySymbol = new Map();
+  const inventory = new Map();
+  const invalidSequenceSymbols = new Set();
   for (const tx of transactionRows) {
     const symbol = String(tx.symbol || '').trim().toUpperCase();
     const quantity = Number(tx.quantity) || 0;
     const signedQuantity = tx.transaction_type === 'SELL' ? -quantity : quantity;
     ledgerBySymbol.set(symbol, (ledgerBySymbol.get(symbol) || 0) + signedQuantity);
+    const position = inventory.get(symbol) || { quantity: 0, costBasis: 0 };
+    const netCash = transactionNetCash(tx);
+
+    if (tx.transaction_type === 'BUY') {
+      buyCash += netCash;
+      position.quantity += quantity;
+      position.costBasis += netCash;
+    } else {
+      saleCash += netCash;
+      const tolerance = Math.max(0.00001, Math.abs(position.quantity) * 0.0001);
+      if (position.quantity <= 0 || position.quantity + tolerance < quantity) {
+        invalidSequenceSymbols.add(symbol);
+      } else {
+        const averageCost = position.costBasis / position.quantity;
+        const soldCostBasis = averageCost * quantity;
+        realizedFromLedger += netCash - soldCostBasis;
+        position.quantity -= quantity;
+        position.costBasis -= soldCostBasis;
+        if (position.quantity <= tolerance) {
+          position.quantity = 0;
+          position.costBasis = 0;
+        }
+      }
+    }
+    inventory.set(symbol, position);
   }
+
+  const netContributed = buyCash - saleCash;
+  const currencies = [...new Set(transactionRows.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
   const symbols = new Set([...holdingsBySymbol.keys(), ...ledgerBySymbol.keys()]);
   const quantityMismatchSymbols = [...symbols].filter(symbol => {
     const holdingQuantity = holdingsBySymbol.get(symbol) || 0;
     const ledgerQuantity = ledgerBySymbol.get(symbol) || 0;
     const tolerance = Math.max(0.00001, Math.abs(holdingQuantity) * 0.0001);
-    return Math.abs(holdingQuantity - ledgerQuantity) > tolerance;
+    return Math.abs(holdingQuantity - ledgerQuantity) > tolerance || invalidSequenceSymbols.has(symbol);
   }).sort();
-  const currencies = [...new Set(transactionRows.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
-  const derivedTransactionCount = transactionRows.filter(row =>
-    row.quantity_derived || row.price_derived
-  ).length;
+  const derivedTransactionCount = transactionRows.filter(row => row.quantity_derived || row.price_derived).length;
 
   const quoteCoverage = {
     totalHoldings: holdings.length,
@@ -144,10 +166,12 @@ function calculateActualPortfolio(holdings, transactionRows, quotes, histories =
   };
   const ledgerUsable = transactionRows.length > 0 && currencies.length === 1 && quantityMismatchSymbols.length === 0;
   const markToMarketComplete = quoteCoverage.status === 'complete';
+  const ledgerOpenCostBasis = [...inventory.values()].reduce((sum, position) => sum + position.costBasis, 0);
+  const openCostBasis = ledgerUsable ? ledgerOpenCostBasis : holdingsOpenCostBasis;
   const unrealizedPnl = markToMarketComplete ? currentValue - openCostBasis : null;
-  const totalTradingPnl = ledgerUsable && markToMarketComplete ? currentValue - netContributed : null;
-  const realizedPnl = totalTradingPnl != null && unrealizedPnl != null
-    ? totalTradingPnl - unrealizedPnl
+  const realizedPnl = ledgerUsable ? realizedFromLedger : null;
+  const totalTradingPnl = ledgerUsable && markToMarketComplete && unrealizedPnl != null
+    ? realizedFromLedger + unrealizedPnl
     : null;
 
   let accountingStatus = 'complete';
@@ -175,7 +199,6 @@ function calculateActualPortfolio(holdings, transactionRows, quotes, histories =
     derivedTransactionCount,
     quoteCoverage,
   };
-}
 
 function sortedHistoryPoints(history) {
   return Array.isArray(history?.points)
