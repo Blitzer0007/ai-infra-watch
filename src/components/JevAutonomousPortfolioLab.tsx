@@ -131,6 +131,24 @@ export default function JevAutonomousPortfolioLab() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.detail || body?.error || 'JEV candidate research failed.');
       setCandidateResearch(body);
+      const availability = body?.jev?.evidence_availability || {};
+      const gate = body?.jev?.evidence_gate || {};
+      const missing = Array.isArray(availability.missing) ? availability.missing : [];
+      const conflicts = Number(gate?.conflict_detection?.count || 0);
+      const action = String(gate.action || body?.jev?.action || '').toLowerCase();
+      if (body?.ok === false || missing.length > 0 || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)) {
+        const dedupeKey = 'jev-evidence-review:' + [...selected].sort().join('-') + ':' + (action || 'insufficient') + ':' + [...missing].sort().join('-');
+        void authFetch('/api/alert-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: {
+            type: 'catalyst', severity: conflicts > 0 ? 'high' : 'medium',
+            symbol: 'JEV', title: 'JEV research evidence needs review',
+            message: `Candidate review for ${selected.join(', ')} returned gate ${action || 'insufficient'}; missing families: ${missing.join(', ') || 'not reported'}; conflicts: ${conflicts}. Do not treat the packet as a validated ranking until evidence gaps are resolved.`,
+            dedupeKey, dedupeMinutes: 1440,
+          } }),
+        }).catch(() => undefined);
+      }
     } catch (error) {
       setResearchError(error instanceof Error ? error.message : 'JEV candidate research failed.');
     } finally {
