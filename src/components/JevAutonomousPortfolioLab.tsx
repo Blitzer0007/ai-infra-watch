@@ -341,14 +341,19 @@ export default function JevAutonomousPortfolioLab() {
         mode: 'paper', reviewFrequency: 'weekly', universe: 'US equities', benchmarks: ['SPY', 'QQQ'],
         targetHoldings: target, capital, transactionCostBps: costBps,
         riskLimits: { maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05 },
-        evidenceQualityInput: {
-          evidence_availability: {
-            usable_families: [],
-            missing: ['market data', 'peer comparison', 'fundamental evidence', 'valuation', 'evidence-backed candidate ranking'],
-          },
-          evidence_freshness: [],
-          conflict_count: 0,
-        },
+        evidenceQualityInput: candidateResearch ? {
+          evidence_availability: candidateResearch?.jev?.evidence_availability
+            || candidateResearch?.jev?.evidence_gate?.evidence_availability
+            || {},
+          evidence_freshness: candidateResearch?.jev?.evidence_freshness
+            || candidateResearch?.jev?.evidence_gate?.evidence_freshness
+            || [],
+          conflict_count: Number(
+            candidateResearch?.jev?.evidence_gate?.conflict_detection?.count
+            || candidateResearch?.jev?.evidence_gate?.conflict_count
+            || 0
+          ),
+        } : null,
       }} />
       <div className="rounded-lg border border-white/10 p-3 text-sm">
         <p className="font-medium">Forecast validation threshold</p>
