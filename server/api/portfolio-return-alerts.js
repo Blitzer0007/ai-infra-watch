@@ -103,6 +103,7 @@ async function supabase(path, options = {}) {
 }
 
 export function getReturnThresholdTransitions(returnPct, states = new Map()) {
+  if (returnPct == null || returnPct === '') return { trigger: [], reset: [] };
   const value = Number(returnPct);
   if (!Number.isFinite(value)) return { trigger: [], reset: [] };
   const trigger = [];
@@ -117,7 +118,7 @@ export function getReturnThresholdTransitions(returnPct, states = new Map()) {
 
 export async function evaluatePortfolioReturnAlerts(digest) {
   const review = digest?.returnReview;
-  if (!review || !Number.isFinite(Number(review.returnPct)) || review.portfolio?.quoteCoverage?.status !== 'complete') {
+  if (!review || review.returnPct == null || !Number.isFinite(Number(review.returnPct)) || review.portfolio?.quoteCoverage?.status !== 'complete') {
     return {
       evaluated: false,
       reason: !review ? 'cash-flow portfolio data unavailable' : 'portfolio quote coverage is not complete',
