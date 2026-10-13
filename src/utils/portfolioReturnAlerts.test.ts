@@ -28,6 +28,7 @@ test('falling below a threshold resets it for a future recrossing', () => {
 });
 
 test('non-finite returns do not trigger or reset anything', () => {
-  assert.deepEqual(getReturnThresholdTransitions(null, new Map()), { trigger: [], reset: [] });
-  assert.deepEqual(getReturnThresholdTransitions(Number.NaN, new Map()), { trigger: [], reset: [] });
+  const active = new Map([['portfolio-return:25', { active: true }]]);
+  assert.deepEqual(getReturnThresholdTransitions(null, active), { trigger: [], reset: [] });
+  assert.deepEqual(getReturnThresholdTransitions(Number.NaN, active), { trigger: [], reset: [] });
 });
