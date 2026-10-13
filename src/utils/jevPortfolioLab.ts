@@ -146,7 +146,12 @@ export function runHistoricalPaperBacktest(args: {
     if (day.has(row.symbol)) throw new Error('Duplicate historical price for symbol/date.');
     day.set(row.symbol, row);
   }
-  const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b)).filter(date => symbols.every(symbol=>byDate.get(date)?.has(symbol)));
+  // Do not silently drop partial dates: that can hide gaps in an input history and make a backtest look healthier than its evidence supports. Every supplied date must contain the strategy holdings and both benchmarks.
+  for (const [date, day] of byDate) {
+    const missing = symbols.filter(symbol => !day.has(symbol));
+    if (missing.length) throw new Error(`Historical prices must have common dates for portfolio and both benchmarks; ${date} is missing: ${missing.join(', ')}.`);
+  }
+  const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b));
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
   let strategyValue=startCapital, spyValue=startCapital, qqqValue=startCapital, peak=startCapital, maxDrawdown=0, costsDollars=0;
