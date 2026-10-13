@@ -39,6 +39,24 @@ describe('portfolio trading P&L accounting', () => {
     assert.equal(result.totalTradingPnl, 30);
   });
 
+  it('uses chronological weighted-average cost when earlier buys are supplied out of order', () => {
+    const result = calculatePortfolioTradingPerformance(
+      [{ symbol: 'NOW', quantity: 1, averageCost: 50, currentPrice: 70 }],
+      [
+        { symbol: 'NOW', transactionType: 'SELL', quantity: 1, amount: 55, currency: 'USD', tradeDate: '2026-03-01' },
+        { symbol: 'NOW', transactionType: 'BUY', quantity: 1, amount: 60, currency: 'USD', tradeDate: '2026-02-01' },
+        { symbol: 'NOW', transactionType: 'BUY', quantity: 1, amount: 40, currency: 'USD', tradeDate: '2026-01-01' },
+      ],
+      true,
+    );
+
+    assert.equal(result.status, 'complete');
+    assert.equal(result.realizedPnl, 5);
+    assert.equal(result.openCostBasis, 50);
+    assert.equal(result.unrealizedPnl, 20);
+    assert.equal(result.totalTradingPnl, 25);
+  });
+
   it('withholds realized and total P&L if the trade ledger does not reconcile', () => {
     const result = calculatePortfolioTradingPerformance(
       [{ symbol: 'NOW', quantity: 1, averageCost: 50, currentPrice: 60 }],
