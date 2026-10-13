@@ -603,7 +603,15 @@ export default async function handler(req, res) {
           severity: 'WATCH',
           symbol,
           title: aboveTarget ? 'At or above analyst target' : 'Near analyst target',
-          detail: 'Current price 
+          detail: 'Current price $' + Number(q.price).toFixed(2) + ' is ' + (aboveTarget ? 'at/above' : 'within 5% of') +
+            ' the mean analyst target of $' + Number(analystTarget.targetMean).toFixed(2) + ' (' + Number(analystTarget.analystCount) +
+            ' analysts; updated ' + String(analystTarget.lastUpdated).slice(0, 10) +
+            '). Consensus is a reference point, not intrinsic value; reassess thesis, earnings and downside.',
+          impact: null,
+        });
+      }
+
+      const currentAllocationPct = totalCurrentValue > 0 && Number(q?.price) > 0
         ? (Number(q.price) * Number(holding.quantity) / totalCurrentValue) * 100
         : null;
       const targetAllocationPct = Number(holding.target_allocation_pct);
