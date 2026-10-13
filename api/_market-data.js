@@ -143,8 +143,13 @@ async function yahooHistory(symbol, range) {
   if (!result) throw new Error('No Yahoo history');
   const ts = result.timestamp || [];
   const closes = result.indicators?.quote?.[0]?.close || [];
-  const points = ts.map((t, i) => ({ date: new Date(t * 1000).toISOString().slice(0,10), price: closes[i] }))
-    .filter(p => Number.isFinite(p.price));
+  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose || [];
+  const points = ts.map((t, i) => ({
+    date: new Date(t * 1000).toISOString().slice(0,10),
+    price: closes[i],
+    adjustedPrice: Number.isFinite(adjustedCloses[i]) ? adjustedCloses[i] : null,
+    adjusted: Number.isFinite(adjustedCloses[i]),
+  })).filter(p => Number.isFinite(p.price));
   if (!points.length) throw new Error('No Yahoo history points');
   return { points, currency: result.meta?.currency || 'USD', exchange: result.meta?.exchangeName || null };
 }
@@ -163,8 +168,12 @@ async function finnhubHistory(symbol, range) {
       '&resolution=D&from=' + from + '&to=' + to + '&token=' + encodeURIComponent(key)
   );
   if (j?.s !== 'ok' || !Array.isArray(j?.c)) throw new Error('Finnhub history unavailable');
-  const points = j.c.map((price, i) => ({ date: new Date(j.t[i] * 1000).toISOString().slice(0,10), price }))
-    .filter(p => Number.isFinite(p.price));
+  const points = j.c.map((price, i) => ({
+    date: new Date(j.t[i] * 1000).toISOString().slice(0,10),
+    price,
+    adjustedPrice: null,
+    adjusted: false,
+  })).filter(p => Number.isFinite(p.price));
   if (!points.length) throw new Error('No Finnhub history points');
   return { points, currency: 'USD', exchange: null };
 }
@@ -182,7 +191,7 @@ async function alphaHistory(symbol, range) {
   const cutoff = Date.now() - rangeDays(range) * 86400000;
   const points = Object.entries(series)
     .filter(([date]) => new Date(date).getTime() >= cutoff)
-    .map(([date, row]) => ({ date, price: Number(row?.['4. close']) }))
+    .map(([date, row]) => ({ date, price: Number(row?.['4. close']), adjustedPrice: null, adjusted: false }))
     .filter(p => Number.isFinite(p.price))
     .sort((a,b) => a.date.localeCompare(b.date));
   if (!points.length) throw new Error('No Alpha Vantage history points');

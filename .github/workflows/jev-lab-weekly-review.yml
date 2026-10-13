@@ -1,0 +1,35 @@
+name: JEV Weekly Paper Review
+
+on:
+  schedule:
+    - cron: "0 15 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jev-weekly-paper-review
+  cancel-in-progress: false
+
+jobs:
+  weekly-review:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send weekly paper-review Telegram summary
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          AIW_BASE_URL: ${{ vars.AIW_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "CRON_SECRET is required to authorize the weekly review endpoint."
+            exit 1
+          fi
+          BASE_URL="${AIW_BASE_URL:-https://ai-infra-watch-theta.vercel.app}"
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST "${BASE_URL%/}/api/jev-lab" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{"action":"weekly-review"}'
