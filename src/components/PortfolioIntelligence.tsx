@@ -13,6 +13,7 @@ import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
 import { applyStressHysteresis, buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks } from '../utils/measurement';
+import { calculatePortfolioTradingPerformance } from '../utils/portfolioAccounting';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
@@ -418,6 +419,27 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const liveUnrealizedPct = liveCurrentTotal != null && investedTotal
     ? (liveUnrealized as number / investedTotal) * 100
     : null;
+  const tradePerformance = useMemo(() => calculatePortfolioTradingPerformance(
+    analyses.map(item => ({
+      symbol: item.symbol,
+      quantity: item.quantity,
+      averageCost: item.averageCost,
+      currentPrice: item.livePrice != null && !item.liveStale ? item.livePrice : null,
+    })),
+    portfolioTransactions,
+    allQuotesFresh,
+  ), [analyses, portfolioTransactions, allQuotesFresh]);
+  const accountingNote = tradePerformance.status === 'complete'
+    ? 'Ledger reconciled'
+    : tradePerformance.status === 'review-transactions'
+      ? 'Some trade values are derived · verify flagged records'
+      : tradePerformance.status === 'quantity-mismatch'
+        ? 'Trade quantities do not reconcile · total P&L withheld'
+        : tradePerformance.status === 'mixed-currency'
+          ? 'Mixed currencies · total P&L withheld'
+          : tradePerformance.status === 'quotes-incomplete'
+            ? 'Fresh quotes required · total P&L withheld'
+            : 'Transaction history unavailable · total P&L withheld';
   const stressFreshCount = analyses.filter(item => item.livePrice != null && !item.liveStale).length;
   const stressStaleCount = analyses.filter(item => item.livePrice != null && item.liveStale).length;
   const portfolioMetricInputs = useMemo(() => analyses.map(item => ({ symbol: item.symbol, investedValue: item.investedValue, currentValue: item.currentValue, pnl: item.pnl, pnlPct: item.pnlPct, dailyChangePct: item.dailyChangePct, group: item.group })), [analyses]);
@@ -771,10 +793,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               </section>
               )}
       {tab === 'overview' && (
-              <div className="grid grid-cols-2 xl:grid-cols-5 gap-3" id="portfolio-investment-summary">
-                <Metric label="Amount invested" value={formatPortfolioMoney(investedTotal)} suffix={currency === 'INR' ? 'home currency · USD basis' : 'position cost'} tone="neutral" icon={<WalletCards/>}/>
-                <Metric label="Current value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh · ' + stalePositions.length + ' fallback'} tone="up" icon={<TrendingUp/>}/>
-                <Metric label="Profit / loss" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(liveUnrealized)) : '—'} suffix={(liveUnrealizedPct != null ? '(' + liveUnrealizedPct.toFixed(2) + '%)' : '') + (stalePositions.length ? ' · snapshot fallback' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
+              <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-7 gap-3" id="portfolio-investment-summary">
+                <Metric label="Open cost basis" value={formatPortfolioMoney(investedTotal)} suffix="Cost of shares still held" tone="neutral" icon={<WalletCards/>}/>
+                <Metric label="Holdings value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh quotes'} tone="up" icon={<TrendingUp/>}/>
+                <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(liveUnrealized)) : '—'} suffix={(liveUnrealizedPct != null ? liveUnrealizedPct.toFixed(2) + '% on open cost' : '') + (stalePositions.length ? ' · quotes need review' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
+                <Metric label="Realized P&L" value={tradePerformance.realizedPnl != null ? (tradePerformance.realizedPnl >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(tradePerformance.realizedPnl)) : '—'} suffix="Closed-trade profit / loss" tone={tradePerformance.realizedPnl != null && tradePerformance.realizedPnl >= 0 ? 'up' : 'down'} icon={<TrendingUp/>}/>
+                <Metric label="Total trading P&L" value={tradePerformance.totalTradingPnl != null ? (tradePerformance.totalTradingPnl >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(tradePerformance.totalTradingPnl)) : '—'} suffix={accountingNote + ' · excludes untracked cash'} tone={tradePerformance.totalTradingPnl != null && tradePerformance.totalTradingPnl >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
                 <Metric label="AI infrastructure strength" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
