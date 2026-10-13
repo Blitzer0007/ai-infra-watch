@@ -4,6 +4,7 @@ import { buildPaperRebalance, PAPER_LAB_DEFAULTS, runHistoricalPaperBacktest, ty
 import { authFetch } from '../utils/apiAuth';
 import JevDecisionPanel from './JevDecisionPanel';
 import { forecastValidationGate } from '../utils/forecastValidation';
+import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
 
 const candidates = [
   { symbol: 'MSFT', sector: 'software', label: 'Microsoft' },
@@ -134,17 +135,18 @@ export default function JevAutonomousPortfolioLab() {
       const availability = body?.jev?.evidence_availability || {};
       const gate = body?.jev?.evidence_gate || {};
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
-      const conflicts = Number(gate?.conflict_detection?.count || 0);
+      const conflicts = Number(gate?.conflict_detection?.count || gate?.conflict_count || 0);
       const action = String(gate.action || body?.jev?.action || '').toLowerCase();
       if (body?.ok === false || availability.complete !== true || missing.length > 0 || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)) {
-        const dedupeKey = 'jev-evidence-review:' + [...selected].sort().join('-') + ':' + (action || 'insufficient') + ':' + [...missing].sort().join('-');
+        const diagnostic = describeJevEvidenceGap(availability, gate, action);
+        const dedupeKey = 'jev-evidence-review:' + [...selected].sort().join('-') + ':' + (action || 'insufficient') + ':' + diagnostic.dedupeSuffix;
         void authFetch('/api/alert-notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ event: {
             type: 'catalyst', severity: conflicts > 0 ? 'high' : 'medium',
             symbol: 'JEV', title: 'JEV research evidence needs review',
-            message: `Candidate review for ${selected.join(', ')} returned gate ${action || 'insufficient'}; missing families: ${missing.join(', ') || 'not reported'}; conflicts: ${conflicts}. Do not treat the packet as a validated ranking until evidence gaps are resolved.`,
+            message: `Candidate review for ${selected.join(', ')}. ${diagnostic.message} Conflicts: ${conflicts}. Do not treat the packet as a validated ranking until evidence gaps are resolved.`,
             dedupeKey, dedupeMinutes: 1440,
           } }),
         }).catch(() => undefined);
@@ -339,14 +341,19 @@ export default function JevAutonomousPortfolioLab() {
         mode: 'paper', reviewFrequency: 'weekly', universe: 'US equities', benchmarks: ['SPY', 'QQQ'],
         targetHoldings: target, capital, transactionCostBps: costBps,
         riskLimits: { maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05 },
-        evidenceQualityInput: {
-          evidence_availability: {
-            usable_families: [],
-            missing: ['market data', 'peer comparison', 'fundamental evidence', 'valuation', 'evidence-backed candidate ranking'],
-          },
-          evidence_freshness: [],
-          conflict_count: 0,
-        },
+        evidenceQualityInput: candidateResearch ? {
+          evidence_availability: candidateResearch?.jev?.evidence_availability
+            || candidateResearch?.jev?.evidence_gate?.evidence_availability
+            || {},
+          evidence_freshness: candidateResearch?.jev?.evidence_freshness
+            || candidateResearch?.jev?.evidence_gate?.evidence_freshness
+            || [],
+          conflict_count: Number(
+            candidateResearch?.jev?.evidence_gate?.conflict_detection?.count
+            || candidateResearch?.jev?.evidence_gate?.conflict_count
+            || 0
+          ),
+        } : null,
       }} />
       <div className="rounded-lg border border-white/10 p-3 text-sm">
         <p className="font-medium">Forecast validation threshold</p>
