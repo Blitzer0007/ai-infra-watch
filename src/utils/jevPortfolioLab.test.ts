@@ -47,10 +47,10 @@ test('charges costs on traded notional and reports cost transparently', () => {
     target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     portfolioValue: 10000, decisionAt, executionAt, costBps: 20,
   });
-  assert.equal(result.trades[0].notional, 500);
+  assert.ok(Math.abs(result.trades[0].notional - 500) < 1e-8);
   assert.equal(result.totalCost, 1);
 });
 
 test('net returns deduct transaction costs', () => {
-  assert.equal(netReturnPct(10, 5000, 10000, 20), 9);
+  assert.equal(netReturnPct(10, 5000, 10000, 20), 9.9);
 });
