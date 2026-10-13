@@ -412,6 +412,515 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
   return lines.join('\n');
 }
 
+
+const PORTFOLIO_RETURN_THRESHOLDS = [25, 30];
+
+function returnAlertText(threshold, review) {
+  const portfolio = review.portfolio || {};
+  const lines = [
+    threshold >= 30
+      ? '🚨 AI Infra Watch · Portfolio Return Milestone'
+      : '📈 AI Infra Watch · Portfolio Return Milestone',
+    '',
+    'Portfolio return crossed +' + threshold + '%',
+    'Cash-flow-aware return: ' + Number(review.returnPct).toFixed(2) + '%',
+    'Current portfolio value: ' + signedMoney(Number(portfolio.currentValue)),
+    'Portfolio P&L vs net contributions: ' + signedMoney(Number(portfolio.cashFlowPnl)),
+    'Net contributions: ' + signedMoney(Number(portfolio.netContributed)),
+    'Quote coverage: ' + String(portfolio.quoteCoverage?.status || 'unknown') +
+      (portfolio.quoteCoverage?.missingQuotes ? ' · ' + portfolio.quoteCoverage.missingQuotes + ' missing' : ''),
+    '',
+    'REVIEW BEFORE ACTING',
+  ];
+
+  const actions = Array.isArray(review.actionItems) ? review.actionItems.slice(0, 3) : [];
+  const urgent = actions.filter(item => String(item.severity || '').toUpperCase() === 'ACT');
+  const watch = actions.filter(item => String(item.severity || '').toUpperCase() === 'WATCH');
+  if (urgent.length) {
+    lines.push('Saved-rule priorities:');
+    urgent.forEach(item => lines.push('• [ACT] ' + item.symbol + ' — ' + item.title + ': ' + item.detail));
+  } else if (watch.length) {
+    lines.push('Saved rules to watch:');
+    watch.forEach(item => lines.push('• [WATCH] ' + item.symbol + ' — ' + item.title + ': ' + item.detail));
+  } else if (review.actionItemsAvailable) {
+    lines.push('No ACT/WATCH item was returned by the current decision scan.');
+  } else {
+    lines.push('Saved-rule status unavailable; check Decision Center before changing positions.');
+  }
+
+  const rules = review.rules || {};
+  lines.push(
+    'Rule check: ' + (rules.total ?? '—') + ' evaluated · ' +
+      (rules.breached ?? '—') + ' breached · ' + (rules.near ?? '—') + ' near · ' +
+      (rules.noRule ?? '—') + ' without rules',
+    'Top-3 concentration: ' + (portfolio.concentrationTop3Pct == null ? '—' : Number(portfolio.concentrationTop3Pct).toFixed(1) + '%'),
+    'Illustrative portfolio stress: ' + (portfolio.scenarioShockTotal == null ? '—' : signedMoney(Number(portfolio.scenarioShockTotal))),
+  );
+
+  const benchmark = review.benchmark || {};
+  for (const symbol of ['SPY', 'SOXX']) {
+    const result = benchmark[symbol];
+    if (result?.pnl != null && portfolio.cashFlowPnl != null && result?.coverage?.status !== 'partial') {
+      const excess = Number(portfolio.cashFlowPnl) - Number(result.pnl);
+      lines.push('Same-cash comparison vs ' + symbol + ': ' + (excess >= 0 ? '+' : '') + '
+  const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
+  const rows = await Promise.all(holdings.map(async holding => {
+    const symbol = String(holding.symbol).trim().toUpperCase();
+    const quantity = Number(holding.quantity);
+    const cost = Number(holding.average_cost);
+    try {
+      const q = await quote(symbol);
+      const value = q.price * quantity;
+      const pnl = (q.price - cost) * quantity;
+      return {
+        symbol,
+        price: q.price,
+        quantity,
+        averageCost: cost,
+        value,
+        pnl,
+        pnlPct: cost ? (q.price / cost - 1) * 100 : 0,
+        changePct: q.changePct,
+        quoteStatus: 'fresh',
+      };
+    } catch (error) {
+      return {
+        symbol,
+        price: null,
+        quantity,
+        averageCost: cost,
+        value: 0,
+        pnl: null,
+        pnlPct: null,
+        changePct: null,
+        quoteStatus: 'unavailable',
+        error: error instanceof Error ? error.message : 'quote unavailable',
+      };
+    }
+  }));
+
+  const valid = rows.filter(row => row.quoteStatus === 'fresh' && row.value > 0);
+  const unavailable = rows.filter(row => row.quoteStatus !== 'fresh');
+  const totalValue = valid.reduce((sum, row) => sum + row.value, 0);
+  const totalCost = valid.reduce((sum, row) => sum + row.averageCost * row.quantity, 0);
+  const totalPnl = valid.reduce((sum, row) => sum + row.pnl, 0);
+  const totalPnlPct = totalCost ? (totalValue / totalCost - 1) * 100 : null;
+  const dailyMoves = valid.filter(row => row.changePct != null).map(row => row.changePct);
+  const breadthPositive = dailyMoves.filter(value => value > 0).length;
+  const breadthTotal = dailyMoves.length;
+  const breadthPct = breadthTotal ? (breadthPositive / breadthTotal) * 100 : null;
+  const avgDailyMove = dailyMoves.length ? dailyMoves.reduce((sum, value) => sum + value, 0) / dailyMoves.length : null;
+  const sortedByValue = [...valid].sort((a, b) => b.value - a.value);
+  const largest = sortedByValue[0] || null;
+  const top3Value = sortedByValue.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
+  const top3Pct = totalValue ? (top3Value / totalValue) * 100 : null;
+  const effectiveHoldings = calculateEffectiveHoldings(valid);
+  const gainers = [...valid].filter(row => row.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 3);
+  const decliners = [...valid].filter(row => row.changePct < 0).sort((a, b) => a.changePct - b.changePct).slice(0, 3);
+  const pnlContributors = [...valid].sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)).slice(0, 5);
+  const attention = [...valid]
+    .filter(row => (row.changePct != null && row.changePct <= -3) || (row.pnl < 0 && row.changePct != null && row.changePct < 0))
+    .sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0))
+    .slice(0, 5);
+
+  const macroHigh = MACRO_RISKS.filter(item => item.level === 'HIGH').length;
+  const macroMedium = MACRO_RISKS.filter(item => item.level === 'MEDIUM').length;
+  const macroLoad = Math.min(30, macroHigh * 12 + macroMedium * 6);
+  const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const date = localDate;
+
+  const decisionResult = await fetchDecisionCenter();
+  const decision = decisionResult.decision;
+  const isSunday = new Intl.DateTimeFormat('en-US', { timeZone: process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata', weekday: 'short' }).format(new Date()) === 'Sun';
+  const weekly = isSunday && decisionJournal?.getWeeklyDecisionReview
+    ? await decisionJournal.getWeeklyDecisionReview().catch(() => null)
+    : null;
+
+  if (decision) {
+    return {
+      date: localDate,
+      text: buildDecisionFirstText(decision, localDate, weekly, decisionResult.error),
+      rows,
+      totalValue,
+      totalPnl,
+      totalPnlPct,
+      breadthPct,
+      avgDailyMove,
+      largestHolding: largest?.symbol || null,
+      top3ConcentrationPct: top3Pct,
+      effectiveHoldings,
+      macroLoad,
+      macroHigh,
+      macroMedium,
+      attention: (decision.actionItems || []).slice(0, 3).map(item => item.symbol),
+      quoteCoverage: { fresh: valid.length, total: rows.length, unavailable: unavailable.length },
+      decisionFirst: true,
+      decisionLayerStatus: decisionResult.error ? 'degraded' : 'available',
+      decisionLayerError: decisionResult.error || null,
+      earningsStatus: decision?.earningsStatus || null,
+      earningsError: decision?.earningsError || null,
+      returnReview: (() => {
+        const portfolio = decision?.portfolio || {};
+        const netContributed = Number(portfolio.netContributed);
+        const cashFlowPnl = Number(portfolio.cashFlowPnl);
+        const returnPct = Number.isFinite(netContributed) && netContributed > 0 && Number.isFinite(cashFlowPnl)
+          ? cashFlowPnl / netContributed * 100
+          : null;
+        return {
+          returnPct,
+          portfolio,
+          actionItems: Array.isArray(decision?.actionItems) ? decision.actionItems : [],
+          actionItemsAvailable: Array.isArray(decision?.actionItems),
+          rules: decision?.rules || {},
+          benchmark: decision?.benchmark || {},
+          earnings: Array.isArray(decision?.earnings) ? decision.earnings : [],
+          earningsStatus: decision?.earningsStatus || null,
+          earningsError: decision?.earningsError || null,
+          forecast: decision?.forecast || {},
+          signalGate: decision?.signalGate || {},
+        };
+      })(),
+    };
+  }
+
+  const lines = [
+    'AI Infra Watch — Daily Intelligence Brief',
+    date,
+    '',
+    'PORTFOLIO',
+    'Value: $' + totalValue.toFixed(2),
+    'Unrealized P&L: ' + signedMoney(totalPnl) + (totalPnlPct == null ? '' : ' · ' + signedPct(totalPnlPct)),
+    'Breadth: ' + (breadthPct == null ? '—' : breadthPct.toFixed(0) + '% positive') + (avgDailyMove == null ? '' : ' · Avg daily move ' + signedPct(avgDailyMove)),
+    'Quote coverage: ' + valid.length + '/' + rows.length + ' fresh' + (unavailable.length ? ' · ' + unavailable.length + ' unavailable' : ''),
+    '',
+    'EXPOSURE',
+    'Largest holding: ' + (largest ? largest.symbol + ' · ' + (largest.value / totalValue * 100).toFixed(1) + '%' : '—'),
+    'Top 3 concentration: ' + (top3Pct == null ? '—' : top3Pct.toFixed(1) + '%'),
+    'Diversification equivalent: ' + (effectiveHoldings == null ? '—' : effectiveHoldings.toFixed(1) + ' effective positions'),
+    '',
+    'DAILY LEADERS',
+    'Gainers:' + (gainers.length ? ' ' + gainers.map(row => row.symbol + ' ' + signedPct(row.changePct)).join(' · ') : ' none'),
+    'Decliners:' + (decliners.length ? ' ' + decliners.map(row => row.symbol + ' ' + signedPct(row.changePct)).join(' · ') : ' none'),
+    '',
+    'P&L CONTRIBUTORS',
+    ...pnlContributors.map(row => row.symbol + ': ' + signedMoney(row.pnl) + ' · ' + signedPct(row.pnlPct)),
+    '',
+    'MACRO RISK MAP',
+    'Load: ' + macroLoad + '/30 · ' + macroHigh + ' high · ' + macroMedium + ' medium · capped at 30',
+    'Themes: ' + MACRO_RISKS.map(item => item.title).join(' · '),
+    '',
+    'ATTENTION',
+    ...(attention.length
+      ? attention.map(row => row.symbol + ': daily ' + signedPct(row.changePct) + ' · P&L ' + signedMoney(row.pnl))
+      : ['No holding met the current daily attention threshold.']),
+    ...(unavailable.length ? ['', 'QUOTE UNAVAILABLE', ...unavailable.map(row => row.symbol + ': quote unavailable; excluded from totals and P&L.') ] : []),
+    '',
+    'Per-holding snapshot',
+    ...rows.map(row => row.quoteStatus === 'fresh'
+      ? row.symbol + ': $' + row.price.toFixed(2) + ' · ' + signedPct(row.changePct) + ' · P&L ' + signedMoney(row.pnl)
+      : row.symbol + ': quote unavailable'),
+    '',
+    'Measurement only — no trading instructions. Macro risk map is deterministic; it is not a live event score.'
+  ];
+
+  return {
+    date,
+    text: lines.join('\n'),
+    rows,
+    totalValue,
+    totalPnl,
+    totalPnlPct,
+    breadthPct,
+    avgDailyMove,
+    largestHolding: largest?.symbol || null,
+    top3ConcentrationPct: top3Pct,
+    effectiveHoldings,
+    macroLoad,
+    macroHigh,
+    macroMedium,
+    attention: attention.map(row => row.symbol),
+    quoteCoverage: { fresh: valid.length, total: rows.length, unavailable: unavailable.length },
+    decisionLayerStatus: 'unavailable',
+    decisionLayerError: decisionResult.error || 'Decision center unavailable',
+  };
+}
+async function deliver(digest, channels) {
+  const delivered = [];
+  const errors = [];
+
+  const webhookUrl = process.env.PORTFOLIO_DIGEST_WEBHOOK_URL;
+  if ((channels.includes('webhook') || (!channels.length && webhookUrl)) && webhookUrl) {
+    try {
+      const response = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'ai-infra-watch', type: 'portfolio_daily_digest', ...digest }) });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      delivered.push('webhook');
+    } catch (error) { errors.push('webhook: ' + (error instanceof Error ? error.message : 'delivery failed')); }
+  }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if ((channels.includes('telegram') || (!channels.length && botToken && chatId)) && botToken && chatId) {
+    try {
+      const dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
+      const actions = Array.isArray(digest?.decision?.actionItems) ? digest.decision.actionItems.slice(0, 3) : [];
+      const inlineKeyboard = [];
+      for (const item of actions) {
+        const symbol = String(item?.symbol || '').trim().toUpperCase();
+        if (!symbol) continue;
+        inlineKeyboard.push([
+          { text: 'Review ' + symbol, url: dashboardBase + '/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) },
+          { text: 'Journal ' + symbol, url: dashboardBase + '/overview' },
+        ]);
+      }
+      inlineKeyboard.push([
+        { text: 'Open Decision Center', url: dashboardBase + '/overview' },
+        { text: 'Open Watchlist', url: dashboardBase + '/watchlist' },
+      ]);
+      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        chat_id: chatId,
+        text: digest.text,
+        reply_markup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
+        disable_web_page_preview: true,
+      }) });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      delivered.push('telegram');
+    } catch (error) { errors.push('telegram: ' + (error instanceof Error ? error.message : 'delivery failed')); }
+  }
+
+  const resendKey = process.env.RESEND_API_KEY;
+  const emailTo = process.env.PORTFOLIO_DIGEST_EMAIL;
+  if ((channels.includes('email') || (!channels.length && resendKey && emailTo)) && resendKey && emailTo) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + resendKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: process.env.PORTFOLIO_DIGEST_FROM || 'AI Infra Watch <onboarding@resend.dev>', to: [emailTo], subject: 'AI Infra Watch — Daily Portfolio Summary ' + digest.date, text: digest.text }),
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      delivered.push('email');
+    } catch (error) { errors.push('email: ' + (error instanceof Error ? error.message : 'delivery failed')); }
+  }
+
+  return { delivered, errors };
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!await authorize(req, res)) return;
+
+  try {
+    if (req.method !== 'POST' && req.method !== 'GET') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const cron = await isCron(req);
+    const slotKey = cron ? digestSlotKey(req) : null;
+
+    if (cron && !await claimDigestSlot(slotKey)) {
+      return res.status(200).json({
+        ok: true,
+        skipped: true,
+        reason: 'digest slot already completed or another scheduler is running it',
+        slotKey,
+      });
+    }
+
+    try {
+      const decisionJournal = await loadDecisionJournal();
+      if (cron && decisionJournal?.reviewDueDecisionJournal) {
+        await decisionJournal.reviewDueDecisionJournal().catch(error => console.error('decision journal review failed:', error));
+      }
+
+      const digest = await buildDigest(decisionJournal);
+
+      if (req.method === 'GET' && !cron) {
+        return res.status(200).json({ ...digest, delivery: { configured: false, previewOnly: true } });
+      }
+
+      // Portfolio milestone alerts run only from the authenticated scheduled path,
+      // never from browser previews. Threshold state is persisted after successful
+      // Telegram delivery to avoid both duplicate alerts and lost retries.
+      let returnAlerts = { evaluated: false, reason: 'not a scheduled run', triggered: [], sent: 0, errors: [] };
+      if (cron) {
+        try {
+          returnAlerts = await evaluatePortfolioReturnAlerts(digest);
+        } catch (error) {
+          returnAlerts = {
+            evaluated: false,
+            reason: 'portfolio return alert evaluation failed',
+            triggered: [],
+            sent: 0,
+            errors: [error instanceof Error ? error.message : String(error)],
+          };
+        }
+      }
+
+      const requested = req.method === 'POST'
+        ? String(req.body?.channels || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const delivery = await deliver(digest, requested);
+      const failed = delivery.errors.length > 0 && delivery.delivered.length === 0;
+
+      await finishDigestSlot(
+        slotKey,
+        failed ? 'failed' : 'completed',
+        { ...delivery, returnAlerts },
+        [...delivery.errors, ...returnAlerts.errors].length ? [...delivery.errors, ...returnAlerts.errors].join(' · ') : null,
+      );
+
+      return res.status(failed ? 502 : 200).json({
+        ok: true,
+        ...digest,
+        delivery,
+        returnAlerts,
+        slotKey,
+      });
+    } catch (error) {
+      await finishDigestSlot(
+        slotKey,
+        'failed',
+        {},
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Portfolio digest failed',
+    });
+  }
+}
+ + excess.toFixed(2));
+    } else {
+      lines.push('Same-cash comparison vs ' + symbol + ': unavailable/partial');
+    }
+  }
+
+  const earnings = Array.isArray(review.earnings) ? review.earnings.slice(0, 3) : [];
+  lines.push('', 'CATALYST CHECK');
+  if (review.earningsStatus && review.earningsStatus !== 'ok') {
+    lines.push('Earnings feed status: ' + review.earningsStatus + (review.earningsError ? ' · ' + review.earningsError : ''));
+  } else if (earnings.length) {
+    earnings.forEach(item => lines.push('• ' + item.symbol + ' earnings ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd') + ' · ' + item.date));
+  } else {
+    lines.push('No monitored earnings event in the next 7 days.');
+  }
+
+  const eligibleSignals = Number(review.signalGate?.eligible || 0);
+  const forecastGate = String(review.forecast?.gate || 'unknown');
+  lines.push(
+    'Evidence readiness: ' + eligibleSignals + ' validated signal families · forecast gate ' + forecastGate,
+    eligibleSignals > 0 && forecastGate === 'ready'
+      ? 'Opportunity review: inspect ticker-specific evidence and valuation before considering an add.'
+      : 'Opportunity review: no broad buy signal is established by this milestone alone; verify ticker-specific evidence first.',
+    '',
+    threshold >= 30
+      ? 'Suggested next step: review profit protection, position concentration, and saved exit rules.'
+      : 'Suggested next step: review thesis strength, concentration, and saved exit rules.',
+    'This is a review trigger, not an automatic sell/buy instruction.'
+  );
+  return lines.join('\n');
+}
+
+async function evaluatePortfolioReturnAlerts(digest) {
+  const review = digest?.returnReview;
+  if (!review || review.returnPct == null || review.portfolio?.quoteCoverage?.status !== 'complete') {
+    return {
+      evaluated: false,
+      reason: !review ? 'cash-flow-aware portfolio data unavailable' : 'portfolio quote coverage is not complete',
+      triggered: [],
+      sent: 0,
+      errors: [],
+    };
+  }
+
+  const now = new Date().toISOString();
+  const rows = await supabase(
+    'server_alert_state?select=event_key,active,last_triggered_at,metadata&event_key=in.%28%22portfolio-return%3A25%22%2C%22portfolio-return%3A30%22%29&limit=10',
+    { method: 'GET' },
+  );
+  const previous = new Map((rows || []).map(row => [String(row.event_key), row]));
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!botToken || !chatId) {
+    return { evaluated: true, returnPct: review.returnPct, triggered: [], sent: 0, errors: ['Telegram credentials are not configured; threshold state was not changed.'] };
+  }
+
+  const triggered = [];
+  const errors = [];
+  let sent = 0;
+  const stateUpdates = [];
+
+  for (const threshold of PORTFOLIO_RETURN_THRESHOLDS) {
+    const key = 'portfolio-return:' + threshold;
+    const old = previous.get(key);
+    const above = Number(review.returnPct) >= threshold;
+
+    if (!above) {
+      if (old?.active) {
+        stateUpdates.push({
+          event_key: key,
+          active: false,
+          last_seen_at: now,
+          last_triggered_at: old.last_triggered_at || null,
+          metadata: { thresholdPct: threshold, lastObservedReturnPct: Number(review.returnPct), resetAt: now },
+        });
+      }
+      continue;
+    }
+
+    if (old?.active) continue;
+
+    try {
+      const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: returnAlertText(threshold, review),
+          disable_web_page_preview: true,
+          reply_markup: { inline_keyboard: [[
+            { text: 'Review Portfolio', url: 'https://ai-infra-watch-theta.vercel.app/portfolio?portfolio_tab=holdings' },
+            { text: 'Open Decision Center', url: 'https://ai-infra-watch-theta.vercel.app/overview' },
+          ]] },
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok === false) throw new Error(String(body?.description || 'Telegram HTTP ' + response.status));
+
+      sent += 1;
+      triggered.push(threshold);
+      stateUpdates.push({
+        event_key: key,
+        active: true,
+        last_seen_at: now,
+        last_triggered_at: now,
+        metadata: {
+          thresholdPct: threshold,
+          returnPct: Number(review.returnPct),
+          currentValue: Number(review.portfolio.currentValue),
+          cashFlowPnl: Number(review.portfolio.cashFlowPnl),
+          netContributed: Number(review.portfolio.netContributed),
+          quoteCoverage: review.portfolio.quoteCoverage?.status || 'unknown',
+        },
+      });
+    } catch (error) {
+      errors.push('+' + threshold + '%: ' + (error instanceof Error ? error.message : 'Telegram delivery failed'));
+    }
+  }
+
+  if (stateUpdates.length) {
+    await supabase('server_alert_state', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(stateUpdates),
+    });
+  }
+
+  return { evaluated: true, returnPct: review.returnPct, triggered, sent, errors };
+}
+
 async function buildDigest(decisionJournal) {
   const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
   const rows = await Promise.all(holdings.map(async holding => {
