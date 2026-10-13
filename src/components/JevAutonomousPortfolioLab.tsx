@@ -305,9 +305,9 @@ export default function JevAutonomousPortfolioLab() {
       {historyCoverage && <div className="space-y-2">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {historyCoverage.results.map((item: any) => <div key={item.symbol} className="rounded-lg border border-white/10 p-3">
-            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{item.symbol}</span><span className={item.ok && !item.stale ? 'text-xs text-emerald-300' : 'text-xs text-amber-200'}>{!item.ok ? 'Unavailable' : item.stale ? 'Stale cache' : 'Available'}</span></div>
+            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{item.symbol}</span><span className={item.ok && item.adjusted && !item.stale ? 'text-xs text-emerald-300' : 'text-xs text-amber-200'}>{!item.ok ? 'Unavailable' : item.stale ? 'Stale cache' : item.adjusted ? 'Adjusted closes' : 'Raw closes only'}</span></div>
             <p className="mt-1 text-xs text-white/45">{item.source || 'No provider'}</p>
-            <p className="mt-2 text-sm">{item.pointCount} daily points</p>
+            <p className="mt-2 text-sm">{item.adjustedPointCount || 0} adjusted / {item.pointCount} daily points</p>
             <p className="text-xs text-white/40">{item.firstDate || '—'} to {item.lastDate || '—'}</p>
           </div>)}
         </div>
