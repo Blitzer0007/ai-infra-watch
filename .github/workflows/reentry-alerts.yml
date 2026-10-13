@@ -1,0 +1,41 @@
+name: Re-entry Telegram Alerts
+run-name: Re-entry scan • ${{ github.event.schedule || 'manual' }}
+on:
+  schedule:
+    - cron: '15 1 * * 1-5'
+    - cron: '15 14 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: reentry-alerts
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-slim
+    timeout-minutes: 8
+    steps:
+      - name: Request GitHub OIDC token
+        id: oidc
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body --silent --show-error --get --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" --data-urlencode "audience=ai-infra-watch" "$ACTIONS_ID_TOKEN_REQUEST_URL")
+          TOKEN=$(printf '%s' "$RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write(JSON.parse(d).value||''));")
+          test -n "$TOKEN"
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Scan sold-stock re-entry watchlist and send Telegram alerts
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          FALLBACK_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="https://ai-infra-watch-theta.vercel.app/api/reentry-alerts?run=true"
+          CODE=$(curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
+          if [ "$CODE" != "200" ] && [ -n "${FALLBACK_TOKEN:-}" ]; then
+            CODE=$(curl --silent --show-error --retry 2 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
+          fi
+          cat response.json
+          test "$CODE" = "200"
+          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.errors?.length){console.error(d.errors.join('\\n'));process.exit(1)}"

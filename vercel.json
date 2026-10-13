@@ -65,6 +65,10 @@
       "destination": "/api/cron?route=forecast-auto-track"
     },
     {
+      "source": "/api/reentry-alerts",
+      "destination": "/api/cron?route=reentry-alerts"
+    },
+    {
       "source": "/api/portfolio-digest",
       "destination": "/api/cron?route=portfolio-digest"
     },
