@@ -70,13 +70,44 @@ export default async function handler(req, res) {
   }));
 
   const allAdjusted = fetched.every(item => item.adjusted && !item.stale);
-  const prices = includePrices && allAdjusted ? fetched.flatMap(item => item.prices || []) : [];
+  let prices = [];
+  let backtestReady = false;
+  let commonRange = null;
+  let alignmentError = null;
+  if (includePrices && allAdjusted) {
+    const starts = fetched.map(item => item.firstDate).filter(Boolean).sort();
+    const ends = fetched.map(item => item.lastDate).filter(Boolean).sort();
+    const commonStart = starts.at(-1);
+    const commonEnd = ends[0];
+    if (!commonStart || !commonEnd || commonStart > commonEnd) {
+      alignmentError = 'The selected holdings and both benchmarks have no overlapping adjusted-price date range.';
+    } else {
+      commonRange = { startDate: commonStart, endDate: commonEnd };
+      const pointsBySymbol = fetched.map(item => ({
+        symbol: item.symbol,
+        points: (item.prices || []).filter(point => point.date >= commonStart && point.date <= commonEnd),
+      }));
+      const dateSets = pointsBySymbol.map(item => new Set(item.points.map(point => point.date)));
+      const baseDates = [...(dateSets[0] || [])].sort();
+      const missingDate = baseDates.find(date => dateSets.some(dates => !dates.has(date)));
+      const referenceDates = new Set(baseDates);
+      const extraDate = dateSets.some(dates => [...dates].some(date => !referenceDates.has(date)));
+      if (!baseDates.length || missingDate || extraDate || dateSets.some(dates => dates.size !== baseDates.length)) {
+        alignmentError = 'Adjusted-price histories contain non-matching trading dates inside the common range; backtest blocked rather than silently dropping gaps.';
+      } else {
+        prices = pointsBySymbol.flatMap(item => item.points);
+        backtestReady = prices.length > 0;
+      }
+    }
+  } else if (includePrices) {
+    alignmentError = 'Every selected holding and both benchmarks must have fresh adjusted-close history.';
+  }
   return res.status(200).json({
     ok: fetched.some(item => item.ok),
     range,
     fetchedAt: new Date().toISOString(),
     results: fetched.map(({ prices: _prices, ...item }) => item),
-    ...(includePrices ? { prices, backtestReady: allAdjusted && prices.length > 0 } : {}),
+    ...(includePrices ? { prices, backtestReady, commonRange, alignmentError } : {}),
     availabilityAssumption: 'Daily bars are treated as available after the UTC calendar day ends; this is an explicit assumption, not verified point-in-time provider provenance.',
     purpose: includePrices ? 'adjusted_close_backtest_input' : 'coverage_check_only',
   });
