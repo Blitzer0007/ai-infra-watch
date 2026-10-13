@@ -340,7 +340,18 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
   lines.push(
     '',
     'RESULT',
-    'Cash-flow P&L: ' + signedMoney(Number(portfolio.cashFlowPnl || 0)),
+    'Total trading P&L: ' + (portfolio.totalTradingPnl == null ? 'unavailable' : signedMoney(Number(portfolio.totalTradingPnl))),
+    'Realized P&L: ' + (portfolio.realizedPnl == null ? 'unavailable' : signedMoney(Number(portfolio.realizedPnl))),
+    'Unrealized P&L: ' + (portfolio.unrealizedPnl == null ? 'unavailable' : signedMoney(Number(portfolio.unrealizedPnl))),
+    'Open cost basis: ' + (portfolio.openCostBasis == null ? 'unavailable' : money(portfolio.openCostBasis)),
+    'Cumulative purchase cost: ' + (portfolio.grossPurchaseCost == null ? 'unavailable' : money(portfolio.grossPurchaseCost)),
+    'Accounting status: ' + String(portfolio.accountingStatus || 'unknown'),
+    ...(portfolio.accountingStatus === 'review-transactions'
+      ? ['DATA QUALITY · ' + Number(portfolio.derivedTransactionCount || 0) + ' transaction records use derived values; review flagged trades.']
+      : []),
+    ...(Array.isArray(portfolio.quantityMismatchSymbols) && portfolio.quantityMismatchSymbols.length
+      ? ['DATA QUALITY · transaction quantities do not reconcile for: ' + portfolio.quantityMismatchSymbols.join(', ') + '.']
+      : []),
     'Same cash in SPY: ' + (spy?.pnl == null ? 'unavailable' : signedMoney(Number(spy.pnl))) +
       (spy?.coverage?.status === 'partial' ? ' · partial coverage' : '') +
       (excessSpy == null ? '' : ' · ' + benchmarkOutcomeLabel(excessSpy, 'SPY')),
