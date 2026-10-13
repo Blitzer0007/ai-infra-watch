@@ -180,7 +180,7 @@ export default function JevAutonomousPortfolioLab() {
     const action = String(gate.action || candidateResearch?.jev?.action || '').toLowerCase();
     const evidenceStatus = !candidateResearch || candidateResearch?.ok === false
       ? 'insufficient'
-      : missing.length || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)
+      : missing.length || conflicts > 0 || availability.complete !== true || ['insufficient', 'gather_more'].includes(action)
         ? 'partial'
         : Number(gate.evidence_quality) >= 0.8 ? 'strong' : 'usable';
     const researchSnapshot = candidateResearch ? {
@@ -275,7 +275,7 @@ export default function JevAutonomousPortfolioLab() {
       {candidateResearch && <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.03] p-4 space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold">JEV candidate research result</h3>
-          <span className={candidateResearch?.jev?.evidence_gate?.action === 'insufficient' || candidateResearch?.jev?.evidence_gate?.action === 'gather_more' || candidateResearch?.ok === false ? 'rounded-full border border-amber-400/30 px-2 py-1 text-xs text-amber-200' : 'rounded-full border border-white/15 px-2 py-1 text-xs text-white/60'}>Gate: {candidateResearch?.jev?.evidence_gate?.action || candidateResearch?.jev?.action || (candidateResearch?.ok ? 'reported by agent' : 'insufficient')}</span>
+          <span className={candidateResearch?.jev?.evidence_gate?.action === 'insufficient' || candidateResearch?.jev?.evidence_gate?.action === 'gather_more' || candidateResearch?.jev?.evidence_availability?.complete !== true || candidateResearch?.ok === false ? 'rounded-full border border-amber-400/30 px-2 py-1 text-xs text-amber-200' : 'rounded-full border border-white/15 px-2 py-1 text-xs text-white/60'}>Gate: {candidateResearch?.jev?.evidence_gate?.action || candidateResearch?.jev?.action || (candidateResearch?.jev?.evidence_availability?.complete === true ? 'complete' : 'insufficient')}</span>
         </div>
         <p className="text-sm text-white/70 whitespace-pre-wrap">{candidateResearch.summary || candidateResearch.error || 'The agent returned no summary.'}</p>
         {Array.isArray(candidateResearch?.jev?.evidence_availability?.missing) && candidateResearch.jev.evidence_availability.missing.length > 0 && <p className="text-xs text-amber-200">Missing evidence: {candidateResearch.jev.evidence_availability.missing.join(', ')}</p>}
