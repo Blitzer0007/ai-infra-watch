@@ -219,7 +219,48 @@ export function getHoldingReviewTransition(symbol, returnPct, actionItems = [], 
   return { trigger: !oldState?.active || String(oldState?.metadata?.signature || '') !== signature, reset: false, signature, items, earnings: upcoming };
 }
 
-function formatGroupedHoldingAlerts(events) {
+export function buildHoldingThesisContext(symbol, holding = null, actionItems = []) {
+  const thesis = String(holding?.decision_thesis || '').trim();
+  const notes = String(holding?.notes || '').trim();
+  const practicalNotes = String(holding?.practical_notes || '').trim();
+  const ownActions = (Array.isArray(actionItems) ? actionItems : [])
+    .filter(item => String(item?.symbol || '').trim().toUpperCase() === String(symbol || '').trim().toUpperCase()
+      && ['ACT', 'WATCH'].includes(String(item?.severity || '').toUpperCase()))
+    .slice(0, 2);
+  const lines = [
+    'ADD OPPORTUNITY: INSUFFICIENT EVIDENCE — no independent, evidence-backed add signal is available in this alert.',
+    'Why: a profit milestone alone does not establish attractive valuation, a valid thesis, or suitable position sizing.',
+    'Saved thesis: ' + (thesis || notes || 'not recorded for this holding.'),
+  ];
+  if (ownActions.length) {
+    lines.push('Thesis/risk evidence from Decision Center:');
+    ownActions.forEach(item => lines.push('• [' + String(item.severity).toUpperCase() + '] ' + String(item.title || 'Review signal') + ': ' + String(item.detail || 'Details unavailable.')));
+  } else {
+    lines.push('Decision evidence: no symbol-specific ACT/WATCH item was returned in this scan; this is not proof that the thesis is intact.');
+  }
+  if (practicalNotes) lines.push('Saved context: ' + practicalNotes);
+  if (holding?.loss_limit_pct != null) lines.push('Saved loss limit: ' + Number(holding.loss_limit_pct) + '%');
+  if (holding?.exit_rule_text) lines.push('Saved exit rule: ' + String(holding.exit_rule_text));
+  else if (holding?.exit_rule_type) lines.push('Saved exit rule: ' + String(holding.exit_rule_type) + (holding.exit_rule_value != null ? ' (' + String(holding.exit_rule_value) + ')' : ''));
+  if (holding?.target_allocation_pct != null) lines.push('Target portfolio weight: ' + Number(holding.target_allocation_pct) + '%');
+  if (holding?.max_allocation_pct != null) lines.push('Maximum portfolio weight: ' + Number(holding.max_allocation_pct) + '%');
+  lines.push('Next check: verify current valuation, fresh company evidence, downside risk and concentration before considering an add.');
+  return lines;
+}
+
+async function loadHoldingContexts(symbols) {
+  try {
+    const rows = await supabase('portfolio_holdings?select=symbol,decision_thesis,notes,practical_notes,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,target_allocation_pct,max_allocation_pct');
+    const wanted = new Set((symbols || []).map(symbol => String(symbol).trim().toUpperCase()));
+    return Object.fromEntries((Array.isArray(rows) ? rows : [])
+      .filter(row => wanted.has(String(row.symbol || '').trim().toUpperCase()))
+      .map(row => [String(row.symbol).trim().toUpperCase(), row]));
+  } catch {
+    return {};
+  }
+}
+
+function formatGroupedHoldingAlerts(events, holdingContexts = {}, actionItems = []) {
   const bySymbol = new Map();
   for (const event of events) {
     const symbol = String(event.symbol || '').toUpperCase();
@@ -244,7 +285,8 @@ function formatGroupedHoldingAlerts(events) {
       lines.push('Avg buy ' + money(row.averageCost) + ' · quote ' + money(row.price) + ' · open cost ' + money(row.openCostBasis) + ' · unrealized ' + signedMoney(row.pnl) + ' · realized ' + signedMoney(Number(row.realizedPnl || 0)));
       if (Number(row.positionReview || 0) > 0) lines.push('Cost-basis note: ' + Number(row.positionReview) + ' transaction(s) use derived values; verify broker records.');
     }
-    lines.push('Review the saved thesis, exit rules, valuation and concentration before acting.');
+    lines.push(...buildHoldingThesisContext(symbol, holdingContexts[symbol] || null, actionItems));
+    lines.push('Review alert only — no automatic buy/sell instruction.');
   }
   const maxLength = 3900;
   if (lines.join('\n').length > maxLength) {
@@ -327,8 +369,9 @@ export async function evaluatePortfolioHoldingReturnAlerts(digest) {
   }
 
   if (events.length) {
-    const text = formatGroupedHoldingAlerts(events), dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
     const symbols = [...new Set(events.map(event => event.symbol))];
+    const holdingContexts = await loadHoldingContexts(symbols);
+    const text = formatGroupedHoldingAlerts(events, holdingContexts, actionItems), dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
     const keyboard = symbols.slice(0, 4).map(symbol => [{ text: 'Review ' + symbol, url: dashboardBase + '/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) }]);
     keyboard.push([{ text: 'Open Decision Center', url: dashboardBase + '/overview' }]);
     try {
