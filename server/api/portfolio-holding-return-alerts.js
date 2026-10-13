@@ -63,9 +63,13 @@ function formatHoldingAlert(row, threshold, digest) {
     'Latest quote: ' + money(price),
     'Shares still held: ' + quantity.toFixed(8).replace(/0+$/, '').replace(/\.$/, ''),
     'Open cost basis: ' + money(averageCost * quantity),
-    'Unrealized P&L: ' + signedMoney(pnl) + ' · before untracked fees/taxes',
+    'Unrealized P&L: ' + signedMoney(pnl) + ' · includes recorded trade costs',
     'Current position value: ' + money(value),
     'Portfolio weight: ' + (weightPct == null ? 'unavailable · quote coverage incomplete' : weightPct.toFixed(2) + '%'),
+    'Realized P&L from earlier partial sales: ' + signedMoney(Number(row.realizedPnl || 0)),
+    ...(Number(row.positionReview || 0) > 0
+      ? ['COST-BASIS QUALITY · ' + Number(row.positionReview) + ' transaction(s) use derived values; verify the broker history.']
+      : []),
     '',
     'REVIEW BEFORE ACTING',
   ];
@@ -115,18 +119,123 @@ async function supabase(path, options = {}) {
   return body ? JSON.parse(body) : null;
 }
 
+export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []) {
+  const ordered = [...transactionRows].sort((a, b) =>
+    String(a.trade_date || '').localeCompare(String(b.trade_date || '')) ||
+    Number(a.source_row || 0) - Number(b.source_row || 0)
+  );
+  const inventory = new Map();
+  for (const tx of ordered) {
+    const symbol = String(tx.symbol || '').trim().toUpperCase();
+    const quantity = Number(tx.quantity);
+    const amount = Number(tx.amount);
+    const brokerage = Math.max(0, Number(tx.brokerage) || 0);
+    if (!symbol || !(quantity > 0) || !(amount > 0) || !['BUY', 'SELL'].includes(tx.transaction_type)) {
+      if (symbol) inventory.set(symbol, { ...(inventory.get(symbol) || {}), invalid: true });
+      continue;
+    }
+
+    const position = inventory.get(symbol) || {
+      quantity: 0,
+      costBasis: 0,
+      realizedPnl: 0,
+      derivedCount: 0,
+      currencies: new Set(),
+      invalid: false,
+    };
+    position.currencies.add(String(tx.currency || 'USD').trim().toUpperCase());
+    if (tx.quantity_derived || tx.price_derived) position.derivedCount++;
+
+    if (tx.transaction_type === 'BUY') {
+      position.quantity += quantity;
+      position.costBasis += amount + brokerage;
+    } else {
+      const tolerance = Math.max(0.00001, Math.abs(position.quantity) * 0.0001);
+      if (position.quantity <= 0 || position.quantity + tolerance < quantity) {
+        position.invalid = true;
+      } else {
+        const averageCost = position.costBasis / position.quantity;
+        const proceeds = Math.max(0, amount - brokerage);
+        position.realizedPnl += proceeds - averageCost * quantity;
+        position.quantity -= quantity;
+        position.costBasis -= averageCost * quantity;
+        if (position.quantity <= tolerance) {
+          position.quantity = 0;
+          position.costBasis = 0;
+        }
+      }
+    }
+    inventory.set(symbol, position);
+  }
+
+  const holdingsBySymbol = new Map();
+  for (const row of holdings) {
+    const symbol = String(row.symbol || '').trim().toUpperCase();
+    holdingsBySymbol.set(symbol, (holdingsBySymbol.get(symbol) || 0) + Number(row.quantity || 0));
+  }
+
+  const result = new Map();
+  for (const [symbol, position] of inventory.entries()) {
+    const expected = holdingsBySymbol.get(symbol) || 0;
+    const tolerance = Math.max(0.00001, Math.abs(expected) * 0.0001);
+    const quantityMismatch = Math.abs(position.quantity - expected) > tolerance;
+    const currencyMismatch = position.currencies.size !== 1;
+    const valid = !position.invalid && !quantityMismatch && !currencyMismatch && position.quantity > 0 && position.costBasis > 0;
+    result.set(symbol, {
+      quantity: position.quantity,
+      openCostBasis: position.costBasis,
+      averageCost: position.quantity > 0 ? position.costBasis / position.quantity : null,
+      realizedPnl: position.realizedPnl,
+      derivedCount: position.derivedCount,
+      valid,
+      quantityMismatch,
+      currencyMismatch,
+      invalidSequence: position.invalid,
+    });
+  }
+  return result;
+}
+
 export async function evaluatePortfolioHoldingReturnAlerts(digest) {
   const rows = Array.isArray(digest?.rows) ? digest.rows : [];
-  const eligible = rows.filter(row =>
-    String(row?.quoteStatus || '') === 'fresh' &&
-    String(row?.symbol || '').trim() &&
-    Number(row?.quantity) > 0 &&
-    Number(row?.averageCost) > 0 &&
-    Number.isFinite(Number(row?.pnlPct)) &&
-    Number.isFinite(Number(row?.price))
-  );
+  let transactionRows = [];
+  try {
+    transactionRows = await supabase(
+      'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc'
+    ) || [];
+  } catch (error) {
+    return { evaluated: false, reason: 'transaction ledger unavailable; refusing to estimate holding return from stored average-cost snapshots', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [error instanceof Error ? error.message : String(error)] };
+  }
+
+  const ledger = deriveHoldingLedgerCostBasis(transactionRows, rows);
+  const eligible = rows.flatMap(row => {
+    const symbol = String(row?.symbol || '').trim().toUpperCase();
+    const position = ledger.get(symbol);
+    if (
+      String(row?.quoteStatus || '') !== 'fresh' ||
+      !symbol ||
+      !(Number(row?.quantity) > 0) ||
+      !(Number(row?.price) > 0) ||
+      !position?.valid ||
+      Math.abs(Number(row.quantity) - Number(position.quantity)) > Math.max(0.00001, Math.abs(Number(row.quantity)) * 0.0001)
+    ) return [];
+    const averageCost = Number(position.averageCost);
+    if (!(averageCost > 0)) return [];
+    const value = Number(row.price) * Number(row.quantity);
+    const openCostBasis = Number(position.openCostBasis);
+    return [{
+      ...row,
+      symbol,
+      averageCost,
+      openCostBasis,
+      pnl: value - openCostBasis,
+      pnlPct: (Number(row.price) / averageCost - 1) * 100,
+      realizedPnl: Number(position.realizedPnl || 0),
+      positionReview: Number(position.derivedCount || 0),
+    }];
+  });
   if (!eligible.length) {
-    return { evaluated: false, reason: 'no eligible fresh holding quotes or average costs', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [] };
+    return { evaluated: false, reason: 'no fresh, ledger-reconciled holdings with reliable cost basis', evaluatedHoldings: 0, triggered: [], sent: 0, errors: [] };
   }
 
   const keys = eligible.flatMap(row => THRESHOLDS.map(threshold => holdingStateKey(row.symbol, threshold)));
