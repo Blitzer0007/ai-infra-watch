@@ -102,6 +102,19 @@ async function supabase(path, options = {}) {
   return body ? JSON.parse(body) : null;
 }
 
+export function getReturnThresholdTransitions(returnPct, states = new Map()) {
+  const value = Number(returnPct);
+  if (!Number.isFinite(value)) return { trigger: [], reset: [] };
+  const trigger = [];
+  const reset = [];
+  for (const threshold of THRESHOLDS) {
+    const old = states.get('portfolio-return:' + threshold);
+    if (value >= threshold && !old?.active) trigger.push(threshold);
+    if (value < threshold && old?.active) reset.push(threshold);
+  }
+  return { trigger, reset };
+}
+
 export async function evaluatePortfolioReturnAlerts(digest) {
   const review = digest?.returnReview;
   if (!review || !Number.isFinite(Number(review.returnPct)) || review.portfolio?.quoteCoverage?.status !== 'complete') {
@@ -125,6 +138,7 @@ export async function evaluatePortfolioReturnAlerts(digest) {
   }
 
   const timestamp = new Date().toISOString();
+  const transitions = getReturnThresholdTransitions(review.returnPct, previous);
   const updates = [];
   const triggered = [];
   const errors = [];
@@ -134,7 +148,7 @@ export async function evaluatePortfolioReturnAlerts(digest) {
     const key = 'portfolio-return:' + threshold;
     const old = previous.get(key);
     if (Number(review.returnPct) < threshold) {
-      if (old?.active) updates.push({
+      if (transitions.reset.includes(threshold)) updates.push({
         event_key: key,
         active: false,
         last_seen_at: timestamp,
@@ -143,7 +157,7 @@ export async function evaluatePortfolioReturnAlerts(digest) {
       });
       continue;
     }
-    if (old?.active) continue;
+    if (!transitions.trigger.includes(threshold)) continue;
 
     try {
       const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
