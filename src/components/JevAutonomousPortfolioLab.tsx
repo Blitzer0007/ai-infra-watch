@@ -137,7 +137,7 @@ export default function JevAutonomousPortfolioLab() {
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
       const conflicts = Number(gate?.conflict_detection?.count || gate?.conflict_count || 0);
       const action = String(gate.action || body?.jev?.action || '').toLowerCase();
-      if (body?.ok === false || availability.complete !== true || missing.length > 0 || conflicts > 0 || ['insufficient', 'gather_more', 'continue'].includes(action)) {
+      if (body?.ok === false || availability.complete !== true || missing.length > 0 || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)) {
         const diagnostic = describeJevEvidenceGap(availability, gate, action);
         const dedupeKey = 'jev-evidence-review:' + [...selected].sort().join('-') + ':' + (action || 'insufficient') + ':' + diagnostic.dedupeSuffix;
         void authFetch('/api/alert-notify', {
