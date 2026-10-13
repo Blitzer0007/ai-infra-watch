@@ -429,10 +429,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     portfolioTransactions,
     allQuotesFresh,
   ), [analyses, portfolioTransactions, allQuotesFresh]);
+  const accountingUnrealized = tradePerformance.unrealizedPnl ?? liveUnrealized;
+  const accountingUnrealizedPct = tradePerformance.unrealizedPnl != null && tradePerformance.openCostBasis != null && tradePerformance.openCostBasis > 0
+    ? tradePerformance.unrealizedPnl / tradePerformance.openCostBasis * 100
+    : liveUnrealizedPct;
   const accountingNote = tradePerformance.status === 'complete'
-    ? 'Ledger reconciled'
+    ? 'Trade ledger reconciled'
     : tradePerformance.status === 'review-transactions'
-      ? 'Some trade values are derived · verify flagged records'
+      ? (tradePerformance.reviewTransactionCount || tradePerformance.derivedTransactionCount) + ' trade records flagged · verify values'
       : tradePerformance.status === 'quantity-mismatch'
         ? 'Trade quantities do not reconcile · total P&L withheld'
         : tradePerformance.status === 'mixed-currency'
@@ -794,9 +798,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               )}
       {tab === 'overview' && (
               <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-7 gap-3" id="portfolio-investment-summary">
-                <Metric label="Open cost basis" value={formatPortfolioMoney(investedTotal)} suffix="Cost of shares still held" tone="neutral" icon={<WalletCards/>}/>
+                <Metric label="Open cost basis" value={formatPortfolioMoney(tradePerformance.openCostBasis ?? investedTotal)} suffix="Remaining share cost · trade-ledger basis" tone="neutral" icon={<WalletCards/>}/>
                 <Metric label="Holdings value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh quotes'} tone="up" icon={<TrendingUp/>}/>
-                <Metric label="Unrealized P&L" value={liveUnrealized != null ? (liveUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(liveUnrealized)) : '—'} suffix={(liveUnrealizedPct != null ? liveUnrealizedPct.toFixed(2) + '% on open cost' : '') + (stalePositions.length ? ' · quotes need review' : '')} tone={liveUnrealized != null && liveUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
+                <Metric label="Unrealized P&L" value={accountingUnrealized != null ? (accountingUnrealized >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(accountingUnrealized)) : '—'} suffix={(accountingUnrealizedPct != null ? accountingUnrealizedPct.toFixed(2) + '% on open cost' : '') + (stalePositions.length ? ' · quotes need review' : '')} tone={accountingUnrealized != null && accountingUnrealized >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
                 <Metric label="Realized P&L" value={tradePerformance.realizedPnl != null ? (tradePerformance.realizedPnl >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(tradePerformance.realizedPnl)) : '—'} suffix="Closed-trade profit / loss" tone={tradePerformance.realizedPnl != null && tradePerformance.realizedPnl >= 0 ? 'up' : 'down'} icon={<TrendingUp/>}/>
                 <Metric label="Total trading P&L" value={tradePerformance.totalTradingPnl != null ? (tradePerformance.totalTradingPnl >= 0 ? '+' : '−') + formatPortfolioMoney(Math.abs(tradePerformance.totalTradingPnl)) : '—'} suffix={accountingNote + ' · excludes untracked cash'} tone={tradePerformance.totalTradingPnl != null && tradePerformance.totalTradingPnl >= 0 ? 'up' : 'down'} icon={<Activity/>}/>
                 <Metric label="AI infrastructure strength" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
