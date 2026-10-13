@@ -71,7 +71,7 @@ function history(): HistoricalPrice[] {
 
 test('historical backtest compares strategy with both benchmarks and applies costs', () => {
   const result = runHistoricalPaperBacktest({
-    prices: history(), target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }],
+    prices: history(), target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, costBps: 10, minimumObservations: 50,
   });
   assert.equal(result.startDate, '2026-01-01');
@@ -86,7 +86,7 @@ test('historical backtest compares strategy with both benchmarks and applies cos
 
 test('historical backtest rejects data unavailable at the decision cutoff', () => {
   assert.throws(() => runHistoricalPaperBacktest({
-    prices: history(), target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }],
+    prices: history(), target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000,
     decisionCutoffByDate: { '2026-01-08': '2026-01-08T21:00:00Z' },
   }), /Look-ahead data rejected/);
@@ -96,13 +96,37 @@ test('historical backtest rejects duplicate symbol/date rows', () => {
   const prices = history();
   prices.push({ ...prices[0] });
   assert.throws(() => runHistoricalPaperBacktest({
-    prices, target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }], startCapital: 10000,
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
   }), /Duplicate historical price/);
 });
 
 test('historical backtest requires common dates for portfolio and both benchmarks', () => {
   assert.throws(() => runHistoricalPaperBacktest({
     prices: history().filter(row => !(row.symbol === 'QQQ' && row.date === '2026-01-08')),
-    target: [{ symbol: 'MSFT', weight: 0.5, sector: 'software' }], startCapital: 10000,
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
   }), /common dates for portfolio and both benchmarks/);
+});
+
+test('historical backtest enforces the same position, sector, and cash guardrails as paper proposals', () => {
+  const prices = history();
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.2, sector: 'software' }], startCapital: 10000,
+  }), /position limit/i);
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices, target: [
+      { symbol: 'MSFT', weight: 0.15, sector: 'software' },
+      { symbol: 'TEAM', weight: 0.15, sector: 'software' },
+      { symbol: 'NOW', weight: 0.10, sector: 'software' },
+    ], startCapital: 10000,
+  }), /sector concentration/i);
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices, target: [
+      { symbol: 'MSFT', weight: 0.15, sector: 'software' },
+      { symbol: 'META', weight: 0.15, sector: 'internet' },
+      { symbol: 'NVDA', weight: 0.15, sector: 'semiconductors' },
+      { symbol: 'NOW', weight: 0.15, sector: 'platforms' },
+      { symbol: 'TEAM', weight: 0.15, sector: 'collaboration' },
+      { symbol: 'GOOGL', weight: 0.10, sector: 'search' },
+    ], startCapital: 10000,
+  }), /minimum cash reserve/i);
 });
