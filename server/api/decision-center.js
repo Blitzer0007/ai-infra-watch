@@ -199,6 +199,7 @@ function calculateActualPortfolio(holdings, transactionRows, quotes, histories =
     derivedTransactionCount,
     quoteCoverage,
   };
+}
 
 function sortedHistoryPoints(history) {
   return Array.isArray(history?.points)
