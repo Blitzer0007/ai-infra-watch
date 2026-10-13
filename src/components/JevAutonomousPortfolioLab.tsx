@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Activity, ShieldCheck, Clock3, CircleDollarSign, RefreshCw } from 'lucide-react';
 import { buildPaperRebalance, PAPER_LAB_DEFAULTS, type PaperHolding } from '../utils/jevPortfolioLab';
 import JevDecisionPanel from './JevDecisionPanel';
@@ -19,6 +19,30 @@ export default function JevAutonomousPortfolioLab() {
   const [selected, setSelected] = useState<string[]>(['MSFT', 'META', 'NOW', 'NVDA']);
   const [review, setReview] = useState<string | null>(null);
   const [message, setMessage] = useState('No paper rebalance has been approved yet.');
+  const [historyCoverage, setHistoryCoverage] = useState<any>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const selectedKey = selected.join(',');
+
+  const loadHistoryCoverage = async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const symbols = [...new Set([...selected, 'SPY', 'QQQ'])];
+      const response = await fetch('/api/jev-lab-history?range=2y&symbols=' + encodeURIComponent(symbols.join(',')));
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(body.results)) throw new Error(body.error || 'Could not load historical data coverage.');
+      setHistoryCoverage(body);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Could not load historical data coverage.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadHistoryCoverage();
+  }, [selectedKey]);
   const target: PaperHolding[] = useMemo(() => selected.map(symbol => {
     const item = candidates.find(candidate => candidate.symbol === symbol)!;
     return { symbol, sector: item.sector, weight: Math.min(0.15, 0.6 / Math.max(selected.length, 1)) };
@@ -77,6 +101,27 @@ export default function JevAutonomousPortfolioLab() {
       <div className="rounded-lg bg-black/20 p-4 text-sm"><p>Target allocation: {target.reduce((sum, item) => sum + item.weight, 0).toLocaleString(undefined, { style: 'percent', maximumFractionDigits: 1 })}</p><p>Cash reserve: {preview ? (preview.cashWeight * 100).toFixed(1) + '%' : 'Risk controls blocked this allocation'}</p><p>Estimated transaction costs: {preview ? '$' + preview.totalCost.toFixed(2) : 'Unavailable'}</p><p className="mt-2 text-xs text-white/40">Current stage: manual paper proposal. Returns are not shown until timestamped market history and benchmark histories are wired in.</p></div>
       <button onClick={approvePaperReview} disabled={!preview || selected.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40"><RefreshCw size={16}/> Save approved paper proposal</button>
       <p role="status" className="text-sm text-white/60">{message}{review ? ' Last saved: ' + new Date(review).toLocaleString() : ''}</p>
+    </section>
+    <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Historical market-data coverage</h2>
+          <p className="mt-1 text-sm text-white/50">Checks whether price history is available for your selected holdings and both benchmarks.</p>
+        </div>
+        <button type="button" onClick={() => void loadHistoryCoverage()} disabled={historyLoading} className="rounded-lg border border-white/15 px-3 py-2 text-sm disabled:opacity-50">{historyLoading ? 'Checking…' : 'Refresh coverage'}</button>
+      </div>
+      {historyError && <p role="status" className="text-sm text-amber-200">{historyError}</p>}
+      {historyCoverage && <div className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {historyCoverage.results.map((item: any) => <div key={item.symbol} className="rounded-lg border border-white/10 p-3">
+            <div className="flex items-center justify-between gap-2"><span className="font-semibold">{item.symbol}</span><span className={item.ok && !item.stale ? 'text-xs text-emerald-300' : 'text-xs text-amber-200'}>{!item.ok ? 'Unavailable' : item.stale ? 'Stale cache' : 'Available'}</span></div>
+            <p className="mt-1 text-xs text-white/45">{item.source || 'No provider'}</p>
+            <p className="mt-2 text-sm">{item.pointCount} daily points</p>
+            <p className="text-xs text-white/40">{item.firstDate || '—'} to {item.lastDate || '—'}</p>
+          </div>)}
+        </div>
+        <p className="text-xs text-white/40">Last checked: {historyCoverage.fetchedAt ? new Date(historyCoverage.fetchedAt).toLocaleString() : 'unknown'}. This is a data-coverage check only, not a verified backtest. Adjusted-price integrity and point-in-time availability must be validated before reporting historical strategy returns.</p>
+      </div>}
     </section>
     <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
       <h2 className="text-lg font-semibold">JEV review & forecast-validation guard</h2>
