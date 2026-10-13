@@ -7,6 +7,7 @@ import { authFetch } from '../utils/apiAuth';
 import { loadAlertEvents, saveAlertEvents } from '../utils/alertEngine';
 import { fetchPortfolioHoldings, StoredPortfolioHolding } from '../utils/portfolioApi';
 import EarningsAlerts from './EarningsAlerts';
+import ReentryIntelligence from './ReentryIntelligence';
 
 type LiveQuote = {
   price: number;
@@ -363,6 +364,8 @@ export default function BuySellWatchlist() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><h2 className="text-sm font-black text-white">Notifications</h2><p className="text-[10px] text-white/35 mt-1">Notification controls are centralized in Settings.</p></div><button type="button" onClick={() => { window.location.href = '/settings'; }} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase text-white/55 hover:text-white">Manage notifications <ArrowUpRight className="w-3 h-3" /></button></div>
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2"><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Browser</div><div className="text-[9px] text-white/55 mt-1">{config.browserNotifications ? 'Enabled' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Large moves</div><div className="text-[9px] text-white/55 mt-1">{config.largeMoveEnabled ? config.largeMovePct + '% threshold' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Catalysts</div><div className="text-[9px] text-white/55 mt-1">{config.catalystAlerts ? 'Enabled' : 'Off'}</div></div><div className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="text-[8px] font-mono uppercase text-white/25">Server</div><div className="text-[9px] text-emerald-300/80 mt-1"><CheckCircle2 className="inline w-3 h-3 mr-1" />Independent</div></div></div>
       </section>
+
+      <ReentryIntelligence />
 
       <EarningsAlerts />
 
