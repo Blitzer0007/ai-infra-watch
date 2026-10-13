@@ -732,11 +732,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
-                  <Info label="Weighted stress" value={weightedStress.score + '/100'} />
+                  <Info label="Portfolio stress" value={weightedStress.score + '/100'} />
                   <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
-                  <Info label="Top 3 concentration" value={top3ConcentrationPct.toFixed(1) + '%'} />
+                  <Info label="Top 3 share" value={top3ConcentrationPct.toFixed(1) + '%'} />
                   <Info label="Held positions" value={String(analyses.length)} />
-                  <Info label="Effective holdings (HHI)" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
+                  <Info label="Diversification level" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
                 </div>
                 <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
                   <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day portfolio pressure trend</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using the actual held quantities from the broker transaction history; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
@@ -1145,7 +1145,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
 
       {tab === 'network' && (
-        <Panel title="Relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
+        <Panel title="Stock relationship network" subtitle="Live first-order peer relationships from the portfolio universe — select a holding to inspect its connected names">
         {selectedAnalysis ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
@@ -1164,8 +1164,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
-                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer universe</div>
-                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from the full configured universe using transparent comparability signals.</div>
+                <div className="text-[8px] font-mono uppercase tracking-widest text-white/30">Dynamic peer set</div>
+                <div className="text-[8px] text-white/25 mt-1">Primary + core + extended peers selected from tracked stocks using transparent similarity checks.</div>
                 <div className="mt-3 space-y-2">
                   {selectedPeerSet.primary && (() => {
                     const peerSymbol = selectedPeerSet.primary.symbol;
@@ -1194,9 +1194,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </div>
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from the universe.'} icon={<Network/>}/>
+              <Insight title="Dynamic peer selection" body={(selectedPeerSet.primary ? 'Primary: ' + selectedPeerSet.primary.symbol + '. ' : 'No primary peer. ') + selectedPeerSet.core.length + ' core and ' + selectedPeerSet.extended.length + ' extended peers selected from all tracked stocks.'} icon={<Network/>}/>
               <Insight title="Relative movement" body="Peer spread is the selected holding's daily percentage move minus the connected peer's current daily move." icon={<Activity/>}/>
-              <Insight title="Transmission context" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
+              <Insight title="How group moves connect" body={selectedAnalysis.theme + ' → peer response → group breadth / relative strength. This is a monitoring relationship, not a causal claim.'} icon={<FileText/>}/>
             </div>
           </>
         ) : (
@@ -1259,7 +1259,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <div className="text-right shrink-0">
         <div className="font-black text-base">{h.livePrice != null ? '$' + h.livePrice.toFixed(2) : '—'}</div>
         <div className={'text-[10px] font-mono font-bold ' + dailyClass}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</div>
-        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'STALE QUOTE' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
+        <div className={'text-[8px] font-mono mt-1 ' + (h.livePrice != null && !h.liveStale ? 'text-emerald-300/70' : 'text-amber-300/70')}>{h.livePrice != null ? (h.liveStale ? 'QUOTE NEEDS REFRESH' : 'FRESH QUOTE') : 'QUOTE UNAVAILABLE'}</div>
       </div>
     </div>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/5">
@@ -1269,7 +1269,7 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       <MiniMetric label="Value" value={'$' + value.toFixed(2)} valueClass="text-white/85" />
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-[8px] font-mono text-white/25">
-      <span>Portfolio weight {weight.toFixed(1)}%</span>
+      <span>Portfolio share {weight.toFixed(1)}%</span>
       <span>{h.purchaseDate ? 'Bought ' + h.purchaseDate : 'Purchase date not set'}</span>
     </div>
   </button>;
@@ -1505,7 +1505,7 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:Array<PeerCounter
     .sort((a, b) => Math.abs(b.difference ?? 0) - Math.abs(a.difference ?? 0))
     .slice(0, 5);
   return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer impact</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer opportunity-cost scenario</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer comparison</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer opportunity-cost scenario</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer scenario profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Peer minus actual" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Avg peer gap" value={aggregateReturnGap == null ? '—' : (aggregateReturnGap >= 0 ? '+' : '') + aggregateReturnGap.toFixed(2) + ' pts'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
     {contributors.length > 0 && <div className="mt-3 border-t border-white/5 pt-3"><div className="text-[9px] font-mono uppercase text-white/35">Largest contributors to the difference</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">{contributors.map(item => <div key={(item.holdingSymbol || '—') + ':' + (item.peer?.symbol || '—')} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-bold">{item.holdingSymbol || 'Holding'} → {item.peer?.symbol || 'Peer'}</div><div className="text-[8px] text-white/30">Historical opportunity-cost comparison · not a forecast</div></div><div className="text-[10px] font-mono font-bold text-white/65">{(item.difference ?? 0) >= 0 ? '+' : ''}{(item.difference ?? 0).toFixed(2)}</div></div>)}</div></div>}
   </section>;
@@ -1516,7 +1516,7 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
-      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'STALE QUOTE' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'QUOTE NEEDS REFRESH' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
     <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
