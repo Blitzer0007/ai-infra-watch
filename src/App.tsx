@@ -12,10 +12,10 @@ import { fetchPortfolioHoldings } from './utils/portfolioApi';
 import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
 
-const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','quality','outlook','health','guide','settings']);
+const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
   overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
-  portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', quality: '/quality', outlook: '/outlook',
+  portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', 'jev-lab': '/jev-lab', quality: '/quality', outlook: '/outlook',
   health: '/health', guide: '/guide', settings: '/settings'
 };
 function viewFromPath(pathname: string) {
@@ -35,6 +35,7 @@ import Settings from './components/Settings';
 import HelpGuide from './components/HelpGuide';
 import ForwardOutlook from './components/ForwardOutlook';
 import AutonomousResearch from './components/AutonomousResearch';
+import JevAutonomousPortfolioLab from './components/JevAutonomousPortfolioLab';
 import DataHealth from './components/DataHealth';
 import AIQualityLab from './components/AIQualityLab';
 
@@ -334,9 +335,10 @@ export default function App() {
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'quality', label: 'AI Quality Lab', index: '09', icon: Bot },
-    { id: 'outlook', label: 'Forward Outlook', index: '10', icon: TrendingUp },
-    { id: 'health', label: 'Data Health', index: '11', icon: ShieldAlert },
+    { id: 'jev-lab', label: 'JEV Portfolio Lab', index: '09', icon: Bot },
+    { id: 'quality', label: 'AI Quality Lab', index: '10', icon: Bot },
+    { id: 'outlook', label: 'Forward Outlook', index: '11', icon: TrendingUp },
+    { id: 'health', label: 'Data Health', index: '12', icon: ShieldAlert },
     { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
     { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
   ];
@@ -572,6 +574,7 @@ export default function App() {
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
+              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab />}
               {activeView === 'quality' && <AIQualityLab />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
