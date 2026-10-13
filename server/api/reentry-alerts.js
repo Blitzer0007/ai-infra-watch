@@ -101,7 +101,7 @@ export default async function handler(req,res) {
       let rows=await db('reentry_watchlist?select=*&order=symbol.asc');
       if(String(req.query?.refresh||'')==='true') {
         const refreshed=await runScan();
-        rows=refreshed.items.map(item=>({...item,sale_price:item.salePrice,target_price:item.targetPrice,thesis_invalidated:item.thesisInvalidated,last_price:item.lastPrice,drawdown_from_52_week_high_pct:item.drawdownFrom52WeekHighPct,retrieved_at:item.retrievedAt}));
+        rows=refreshed.items;
       }
       return res.status(200).json({ok:true,items:(Array.isArray(rows)?rows:[]).map(publicRow)});
     }
