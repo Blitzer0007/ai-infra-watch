@@ -7,17 +7,18 @@ describe('account-level cash-flow accounting', () => {
     const result = calculateAccountCashFlowPerformance(
       [{ symbol: 'MSFT', quantity: 2, currentPrice: 60 }],
       [{ symbol: 'MSFT', transactionType: 'BUY', quantity: 2, amount: 100, brokerage: 2, currency: 'USD' }],
-      [{ flowType: 'deposit', amount: 150, currency: 'USD', fxToUsd: 1 }, { flowType: 'dividend', amount: 5, currency: 'USD', fxToUsd: 1 }, { flowType: 'fee', amount: 1, currency: 'USD', fxToUsd: 1 }],
+      [{ flowType: 'deposit', amount: 150, currency: 'USD', fxToUsd: 1 }, { flowType: 'dividend', amount: 5, currency: 'USD', fxToUsd: 1 }, { flowType: 'fee', amount: 1, currency: 'USD', fxToUsd: 1 }, { flowType: 'reward', amount: 2, currency: 'USD', fxToUsd: 1 }],
       true,
     );
     assert.equal(result.status, 'complete');
     assert.equal(result.holdingsValueUsd, 120);
-    assert.equal(result.cashBalanceUsd, 52);
-    assert.equal(result.accountValueUsd, 172);
+    assert.equal(result.cashBalanceUsd, 54);
+    assert.equal(result.accountValueUsd, 174);
     assert.equal(result.netContributionsUsd, 150);
-    assert.equal(result.totalPnlUsd, 22);
+    assert.equal(result.totalPnlUsd, 24);
     assert.equal(result.dividendsUsd, 5);
     assert.equal(result.feesUsd, 1);
+    assert.equal(result.rewardsUsd, 2);
   });
   it('converts INR cash flows using the explicitly recorded historical USD rate', () => {
     const result = calculateAccountCashFlowPerformance(

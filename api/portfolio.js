@@ -300,7 +300,7 @@ export default async function handler(req, res) {
       if (body.action === 'cashFlow') {
         const flowType = String(body.flowType || '').trim().toLowerCase(), amount = Number(body.amount);
         const currency = String(body.currency || 'USD').trim().toUpperCase(), fxToUsd = Number(body.fxToUsd), eventDate = String(body.eventDate || '').trim();
-        if (!['deposit', 'withdrawal', 'dividend', 'fee'].includes(flowType)) return res.status(400).json({ error: 'flowType must be deposit, withdrawal, dividend or fee' });
+        if (!['deposit', 'withdrawal', 'dividend', 'fee', 'reward'].includes(flowType)) return res.status(400).json({ error: 'flowType must be deposit, withdrawal, dividend, fee or reward' });
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'amount must be positive' });
         if (!/^[A-Z]{3}$/.test(currency)) return res.status(400).json({ error: 'currency must be a 3-letter currency code' });
         if (!Number.isFinite(fxToUsd) || fxToUsd <= 0) return res.status(400).json({ error: 'fxToUsd must be positive USD per 1 unit of the selected currency' });

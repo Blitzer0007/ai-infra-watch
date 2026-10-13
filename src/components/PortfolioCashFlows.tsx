@@ -60,15 +60,16 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
 
   return <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4 mt-3" data-testid="portfolio-cash-flows">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Account cash flows</div><h3 className="text-sm font-black mt-1">Deposits, withdrawals, dividends and fees</h3>
+      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Account cash flows</div><h3 className="text-sm font-black mt-1">Deposits, withdrawals, dividends, rewards and fees</h3>
         <p className="text-[10px] text-white/40 mt-1">Record your opening deposit and later cash movements. FX is stored per event date so currencies are not silently mixed with USD.</p></div>
       <button type="button" onClick={() => void load()} disabled={loading} className="rounded-lg border border-white/10 px-3 py-2 text-[9px] font-mono uppercase text-white/55 disabled:opacity-40">{loading ? 'Loading…' : 'Refresh records'}</button>
     </div>
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2 mt-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mt-4">
       <Metric label="Holdings value" value={formatUsd(performance.holdingsValueUsd)} />
       <Metric label="Cash balance" value={formatUsd(performance.cashBalanceUsd)} />
       <Metric label="Account value" value={formatUsd(performance.accountValueUsd)} />
       <Metric label="Net contributions" value={formatUsd(performance.netContributionsUsd)} />
+      <Metric label="Rewards received" value={formatUsd(performance.rewardsUsd)} />
       <Metric label="Total account P&L" value={formatUsd(performance.totalPnlUsd)} />
       <Metric label="P&L / contributions" value={performance.pnlOnNetContributionsPct == null ? '—' : (performance.pnlOnNetContributionsPct >= 0 ? '+' : '') + performance.pnlOnNetContributionsPct.toFixed(2) + '%'} />
     </div>
@@ -80,7 +81,7 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
       <div className="text-[9px] font-mono uppercase tracking-widest text-white/40">Add cash movement</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mt-3">
         <Field label="Date" value={form.eventDate} type="date" onChange={v => setForm({ ...form, eventDate: v })} />
-        <label className="text-[9px] font-mono text-white/35">Type<select value={form.flowType} onChange={e => setForm({ ...form, flowType: e.target.value as PortfolioCashFlow['flowType'] })} className="mt-1 w-full rounded-lg border border-white/10 bg-[#0F1115] px-3 py-2 text-xs text-white"><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="dividend">Dividend</option><option value="fee">Fee</option></select></label>
+        <label className="text-[9px] font-mono text-white/35">Type<select value={form.flowType} onChange={e => setForm({ ...form, flowType: e.target.value as PortfolioCashFlow['flowType'] })} className="mt-1 w-full rounded-lg border border-white/10 bg-[#0F1115] px-3 py-2 text-xs text-white"><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="dividend">Dividend</option><option value="reward">Reward credit</option><option value="fee">Fee</option></select></label>
         <Field label="Amount" value={form.amount} type="number" onChange={v => setForm({ ...form, amount: v })} placeholder="100.00" />
         <label className="text-[9px] font-mono text-white/35">Currency<select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value, fxToUsd: e.target.value === 'USD' ? '1' : form.fxToUsd === '1' ? '0.012' : form.fxToUsd })} className="mt-1 w-full rounded-lg border border-white/10 bg-[#0F1115] px-3 py-2 text-xs text-white"><option value="USD">USD</option><option value="INR">INR</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="CAD">CAD</option></select></label>
         <Field label="USD per currency unit" value={form.currency === 'USD' ? '1' : form.fxToUsd} type="number" onChange={v => setForm({ ...form, fxToUsd: v })} placeholder="0.012" />

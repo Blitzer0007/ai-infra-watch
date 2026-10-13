@@ -67,7 +67,7 @@ export type PortfolioTransaction = {
 };
 
 export type PortfolioCashFlow = {
-  id: string; eventDate: string; flowType: 'deposit' | 'withdrawal' | 'dividend' | 'fee';
+  id: string; eventDate: string; flowType: 'deposit' | 'withdrawal' | 'dividend' | 'fee' | 'reward';
   amount: number; currency: string; fxToUsd: number; notes: string; createdAt?: string;
 };
 
