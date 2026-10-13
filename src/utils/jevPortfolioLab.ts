@@ -96,6 +96,8 @@ export type HistoricalPrice = {
   date: string;
   close: number;
   availableAt: string;
+  adjusted?: boolean;
+  availabilityStatus?: 'verified' | 'assumed' | 'unknown';
 };
 
 export type HistoricalBacktestResult = {
@@ -110,14 +112,18 @@ export type HistoricalBacktestResult = {
   excessVsQqqPct: number;
   totalTransactionCostsPct: number;
   maxDrawdownPct: number;
+  rebalanceCount: number;
+  adjustedPricesComplete: boolean;
+  availabilityStatus: 'verified' | 'assumed' | 'unknown';
   evidenceStatus: 'insufficient' | 'ready';
 };
 
 /**
- * Deterministic point-in-time backtest over caller-supplied adjusted close history.
+ * Deterministic close-to-close paper backtest over caller-supplied adjusted close history.
  * Input must use the same dates for every held symbol and both benchmarks.
- * Rebalances to target weights at each close; costs apply to changes in weights.
- * This intentionally does not fetch prices or manufacture missing observations.
+ * Holdings drift between weekly rebalances; costs apply to traded notional at entry and each rebalance.
+ * Provider availability timestamps may be assumed rather than verified; that keeps evidenceStatus
+ * insufficient until a trusted point-in-time history source is available.
  */
 export function runHistoricalPaperBacktest(args: {
   prices: HistoricalPrice[];
@@ -129,10 +135,15 @@ export function runHistoricalPaperBacktest(args: {
   maxPositionWeight?: number;
   maxSectorWeight?: number;
   minCashWeight?: number;
+  rebalanceEverySessions?: number;
 }): HistoricalBacktestResult {
   const { prices, target, startCapital } = args;
   const costBps = args.costBps ?? 10;
   const minimumObservations = args.minimumObservations ?? 50;
+  const rebalanceEverySessions = args.rebalanceEverySessions ?? 5;
+  if (!Number.isInteger(rebalanceEverySessions) || rebalanceEverySessions < 1 || rebalanceEverySessions > 252) {
+    throw new Error('Rebalance cadence must be between 1 and 252 trading sessions.');
+  }
   if (!finite(startCapital) || startCapital <= 0) throw new Error('Starting capital must be positive.');
   if (!finite(costBps) || costBps < 0 || costBps > 500) throw new Error('Cost assumption must be between 0 and 500 basis points.');
   const maxPositionWeight = args.maxPositionWeight ?? PAPER_LAB_DEFAULTS.maxPositionWeight;
@@ -167,7 +178,8 @@ export function runHistoricalPaperBacktest(args: {
   for (const row of prices) {
     if (!symbols.includes(row.symbol)) continue;
     const t = Date.parse(row.date), available = Date.parse(row.availableAt);
-    if (!row.symbol || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    if (!row.symbol || !/^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    if (row.adjusted === false) throw new Error('Adjusted closes are required for strategy and benchmark return calculations.');
     const cutoff = args.decisionCutoffByDate?.[row.date];
     if (cutoff && (!finite(Date.parse(cutoff)) || available > Date.parse(cutoff) || t > Date.parse(cutoff))) throw new Error('Look-ahead data rejected by historical backtest.');
     if (!byDate.has(row.date)) byDate.set(row.date, new Map());
@@ -183,40 +195,80 @@ export function runHistoricalPaperBacktest(args: {
   const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b));
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
-  let strategyValue=startCapital, spyValue=startCapital, qqqValue=startCapital, peak=startCapital, maxDrawdown=0, costsDollars=0;
-  let driftedWeights = new Map<string,number>();
-  for(let i=1;i<dates.length;i++){
-    const prior=byDate.get(dates[i-1])!, current=byDate.get(dates[i])!;
-    const turnover=target.reduce((sum,h)=>sum+Math.abs(h.weight-(driftedWeights.get(h.symbol)??0)),0)*strategyValue;
-    const cost=turnover*costBps/10000;
-    costsDollars += cost;
-    strategyValue -= cost;
-    let grossMultiplier=1;
-    const nextWeights = new Map<string,number>();
-    for(const h of target){
-      const periodMultiplier=current.get(h.symbol)!.close/prior.get(h.symbol)!.close;
-      grossMultiplier += h.weight*(periodMultiplier-1);
-      nextWeights.set(h.symbol,h.weight*periodMultiplier);
+  const adjustedPricesComplete = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).every(row => row.adjusted === true);
+  const availabilityStatuses = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).map(row => row.availabilityStatus || 'unknown');
+  const availabilityStatus: HistoricalBacktestResult['availabilityStatus'] =
+    availabilityStatuses.length > 0 && availabilityStatuses.every(status => status === 'verified')
+      ? 'verified'
+      : availabilityStatuses.some(status => status === 'assumed') ? 'assumed' : 'unknown';
+
+  let strategyValue = startCapital;
+  let spyValue = startCapital;
+  let qqqValue = startCapital;
+  let peak = startCapital;
+  let maxDrawdown = 0;
+  let costsDollars = 0;
+  let rebalanceCount = 0;
+  let driftedWeights = new Map<string, number>(target.map(h => [h.symbol.toUpperCase(), h.weight]));
+
+  // Entry costs are charged once on the initial invested notional, not on cash.
+  const initialTurnover = target.reduce((sum, holding) => sum + holding.weight, 0) * strategyValue;
+  const initialCost = initialTurnover * costBps / 10000;
+  strategyValue -= initialCost;
+  costsDollars += initialCost;
+  if (initialTurnover > 0) rebalanceCount += 1;
+
+  for (let i = 1; i < dates.length; i++) {
+    const prior = byDate.get(dates[i - 1])!;
+    const current = byDate.get(dates[i])!;
+    const cashWeight = Math.max(0, 1 - [...driftedWeights.values()].reduce((sum, weight) => sum + weight, 0));
+    let dailyMultiplier = cashWeight;
+    const nextWeights = new Map<string, number>();
+    for (const holding of target) {
+      const symbol = holding.symbol.toUpperCase();
+      const periodMultiplier = current.get(symbol)!.close / prior.get(symbol)!.close;
+      const priorWeight = driftedWeights.get(symbol) ?? 0;
+      dailyMultiplier += priorWeight * periodMultiplier;
+      nextWeights.set(symbol, priorWeight * periodMultiplier);
     }
-    strategyValue *= grossMultiplier;
-    if(grossMultiplier>0) for(const [symbol,weight] of nextWeights) nextWeights.set(symbol,weight/grossMultiplier);
-    driftedWeights=nextWeights;
-    spyValue *= current.get('SPY')!.close/prior.get('SPY')!.close;
-    qqqValue *= current.get('QQQ')!.close/prior.get('QQQ')!.close;
-    peak=Math.max(peak,strategyValue);
-    maxDrawdown=Math.min(maxDrawdown,(strategyValue/peak-1)*100);
+    if (!finite(dailyMultiplier) || dailyMultiplier <= 0) throw new Error('Historical return multiplier is invalid.');
+    strategyValue *= dailyMultiplier;
+    for (const [symbol, weight] of nextWeights) nextWeights.set(symbol, weight / dailyMultiplier);
+    driftedWeights = nextWeights;
+
+    spyValue *= current.get('SPY')!.close / prior.get('SPY')!.close;
+    qqqValue *= current.get('QQQ')!.close / prior.get('QQQ')!.close;
+
+    // Rebalance after each completed five-session block, leaving the final observation untouched.
+    if (i < dates.length - 1 && i % rebalanceEverySessions === 0) {
+      const turnover = target.reduce((sum, holding) => {
+        const symbol = holding.symbol.toUpperCase();
+        return sum + Math.abs(holding.weight - (driftedWeights.get(symbol) ?? 0));
+      }, 0) * strategyValue;
+      const cost = turnover * costBps / 10000;
+      strategyValue -= cost;
+      costsDollars += cost;
+      if (turnover > 0.005) rebalanceCount += 1;
+      driftedWeights = new Map(target.map(holding => [holding.symbol.toUpperCase(), holding.weight]));
+    }
+
+    peak = Math.max(peak, strategyValue);
+    maxDrawdown = Math.min(maxDrawdown, (strategyValue / peak - 1) * 100);
   }
-  const strategyReturnPct=(strategyValue/startCapital-1)*100;
-  const spyReturnPct=(spyValue/startCapital-1)*100;
-  const qqqReturnPct=(qqqValue/startCapital-1)*100;
+  const strategyReturnPct = (strategyValue / startCapital - 1) * 100;
+  const spyReturnPct = (spyValue / startCapital - 1) * 100;
+  const qqqReturnPct = (qqqValue / startCapital - 1) * 100;
   return {
-    startDate:dates[0], endDate:dates[dates.length-1], observations:dates.length,
+    startDate: dates[0], endDate: dates[dates.length - 1], observations: dates.length,
     strategyReturnPct, spyReturnPct, qqqReturnPct,
-    strategyNetReturnPct:strategyReturnPct,
-    excessVsSpyPct:strategyReturnPct-spyReturnPct,
-    excessVsQqqPct:strategyReturnPct-qqqReturnPct,
-    totalTransactionCostsPct:costsDollars/startCapital*100,
-    maxDrawdownPct:maxDrawdown,
-    evidenceStatus: dates.length-1 >= minimumObservations ? 'ready' : 'insufficient',
+    strategyNetReturnPct: strategyReturnPct,
+    excessVsSpyPct: strategyReturnPct - spyReturnPct,
+    excessVsQqqPct: strategyReturnPct - qqqReturnPct,
+    totalTransactionCostsPct: costsDollars / startCapital * 100,
+    maxDrawdownPct: maxDrawdown,
+    rebalanceCount,
+    adjustedPricesComplete,
+    availabilityStatus,
+    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && availabilityStatus === 'verified' ? 'ready' : 'insufficient',
   };
 }
