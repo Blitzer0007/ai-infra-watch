@@ -6,6 +6,7 @@ import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type Rot
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
+import PortfolioCashFlows from './PortfolioCashFlows';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
 import PortfolioSignalFusion from './PortfolioSignalFusion';
@@ -671,6 +672,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       </div>
 
       <PortfolioManager holdings={holdings} onChanged={setHoldings} />
+      {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
       {portfolioError && <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/70">{portfolioError}. Persistent portfolio data could not be loaded; check the portfolio API and Supabase connection.</div>}
 

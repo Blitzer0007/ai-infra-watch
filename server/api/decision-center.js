@@ -434,6 +434,37 @@ async function fetchSignalGate() {
   };
 }
 
+async function fetchAnalystTargets(symbols) {
+  const key = String(process.env.FINNHUB_API_KEY || '').trim();
+  if (!symbols.length) return { status: 'ok', targets: {} };
+  if (!key) return { status: 'no_key', targets: {} };
+  const entries = await Promise.all(symbols.map(async symbol => {
+    try {
+      const url = new URL('https://finnhub.io/api/v1/stock/price-target');
+      url.searchParams.set('symbol', symbol);
+      url.searchParams.set('token', key);
+      const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (!response.ok) return [symbol, null];
+      const body = await response.json();
+      const targetMean = Number(body?.targetMean);
+      const analystCount = Number(body?.numberOfAnalysts);
+      const lastUpdated = String(body?.lastUpdated || '');
+      const updatedAt = Date.parse(lastUpdated);
+      if (!(targetMean > 0) || !(analystCount > 0) || !Number.isFinite(updatedAt) || Date.now() - updatedAt > 180 * 86400000) return [symbol, null];
+      return [symbol, {
+        targetMean,
+        targetMedian: Number(body?.targetMedian) > 0 ? Number(body.targetMedian) : null,
+        analystCount,
+        lastUpdated,
+      }];
+    } catch {
+      return [symbol, null];
+    }
+  }));
+  const targets = Object.fromEntries(entries.filter(([, value]) => value));
+  return { status: Object.keys(targets).length ? 'ok' : 'unavailable', targets };
+}
+
 async function fetchEarnings(symbols) {
   const key = String(process.env.FINNHUB_API_KEY || '').trim();
   if (!symbols.length) return { status: 'ok', events: [] };
@@ -511,6 +542,13 @@ export default async function handler(req, res) {
       try { return [symbol, await routedQuote(symbol)]; } catch { return [symbol, null]; }
     }));
     const quotes = Object.fromEntries(quoteEntries);
+    const profitReviewSymbols = holdingRows.filter(holding => {
+      const symbol = String(holding.symbol).toUpperCase();
+      const price = Number(quotes[symbol]?.price), cost = Number(holding.average_cost);
+      return price > 0 && cost > 0 && (price / cost - 1) * 100 >= 15;
+    }).map(holding => String(holding.symbol).toUpperCase());
+    const analystTargetsResult = await fetchAnalystTargets(profitReviewSymbols);
+    const analystTargets = analystTargetsResult.targets;
 
     const totalCurrentValue = symbols.reduce((sum, symbol) => {
       const holding = holdingRows.find(row => String(row.symbol).toUpperCase() === symbol);
@@ -557,6 +595,21 @@ export default async function handler(req, res) {
         } : null,
         holdingSince: holding.purchase_date || null,
       });
+
+      const analystTarget = analystTargets[symbol];
+      if (analystTarget && Number(q.price) >= Number(analystTarget.targetMean) * 0.95) {
+        const aboveTarget = Number(q.price) >= Number(analystTarget.targetMean);
+        actionItems.push({
+          severity: 'WATCH',
+          symbol,
+          title: aboveTarget ? 'At or above analyst target' : 'Near analyst target',
+          detail: 'Current price $' + Number(q.price).toFixed(2) + ' is ' + (aboveTarget ? 'at/above' : 'within 5% of') +
+            ' the mean analyst target of $' + Number(analystTarget.targetMean).toFixed(2) + ' (' + Number(analystTarget.analystCount) +
+            ' analysts; updated ' + String(analystTarget.lastUpdated).slice(0, 10) +
+            '). Consensus is a reference point, not intrinsic value; reassess thesis, earnings and downside.',
+          impact: null,
+        });
+      }
 
       const currentAllocationPct = totalCurrentValue > 0 && Number(q?.price) > 0
         ? (Number(q.price) * Number(holding.quantity) / totalCurrentValue) * 100
@@ -751,6 +804,8 @@ export default async function handler(req, res) {
       },
       benchmark,
       benchmarkCoverage: Object.fromEntries(Object.entries(benchmark).map(([symbol,item])=>[symbol,item.coverage||null])),
+      analystTargets,
+      analystTargetsStatus: analystTargetsResult.status,
       earnings: earnings.slice(0, 7),
       earningsStatus: earningsResult.status,
       earningsError: earningsResult.reason || null,
@@ -758,6 +813,7 @@ export default async function handler(req, res) {
       signalGate,
       notes: [
         'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
+        'Fresh analyst price targets can add profit-review prompts near consensus targets; analyst targets are not intrinsic value estimates.',
         'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',
         'Semiconductor shock includes SOXL at 3x leverage and is a scenario, not a prediction.',
         'Forecast validation requires 50 independent verified forecasts overall, including at least 25 independent 5D and 25 independent 20D forecasts; counts use non-overlapping forecast windows by ticker and horizon.',

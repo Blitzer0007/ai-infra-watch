@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveHoldingLedgerCostBasis, getHoldingReturnThresholdTransitions } from '../../server/api/portfolio-holding-return-alerts.js';
+import { deriveHoldingLedgerCostBasis, getHoldingReturnThresholdTransitions, getHoldingReturnGivebackTransition, getHoldingReviewTransition } from '../../server/api/portfolio-holding-return-alerts.js';
 
 describe('per-holding ledger cost basis', () => {
   it('keeps open cost basis and realized gains consistent after a partial sale', () => {
@@ -81,5 +81,37 @@ describe('per-holding return milestone transitions', () => {
       trigger: [],
       reset: [],
     });
+  });
+});
+
+
+describe('profit give-back transitions', () => {
+  it('flags a 10 percentage-point give-back after a 30% peak', () => {
+    assert.deepEqual(getHoldingReturnGivebackTransition(22, 33, false), { peakPct: 33, trigger: true, reset: false, givebackPct: 11 });
+  });
+  it('re-arms only after the return recovers to within five points of the peak', () => {
+    assert.deepEqual(getHoldingReturnGivebackTransition(29, 33, true), { peakPct: 33, trigger: false, reset: true, givebackPct: 4 });
+    assert.deepEqual(getHoldingReturnGivebackTransition(22, 33, true), { peakPct: 33, trigger: false, reset: false, givebackPct: 11 });
+  });
+  it('does not give-back alert until the peak reached at least 30%', () => {
+    assert.equal(getHoldingReturnGivebackTransition(15, 24, false).trigger, false);
+  });
+});
+describe('profitable thesis review transitions', () => {
+  it('triggers on ACT/WATCH evidence for a profitable position and deduplicates unchanged rules', () => {
+    const items = [{ symbol: 'MSFT', severity: 'ACT', title: 'Rule reached', detail: 'Stop reached.' }];
+    const first = getHoldingReviewTransition('MSFT', 25, items, [], null);
+    assert.equal(first.trigger, true);
+    assert.equal(getHoldingReviewTransition('MSFT', 26, items, [], { active: true, metadata: { signature: first.signature } }).trigger, false);
+  });
+  it('resets when a profitable holding no longer has review signals', () => {
+    const result = getHoldingReviewTransition('NOW', 25, [], [], { active: true });
+    assert.equal(result.reset, true);
+    assert.equal(result.trigger, false);
+  });
+  it('includes upcoming earnings as a review trigger', () => {
+    const result = getHoldingReviewTransition('NOW', 20, [], [{ symbol: 'NOW', date: '2026-10-20', daysUntil: 3 }], null);
+    assert.equal(result.trigger, true);
+    assert.match(result.signature, /EARNINGS:2026-10-20/);
   });
 });
