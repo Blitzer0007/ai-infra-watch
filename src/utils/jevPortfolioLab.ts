@@ -165,8 +165,7 @@ export function runHistoricalPaperBacktest(args: {
       nextWeights.set(h.symbol,h.weight*periodMultiplier);
     }
     strategyValue *= grossMultiplier;
-    const investedAfterReturn=[...nextWeights.values()].reduce((sum,w)=>sum+w,0);
-    if(investedAfterReturn>0) for(const [symbol,weight] of nextWeights) nextWeights.set(symbol,weight/investedAfterReturn);
+    if(grossMultiplier>0) for(const [symbol,weight] of nextWeights) nextWeights.set(symbol,weight/grossMultiplier);
     driftedWeights=nextWeights;
     spyValue *= current.get('SPY')!.close/prior.get('SPY')!.close;
     qqqValue *= current.get('QQQ')!.close/prior.get('QQQ')!.close;
