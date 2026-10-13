@@ -824,3 +824,4 @@ export default async function handler(req, res) {
     console.error('decision center error:', error);
     return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Decision center unavailable.' });
   }
+}
