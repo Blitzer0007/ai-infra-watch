@@ -459,7 +459,7 @@ export default function UnifiedEventTimeline({
       <div className="mb-4 rounded-xl border border-white/5 bg-white/[.02] p-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Cross-signal impact matrix</div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Combined event impact matrix</div>
             <div className="text-[10px] text-white/35 mt-1">
               Compare observed post-event reactions by evidence type. Averages describe historical associations only; they do not identify a causal winner.
             </div>
@@ -484,7 +484,7 @@ export default function UnifiedEventTimeline({
         </div>
 
         {!impactMatrix.length ? (
-          <div className="mt-3 text-[9px] font-mono text-white/25">No cross-signal history is available yet.</div>
+          <div className="mt-3 text-[9px] font-mono text-white/25">No combined event history is available yet.</div>
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
             {impactMatrix.map(item => (

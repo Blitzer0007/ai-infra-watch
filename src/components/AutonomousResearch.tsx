@@ -136,7 +136,7 @@ function evidenceStateLabel(result: ResearchResponse | null) {
     : Object.values(availability?.channels || {}).filter(channel => channel?.status === 'AVAILABLE').length;
   if (usable >= 2) return 'Multi-source';
   if (usable === 1) return 'Single-source';
-  return 'Evidence gate: insufficient';
+  return 'Evidence check: not enough support';
 }
 
 function evidenceStateClass(state: string) {
@@ -440,7 +440,7 @@ export default function AutonomousResearch() {
               {result.jev?.evidence_gate && (
                 <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
                   <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">
-                    Evidence coverage
+                    Source coverage
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {(Object.entries(result.jev.evidence_availability?.channels || {}) as Array<[string, { status?: string }]>).map(([family, channel]) => (
@@ -476,7 +476,7 @@ export default function AutonomousResearch() {
                     </span>
                   </div>
                   <p className="mt-2 text-[10px] leading-5 text-rose-100/65">
-                    Non-stale evidence contains materially incompatible lifecycle claims. Both claims remain visible and the discrepancy is routed for investigation rather than resolved by the UI.
+                    Current sources contain materially different lifecycle claims. Both remain visible and the discrepancy is flagged for investigation rather than hidden by the UI.
                   </p>
                 </div>
               )}
@@ -491,7 +491,7 @@ export default function AutonomousResearch() {
                   </div>
                   {result.jev.evidence_gate.citation_coverage && (
                     <div className="mt-2 text-[9px] font-mono text-white/30">
-                      Citation coverage: {typeof result.jev.evidence_gate.citation_coverage.coverage === 'number'
+                      Source support: {typeof result.jev.evidence_gate.citation_coverage.coverage === 'number'
                         ? Math.round(result.jev.evidence_gate.citation_coverage.coverage * 100) + '%'
                         : '—'}
                       {' · '}
@@ -503,7 +503,7 @@ export default function AutonomousResearch() {
 
               {result.jev?.evidence_gate?.evidence_freshness && result.jev.evidence_gate.evidence_freshness.length > 0 && (
                 <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                  <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">Evidence freshness</div>
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-wider text-white/35">Source freshness</div>
                   <div className="flex flex-wrap gap-1.5">
                     {result.jev.evidence_gate.evidence_freshness.map((entry, index) => {
                       const freshness = entry.freshness;
@@ -552,7 +552,7 @@ export default function AutonomousResearch() {
                             : 'border-fuchsia-400/20 bg-fuchsia-400/5 text-fuchsia-300/80'
                     )
                   }>
-                    Evidence gate: {result.jev.evidence_gate.action || 'continue'}
+                    Evidence check: {result.jev.evidence_gate.action || 'continue'}
                     {typeof result.jev.evidence_gate.evidence_quality === 'number'
                       ? ' · ' + Math.round(result.jev.evidence_gate.evidence_quality) + '/100'
                       : ''}

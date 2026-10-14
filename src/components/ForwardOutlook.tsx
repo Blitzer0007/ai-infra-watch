@@ -1567,7 +1567,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1 aiw-scroll-region">{forecasts.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 10).map(f => (
           <div key={f.id} className="rounded-xl border border-white/5 bg-black/10 p-3 text-[11px] font-mono">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white/55"><span>{f.ticker}</span><span>{f.horizon} trading days</span><span>Target trading date {f.targetDate}</span><span>Entry ${formatPrice(f.entryPrice)}</span><span className={f.status === 'verified' ? 'text-cyan-200' : 'text-amber-200'}>{f.status === 'verified' ? 'Verified' : 'Awaiting outcome'}</span></div>
-            <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Likely range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
+            <div className="mt-1 text-white/40">Typical expected move {formatReturn(f.median)} · Typical historical range {formatReturn(f.p25)} to {formatReturn(f.p75)}{f.status === 'verified' && f.actualReturn != null ? ' · actual ' + formatReturn(f.actualReturn) + ' on ' + f.actualDate : ''}</div>
             {f.evidenceSnapshot && <div className="mt-1 text-white/30">
               Saved evidence: {forecastEvidenceState(f.evidenceSnapshot) === 'CAPTURED' ? 'Captured when this forecast was created' : 'Needs review'} · {f.evidenceSnapshot.analystConsensus?.status === 'available' ? 'analyst evidence available' : f.evidenceSnapshot.analystConsensus?.status === 'partial' ? 'analyst evidence partly available' : f.evidenceSnapshot.analystConsensus?.status === 'failed' ? 'analyst data could not be loaded' : 'analyst data not available'} · {
                 (f.evidenceSnapshot.counts?.news || 0) +
@@ -1837,7 +1837,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
                     <span>{row.asOfDate} → {row.targetDate}</span>
                     <span>Typical expected move {formatReturn(row.median)}</span>
                     <span>Actual {formatReturn(row.actual)}</span>
-                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'Likely range' : 'outside Likely range'}</span>
+                    <span className={row.actual >= row.p25 && row.actual <= row.p75 ? 'text-cyan-200' : 'text-amber-200'}>{row.actual >= row.p25 && row.actual <= row.p75 ? 'Typical historical range' : 'outside Typical historical range'}</span>
                   </div>
                 ))}
               </div>
@@ -1878,7 +1878,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
               { key: 'direction', header: 'Direction', accessor: row => row.direction, type: 'percent', align: 'right', render: row => (row.direction * 100).toFixed(0) + '%' },
               { key: 'baseline', header: 'Simple comparison', accessor: row => row.baselineDirection, type: 'percent', align: 'right', render: row => (row.baselineDirection * 100).toFixed(0) + '%' },
               { key: 'error', header: 'Error', accessor: row => row.error, type: 'number', align: 'right', render: row => row.error.toFixed(1) },
-              { key: 'coverage', header: 'Likely range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
+              { key: 'coverage', header: 'Typical historical range', accessor: row => row.coverage50, type: 'percent', align: 'right', render: row => (row.coverage50 * 100).toFixed(0) + '%' },
             ]}
           /></div>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">{matrix.calibration.map(bucket => <div key={bucket.bucket} className="rounded-lg border border-white/5 bg-black/10 p-2"><div className="text-[10px] text-white/30">{bucket.bucket}</div><div className="text-xs font-mono font-bold mt-1">{bucket.n ? (bucket.observedPositiveRate! * 100).toFixed(0) + '%' : '—'}</div><div className="text-[10px] text-white/35">{bucket.n} tests · gap {bucket.calibrationErrorPct == null ? '—' : (bucket.calibrationErrorPct >= 0 ? '+' : '') + bucket.calibrationErrorPct.toFixed(0) + ' percentage points'}</div></div>)}</div>
