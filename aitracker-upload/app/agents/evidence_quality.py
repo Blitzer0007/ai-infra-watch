@@ -43,7 +43,7 @@ ENTITY_KEYS = {
 }
 
 CLAIM_KEYS = {
-    "claim", "statement", "finding", "summary", "headline", "description",
+    "claim", "statement", "finding", "summary", "headline", "title", "description",
     "text", "content", "status",
 }
 
@@ -206,13 +206,28 @@ def _record_claim_context(record: dict[str, Any]) -> tuple[str, str]:
             ):
                 entity = candidate
                 break
-    for key, value in record.items():
-        if str(key) in CLAIM_KEYS and isinstance(value, str):
+    # Prefer the record's descriptive claim/title over the lifecycle status itself.
+    # Comparing "active" with "cancelled" would only repeat the contradiction,
+    # not establish that both sources refer to the same underlying event.
+    for key in ("title", "headline", "claim", "statement", "finding", "summary", "description", "text", "content"):
+        value = record.get(key)
+        if isinstance(value, str):
             candidate = value.strip()
             if candidate and len(candidate) <= 500:
                 claim = candidate
                 break
     return entity, claim
+
+
+def _same_claim(left: str, right: str) -> bool:
+    """Conservatively match event descriptions without treating entity alone as identity."""
+    ignored = {"a", "an", "the", "update", "updated", "status", "report", "reported"}
+    left_tokens = set(re.findall(r"[a-z0-9]+", left.lower())) - ignored
+    right_tokens = set(re.findall(r"[a-z0-9]+", right.lower())) - ignored
+    if not left_tokens or not right_tokens:
+        return False
+    overlap = len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+    return overlap >= 0.5
 
 
 def _iter_status_records(value: Any):
@@ -274,7 +289,9 @@ def detect_conflicts(calls: list[Any], now: datetime | None = None) -> dict[str,
             pair = frozenset({left["status"], right["status"]})
             if pair not in CONFLICT_PAIRS:
                 continue
-            if left["entity"] and right["entity"] and left["entity"].lower() != right["entity"].lower():
+            if not left["entity"] or not right["entity"] or left["entity"].lower() != right["entity"].lower():
+                continue
+            if not left["claim"] or not right["claim"] or not _same_claim(left["claim"], right["claim"]):
                 continue
             conflicts.append({
                 "type": "CONTRADICTORY_STATUS",
