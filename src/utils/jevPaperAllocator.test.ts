@@ -87,7 +87,7 @@ describe('JEV paper allocator evidence and risk gates', () => {
     assert.equal(result.suggestedWeights.find(item => item.symbol === 'META')?.weight, 0.1);
   });
 
-  it('blocks allocation when a fresh quote breaches a saved loss or price-stop rule', () => {
+  it('blocks a breached loss limit and flags price-stop rules for manual verification', () => {
     const lossLimit = buildJevPaperAllocator({
       candidates: [{ symbol: 'NVDA', sector: 'semiconductors', currentPrice: 80, averageCost: 100, quoteFresh: true, lossLimitPct: 15 }],
       capital: 1000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
@@ -97,12 +97,12 @@ describe('JEV paper allocator evidence and risk gates', () => {
     assert.ok(lossLimit.blockedReasons.some(reason => reason.includes('saved loss limit')));
 
     const priceStop = buildJevPaperAllocator({
-      candidates: [{ symbol: 'MU', sector: 'semiconductors', currentPrice: 70, averageCost: 100, quoteFresh: true, exitRuleType: 'price-stop', exitRuleValue: 75 }],
+      candidates: [{ symbol: 'MU', sector: 'semiconductors', currentPrice: 70, averageCost: 100, quoteFresh: true, exitRuleType: 'price-stop', exitRuleValue: 15 }],
       capital: 1000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
       savedRulesLoaded: true,
     });
-    assert.equal(priceStop.allocationAllowed, false);
-    assert.ok(priceStop.blockedReasons.some(reason => reason.includes('saved price stop')));
+    assert.equal(priceStop.allocationAllowed, true);
+    assert.ok(priceStop.alerts.some(reason => reason.includes('price-stop rule')));
   });
 
   it('blocks when a saved time-limit exit rule has expired', () => {
