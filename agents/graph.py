@@ -17,9 +17,23 @@ def supervisor(state: AgentState) -> dict[str, Any]:
         "user_query": state.get("user_query", ""),
         "requested_symbols": state.get("requested_symbols", []),
         "started_at": datetime.now(timezone.utc).isoformat(),
-        "trace": state.get("trace", []) + ["supervisor"],
-        "errors": state.get("errors", []),
+        "trace": ["supervisor"],
+        "errors": [],
     }
+
+
+def route_agents(state: AgentState) -> list[str]:
+    """Route focused questions narrowly; default to parallel market and risk retrieval."""
+    query = (state.get("user_query") or "").lower()
+    market_terms = ("price", "return", "performance", "rotation", "breadth", "relative strength", "quote")
+    risk_terms = ("risk", "geopolitical", "policy", "export control", "supply chain", "power constraint", "regulation")
+    has_market = any(term in query for term in market_terms)
+    has_risk = any(term in query for term in risk_terms)
+    if has_market and not has_risk:
+        return ["market_agent"]
+    if has_risk and not has_market:
+        return ["risk_agent"]
+    return ["market_agent", "risk_agent"]
 
 
 def build_graph():
@@ -30,8 +44,8 @@ def build_graph():
     builder.add_node("synthesis_agent", synthesis_agent)
 
     builder.add_edge(START, "supervisor")
-    builder.add_edge("supervisor", "market_agent")
-    builder.add_edge("market_agent", "risk_agent")
+    builder.add_conditional_edges("supervisor", route_agents)
+    builder.add_edge("market_agent", "synthesis_agent")
     builder.add_edge("risk_agent", "synthesis_agent")
     builder.add_edge("synthesis_agent", END)
 
