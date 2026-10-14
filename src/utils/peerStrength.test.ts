@@ -82,3 +82,15 @@ test('rejects duplicate symbols and ignores metrics with mismatched units', () =
   assert.ok(result[0].missingMetrics.includes('size'));
   assert.ok(result[0].missingMetrics.includes('revenueGrowth'));
 });
+
+test('does not score a metric when only one candidate has comparable evidence', () => {
+  const results = scorePeerStrength([
+    snapshot('AAA'),
+    { symbol: 'BBB', metrics: {} },
+  ], { now, minimumCoverage: 0.1 });
+  const a = results.find(item => item.symbol === 'AAA')!;
+  assert.equal(a.score, null);
+  assert.equal(a.coverage, 0);
+  assert.ok(a.missingMetrics.includes('size'));
+  assert.ok(a.missingMetrics.includes('revenueGrowth'));
+});
