@@ -215,8 +215,17 @@ function annualFactRows(facts, tags) {
     const byEnd = new Map();
     for (const row of rows) if (!byEnd.has(row.end)) byEnd.set(row.end, row);
     const uniqueRows = [...byEnd.values()].slice(0, 3);
-    // Prefer tags with more distinct annual periods instead of stopping at a latest-year-only tag.
-    if (uniqueRows.length > bestRows.length) bestRows = uniqueRows;
+    // Prefer the tag with the newest fiscal period first. A tag with several
+    // old periods must not beat a tag carrying the latest filing; older values
+    // would make peer strength appear verified while silently years out of date.
+    const newestEnd = String(uniqueRows[0]?.end || "");
+    const bestEnd = String(bestRows[0]?.end || "");
+    if (
+      uniqueRows.length > 0 &&
+      (newestEnd > bestEnd || (newestEnd === bestEnd && uniqueRows.length > bestRows.length))
+    ) {
+      bestRows = uniqueRows;
+    }
   }
   return bestRows;
 }
