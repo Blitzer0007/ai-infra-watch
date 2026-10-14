@@ -30,7 +30,7 @@ export default function Settings() {
         const response = await authFetch('/api/alert-notify', { cache: 'no-store' });
         const data = await response.json().catch(() => ({}));
         if (!cancelled) {
-          setTelegramConfigured(response.ok && data.telegram_configured === true);
+          setTelegramConfigured(response.ok && data.telegram_configured === true && data?.telegram_chat?.status === 'verified');
           setTelegramDiagnostic(data?.telegram_chat || null);
         }
       } catch {
@@ -295,7 +295,7 @@ export default function Settings() {
                 <MessageCircle className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
                 <div>
                   <div className="text-[10px] font-bold text-white">Telegram</div>
-                  <div className="text-[9px] text-white/35">{telegramConfigured === true ? 'Server bot configured' : telegramConfigured === false ? 'Server bot not configured' : 'Checking server configuration…'}</div>
+                  <div className="text-[9px] text-white/35">{telegramDiagnostic?.status === 'invalid' ? 'Chat ID needs correction' : telegramDiagnostic?.status === 'unknown' ? 'Could not verify target chat' : telegramConfigured === true ? 'Server bot and target chat verified' : telegramConfigured === false ? 'Server bot or target chat not ready' : 'Checking server configuration…'}</div>
                 </div>
               </div>
               <span className={'shrink-0 rounded border px-2.5 py-1.5 text-[9px] font-bold uppercase ' + (telegramConfigured === true ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/5 text-white/40')}>
