@@ -43,7 +43,7 @@ function finiteValue(value: unknown): value is number {
 function isFresh(metric: PeerMetricEvidence, now: number, maxAgeDays: number): boolean {
   if (metric.status !== 'verified' || !metric.source.trim()) return false;
   const timestamp = Date.parse(metric.observedAt);
-  return Number.isFinite(timestamp) && timestamp <= now + DAY_MS && now - timestamp <= maxAgeDays * DAY_MS;
+  return Number.isFinite(timestamp) && timestamp <= now && now - timestamp <= maxAgeDays * DAY_MS;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -67,6 +67,12 @@ export function scorePeerStrength(
     ...snapshot,
     symbol: String(snapshot.symbol || '').trim().toUpperCase(),
   }));
+  const symbols = new Set<string>();
+  for (const snapshot of normalized) {
+    if (!snapshot.symbol) throw new Error('Peer-strength snapshots require a symbol.');
+    if (symbols.has(snapshot.symbol)) throw new Error('Peer-strength snapshots must have unique symbols.');
+    symbols.add(snapshot.symbol);
+  }
   const usable = new Map<string, Partial<Record<PeerMetricKey, number>>>();
   const evidenceBySymbol = new Map<string, Partial<Record<PeerMetricKey, PeerMetricEvidence>>>();
   const statusBySymbol = new Map<string, { missing: PeerMetricKey[]; stale: PeerMetricKey[]; conflicted: PeerMetricKey[] }>();
@@ -80,6 +86,11 @@ export function scorePeerStrength(
     for (const key of KEYS) {
       const metric = snapshot.metrics[key];
       if (!metric || metric.status === 'missing' || !finiteValue(metric.value)) {
+        missing.push(key);
+        continue;
+      }
+      const expectedUnit = key === 'size' ? 'usd' : key === 'analystCoverage' ? 'count' : 'percent';
+      if (metric.unit !== expectedUnit || ((key === 'size' || key === 'analystCoverage') && metric.value < 0)) {
         missing.push(key);
         continue;
       }
