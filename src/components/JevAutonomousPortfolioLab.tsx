@@ -195,8 +195,10 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       if (!response.ok) throw new Error(body?.detail || body?.error || 'JEV candidate research failed.');
       setCandidateResearch(body);
       setUseSuggestedAllocation(false);
-      const availability = body?.jev?.evidence_availability || {};
       const gate = body?.jev?.evidence_gate || {};
+      // The Python agent currently nests the canonical availability matrix inside evidence_gate.
+      // Prefer a future top-level alias when present, but never replace the real matrix with {}.
+      const availability = body?.jev?.evidence_availability || gate?.evidence_availability || {};
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
       const conflicts = Number(gate?.conflict_detection?.count || gate?.conflict_count || 0);
       const action = String(gate.action || body?.jev?.action || '').toLowerCase();
