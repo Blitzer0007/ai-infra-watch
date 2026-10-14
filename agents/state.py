@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from operator import add
+from typing import Annotated, Any, TypedDict
 
 
 class AgentState(TypedDict, total=False):
@@ -9,8 +10,8 @@ class AgentState(TypedDict, total=False):
     market_evidence: dict[str, Any]
     risk_evidence: dict[str, Any]
     synthesis: dict[str, Any]
-    sources: list[dict[str, Any]]
-    errors: list[str]
-    trace: list[str]
+    sources: Annotated[list[dict[str, Any]], add]
+    errors: Annotated[list[str], add]
+    trace: Annotated[list[str], add]
     started_at: str
     completed_at: str

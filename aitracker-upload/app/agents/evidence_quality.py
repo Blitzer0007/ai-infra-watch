@@ -14,6 +14,7 @@ FRESHNESS_WINDOWS_HOURS: dict[str, tuple[float, float]] = {
     "market": (24, 72),
     "news": (72, 24 * 14),
     "sec": (24 * 30, 24 * 90),
+    "regulatory_primary": (24 * 30, 24 * 90),
     "earnings": (24 * 14, 24 * 90),
     "event_study": (24 * 90, 24 * 365),
     "analyst_consensus": (24, 24 * 7),
@@ -42,7 +43,7 @@ ENTITY_KEYS = {
 }
 
 CLAIM_KEYS = {
-    "claim", "statement", "finding", "summary", "headline", "description",
+    "claim", "statement", "finding", "summary", "headline", "title", "description",
     "text", "content", "status",
 }
 
@@ -205,13 +206,28 @@ def _record_claim_context(record: dict[str, Any]) -> tuple[str, str]:
             ):
                 entity = candidate
                 break
-    for key, value in record.items():
-        if str(key) in CLAIM_KEYS and isinstance(value, str):
+    # Prefer the record's descriptive claim/title over the lifecycle status itself.
+    # Comparing "active" with "cancelled" would only repeat the contradiction,
+    # not establish that both sources refer to the same underlying event.
+    for key in ("title", "headline", "claim", "statement", "finding", "summary", "description", "text", "content"):
+        value = record.get(key)
+        if isinstance(value, str):
             candidate = value.strip()
             if candidate and len(candidate) <= 500:
                 claim = candidate
                 break
     return entity, claim
+
+
+def _same_claim(left: str, right: str) -> bool:
+    """Conservatively match event descriptions without treating entity alone as identity."""
+    ignored = {"a", "an", "the", "update", "updated", "status", "report", "reported"}
+    left_tokens = set(re.findall(r"[a-z0-9]+", left.lower())) - ignored
+    right_tokens = set(re.findall(r"[a-z0-9]+", right.lower())) - ignored
+    if not left_tokens or not right_tokens:
+        return False
+    overlap = len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+    return overlap >= 0.5
 
 
 def _iter_status_records(value: Any):
@@ -246,7 +262,7 @@ def _extract_claims(tool_name: str, output: Any) -> list[dict[str, Any]]:
                 "tool": tool_name,
             })
     return claims
-def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
+def detect_conflicts(calls: list[Any], now: datetime | None = None) -> dict[str, Any]:
     """Find conservative same-claim contradictions across successful calls.
 
     Different lifecycle stages (e.g. signed then implementation delayed) are
@@ -259,8 +275,9 @@ def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
         if not getattr(call, "ok", False):
             continue
         output = getattr(call, "output", None)
-        freshness = normalize_freshness(getattr(call, "tool", ""), output)
-        if freshness["status"] == "STALE":
+        freshness = normalize_freshness(getattr(call, "tool", ""), output, now=now)
+        if freshness["status"] not in {"FRESH", "AGING"}:
+            # Unknown timestamps are not enough to establish a current contradiction.
             continue
         claims.extend(_extract_claims(getattr(call, "tool", ""), output))
 
@@ -272,7 +289,9 @@ def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
             pair = frozenset({left["status"], right["status"]})
             if pair not in CONFLICT_PAIRS:
                 continue
-            if left["entity"] and right["entity"] and left["entity"].lower() != right["entity"].lower():
+            if not left["entity"] or not right["entity"] or left["entity"].lower() != right["entity"].lower():
+                continue
+            if not left["claim"] or not right["claim"] or not _same_claim(left["claim"], right["claim"]):
                 continue
             conflicts.append({
                 "type": "CONTRADICTORY_STATUS",

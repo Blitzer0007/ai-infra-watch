@@ -1,0 +1,88 @@
+name: Peer Fundamentals Production Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: peer-fundamentals-production-smoke
+  cancel-in-progress: false
+
+jobs:
+  peer-fundamentals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check SEC peer-fundamentals API contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://ai-infra-watch-theta.vercel.app/api/company-scale?action=peer-fundamentals&symbols=NVDA%2CAMD"
+          status="$(curl --silent --show-error --max-time 35 -o /tmp/peer-fundamentals.json -w '%{http_code}' "$url")"
+          if [ "$status" != "200" ]; then
+            echo "::error::Expected HTTP 200 from peer-fundamentals API, got $status"
+            cat /tmp/peer-fundamentals.json
+            exit 1
+          fi
+
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          body = json.loads(Path("/tmp/peer-fundamentals.json").read_text(encoding="utf-8"))
+          if body.get("source") != "SEC EDGAR companyfacts":
+              raise SystemExit(f"unexpected evidence source: {body.get('source')!r}")
+          if not isinstance(body.get("retrievedAt"), str):
+              raise SystemExit("retrievedAt must be present")
+          try:
+              retrieved = datetime.fromisoformat(body["retrievedAt"].replace("Z", "+00:00"))
+          except ValueError as exc:
+              raise SystemExit(f"retrievedAt is not ISO-8601: {exc}")
+          if retrieved.tzinfo is None or retrieved > datetime.now(timezone.utc):
+              raise SystemExit("retrievedAt must be timezone-aware and not in the future")
+
+          results = body.get("results")
+          if not isinstance(results, list):
+              raise SystemExit("results must be an array")
+          by_symbol = {row.get("symbol"): row for row in results if isinstance(row, dict)}
+          for symbol in ("NVDA", "AMD"):
+              row = by_symbol.get(symbol)
+              if not row:
+                  raise SystemExit(f"missing requested peer {symbol}")
+              if row.get("status") not in {"partial", "insufficient-evidence", "unavailable", "not-found"}:
+                  raise SystemExit(f"unexpected status for {symbol}: {row.get('status')!r}")
+              metrics = row.get("metrics")
+              if not isinstance(metrics, dict):
+                  raise SystemExit(f"{symbol} metrics must be an object")
+              for metric_name, metric in metrics.items():
+                  if not isinstance(metric, dict):
+                      raise SystemExit(f"{symbol}.{metric_name} must be an evidence object")
+                  if metric.get("status") != "verified":
+                      raise SystemExit(f"{symbol}.{metric_name} must only expose verified evidence")
+                  if not metric.get("source", "").startswith("SEC EDGAR companyfacts"):
+                      raise SystemExit(f"{symbol}.{metric_name} has unexpected source")
+                  if not metric.get("sourceUrl", "").startswith("https://data.sec.gov/"):
+                      raise SystemExit(f"{symbol}.{metric_name} has unexpected source URL")
+                  if not metric.get("observedAt") or not metric.get("periodEnd"):
+                      raise SystemExit(f"{symbol}.{metric_name} is missing filing/period timestamps")
+                  if not isinstance(metric.get("value"), (int, float)):
+                      raise SystemExit(f"{symbol}.{metric_name} must have a numeric value")
+
+          nvda_size = by_symbol["NVDA"]["metrics"].get("size")
+          if not nvda_size:
+              raise SystemExit("NVDA must expose a sourced annual revenue size proxy")
+          observed = datetime.fromisoformat(nvda_size["observedAt"].replace("Z", "+00:00"))
+          age = datetime.now(timezone.utc) - observed
+          if observed.tzinfo is None or age < timedelta(0) or age > timedelta(days=550):
+              raise SystemExit(f"NVDA annual revenue evidence is stale or invalid: {nvda_size['observedAt']}")
+
+          print("SEC peer-fundamentals production API contract passed")
+          for symbol in ("NVDA", "AMD"):
+              row = by_symbol[symbol]
+              print(f"{symbol}: status={row['status']}, verified_metrics={len(row['metrics'])}")
+          PY

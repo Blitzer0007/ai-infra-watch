@@ -166,6 +166,6 @@ def market_agent(state: AgentState) -> dict[str, Any]:
             },
             *([mcp_source] if mcp_source else []),
         ],
-        "errors": state.get("errors", []) + ([mcp_error] if mcp_error else []),
-        "trace": state.get("trace", []) + ["market_agent"],
+        "errors": ([mcp_error] if mcp_error else []),
+        "trace": ["market_agent"],
     }

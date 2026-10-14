@@ -125,7 +125,7 @@ def risk_agent(state: AgentState) -> dict[str, Any]:
     if mcp_error:
         evidence["mcpError"] = mcp_error
 
-    sources = state.get("sources", []) + [{
+    sources = [{
         "agent": "Risk Agent",
         "type": mcp_source["type"] if mcp_source else "risk_taxonomy",
         "source": mcp_source["source"] if mcp_source else "ai-infra-watch risk mapping",
@@ -135,6 +135,6 @@ def risk_agent(state: AgentState) -> dict[str, Any]:
     return {
         "risk_evidence": evidence,
         "sources": sources,
-        "errors": state.get("errors", []) + ([mcp_error] if mcp_error else []),
-        "trace": state.get("trace", []) + ["risk_agent"],
+        "errors": ([mcp_error] if mcp_error else []),
+        "trace": ["risk_agent"],
     }

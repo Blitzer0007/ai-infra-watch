@@ -72,7 +72,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py
 
       - name: Run MCP contract tests
         env:
