@@ -137,3 +137,65 @@ describe('JEV paper allocator evidence and risk gates', () => {
     }), /between 0 and 100/);
   });
 });
+
+
+  it('applies a bounded peer-strength tilt only when all candidates have fresh coverage', () => {
+    const result = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 100, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 0, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    assert.equal(result.allocationAllowed, true);
+    assert.ok(result.suggestedWeights.find(item => item.symbol === 'AAA')!.weight >
+      result.suggestedWeights.find(item => item.symbol === 'BBB')!.weight);
+    assert.ok(result.alerts.some(alert => alert.includes('Evidence-backed peer strength')));
+    assert.ok(result.suggestedWeights.every(item => item.weight <= 0.15 + 1e-9));
+  });
+
+  it('does not apply peer-strength tilt if any candidate evidence is stale or under-covered', () => {
+    const result = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 100, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 0, peerStrengthCoverage: 0.2, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    assert.equal(result.suggestedWeights.find(item => item.symbol === 'AAA')!.weight,
+      result.suggestedWeights.find(item => item.symbol === 'BBB')!.weight);
+    assert.ok(result.alerts.some(alert => alert.includes('no peer-strength ranking is applied')));
+  });
+
+  it('preserves saved target allocations despite peer-strength differences', () => {
+    const result = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', targetAllocationPct: 10, peerStrengthScore: 100, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', targetAllocationPct: 10, peerStrengthScore: 0, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: true,
+    });
+    assert.equal(result.suggestedWeights.find(item => item.symbol === 'AAA')!.weight, 0.1);
+    assert.equal(result.suggestedWeights.find(item => item.symbol === 'BBB')!.weight, 0.1);
+  });
+
+  it('includes covered peer strength in the balance score and emits a low-strength risk alert', () => {
+    const strong = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 90, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 80, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    const weak = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 20, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 10, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    assert.ok(strong.balanceScore! > weak.balanceScore!);
+    assert.ok(weak.alerts.some(alert => alert.includes('low relative peer-strength score')));
+    assert.ok(strong.alerts.some(alert => alert.includes('blends diversification')));
+  });

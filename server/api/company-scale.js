@@ -195,6 +195,102 @@ function pickRevenueFact(facts) {
   return null;
 }
 
+
+function annualFactRows(facts, tags) {
+  const usgaap = facts?.facts?.['us-gaap'] || {};
+  let bestRows = [];
+  for (const tag of tags) {
+    const units = usgaap[tag]?.units || {};
+    const rows = (units.USD || []).filter(row =>
+      row?.form === '10-K' && row?.fp === 'FY' && Number.isFinite(row?.val) &&
+      row?.start && row?.end && row?.filed
+    ).map(row => ({
+      value: Number(row.val), start: row.start, end: row.end, filed: row.filed,
+      form: row.form, tag, source: 'SEC EDGAR companyfacts',
+      sourceUrl: 'https://data.sec.gov/api/xbrl/companyfacts/CIK' + String(facts?.cik || '').padStart(10, '0') + '.json',
+    })).filter(row => {
+      const days = (Date.parse(row.end) - Date.parse(row.start)) / 86400000;
+      return days >= 300 && days <= 400;
+    }).sort((a, b) => String(b.end).localeCompare(String(a.end)) || String(b.filed).localeCompare(String(a.filed)));
+    const byEnd = new Map();
+    for (const row of rows) if (!byEnd.has(row.end)) byEnd.set(row.end, row);
+    const uniqueRows = [...byEnd.values()].slice(0, 3);
+    // Prefer tags with more distinct annual periods instead of stopping at a latest-year-only tag.
+    if (uniqueRows.length > bestRows.length) bestRows = uniqueRows;
+  }
+  return bestRows;
+}
+
+function factEvidence(row, value, unit) {
+  if (!row || !Number.isFinite(value)) return null;
+  return {
+    value,
+    unit,
+    source: 'SEC EDGAR companyfacts · ' + row.tag,
+    sourceUrl: row.sourceUrl,
+    observedAt: new Date(row.filed + 'T00:00:00Z').toISOString(),
+    periodEnd: row.end,
+    status: 'verified',
+  };
+}
+
+async function getPeerFundamentalSnapshot(symbol, tickerMap) {
+  const company = tickerMap.get(symbol);
+  if (!company) return { symbol, company: null, metrics: {}, status: 'not-found', error: 'Ticker not found in the SEC directory.' };
+  const facts = await fetchSec('https://data.sec.gov/api/xbrl/companyfacts/CIK' + company.cik + '.json');
+  facts.cik = company.cik;
+  const revenue = annualFactRows(facts, [
+    'RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet',
+    'SalesRevenueGoodsNet', 'SalesRevenueServicesNet',
+  ]);
+  const operatingIncome = annualFactRows(facts, ['OperatingIncomeLoss']);
+  const capex = annualFactRows(facts, ['PaymentsToAcquirePropertyPlantAndEquipment']);
+  const metrics = {};
+  if (revenue[0]) metrics.size = factEvidence(revenue[0], revenue[0].value, 'usd');
+  const currentRevenueYear = Number(revenue[0]?.end?.slice(0, 4));
+  const previousRevenueYear = Number(revenue[1]?.end?.slice(0, 4));
+  const currentRevenueDays = revenue[0] ? (Date.parse(revenue[0].end) - Date.parse(revenue[0].start)) / 86400000 : NaN;
+  const previousRevenueDays = revenue[1] ? (Date.parse(revenue[1].end) - Date.parse(revenue[1].start)) / 86400000 : NaN;
+  const comparableAnnualRevenue = Number.isFinite(currentRevenueDays) && Number.isFinite(previousRevenueDays) && Math.abs(currentRevenueDays - previousRevenueDays) <= 35;
+  if (revenue[0] && revenue[1] && revenue[1].value !== 0 && currentRevenueYear === previousRevenueYear + 1 && comparableAnnualRevenue) {
+    metrics.revenueGrowth = factEvidence(revenue[0], ((revenue[0].value / revenue[1].value) - 1) * 100, 'percent');
+  }
+  const matchingOperating = operatingIncome.find(row => row.end === revenue[0]?.end && row.start === revenue[0]?.start);
+  if (matchingOperating && revenue[0]?.value > 0) {
+    metrics.operatingMargin = factEvidence(matchingOperating, matchingOperating.value / revenue[0].value * 100, 'percent');
+  }
+  const matchingCapex = capex.find(row => row.end === revenue[0]?.end && row.start === revenue[0]?.start);
+  if (matchingCapex && revenue[0]?.value > 0) {
+    metrics.capitalIntensity = factEvidence(matchingCapex, Math.abs(matchingCapex.value) / revenue[0].value * 100, 'percent');
+  }
+  return {
+    symbol,
+    company: company.title,
+    cik: company.cik,
+    metrics,
+    source: 'SEC EDGAR companyfacts',
+    retrievedAt: new Date().toISOString(),
+    status: Object.keys(metrics).length ? 'partial' : 'insufficient-evidence',
+    note: 'Annual SEC facts only. Metrics are omitted when comparable annual facts are unavailable; values may reflect the latest filed fiscal year rather than current-quarter conditions.',
+  };
+}
+
+async function handlePeerFundamentals(req, res) {
+  const symbols = [...new Set(String(req.query?.symbols || '').split(',').map(cleanSymbol).filter(symbol => /^[A-Z0-9.^=-]{1,20}$/.test(symbol)))].slice(0, 12);
+  if (symbols.length < 2) return res.status(400).json({ error: 'At least two valid US ticker symbols are required.' });
+  try {
+    const tickerMap = await loadTickerMap();
+    const settled = await Promise.allSettled(symbols.map(symbol => getPeerFundamentalSnapshot(symbol, tickerMap)));
+    const results = settled.map((item, index) => item.status === 'fulfilled'
+      ? item.value
+      : { symbol: symbols[index], company: null, metrics: {}, source: 'SEC EDGAR companyfacts', status: 'unavailable', error: String(item.reason?.message || item.reason) });
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=21600');
+    return res.status(200).json({ source: 'SEC EDGAR companyfacts', retrievedAt: new Date().toISOString(), results });
+  } catch (error) {
+    return res.status(502).json({ error: String(error?.message || error), source: 'SEC EDGAR companyfacts' });
+  }
+}
+
 async function getCompanyScale(symbol) {
   const normalized = cleanSymbol(symbol);
   if (!normalized) throw new Error('Symbol is required.');
@@ -1159,6 +1255,7 @@ async function handleMilestones(req, res) {
 export default async function handler(req, res) {
   const action = String(req.query?.action || '').trim().toLowerCase();
   if (action === 'history') return handleHistory(req, res);
+  if (action === 'peer-fundamentals') return handlePeerFundamentals(req, res);
   if (action === 'milestones') return handleMilestones(req, res);
   if (action === 'contract-discovery') return handleContractDiscovery(req, res);
   if (action === 'executive') return handleExecutiveSignals(req, res);

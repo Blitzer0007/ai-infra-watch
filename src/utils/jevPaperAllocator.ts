@@ -3,6 +3,10 @@ export type JevAllocatorCandidate = {
   sector: string;
   peerCount?: number;
   peerComparabilityScore?: number;
+  /** Evidence-gated relative score; only set from scorePeerStrength output. */
+  peerStrengthScore?: number | null;
+  peerStrengthCoverage?: number;
+  peerStrengthEvidenceFresh?: boolean;
   currentPrice?: number | null;
   averageCost?: number | null;
   quoteFresh?: boolean;
@@ -65,6 +69,8 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     if (!String(item.sector || '').trim()) throw new Error('Every candidate requires a sector.');
     if (item.peerCount != null && (!Number.isInteger(item.peerCount) || item.peerCount < 0)) throw new Error('Peer count must be a non-negative integer.');
     if (item.peerComparabilityScore != null && (!finite(item.peerComparabilityScore) || item.peerComparabilityScore < 0 || item.peerComparabilityScore > 100)) throw new Error('Peer comparability must be between 0 and 100.');
+    if (item.peerStrengthScore != null && (!finite(item.peerStrengthScore) || item.peerStrengthScore < 0 || item.peerStrengthScore > 100)) throw new Error('Peer strength must be between 0 and 100.');
+    if (item.peerStrengthCoverage != null && (!finite(item.peerStrengthCoverage) || item.peerStrengthCoverage < 0 || item.peerStrengthCoverage > 1)) throw new Error('Peer strength coverage must be between 0 and 1.');
     for (const field of ['currentWeightPct', 'targetAllocationPct', 'maxAllocationPct', 'lossLimitPct'] as const) {
       const value = item[field];
       if (value != null && (!finite(value) || value < 0 || value > 100)) throw new Error(field + ' must be between 0 and 100.');
@@ -106,12 +112,24 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   const alerts: string[] = [];
   const sectorWeights: Record<string, number> = {};
   if (allocationAllowed) {
+    const peerStrengthReady = input.candidates.length > 1 && input.candidates.every(candidate =>
+      candidate.peerStrengthScore != null && candidate.peerStrengthCoverage != null && candidate.peerStrengthCoverage >= 0.6 && candidate.peerStrengthEvidenceFresh === true
+    );
+    if (peerStrengthReady) alerts.push('Evidence-backed peer strength is available for all selected candidates; small ranking tilts apply only where no saved target allocation exists.');
+    else if (input.candidates.some(candidate => candidate.peerStrengthScore != null)) alerts.push('Peer-strength evidence is incomplete, stale, or below 60% coverage for at least one candidate; no peer-strength ranking is applied.');
     if (input.candidates.some(candidate => (candidate.peerCount ?? 0) === 0)) {
       alerts.push('Peer comparisons are unavailable for one or more candidates; suggested weights remain unranked and equal-weight unless saved targets apply.');
     }
     const equalWeight = Math.min(maxPosition, (1 - minCash) / input.candidates.length);
     const desiredWeight = (candidate: JevAllocatorCandidate) => {
-      const requested = candidate.targetAllocationPct == null ? equalWeight : candidate.targetAllocationPct / 100;
+      const savedTargetExists = candidate.targetAllocationPct != null;
+      const baseRequested = savedTargetExists ? candidate.targetAllocationPct! / 100 : equalWeight;
+      // Only tilt un-targeted candidates when every selected name has fresh,
+      // sufficiently covered peer-strength evidence. Limit the tilt to ±20%.
+      const tilt = peerStrengthReady && !savedTargetExists
+        ? 0.8 + (candidate.peerStrengthScore! / 100) * 0.4
+        : 1;
+      const requested = baseRequested * tilt;
       const savedMax = candidate.maxAllocationPct == null ? maxPosition : Math.min(maxPosition, candidate.maxAllocationPct / 100);
       return Math.max(0, Math.min(requested, savedMax, maxPosition));
     };
@@ -133,6 +151,9 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
           weight: roundWeight(weight),
           dollars: Number((input.capital * roundWeight(weight)).toFixed(2)),
         });
+        if (peerStrengthReady && member.peerStrengthScore != null && member.peerStrengthScore < 35 && weight > 0.05) {
+          alerts.push(member.symbol.toUpperCase() + ' has a low relative peer-strength score (' + member.peerStrengthScore.toFixed(1) + '/100); review the proposed exposure before manual approval.');
+        }
         if (member.currentWeightPct != null && member.maxAllocationPct != null && member.currentWeightPct > member.maxAllocationPct + 0.5) {
           alerts.push(member.symbol.toUpperCase() + ' is already above its saved maximum allocation; proposed paper weight is capped and should be reviewed.');
         }
@@ -170,12 +191,19 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     const cashWeight = input.capital > 0 ? cashDollars / input.capital : Math.max(0, 1 - invested);
     if (cashWeight < minCash - 1e-6) alerts.push('Suggested allocation would breach the minimum cash reserve.');
     if (suggestedWeights.some(row => row.weight > maxPosition + 1e-9)) alerts.push('A suggested position exceeds the maximum position limit.');
-    const score = Math.max(0, Math.min(100, 100 - Math.max(0, Math.max(...Object.values(sectorWeights), 0) - 0.2) * 100));
+    const diversificationScore = Math.max(0, Math.min(100, 100 - Math.max(0, Math.max(...Object.values(sectorWeights), 0) - 0.2) * 100));
+    const peerStrengthScore = peerStrengthReady
+      ? input.candidates.reduce((sum, candidate) => sum + (candidate.peerStrengthScore ?? 50), 0) / input.candidates.length
+      : null;
+    const score = peerStrengthScore == null
+      ? diversificationScore
+      : diversificationScore * 0.7 + peerStrengthScore * 0.3;
+    if (peerStrengthReady && peerStrengthScore != null) alerts.push('Portfolio balance score blends diversification (70%) with average relative peer strength (30%); peer strength is a peer-set comparison, not a return forecast.');
     return {
       allocationAllowed, blockedReasons, suggestedWeights: suggestedWeights.sort((a, b) => a.symbol.localeCompare(b.symbol)),
       cashWeight: roundWeight(cashWeight), cashDollars,
       balanceScore: Number(score.toFixed(1)), sectorWeights, alerts,
-      methodology: 'Equal-weight paper proposal, capped at 15% per holding and 35% per sector, with at least 5% cash. Peer coverage is shown as context only; it does not rank stocks. No broker orders are sent.',
+      methodology: 'Paper-only proposal, capped at 15% per holding and 35% per sector, with at least 5% cash. A bounded ±20% relative peer-strength tilt is used only when every selected candidate has fresh, verified peer metrics and at least 60% metric-weight coverage; saved target allocations take precedence. Missing evidence never receives an imputed score. Manual approval is required; no broker orders are sent.',
     };
   }
 

@@ -8,6 +8,7 @@ import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
 import { selectDynamicPeers } from '../utils/peerIntelligence';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import { buildJevPaperAllocator } from '../utils/jevPaperAllocator';
+import { scorePeerStrength, type PeerFundamentalSnapshot } from '../utils/peerStrength';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 
 const candidates = [
@@ -43,6 +44,8 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
   const [storedHoldings, setStoredHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [holdingRulesError, setHoldingRulesError] = useState('');
   const [holdingRulesLoaded, setHoldingRulesLoaded] = useState(false);
+  const [peerFundamentals, setPeerFundamentals] = useState<PeerFundamentalSnapshot[]>([]);
+  const [peerFundamentalsStatus, setPeerFundamentalsStatus] = useState('not-loaded');
   const selectedKey = selected.join(',');
 
   const loadHistoryCoverage = async () => {
@@ -85,6 +88,26 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     setCandidateResearch(null);
     setUseSuggestedAllocation(false);
     setResearchError('');
+    let cancelled = false;
+    setPeerFundamentalsStatus('loading');
+    const symbols = [...new Set(selected)];
+    if (symbols.length < 2) {
+      setPeerFundamentals([]);
+      setPeerFundamentalsStatus('insufficient-universe');
+      return () => { cancelled = true; };
+    }
+    authFetch('/api/company-scale?action=peer-fundamentals&symbols=' + encodeURIComponent(symbols.join(',')), { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body.results)) throw new Error(body.error || 'SEC peer fundamentals unavailable.');
+        if (!cancelled) {
+          setPeerFundamentals(body.results.filter((row: any) => row && row.symbol && row.metrics).map((row: any) => ({ symbol: row.symbol, metrics: row.metrics })));
+          setPeerFundamentalsStatus('loaded');
+        }
+      }).catch(() => {
+        if (!cancelled) { setPeerFundamentals([]); setPeerFundamentalsStatus('unavailable'); }
+      });
+    return () => { cancelled = true; };
   }, [selectedKey]);
 
   useEffect(() => {
@@ -225,6 +248,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     ...(Array.isArray(candidateResearch?.jev?.thesis_invalidations) ? candidateResearch.jev.thesis_invalidations : []),
     ...(Array.isArray(candidateResearch?.jev?.thesis_rule_breaches) ? candidateResearch.jev.thesis_rule_breaches : []),
   ].map((item: any) => typeof item === 'string' ? item : String(item?.symbol || item?.ticker || 'unknown holding'));
+  const peerStrengthResults = useMemo(() => scorePeerStrength(peerFundamentals, { maxAgeDays: 550, minimumCoverage: 0.6 }), [peerFundamentals]);
   const allocator = useMemo(() => buildJevPaperAllocator({
     candidates: selected.map(symbol => {
       const item = candidates.find(candidate => candidate.symbol === symbol)!;
@@ -232,12 +256,15 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       const holding = storedHoldings.find(row => row.symbol.toUpperCase() === symbol.toUpperCase());
       const quote = livePrices[symbol];
       const quoteFresh = Boolean(quote && !quote.stale && Number.isFinite(quote.price) && quote.price > 0);
+      const strength = peerStrengthResults.find(result => result.symbol === symbol);
       const portfolioValue = storedHoldings.length > 0 && storedHoldings.every(row => {
         const rowQuote = livePrices[row.symbol.toUpperCase()];
         return Boolean(rowQuote && !rowQuote.stale && Number.isFinite(rowQuote.price) && rowQuote.price > 0);
       }) ? storedHoldings.reduce((sum, row) => sum + livePrices[row.symbol.toUpperCase()].price * row.quantity, 0) : null;
       return {
         symbol, sector: item.sector, peerCount: peer?.peerCount || 0, peerComparabilityScore: peer?.comparabilityScore || 0,
+        peerStrengthScore: strength?.score ?? null, peerStrengthCoverage: strength?.coverage ?? 0,
+        peerStrengthEvidenceFresh: strength?.status === 'scored' && strength.availableMetrics.length > 0,
         currentPrice: quoteFresh ? quote!.price : null, averageCost: holding?.averageCost ?? null, quoteFresh,
         currentWeightPct: portfolioValue && quoteFresh ? (quote!.price * (holding?.quantity || 0) / portfolioValue) * 100 : null,
         targetAllocationPct: holding?.targetAllocationPct ?? null, maxAllocationPct: holding?.maxAllocationPct ?? null,
@@ -250,7 +277,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     evidenceFresh, conflictCount: evidenceConflicts, gateAction: evidenceAction, thesisBreaches,
     savedRulesLoaded: holdingRulesLoaded,
     maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05,
-  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, holdingRulesLoaded, storedHoldings, livePrices]);
+  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, peerStrengthResults, holdingRulesLoaded, storedHoldings, livePrices]);
 
   const target: PaperHolding[] = useMemo(() => {
     if (useSuggestedAllocation && allocator.allocationAllowed) return allocator.suggestedWeights.map(item => ({
@@ -378,10 +405,11 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
           <h3 className="font-semibold">Peer-aware new-money allocator</h3>
           <span className={allocator.allocationAllowed ? 'rounded-full border border-emerald-400/30 px-2 py-1 text-xs text-emerald-200' : 'rounded-full border border-amber-400/30 px-2 py-1 text-xs text-amber-200'}>{allocator.allocationAllowed ? 'Evidence gate passed' : 'Allocation blocked'}</span>
         </div>
-        <p className="text-xs text-white/55">Peer comparability comes from configured relationships, industry/theme overlap, and geography. Fundamental peer strength metrics are not yet consistently available, so this is not an investment ranking. The suggested weights are equal-weight paper allocations constrained by position, sector, and cash limits.</p>
+        <p className="text-xs text-white/55">Peer comparability measures similarity; peer strength is separate and uses only sourced SEC annual fundamentals. Missing, stale, mismatched, or insufficient evidence disables the strength tilt. The proposal remains paper-only and constrained by saved targets, position, sector, and cash limits.</p>
+        <p className="text-xs text-white/45">SEC fundamentals: {peerFundamentalsStatus === 'loaded' ? peerStrengthResults.filter(item => item.status === 'scored').length + ' of ' + selected.length + ' candidates meet the evidence threshold.' : peerFundamentalsStatus === 'loading' ? 'Loading company filings…' : peerFundamentalsStatus === 'unavailable' ? 'Unavailable; no peer-strength ranking is applied.' : 'Waiting for selected candidates.'} Annual filings can lag current conditions; analyst coverage is not included unless a verified count is available.</p>
         {allocator.blockedReasons.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{allocator.blockedReasons.map((reason: string) => <li key={reason}>{reason}</li>)}</ul>}
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-white/70">Peer comparability context</h4>
+          <h4 className="text-xs font-semibold text-white/70">Peer comparability and financial-strength evidence</h4>
           {peerContexts.map(peer => <div key={peer.symbol} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm">
             <div><p className="font-medium">{peer.symbol}</p><p className="mt-1 text-xs text-white/45">{peer.primary ? 'Closest peer: ' + peer.primary.symbol + ' · ' + peer.primary.name : 'No configured peer found in the tracked universe.'}</p><p className="text-xs text-white/40">{peer.reasons.join(' · ') || 'No comparability reasons available.'}</p></div>
             <div className="text-right"><p className="font-semibold">{peer.comparabilityScore}/100</p><p className="text-xs text-white/40">{peer.peerCount} comparable names</p></div>
@@ -390,7 +418,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
         </div>
         {allocator.allocationAllowed && <>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">Diversification heuristic, not return forecast</p></div>
+            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">70% diversification + 30% peer strength when evidence is ready; not a return forecast</p></div>
             <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Suggested cash reserve</p><p className="text-xl font-semibold">\${allocator.cashDollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="text-xs text-white/40">{(allocator.cashWeight * 100).toFixed(1)}% of capital</p></div>
             <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Selected candidates</p><p className="text-xl font-semibold">{allocator.suggestedWeights.length}</p><p className="text-xs text-white/40">Manual paper proposal only</p></div>
           </div>
@@ -398,7 +426,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
             {allocator.suggestedWeights.map(item => {
               const peer = peerContexts.find(entry => entry.symbol === item.symbol);
               return <div key={item.symbol} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm">
-                <div><p className="font-medium">{item.symbol} <span className="text-xs font-normal text-white/45">· {item.sector}</span></p><p className="mt-1 text-xs text-white/45">Peer coverage: {peer?.peerCount || 0} candidates · comparability {peer?.comparabilityScore || 0}/100</p><p className="text-xs text-white/40">{peer?.primary ? 'Closest peer: ' + peer.primary.symbol : 'No configured closest peer'}</p></div>
+                <div><p className="font-medium">{item.symbol} <span className="text-xs font-normal text-white/45">· {item.sector}</span></p><p className="mt-1 text-xs text-white/45">Peer coverage: {peer?.peerCount || 0} candidates · comparability {peer?.comparabilityScore || 0}/100</p><p className="text-xs text-white/40">{peer?.primary ? 'Closest peer: ' + peer.primary.symbol : 'No configured closest peer'}</p><p className="text-xs text-white/40">Financial strength: {peerStrengthResults.find(result => result.symbol === item.symbol)?.score == null ? 'Insufficient SEC evidence' : peerStrengthResults.find(result => result.symbol === item.symbol)?.score + '/100'} · coverage {Math.round((peerStrengthResults.find(result => result.symbol === item.symbol)?.coverage || 0) * 100)}%</p></div>
                 <div className="text-right"><p className="font-semibold">\${item.dollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="text-xs text-white/45">{(item.weight * 100).toFixed(1)}%</p></div>
               </div>;
             })}
