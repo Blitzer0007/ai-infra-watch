@@ -198,32 +198,27 @@ function pickRevenueFact(facts) {
 
 function annualFactRows(facts, tags) {
   const usgaap = facts?.facts?.['us-gaap'] || {};
+  let bestRows = [];
   for (const tag of tags) {
     const units = usgaap[tag]?.units || {};
-    const unit = units.USD ? 'usd' : null;
-    const rows = (unit ? units.USD : []).filter(row =>
+    const rows = (units.USD || []).filter(row =>
       row?.form === '10-K' && row?.fp === 'FY' && Number.isFinite(row?.val) &&
       row?.start && row?.end && row?.filed
     ).map(row => ({
-      value: Number(row.val),
-      start: row.start,
-      end: row.end,
-      filed: row.filed,
-      form: row.form,
-      tag,
-      source: 'SEC EDGAR companyfacts',
+      value: Number(row.val), start: row.start, end: row.end, filed: row.filed,
+      form: row.form, tag, source: 'SEC EDGAR companyfacts',
       sourceUrl: 'https://data.sec.gov/api/xbrl/companyfacts/CIK' + String(facts?.cik || '').padStart(10, '0') + '.json',
     })).filter(row => {
       const days = (Date.parse(row.end) - Date.parse(row.start)) / 86400000;
       return days >= 300 && days <= 400;
     }).sort((a, b) => String(b.end).localeCompare(String(a.end)) || String(b.filed).localeCompare(String(a.filed)));
-    if (rows.length) {
-      const byEnd = new Map();
-      for (const row of rows) if (!byEnd.has(row.end)) byEnd.set(row.end, row);
-      return [...byEnd.values()].slice(0, 3);
-    }
+    const byEnd = new Map();
+    for (const row of rows) if (!byEnd.has(row.end)) byEnd.set(row.end, row);
+    const uniqueRows = [...byEnd.values()].slice(0, 3);
+    // Prefer tags with more distinct annual periods instead of stopping at a latest-year-only tag.
+    if (uniqueRows.length > bestRows.length) bestRows = uniqueRows;
   }
-  return [];
+  return bestRows;
 }
 
 function factEvidence(row, value, unit) {
