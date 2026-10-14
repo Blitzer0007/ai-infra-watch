@@ -26,8 +26,9 @@ Track progress in [Issue #110](https://github.com/Blitzer0007/ai-infra-watch/iss
 ### P1-B — Historical backtest integrity
 - [ ] Audit adjusted-close semantics, date/benchmark alignment, decision/execution timestamps, rebalance timing, and transaction-cost accounting.
 - [ ] Verify point-in-time cutoffs for every decision and reject look-ahead observations.
-- [ ] Document survivorship-bias limitations when using today's selected universe and tickers.
-- [ ] Keep outputs labeled exploratory/insufficient whenever provider availability timestamps are assumed or unknown.
+- [x] Gate evidence-ready status on explicit point-in-time universe-membership verification; price history and cutoffs alone do not resolve survivorship bias.
+- [ ] Obtain reliable historical universe membership data and document residual survivorship-bias limitations when using today's selected universe and tickers.
+- [ ] Keep outputs labeled exploratory/insufficient whenever provider availability timestamps or universe membership are assumed or unknown.
 - [ ] Run unit tests, typecheck, build, API/DB validation, and Playwright CI; record remaining data-provider limitations.
 
 ### P1-C — Re-entry Telegram delivery and deduplication
