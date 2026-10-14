@@ -70,3 +70,15 @@ test('excludes evidence with a missing source or future timestamp', () => {
   assert.ok(result.staleMetrics.includes('size'));
   assert.ok(result.staleMetrics.includes('revenueGrowth'));
 });
+
+test('rejects duplicate symbols and ignores metrics with mismatched units', () => {
+  assert.throws(() => scorePeerStrength([snapshot('AAA'), snapshot(' aaa ')], { now }), /unique symbols/);
+  const result = scorePeerStrength([
+    snapshot('AAA', { size: metric(100, 'percent'), revenueGrowth: metric(20, 'usd') }),
+    snapshot('BBB'),
+  ], { now, minimumCoverage: 0.1 });
+  assert.equal(result[0].evidence.size, undefined);
+  assert.equal(result[0].evidence.revenueGrowth, undefined);
+  assert.ok(result[0].missingMetrics.includes('size'));
+  assert.ok(result[0].missingMetrics.includes('revenueGrowth'));
+});
