@@ -418,7 +418,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
         </div>
         {allocator.allocationAllowed && <>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">Diversification heuristic, not return forecast</p></div>
+            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">70% diversification + 30% peer strength when evidence is ready; not a return forecast</p></div>
             <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Suggested cash reserve</p><p className="text-xl font-semibold">\${allocator.cashDollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="text-xs text-white/40">{(allocator.cashWeight * 100).toFixed(1)}% of capital</p></div>
             <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Selected candidates</p><p className="text-xl font-semibold">{allocator.suggestedWeights.length}</p><p className="text-xs text-white/40">Manual paper proposal only</p></div>
           </div>
