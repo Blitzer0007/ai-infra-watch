@@ -89,9 +89,7 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
       blockedReasons.push(symbol + ' is at or below its saved loss limit; review the holding rule before allocating.');
     }
     const exitType = String(candidate.exitRuleType || '').toLowerCase().replace(/[ _]+/g, '-');
-    if (hasFreshQuote && ['price-stop', 'price-stop-loss'].includes(exitType) && Number(candidate.exitRuleValue) > 0 && price <= Number(candidate.exitRuleValue)) {
-      blockedReasons.push(symbol + ' is at or below its saved price stop; review before allocating.');
-    }
+
     if (exitType === 'time-limit' && candidate.purchaseDate && Number(candidate.exitRuleValue) > 0) {
       const purchaseTime = Date.parse(candidate.purchaseDate + (candidate.purchaseDate.length === 10 ? 'T00:00:00Z' : ''));
       if (Number.isFinite(purchaseTime) && Date.now() - purchaseTime >= Number(candidate.exitRuleValue) * 86400000) {
@@ -140,6 +138,9 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
         }
         if (String(member.exitRuleType || '').toLowerCase().includes('trailing')) {
           alerts.push(member.symbol.toUpperCase() + ' has a trailing-stop rule; its peak-price reference must be checked before approval.');
+        }
+        if (String(member.exitRuleType || '').toLowerCase().includes('price')) {
+          alerts.push(member.symbol.toUpperCase() + ' has a price-stop rule; verify the configured stop against the current quote before approval.');
         }
         if (member.quoteFresh !== true && (member.lossLimitPct != null || member.exitRuleType)) {
           alerts.push(member.symbol.toUpperCase() + ' has saved risk rules but no fresh quote to evaluate them.');
