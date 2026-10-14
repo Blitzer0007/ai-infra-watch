@@ -115,6 +115,7 @@ export type HistoricalBacktestResult = {
   rebalanceCount: number;
   adjustedPricesComplete: boolean;
   availabilityStatus: 'verified' | 'assumed' | 'unknown';
+  pointInTimeValidated: boolean;
   evidenceStatus: 'insufficient' | 'ready';
 };
 
@@ -195,6 +196,16 @@ export function runHistoricalPaperBacktest(args: {
   const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b));
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
+  // A result cannot be marked ready unless every historical session has an explicit decision cutoff
+  // and every price observation was available by that cutoff. Merely labeling provider timestamps
+  // as verified is not enough if the backtest never applies those timestamps to decision times.
+  const pointInTimeValidated = dates.every(date => {
+    const cutoff = args.decisionCutoffByDate?.[date];
+    const cutoffMs = cutoff ? Date.parse(cutoff) : NaN;
+    const day = byDate.get(date);
+    return finite(cutoffMs) && Boolean(day) &&
+      [...day.values()].every(row => Date.parse(row.availableAt) <= cutoffMs && Date.parse(row.date) <= cutoffMs);
+  });
   const adjustedPricesComplete = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).every(row => row.adjusted === true);
   const availabilityStatuses = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).map(row => row.availabilityStatus || 'unknown');
   const availabilityStatus: HistoricalBacktestResult['availabilityStatus'] =
@@ -269,6 +280,7 @@ export function runHistoricalPaperBacktest(args: {
     rebalanceCount,
     adjustedPricesComplete,
     availabilityStatus,
-    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && availabilityStatus === 'verified' ? 'ready' : 'insufficient',
+    pointInTimeValidated,
+    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && availabilityStatus === 'verified' && pointInTimeValidated ? 'ready' : 'insufficient',
   };
 }

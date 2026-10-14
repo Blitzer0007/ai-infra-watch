@@ -1,5 +1,6 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
+import { assertTelegramAccepted } from './telegram-delivery.js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ISSUER = 'https://token.actions.githubusercontent.com';
@@ -68,7 +69,7 @@ async function sendTelegram(row,q) {
   if(!token||!chat) throw new Error('Telegram credentials are not configured');
   const message=['🟢 AI Infra Watch · Re-entry Candidate','',row.symbol+' · '+assess(row,q).status,'Latest price: $'+q.price.toFixed(2),'Your target: $'+Number(row.target_price).toFixed(2),'20-day average: $'+q.sma20.toFixed(2),'50-day average: $'+q.sma50.toFixed(2),'52-week high drawdown: '+(q.drawdownFrom52WeekHighPct==null?'unavailable':q.drawdownFrom52WeekHighPct.toFixed(1)+'%'),'Saved thesis: '+String(row.thesis||'not recorded'),'','Why now: target reached and trend confirmation met.','Before acting, re-check current valuation, earnings, fresh company evidence, and portfolio concentration.','Review alert only — no automatic buy/sell instruction.'].join('\n');
   const response=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chat,text:message}),signal:AbortSignal.timeout(10000)});
-  if(!response.ok) throw new Error('Telegram delivery failed: HTTP '+response.status);
+  await assertTelegramAccepted(response);
 }
 async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
