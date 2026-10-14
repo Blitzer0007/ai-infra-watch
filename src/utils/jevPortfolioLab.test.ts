@@ -162,3 +162,42 @@ test('historical backtest rejects explicitly unadjusted prices', () => {
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
   }), /Adjusted closes are required/);
 });
+
+
+test('does not mark a backtest ready without explicit cutoffs for every historical session', () => {
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const result = runHistoricalPaperBacktest({
+    prices,
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+    minimumObservations: 2,
+  });
+  assert.equal(result.pointInTimeValidated, false);
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('marks point-in-time validation only when every session has a cutoff after its observations', () => {
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  const prices: HistoricalPrice[] = [];
+  const series: Record<string, number[]> = { MSFT: [100, 110, 121], SPY: [100, 105, 110.25], QQQ: [100, 106, 112.36] };
+  for (const [symbol, values] of Object.entries(series)) {
+    dates.forEach((date, index) => prices.push({
+      symbol,
+      date,
+      close: values[index],
+      availableAt: date + 'T23:59:59.999Z',
+      adjusted: true,
+      availabilityStatus: 'verified',
+    }));
+  }
+  const decisionCutoffByDate = Object.fromEntries(dates.map(date => [date, date + 'T23:59:59.999Z']));
+  const result = runHistoricalPaperBacktest({
+    prices,
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+    minimumObservations: 2,
+    decisionCutoffByDate,
+  });
+  assert.equal(result.pointInTimeValidated, true);
+  assert.equal(result.evidenceStatus, 'ready');
+});
