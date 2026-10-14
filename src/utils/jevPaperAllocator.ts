@@ -106,6 +106,9 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   const alerts: string[] = [];
   const sectorWeights: Record<string, number> = {};
   if (allocationAllowed) {
+    if (input.candidates.some(candidate => (candidate.peerCount ?? 0) === 0)) {
+      alerts.push('Peer comparisons are unavailable for one or more candidates; suggested weights remain unranked and equal-weight unless saved targets apply.');
+    }
     const equalWeight = Math.min(maxPosition, (1 - minCash) / input.candidates.length);
     const desiredWeight = (candidate: JevAllocatorCandidate) => {
       const requested = candidate.targetAllocationPct == null ? equalWeight : candidate.targetAllocationPct / 100;
