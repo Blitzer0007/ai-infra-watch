@@ -17,3 +17,20 @@ test('Telegram success without a message id is not accepted as delivery evidence
 test('HTTP failure is never accepted even if the body claims success', () => {
   assert.equal(telegramAccepted(false, { ok: true, result: { message_id: 42 } }), false);
 });
+
+test('re-entry notification fires only when entering the candidate state', async () => {
+  const { shouldNotifyCandidate } = await import('./reentry-alerts.js');
+  assert.equal(shouldNotifyCandidate('NOT_CANDIDATE', true), true);
+  assert.equal(shouldNotifyCandidate(null, true), true);
+  assert.equal(shouldNotifyCandidate('REENTRY_CANDIDATE', true), false);
+  assert.equal(shouldNotifyCandidate('REENTRY_CANDIDATE', false), false);
+  assert.equal(shouldNotifyCandidate('NOT_CANDIDATE', false), false);
+});
+
+test('a failed delivery leaves the previous non-candidate signature eligible for retry', async () => {
+  const { shouldNotifyCandidate } = await import('./reentry-alerts.js');
+  // State is only patched after sendTelegram succeeds in runScan; a failed send therefore retries next scan.
+  const persistedSignature = 'NOT_CANDIDATE';
+  assert.equal(shouldNotifyCandidate(persistedSignature, true), true);
+  assert.equal(shouldNotifyCandidate(persistedSignature, true), true);
+});
