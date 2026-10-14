@@ -55,7 +55,7 @@ jobs:
         env:
           QA_BASE_URL: http://127.0.0.1:3000
           QA_UI_MOCKS: "true"
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_jev_production.py
 
   api:
     name: API contract validation
