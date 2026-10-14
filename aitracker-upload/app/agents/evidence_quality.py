@@ -246,7 +246,7 @@ def _extract_claims(tool_name: str, output: Any) -> list[dict[str, Any]]:
                 "tool": tool_name,
             })
     return claims
-def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
+def detect_conflicts(calls: list[Any], now: datetime | None = None) -> dict[str, Any]:
     """Find conservative same-claim contradictions across successful calls.
 
     Different lifecycle stages (e.g. signed then implementation delayed) are
@@ -259,7 +259,7 @@ def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
         if not getattr(call, "ok", False):
             continue
         output = getattr(call, "output", None)
-        freshness = normalize_freshness(getattr(call, "tool", ""), output)
+        freshness = normalize_freshness(getattr(call, "tool", ""), output, now=now)
         if freshness["status"] not in {"FRESH", "AGING"}:
             # Unknown timestamps are not enough to establish a current contradiction.
             continue
