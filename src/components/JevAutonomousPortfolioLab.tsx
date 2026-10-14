@@ -331,6 +331,14 @@ export default function JevAutonomousPortfolioLab() {
         </div>
         <p className="text-xs text-white/55">Peer comparability comes from configured relationships, industry/theme overlap, and geography. Fundamental peer strength metrics are not yet consistently available, so this is not an investment ranking. The suggested weights are equal-weight paper allocations constrained by position, sector, and cash limits.</p>
         {allocator.blockedReasons.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{allocator.blockedReasons.map((reason: string) => <li key={reason}>{reason}</li>)}</ul>}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-white/70">Peer comparability context</h4>
+          {peerContexts.map(peer => <div key={peer.symbol} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm">
+            <div><p className="font-medium">{peer.symbol}</p><p className="mt-1 text-xs text-white/45">{peer.primary ? 'Closest peer: ' + peer.primary.symbol + ' · ' + peer.primary.name : 'No configured peer found in the tracked universe.'}</p><p className="text-xs text-white/40">{peer.reasons.join(' · ') || 'No comparability reasons available.'}</p></div>
+            <div className="text-right"><p className="font-semibold">{peer.comparabilityScore}/100</p><p className="text-xs text-white/40">{peer.peerCount} comparable names</p></div>
+          </div>)}
+          <p className="text-xs text-white/35">These scores measure similarity/coverage from configured metadata, not financial strength or expected returns. Missing peer fundamentals are not imputed.</p>
+        </div>
         {allocator.allocationAllowed && <>
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">Diversification heuristic, not return forecast</p></div>
