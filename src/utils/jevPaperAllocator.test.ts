@@ -73,6 +73,48 @@ describe('JEV paper allocator evidence and risk gates', () => {
     );
   });
 
+  it('honors saved target and maximum allocation percentages', () => {
+    const result = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'MSFT', sector: 'software', targetAllocationPct: 20, maxAllocationPct: 5 },
+        { symbol: 'META', sector: 'internet', targetAllocationPct: 10, maxAllocationPct: 15 },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: true,
+    });
+    assert.equal(result.allocationAllowed, true);
+    assert.equal(result.suggestedWeights.find(item => item.symbol === 'MSFT')?.weight, 0.05);
+    assert.equal(result.suggestedWeights.find(item => item.symbol === 'META')?.weight, 0.1);
+  });
+
+  it('blocks allocation when a fresh quote breaches a saved loss or price-stop rule', () => {
+    const lossLimit = buildJevPaperAllocator({
+      candidates: [{ symbol: 'NVDA', sector: 'semiconductors', currentPrice: 80, averageCost: 100, quoteFresh: true, lossLimitPct: 15 }],
+      capital: 1000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: true,
+    });
+    assert.equal(lossLimit.allocationAllowed, false);
+    assert.ok(lossLimit.blockedReasons.some(reason => reason.includes('saved loss limit')));
+
+    const priceStop = buildJevPaperAllocator({
+      candidates: [{ symbol: 'MU', sector: 'semiconductors', currentPrice: 70, averageCost: 100, quoteFresh: true, exitRuleType: 'price-stop', exitRuleValue: 75 }],
+      capital: 1000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: true,
+    });
+    assert.equal(priceStop.allocationAllowed, false);
+    assert.ok(priceStop.blockedReasons.some(reason => reason.includes('saved price stop')));
+  });
+
+  it('blocks when saved portfolio rules could not be loaded', () => {
+    const result = buildJevPaperAllocator({
+      candidates, capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: false,
+    });
+    assert.equal(result.allocationAllowed, false);
+    assert.equal(result.suggestedWeights.length, 0);
+    assert.ok(result.blockedReasons.some(reason => reason.includes('Saved portfolio rules')));
+  });
+
   it('validates candidate symbols and peer comparability values', () => {
     assert.throws(() => buildJevPaperAllocator({
       candidates: [{ symbol: 'MSFT', sector: 'software' }, { symbol: 'MSFT', sector: 'internet' }],
