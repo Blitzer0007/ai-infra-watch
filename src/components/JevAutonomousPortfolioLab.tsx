@@ -42,6 +42,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
   const [useSuggestedAllocation, setUseSuggestedAllocation] = useState(false);
   const [storedHoldings, setStoredHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [holdingRulesError, setHoldingRulesError] = useState('');
+  const [holdingRulesLoaded, setHoldingRulesLoaded] = useState(false);
   const selectedKey = selected.join(',');
 
   const loadHistoryCoverage = async () => {
@@ -93,9 +94,13 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       if (!cancelled) {
         setStoredHoldings(rows);
         setHoldingRulesError('');
+        setHoldingRulesLoaded(true);
       }
     }).catch(error => {
-      if (!cancelled) setHoldingRulesError(error instanceof Error ? error.message : 'Saved portfolio rules are unavailable.');
+      if (!cancelled) {
+        setHoldingRulesError(error instanceof Error ? error.message : 'Saved portfolio rules are unavailable.');
+        setHoldingRulesLoaded(false);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -243,8 +248,9 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     capital,
     evidenceComplete: evidenceAvailability.complete === true && candidateResearch?.ok !== false,
     evidenceFresh, conflictCount: evidenceConflicts, gateAction: evidenceAction, thesisBreaches,
+    savedRulesLoaded: holdingRulesLoaded,
     maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05,
-  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts]);
+  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, holdingRulesLoaded, storedHoldings, livePrices]);
 
   const target: PaperHolding[] = useMemo(() => {
     if (useSuggestedAllocation && allocator.allocationAllowed) return allocator.suggestedWeights.map(item => ({
