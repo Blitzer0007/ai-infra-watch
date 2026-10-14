@@ -8,6 +8,7 @@ import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
 import { selectDynamicPeers } from '../utils/peerIntelligence';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import { buildJevPaperAllocator } from '../utils/jevPaperAllocator';
+import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 
 const candidates = [
   { symbol: 'MSFT', sector: 'software', label: 'Microsoft' },
@@ -18,7 +19,9 @@ const candidates = [
   { symbol: 'GOOGL', sector: 'internet', label: 'Alphabet' },
 ];
 
-export default function JevAutonomousPortfolioLab() {
+type JEVLivePrice = { price: number; changePct: number; stale?: boolean; retrievedAt?: string };
+
+export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePrices?: Record<string, JEVLivePrice> }) {
   const [capital, setCapital] = useState(PAPER_LAB_DEFAULTS.initialCapital);
   const [costBps, setCostBps] = useState(PAPER_LAB_DEFAULTS.costBps);
   const [selected, setSelected] = useState<string[]>(['MSFT', 'META', 'NOW', 'NVDA']);
@@ -37,6 +40,8 @@ export default function JevAutonomousPortfolioLab() {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError] = useState('');
   const [useSuggestedAllocation, setUseSuggestedAllocation] = useState(false);
+  const [storedHoldings, setStoredHoldings] = useState<StoredPortfolioHolding[]>([]);
+  const [holdingRulesError, setHoldingRulesError] = useState('');
   const selectedKey = selected.join(',');
 
   const loadHistoryCoverage = async () => {
@@ -83,6 +88,16 @@ export default function JevAutonomousPortfolioLab() {
 
   useEffect(() => {
     void loadSavedProposals();
+    let cancelled = false;
+    fetchPortfolioHoldings().then(rows => {
+      if (!cancelled) {
+        setStoredHoldings(rows);
+        setHoldingRulesError('');
+      }
+    }).catch(error => {
+      if (!cancelled) setHoldingRulesError(error instanceof Error ? error.message : 'Saved portfolio rules are unavailable.');
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const runHistoricalBacktest = async () => {
@@ -122,8 +137,22 @@ export default function JevAutonomousPortfolioLab() {
     setResearchError('');
     setCandidateResearch(null);
     try {
+      const savedRuleContext = storedHoldings
+        .filter(holding => selected.includes(holding.symbol.toUpperCase()))
+        .map(holding => ({
+          symbol: holding.symbol,
+          thesis: holding.decisionThesis || null,
+          lossLimitPct: holding.lossLimitPct ?? null,
+          exitRuleType: holding.exitRuleType || null,
+          exitRuleValue: holding.exitRuleValue ?? null,
+          exitRuleText: holding.exitRuleText || null,
+          targetAllocationPct: holding.targetAllocationPct ?? null,
+          maxAllocationPct: holding.maxAllocationPct ?? null,
+          purchaseDate: holding.purchaseDate || null,
+        }));
       const question = [
         'Run a weekly US-equity paper portfolio research review for these candidate tickers: ' + selected.join(', ') + '.',
+        'Existing saved thesis and risk rules for selected holdings, when present: ' + JSON.stringify(savedRuleContext) + '. Assess only explicit evidence-backed thesis invalidations; do not invent a rule breach when evidence is missing.',
         'Compare market data, primary SEC/EDGAR disclosures, recent news, macro/geopolitical evidence, and fundamental/valuation evidence where available.',
         'Use existing independent evidence channels and citations with dates. Distinguish source facts from interpretation; report conflicts and stale or missing channels.',
         'Do not invent unavailable evidence or produce a numeric rank when evidence is insufficient. Return the evidence availability, evidence gate action, missing required families, conflicts, and a concise per-ticker comparison.',
@@ -195,7 +224,21 @@ export default function JevAutonomousPortfolioLab() {
     candidates: selected.map(symbol => {
       const item = candidates.find(candidate => candidate.symbol === symbol)!;
       const peer = peerContexts.find(entry => entry.symbol === symbol);
-      return { symbol, sector: item.sector, peerCount: peer?.peerCount || 0, peerComparabilityScore: peer?.comparabilityScore || 0 };
+      const holding = storedHoldings.find(row => row.symbol.toUpperCase() === symbol.toUpperCase());
+      const quote = livePrices[symbol];
+      const quoteFresh = Boolean(quote && !quote.stale && Number.isFinite(quote.price) && quote.price > 0);
+      const portfolioValue = storedHoldings.length > 0 && storedHoldings.every(row => {
+        const rowQuote = livePrices[row.symbol.toUpperCase()];
+        return Boolean(rowQuote && !rowQuote.stale && Number.isFinite(rowQuote.price) && rowQuote.price > 0);
+      }) ? storedHoldings.reduce((sum, row) => sum + livePrices[row.symbol.toUpperCase()].price * row.quantity, 0) : null;
+      return {
+        symbol, sector: item.sector, peerCount: peer?.peerCount || 0, peerComparabilityScore: peer?.comparabilityScore || 0,
+        currentPrice: quoteFresh ? quote!.price : null, averageCost: holding?.averageCost ?? null, quoteFresh,
+        currentWeightPct: portfolioValue && quoteFresh ? (quote!.price * (holding?.quantity || 0) / portfolioValue) * 100 : null,
+        targetAllocationPct: holding?.targetAllocationPct ?? null, maxAllocationPct: holding?.maxAllocationPct ?? null,
+        lossLimitPct: holding?.lossLimitPct ?? null, exitRuleType: holding?.exitRuleType ?? null,
+        exitRuleValue: holding?.exitRuleValue ?? null, purchaseDate: holding?.purchaseDate ?? null,
+      };
     }),
     capital,
     evidenceComplete: evidenceAvailability.complete === true && candidateResearch?.ok !== false,
@@ -358,6 +401,7 @@ export default function JevAutonomousPortfolioLab() {
           <button type="button" onClick={() => setUseSuggestedAllocation(value => !value)} className="rounded-lg border border-violet-400/30 px-3 py-2 text-sm font-semibold text-violet-200">{useSuggestedAllocation ? 'Use manual equal weights' : 'Use suggested weights in paper preview'}</button>
           {useSuggestedAllocation && <p role="status" className="text-xs text-emerald-200">Suggested weights are active in the preview only. Saving still creates a paper proposal; no broker orders are placed.</p>}
         </>}
+        {holdingRulesError && <p className="text-xs text-amber-200">Saved holding rules could not be loaded: {holdingRulesError}. Do not treat this allocation as checked against existing portfolio rules.</p>}
         <p className="text-xs text-white/40">{allocator.methodology}</p>
       </div>
       {researchError && <p role="status" className="text-sm text-amber-200">{researchError}</p>}
