@@ -101,6 +101,21 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
   const [trackerSymbols, setTrackerSymbols] = useState<string[]>(() => loadTrackerSymbols());
   const [customizeTracker, setCustomizeTracker] = useState(false);
 
+  useEffect(() => {
+    const onShortcutsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ symbol?: string }>).detail;
+      const symbols = loadTrackerSymbols();
+      setTrackerSymbols(symbols);
+      const requested = String(detail?.symbol || '').trim().toUpperCase();
+      if (requested && symbols.includes(requested)) {
+        setSelectedStock(requested);
+        setActiveMilestoneId(null);
+      }
+    };
+    window.addEventListener('aiw-ticker-shortcuts-changed', onShortcutsChanged);
+    return () => window.removeEventListener('aiw-ticker-shortcuts-changed', onShortcutsChanged);
+  }, []);
+
   const addTrackerSymbol = (symbol: string) => {
     const normalized = symbol.trim().toUpperCase();
     if (!normalized) return;
