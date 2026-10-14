@@ -196,7 +196,7 @@ function pickRevenueFact(facts) {
 }
 
 
-function annualFactRows(facts, tags) {
+export function annualFactRows(facts, tags) {
   const usgaap = facts?.facts?.['us-gaap'] || {};
   let bestRows = [];
   for (const tag of tags) {
