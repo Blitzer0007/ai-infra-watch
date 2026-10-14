@@ -63,12 +63,19 @@ function assess(row,q) {
   if(targetReached) return {status:'WATCH_ENTRY',reasons:['Target reached, but trend confirmation or saved thesis is missing.']};
   return {status:'NOT_READY',reasons:['Price remains above your saved target.']};
 }
+export function telegramAccepted(httpOk, payload) {
+  return httpOk === true && payload?.ok === true && Number.isInteger(payload?.result?.message_id) && payload.result.message_id > 0;
+}
+
 async function sendTelegram(row,q) {
   const token=String(process.env.TELEGRAM_BOT_TOKEN||'').trim(), chat=String(process.env.TELEGRAM_CHAT_ID||'').trim();
   if(!token||!chat) throw new Error('Telegram credentials are not configured');
   const message=['🟢 AI Infra Watch · Re-entry Candidate','',row.symbol+' · '+assess(row,q).status,'Latest price: $'+q.price.toFixed(2),'Your target: $'+Number(row.target_price).toFixed(2),'20-day average: $'+q.sma20.toFixed(2),'50-day average: $'+q.sma50.toFixed(2),'52-week high drawdown: '+(q.drawdownFrom52WeekHighPct==null?'unavailable':q.drawdownFrom52WeekHighPct.toFixed(1)+'%'),'Saved thesis: '+String(row.thesis||'not recorded'),'','Why now: target reached and trend confirmation met.','Before acting, re-check current valuation, earnings, fresh company evidence, and portfolio concentration.','Review alert only — no automatic buy/sell instruction.'].join('\n');
   const response=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chat,text:message}),signal:AbortSignal.timeout(10000)});
+  const payload=await response.json().catch(()=>null);
   if(!response.ok) throw new Error('Telegram delivery failed: HTTP '+response.status);
+  if(!telegramAccepted(response.ok,payload)) throw new Error('Telegram API did not confirm message acceptance');
+  return payload.result.message_id;
 }
 async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
