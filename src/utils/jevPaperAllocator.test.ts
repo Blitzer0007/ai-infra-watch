@@ -105,6 +105,17 @@ describe('JEV paper allocator evidence and risk gates', () => {
     assert.ok(priceStop.blockedReasons.some(reason => reason.includes('saved price stop')));
   });
 
+  it('blocks when a saved time-limit exit rule has expired', () => {
+    const purchaseDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const result = buildJevPaperAllocator({
+      candidates: [{ symbol: 'RKLB', sector: 'space', purchaseDate, exitRuleType: 'time-limit', exitRuleValue: 10 }],
+      capital: 1000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+      savedRulesLoaded: true,
+    });
+    assert.equal(result.allocationAllowed, false);
+    assert.ok(result.blockedReasons.some(reason => reason.includes('saved time limit')));
+  });
+
   it('blocks when saved portfolio rules could not be loaded', () => {
     const result = buildJevPaperAllocator({
       candidates, capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
