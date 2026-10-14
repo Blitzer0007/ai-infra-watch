@@ -3,6 +3,16 @@ export type JevAllocatorCandidate = {
   sector: string;
   peerCount?: number;
   peerComparabilityScore?: number;
+  currentPrice?: number | null;
+  averageCost?: number | null;
+  quoteFresh?: boolean;
+  currentWeightPct?: number | null;
+  targetAllocationPct?: number | null;
+  maxAllocationPct?: number | null;
+  lossLimitPct?: number | null;
+  exitRuleType?: string | null;
+  exitRuleValue?: number | null;
+  purchaseDate?: string | null;
 };
 
 export type JevAllocatorInput = {
@@ -54,6 +64,10 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     if (!String(item.sector || '').trim()) throw new Error('Every candidate requires a sector.');
     if (item.peerCount != null && (!Number.isInteger(item.peerCount) || item.peerCount < 0)) throw new Error('Peer count must be a non-negative integer.');
     if (item.peerComparabilityScore != null && (!finite(item.peerComparabilityScore) || item.peerComparabilityScore < 0 || item.peerComparabilityScore > 100)) throw new Error('Peer comparability must be between 0 and 100.');
+    for (const field of ['currentWeightPct', 'targetAllocationPct', 'maxAllocationPct', 'lossLimitPct'] as const) {
+      const value = item[field];
+      if (value != null && (!finite(value) || value < 0 || value > 100)) throw new Error(field + ' must be between 0 and 100.');
+    }
   }
 
   const action = String(input.gateAction || '').toLowerCase();
@@ -64,6 +78,22 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   if (input.conflictCount > 0) blockedReasons.push('Resolve material evidence conflicts first.');
   if (['insufficient', 'gather_more', 'stop'].includes(action)) blockedReasons.push('JEV gate action blocks allocation.');
   if (input.thesisBreaches?.length) blockedReasons.push('Review invalidated thesis or breached holding rules: ' + input.thesisBreaches.join(', '));
+  for (const candidate of input.candidates) {
+    const symbol = candidate.symbol.toUpperCase();
+    const price = Number(candidate.currentPrice);
+    const cost = Number(candidate.averageCost);
+    const hasFreshQuote = candidate.quoteFresh === true && Number.isFinite(price) && price > 0;
+    if (hasFreshQuote && candidate.lossLimitPct != null && candidate.lossLimitPct > 0 && cost > 0 && price <= cost * (1 - candidate.lossLimitPct / 100)) {
+      blockedReasons.push(symbol + ' is at or below its saved loss limit; review the holding rule before allocating.');
+    }
+    const exitType = String(candidate.exitRuleType || '').toLowerCase().replace(/[ _]+/g, '-');
+    if (hasFreshQuote && ['price-stop', 'price-stop-loss'].includes(exitType) && Number(candidate.exitRuleValue) > 0 && price <= Number(candidate.exitRuleValue)) {
+      blockedReasons.push(symbol + ' is at or below its saved price stop; review before allocating.');
+    }
+    if (candidate.currentWeightPct != null && candidate.maxAllocationPct != null && candidate.currentWeightPct > candidate.maxAllocationPct + 0.5) {
+      // Existing holdings may already be above the saved maximum; the allocator must not add to that exposure.
+    }
+  }
   const allocationAllowed = blockedReasons.length === 0;
 
   const suggestedWeights: JevAllocatorResult['suggestedWeights'] = [];
@@ -71,22 +101,39 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   const sectorWeights: Record<string, number> = {};
   if (allocationAllowed) {
     const equalWeight = Math.min(maxPosition, (1 - minCash) / input.candidates.length);
+    const desiredWeight = (candidate: JevAllocatorCandidate) => {
+      const requested = candidate.targetAllocationPct == null ? equalWeight : candidate.targetAllocationPct / 100;
+      const savedMax = candidate.maxAllocationPct == null ? maxPosition : Math.min(maxPosition, candidate.maxAllocationPct / 100);
+      return Math.max(0, Math.min(requested, savedMax, maxPosition));
+    };
     const grouped = new Map<string, JevAllocatorCandidate[]>();
     for (const candidate of input.candidates) {
       const sector = candidate.sector.trim().toLowerCase();
       grouped.set(sector, [...(grouped.get(sector) || []), candidate]);
     }
     for (const [sector, members] of grouped) {
-      const requested = equalWeight * members.length;
-      const groupWeight = Math.min(requested, maxSector);
-      const perName = members.length ? groupWeight / members.length : 0;
+      const requested = members.reduce((sum, member) => sum + desiredWeight(member), 0);
+      const groupScale = requested > maxSector ? maxSector / requested : 1;
+      const groupWeight = requested * groupScale;
       sectorWeights[sector] = roundWeight(groupWeight);
-      for (const member of members) suggestedWeights.push({
-        symbol: member.symbol.toUpperCase(),
-        sector,
-        weight: roundWeight(perName),
-        dollars: Number((input.capital * perName).toFixed(2)),
-      });
+      for (const member of members) {
+        const weight = desiredWeight(member) * groupScale;
+        suggestedWeights.push({
+          symbol: member.symbol.toUpperCase(),
+          sector,
+          weight: roundWeight(weight),
+          dollars: Number((input.capital * roundWeight(weight)).toFixed(2)),
+        });
+        if (member.currentWeightPct != null && member.maxAllocationPct != null && member.currentWeightPct > member.maxAllocationPct + 0.5) {
+          alerts.push(member.symbol.toUpperCase() + ' is already above its saved maximum allocation; proposed paper weight is capped and should be reviewed.');
+        }
+        if (member.exitRuleType && String(member.exitRuleType).toLowerCase().includes('thesis')) {
+          alerts.push(member.symbol.toUpperCase() + ' has a qualitative thesis rule; confirm the thesis remains valid before manual approval.');
+        }
+        if (member.quoteFresh !== true && (member.lossLimitPct != null || member.exitRuleType)) {
+          alerts.push(member.symbol.toUpperCase() + ' has saved risk rules but no fresh quote to evaluate them.');
+        }
+      }
       if (requested > maxSector + 1e-9) alerts.push(`${sector} exposure capped at ${(maxSector * 100).toFixed(0)}% to protect diversification.`);
     }
     const requestedWeight = suggestedWeights.reduce((sum, row) => sum + row.weight, 0);
