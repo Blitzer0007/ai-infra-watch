@@ -5,6 +5,10 @@ import { authFetch } from '../utils/apiAuth';
 import JevDecisionPanel from './JevDecisionPanel';
 import { forecastValidationGate } from '../utils/forecastValidation';
 import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
+import { selectDynamicPeers } from '../utils/peerIntelligence';
+import { STOCK_UNIVERSE } from '../utils/stockUniverse';
+import { buildJevPaperAllocator } from '../utils/jevPaperAllocator';
+import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 
 const candidates = [
   { symbol: 'MSFT', sector: 'software', label: 'Microsoft' },
@@ -15,7 +19,9 @@ const candidates = [
   { symbol: 'GOOGL', sector: 'internet', label: 'Alphabet' },
 ];
 
-export default function JevAutonomousPortfolioLab() {
+type JEVLivePrice = { price: number; changePct: number; stale?: boolean; retrievedAt?: string };
+
+export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePrices?: Record<string, JEVLivePrice> }) {
   const [capital, setCapital] = useState(PAPER_LAB_DEFAULTS.initialCapital);
   const [costBps, setCostBps] = useState(PAPER_LAB_DEFAULTS.costBps);
   const [selected, setSelected] = useState<string[]>(['MSFT', 'META', 'NOW', 'NVDA']);
@@ -33,6 +39,10 @@ export default function JevAutonomousPortfolioLab() {
   const [savedProposals, setSavedProposals] = useState<any[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError] = useState('');
+  const [useSuggestedAllocation, setUseSuggestedAllocation] = useState(false);
+  const [storedHoldings, setStoredHoldings] = useState<StoredPortfolioHolding[]>([]);
+  const [holdingRulesError, setHoldingRulesError] = useState('');
+  const [holdingRulesLoaded, setHoldingRulesLoaded] = useState(false);
   const selectedKey = selected.join(',');
 
   const loadHistoryCoverage = async () => {
@@ -73,11 +83,26 @@ export default function JevAutonomousPortfolioLab() {
     setBacktest(null);
     setBacktestError('');
     setCandidateResearch(null);
+    setUseSuggestedAllocation(false);
     setResearchError('');
   }, [selectedKey]);
 
   useEffect(() => {
     void loadSavedProposals();
+    let cancelled = false;
+    fetchPortfolioHoldings().then(rows => {
+      if (!cancelled) {
+        setStoredHoldings(rows);
+        setHoldingRulesError('');
+        setHoldingRulesLoaded(true);
+      }
+    }).catch(error => {
+      if (!cancelled) {
+        setHoldingRulesError(error instanceof Error ? error.message : 'Saved portfolio rules are unavailable.');
+        setHoldingRulesLoaded(false);
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const runHistoricalBacktest = async () => {
@@ -117,8 +142,22 @@ export default function JevAutonomousPortfolioLab() {
     setResearchError('');
     setCandidateResearch(null);
     try {
+      const savedRuleContext = storedHoldings
+        .filter(holding => selected.includes(holding.symbol.toUpperCase()))
+        .map(holding => ({
+          symbol: holding.symbol,
+          thesis: holding.decisionThesis || null,
+          lossLimitPct: holding.lossLimitPct ?? null,
+          exitRuleType: holding.exitRuleType || null,
+          exitRuleValue: holding.exitRuleValue ?? null,
+          exitRuleText: holding.exitRuleText || null,
+          targetAllocationPct: holding.targetAllocationPct ?? null,
+          maxAllocationPct: holding.maxAllocationPct ?? null,
+          purchaseDate: holding.purchaseDate || null,
+        }));
       const question = [
         'Run a weekly US-equity paper portfolio research review for these candidate tickers: ' + selected.join(', ') + '.',
+        'Existing saved thesis and risk rules for selected holdings, when present: ' + JSON.stringify(savedRuleContext) + '. Assess only explicit evidence-backed thesis invalidations; do not invent a rule breach when evidence is missing.',
         'Compare market data, primary SEC/EDGAR disclosures, recent news, macro/geopolitical evidence, and fundamental/valuation evidence where available.',
         'Use existing independent evidence channels and citations with dates. Distinguish source facts from interpretation; report conflicts and stale or missing channels.',
         'Do not invent unavailable evidence or produce a numeric rank when evidence is insufficient. Return the evidence availability, evidence gate action, missing required families, conflicts, and a concise per-ticker comparison.',
@@ -132,6 +171,7 @@ export default function JevAutonomousPortfolioLab() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.detail || body?.error || 'JEV candidate research failed.');
       setCandidateResearch(body);
+      setUseSuggestedAllocation(false);
       const availability = body?.jev?.evidence_availability || {};
       const gate = body?.jev?.evidence_gate || {};
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
@@ -157,10 +197,70 @@ export default function JevAutonomousPortfolioLab() {
       setResearchLoading(false);
     }
   };
-  const target: PaperHolding[] = useMemo(() => selected.map(symbol => {
-    const item = candidates.find(candidate => candidate.symbol === symbol)!;
-    return { symbol, sector: item.sector, weight: Math.min(0.15, 0.6 / Math.max(selected.length, 1)) };
-  }), [selected]);
+  const peerContexts = useMemo(() => selected.map(symbol => {
+    const holding = STOCK_UNIVERSE.find(item => item.symbol.toUpperCase() === symbol.toUpperCase());
+    if (!holding) return { symbol, primary: null, peerCount: 0, comparabilityScore: 0, reasons: [] as string[] };
+    const peers = selectDynamicPeers(holding);
+    const allPeers = [peers.primary, ...peers.core, ...peers.extended].filter(Boolean);
+    const topPeers = allPeers.slice(0, 5);
+    const comparabilityScore = topPeers.length
+      ? Math.round(topPeers.reduce((sum, peer) => sum + peer.score, 0) / topPeers.length)
+      : 0;
+    return { symbol, primary: peers.primary, peerCount: allPeers.length, comparabilityScore, reasons: peers.primary?.reasons || [] };
+  }), [selectedKey]);
+
+  const evidenceAvailability = candidateResearch?.jev?.evidence_availability
+    || candidateResearch?.jev?.evidence_gate?.evidence_availability || {};
+  const evidenceGate = candidateResearch?.jev?.evidence_gate || {};
+  const freshnessRaw = candidateResearch?.jev?.evidence_freshness || evidenceGate?.evidence_freshness || [];
+  const freshnessItems: any[] = Array.isArray(freshnessRaw) ? freshnessRaw
+    : freshnessRaw && typeof freshnessRaw === 'object' ? Object.values(freshnessRaw) : [];
+  const evidenceFresh = freshnessItems.length > 0 && freshnessItems.every((item: any) => {
+    const status = String(typeof item === 'string' ? item : item?.status || item?.state || item?.freshness || '').toLowerCase();
+    return ['fresh', 'current', 'verified'].includes(status);
+  });
+  const evidenceConflicts = Number(evidenceGate?.conflict_detection?.count || evidenceGate?.conflict_count || 0);
+  const evidenceAction = String(evidenceGate?.action || candidateResearch?.jev?.action || '').toLowerCase();
+  const thesisBreaches = [
+    ...(Array.isArray(candidateResearch?.jev?.thesis_invalidations) ? candidateResearch.jev.thesis_invalidations : []),
+    ...(Array.isArray(candidateResearch?.jev?.thesis_rule_breaches) ? candidateResearch.jev.thesis_rule_breaches : []),
+  ].map((item: any) => typeof item === 'string' ? item : String(item?.symbol || item?.ticker || 'unknown holding'));
+  const allocator = useMemo(() => buildJevPaperAllocator({
+    candidates: selected.map(symbol => {
+      const item = candidates.find(candidate => candidate.symbol === symbol)!;
+      const peer = peerContexts.find(entry => entry.symbol === symbol);
+      const holding = storedHoldings.find(row => row.symbol.toUpperCase() === symbol.toUpperCase());
+      const quote = livePrices[symbol];
+      const quoteFresh = Boolean(quote && !quote.stale && Number.isFinite(quote.price) && quote.price > 0);
+      const portfolioValue = storedHoldings.length > 0 && storedHoldings.every(row => {
+        const rowQuote = livePrices[row.symbol.toUpperCase()];
+        return Boolean(rowQuote && !rowQuote.stale && Number.isFinite(rowQuote.price) && rowQuote.price > 0);
+      }) ? storedHoldings.reduce((sum, row) => sum + livePrices[row.symbol.toUpperCase()].price * row.quantity, 0) : null;
+      return {
+        symbol, sector: item.sector, peerCount: peer?.peerCount || 0, peerComparabilityScore: peer?.comparabilityScore || 0,
+        currentPrice: quoteFresh ? quote!.price : null, averageCost: holding?.averageCost ?? null, quoteFresh,
+        currentWeightPct: portfolioValue && quoteFresh ? (quote!.price * (holding?.quantity || 0) / portfolioValue) * 100 : null,
+        targetAllocationPct: holding?.targetAllocationPct ?? null, maxAllocationPct: holding?.maxAllocationPct ?? null,
+        lossLimitPct: holding?.lossLimitPct ?? null, exitRuleType: holding?.exitRuleType ?? null,
+        exitRuleValue: holding?.exitRuleValue ?? null, purchaseDate: holding?.purchaseDate ?? null,
+      };
+    }),
+    capital,
+    evidenceComplete: evidenceAvailability.complete === true && candidateResearch?.ok !== false,
+    evidenceFresh, conflictCount: evidenceConflicts, gateAction: evidenceAction, thesisBreaches,
+    savedRulesLoaded: holdingRulesLoaded,
+    maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05,
+  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, holdingRulesLoaded, storedHoldings, livePrices]);
+
+  const target: PaperHolding[] = useMemo(() => {
+    if (useSuggestedAllocation && allocator.allocationAllowed) return allocator.suggestedWeights.map(item => ({
+      symbol: item.symbol, sector: item.sector, weight: item.weight,
+    }));
+    return selected.map(symbol => {
+      const item = candidates.find(candidate => candidate.symbol === symbol)!;
+      return { symbol, sector: item.sector, weight: Math.min(0.15, 0.6 / Math.max(selected.length, 1)) };
+    });
+  }, [selectedKey, useSuggestedAllocation, allocator]);
   const preview = useMemo(() => {
     try {
       return buildPaperRebalance({
@@ -272,6 +372,43 @@ export default function JevAutonomousPortfolioLab() {
         <button onClick={() => void researchCandidates()} disabled={researchLoading || selected.length === 0} className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 disabled:opacity-40">{researchLoading ? 'Researching candidates…' : 'Run JEV candidate research'}</button>
         <button onClick={() => void runHistoricalBacktest()} disabled={backtestLoading || !preview || selected.length === 0} className="inline-flex items-center gap-2 rounded-lg border border-sky-400/30 px-4 py-2 text-sm font-semibold text-sky-200 disabled:opacity-40">{backtestLoading ? 'Running backtest…' : 'Run 2-year historical backtest'}</button>
         <button onClick={approvePaperReview} disabled={!preview || selected.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40"><RefreshCw size={16}/> Save manual paper proposal</button>
+      </div>
+      <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.03] p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">Peer-aware new-money allocator</h3>
+          <span className={allocator.allocationAllowed ? 'rounded-full border border-emerald-400/30 px-2 py-1 text-xs text-emerald-200' : 'rounded-full border border-amber-400/30 px-2 py-1 text-xs text-amber-200'}>{allocator.allocationAllowed ? 'Evidence gate passed' : 'Allocation blocked'}</span>
+        </div>
+        <p className="text-xs text-white/55">Peer comparability comes from configured relationships, industry/theme overlap, and geography. Fundamental peer strength metrics are not yet consistently available, so this is not an investment ranking. The suggested weights are equal-weight paper allocations constrained by position, sector, and cash limits.</p>
+        {allocator.blockedReasons.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{allocator.blockedReasons.map((reason: string) => <li key={reason}>{reason}</li>)}</ul>}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-white/70">Peer comparability context</h4>
+          {peerContexts.map(peer => <div key={peer.symbol} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm">
+            <div><p className="font-medium">{peer.symbol}</p><p className="mt-1 text-xs text-white/45">{peer.primary ? 'Closest peer: ' + peer.primary.symbol + ' · ' + peer.primary.name : 'No configured peer found in the tracked universe.'}</p><p className="text-xs text-white/40">{peer.reasons.join(' · ') || 'No comparability reasons available.'}</p></div>
+            <div className="text-right"><p className="font-semibold">{peer.comparabilityScore}/100</p><p className="text-xs text-white/40">{peer.peerCount} comparable names</p></div>
+          </div>)}
+          <p className="text-xs text-white/35">These scores measure similarity/coverage from configured metadata, not financial strength or expected returns. Missing peer fundamentals are not imputed.</p>
+        </div>
+        {allocator.allocationAllowed && <>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Portfolio balance score</p><p className="text-xl font-semibold">{allocator.balanceScore}/100</p><p className="text-xs text-white/40">Diversification heuristic, not return forecast</p></div>
+            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Suggested cash reserve</p><p className="text-xl font-semibold">\${allocator.cashDollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="text-xs text-white/40">{(allocator.cashWeight * 100).toFixed(1)}% of capital</p></div>
+            <div className="rounded-lg border border-white/10 p-3"><p className="text-xs text-white/45">Selected candidates</p><p className="text-xl font-semibold">{allocator.suggestedWeights.length}</p><p className="text-xs text-white/40">Manual paper proposal only</p></div>
+          </div>
+          <div className="space-y-2">
+            {allocator.suggestedWeights.map(item => {
+              const peer = peerContexts.find(entry => entry.symbol === item.symbol);
+              return <div key={item.symbol} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm">
+                <div><p className="font-medium">{item.symbol} <span className="text-xs font-normal text-white/45">· {item.sector}</span></p><p className="mt-1 text-xs text-white/45">Peer coverage: {peer?.peerCount || 0} candidates · comparability {peer?.comparabilityScore || 0}/100</p><p className="text-xs text-white/40">{peer?.primary ? 'Closest peer: ' + peer.primary.symbol : 'No configured closest peer'}</p></div>
+                <div className="text-right"><p className="font-semibold">\${item.dollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="text-xs text-white/45">{(item.weight * 100).toFixed(1)}%</p></div>
+              </div>;
+            })}
+          </div>
+          {allocator.alerts.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{allocator.alerts.map((alert: string) => <li key={alert}>{alert}</li>)}</ul>}
+          <button type="button" onClick={() => setUseSuggestedAllocation(value => !value)} className="rounded-lg border border-violet-400/30 px-3 py-2 text-sm font-semibold text-violet-200">{useSuggestedAllocation ? 'Use manual equal weights' : 'Use suggested weights in paper preview'}</button>
+          {useSuggestedAllocation && <p role="status" className="text-xs text-emerald-200">Suggested weights are active in the preview only. Saving still creates a paper proposal; no broker orders are placed.</p>}
+        </>}
+        {holdingRulesError && <p className="text-xs text-amber-200">Saved holding rules could not be loaded: {holdingRulesError}. Do not treat this allocation as checked against existing portfolio rules.</p>}
+        <p className="text-xs text-white/40">{allocator.methodology}</p>
       </div>
       {researchError && <p role="status" className="text-sm text-amber-200">{researchError}</p>}
       {candidateResearch && <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.03] p-4 space-y-2">
