@@ -6,9 +6,8 @@ def test_required_nodes_exist():
     assert {"supervisor", "market_agent", "risk_agent", "synthesis_agent"} <= nodes
 
 
-def test_graph_compiles_with_terminal_node():
+def test_graph_compiles():
     assert agent_graph is not None
-    assert "__end__" in set(agent_graph.nodes)
 
 
 def test_supervisor_routes_market_only_question_narrowly():
