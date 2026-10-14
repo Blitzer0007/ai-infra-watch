@@ -116,6 +116,7 @@ export type HistoricalBacktestResult = {
   adjustedPricesComplete: boolean;
   pointInTimeVerified: boolean;
   availabilityStatus: 'verified' | 'assumed' | 'unknown';
+  universeMembershipStatus: 'verified' | 'assumed' | 'unknown';
   evidenceStatus: 'insufficient' | 'ready';
 };
 
@@ -137,6 +138,8 @@ export function runHistoricalPaperBacktest(args: {
   maxSectorWeight?: number;
   minCashWeight?: number;
   rebalanceEverySessions?: number;
+  /** Must reflect point-in-time membership history, not today's ticker list. */
+  universeMembershipStatus?: 'verified' | 'assumed' | 'unknown';
 }): HistoricalBacktestResult {
   const { prices, target, startCapital } = args;
   const costBps = args.costBps ?? 10;
@@ -212,6 +215,9 @@ export function runHistoricalPaperBacktest(args: {
     availabilityStatuses.length > 0 && availabilityStatuses.every(status => status === 'verified')
       ? 'verified'
       : availabilityStatuses.some(status => status === 'assumed') ? 'assumed' : 'unknown';
+  // Price timestamps do not establish which securities were actually investable at each historical date.
+  // Without point-in-time universe membership evidence, survivorship bias remains unresolved.
+  const universeMembershipStatus = args.universeMembershipStatus ?? 'unknown';
 
   let strategyValue = startCapital;
   let spyValue = startCapital;
@@ -281,6 +287,7 @@ export function runHistoricalPaperBacktest(args: {
     adjustedPricesComplete,
     pointInTimeVerified,
     availabilityStatus,
-    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && pointInTimeVerified && availabilityStatus === 'verified' ? 'ready' : 'insufficient',
+    universeMembershipStatus,
+    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && pointInTimeVerified && availabilityStatus === 'verified' && universeMembershipStatus === 'verified' ? 'ready' : 'insufficient',
   };
 }
