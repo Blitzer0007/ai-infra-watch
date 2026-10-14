@@ -151,6 +151,9 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
           weight: roundWeight(weight),
           dollars: Number((input.capital * roundWeight(weight)).toFixed(2)),
         });
+        if (peerStrengthReady && member.peerStrengthScore != null && member.peerStrengthScore < 35 && weight > 0.05) {
+          alerts.push(member.symbol.toUpperCase() + ' has a low relative peer-strength score (' + member.peerStrengthScore.toFixed(1) + '/100); review the proposed exposure before manual approval.');
+        }
         if (member.currentWeightPct != null && member.maxAllocationPct != null && member.currentWeightPct > member.maxAllocationPct + 0.5) {
           alerts.push(member.symbol.toUpperCase() + ' is already above its saved maximum allocation; proposed paper weight is capped and should be reviewed.');
         }
@@ -188,7 +191,14 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     const cashWeight = input.capital > 0 ? cashDollars / input.capital : Math.max(0, 1 - invested);
     if (cashWeight < minCash - 1e-6) alerts.push('Suggested allocation would breach the minimum cash reserve.');
     if (suggestedWeights.some(row => row.weight > maxPosition + 1e-9)) alerts.push('A suggested position exceeds the maximum position limit.');
-    const score = Math.max(0, Math.min(100, 100 - Math.max(0, Math.max(...Object.values(sectorWeights), 0) - 0.2) * 100));
+    const diversificationScore = Math.max(0, Math.min(100, 100 - Math.max(0, Math.max(...Object.values(sectorWeights), 0) - 0.2) * 100));
+    const peerStrengthScore = peerStrengthReady
+      ? input.candidates.reduce((sum, candidate) => sum + (candidate.peerStrengthScore ?? 50), 0) / input.candidates.length
+      : null;
+    const score = peerStrengthScore == null
+      ? diversificationScore
+      : diversificationScore * 0.7 + peerStrengthScore * 0.3;
+    if (peerStrengthReady && peerStrengthScore != null) alerts.push('Portfolio balance score blends diversification (70%) with average relative peer strength (30%); peer strength is a peer-set comparison, not a return forecast.');
     return {
       allocationAllowed, blockedReasons, suggestedWeights: suggestedWeights.sort((a, b) => a.symbol.localeCompare(b.symbol)),
       cashWeight: roundWeight(cashWeight), cashDollars,
