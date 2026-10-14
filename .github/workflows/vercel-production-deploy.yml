@@ -69,3 +69,53 @@ jobs:
 
       - name: Deploy to Vercel production
         run: vercel deploy --prebuilt --archive=tgz --prod --token="${VERCEL_TOKEN}"
+
+      - name: Smoke-test production release
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://ai-infra-watch-theta.vercel.app"
+
+          curl --fail --silent --show-error --max-time 20 "$BASE_URL/" -o /tmp/production-home.html
+
+          auth_status="$(curl --silent --show-error --max-time 20 -o /tmp/production-auth.json -w '%{http_code}' \
+            -H "Content-Type: application/json" -X POST "$BASE_URL/api/auth" --data '{"token":""}')"
+          if [ "$auth_status" != "401" ]; then
+            echo "::error::Expected anonymous auth check to return 401, got $auth_status"
+            cat /tmp/production-auth.json
+            exit 1
+          fi
+
+          portfolio_status="$(curl --silent --show-error --max-time 20 -o /tmp/production-portfolio.json -w '%{http_code}' \
+            "$BASE_URL/api/portfolio")"
+          if [ "$portfolio_status" != "401" ]; then
+            echo "::error::Expected protected portfolio API to return 401, got $portfolio_status"
+            cat /tmp/production-portfolio.json
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --max-time 35 \
+            "$BASE_URL/api/company-scale?action=peer-fundamentals&symbols=NVDA%2CAMD" \
+            -o /tmp/production-peer-fundamentals.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          body = json.loads(Path("/tmp/production-peer-fundamentals.json").read_text(encoding="utf-8"))
+          if body.get("source") != "SEC EDGAR companyfacts":
+              raise SystemExit(f"unexpected peer fundamentals source: {body.get('source')!r}")
+          rows = body.get("results")
+          if not isinstance(rows, list):
+              raise SystemExit("peer fundamentals results must be an array")
+          by_symbol = {row.get("symbol"): row for row in rows if isinstance(row, dict)}
+          for symbol in ("NVDA", "AMD"):
+              row = by_symbol.get(symbol)
+              if not row:
+                  raise SystemExit(f"missing requested symbol {symbol}")
+              if not isinstance(row.get("metrics"), dict):
+                  raise SystemExit(f"{symbol} metrics must be an object")
+              if row.get("status") not in {"partial", "insufficient-evidence", "unavailable", "not-found"}:
+                  raise SystemExit(f"unexpected {symbol} evidence status: {row.get('status')!r}")
+          print("Production post-deploy smoke passed: homepage, access gates, and SEC peer fundamentals contract.")
+          PY
