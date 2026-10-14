@@ -114,6 +114,7 @@ export type HistoricalBacktestResult = {
   maxDrawdownPct: number;
   rebalanceCount: number;
   adjustedPricesComplete: boolean;
+  pointInTimeVerified: boolean;
   availabilityStatus: 'verified' | 'assumed' | 'unknown';
   evidenceStatus: 'insufficient' | 'ready';
 };
@@ -195,8 +196,18 @@ export function runHistoricalPaperBacktest(args: {
   const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b));
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
-  const adjustedPricesComplete = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).every(row => row.adjusted === true);
-  const availabilityStatuses = prices.filter(row => symbols.includes(row.symbol.toUpperCase())).map(row => row.availabilityStatus || 'unknown');
+  const relevantPrices = prices.filter(row => symbols.includes(row.symbol.toUpperCase()));
+  const adjustedPricesComplete = relevantPrices.every(row => row.adjusted === true);
+  // Provider labels alone cannot prove point-in-time integrity: every decision date
+  // needs an explicit cutoff and every used price must have been available by it.
+  const pointInTimeVerified = dates.every(date => {
+    const rawCutoff = args.decisionCutoffByDate?.[date];
+    const cutoff = rawCutoff ? Date.parse(rawCutoff) : NaN;
+    if (!finite(cutoff)) return false;
+    const day = byDate.get(date)!;
+    return [...day.values()].every(row => Date.parse(row.availableAt) <= cutoff && Date.parse(row.date) <= cutoff);
+  });
+  const availabilityStatuses = relevantPrices.map(row => row.availabilityStatus || 'unknown');
   const availabilityStatus: HistoricalBacktestResult['availabilityStatus'] =
     availabilityStatuses.length > 0 && availabilityStatuses.every(status => status === 'verified')
       ? 'verified'
@@ -268,7 +279,8 @@ export function runHistoricalPaperBacktest(args: {
     maxDrawdownPct: maxDrawdown,
     rebalanceCount,
     adjustedPricesComplete,
+    pointInTimeVerified,
     availabilityStatus,
-    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && availabilityStatus === 'verified' ? 'ready' : 'insufficient',
+    evidenceStatus: dates.length - 1 >= minimumObservations && adjustedPricesComplete && pointInTimeVerified && availabilityStatus === 'verified' ? 'ready' : 'insufficient',
   };
 }
