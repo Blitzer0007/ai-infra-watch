@@ -260,7 +260,8 @@ def detect_conflicts(calls: list[Any]) -> dict[str, Any]:
             continue
         output = getattr(call, "output", None)
         freshness = normalize_freshness(getattr(call, "tool", ""), output)
-        if freshness["status"] == "STALE":
+        if freshness["status"] not in {"FRESH", "AGING"}:
+            # Unknown timestamps are not enough to establish a current contradiction.
             continue
         claims.extend(_extract_claims(getattr(call, "tool", ""), output))
 
