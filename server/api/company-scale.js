@@ -252,14 +252,19 @@ async function getPeerFundamentalSnapshot(symbol, tickerMap) {
   const capex = annualFactRows(facts, ['PaymentsToAcquirePropertyPlantAndEquipment']);
   const metrics = {};
   if (revenue[0]) metrics.size = factEvidence(revenue[0], revenue[0].value, 'usd');
-  if (revenue[0] && revenue[1] && revenue[1].value !== 0 && revenue[0].end.slice(0, 4) !== revenue[1].end.slice(0, 4)) {
+  const currentRevenueYear = Number(revenue[0]?.end?.slice(0, 4));
+  const previousRevenueYear = Number(revenue[1]?.end?.slice(0, 4));
+  const currentRevenueDays = revenue[0] ? (Date.parse(revenue[0].end) - Date.parse(revenue[0].start)) / 86400000 : NaN;
+  const previousRevenueDays = revenue[1] ? (Date.parse(revenue[1].end) - Date.parse(revenue[1].start)) / 86400000 : NaN;
+  const comparableAnnualRevenue = Number.isFinite(currentRevenueDays) && Number.isFinite(previousRevenueDays) && Math.abs(currentRevenueDays - previousRevenueDays) <= 35;
+  if (revenue[0] && revenue[1] && revenue[1].value !== 0 && currentRevenueYear === previousRevenueYear + 1 && comparableAnnualRevenue) {
     metrics.revenueGrowth = factEvidence(revenue[0], ((revenue[0].value / revenue[1].value) - 1) * 100, 'percent');
   }
-  const matchingOperating = operatingIncome.find(row => row.end === revenue[0]?.end);
+  const matchingOperating = operatingIncome.find(row => row.end === revenue[0]?.end && row.start === revenue[0]?.start);
   if (matchingOperating && revenue[0]?.value > 0) {
     metrics.operatingMargin = factEvidence(matchingOperating, matchingOperating.value / revenue[0].value * 100, 'percent');
   }
-  const matchingCapex = capex.find(row => row.end === revenue[0]?.end);
+  const matchingCapex = capex.find(row => row.end === revenue[0]?.end && row.start === revenue[0]?.start);
   if (matchingCapex && revenue[0]?.value > 0) {
     metrics.capitalIntensity = factEvidence(matchingCapex, Math.abs(matchingCapex.value) / revenue[0].value * 100, 'percent');
   }
