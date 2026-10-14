@@ -193,7 +193,7 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
       allocationAllowed, blockedReasons, suggestedWeights: suggestedWeights.sort((a, b) => a.symbol.localeCompare(b.symbol)),
       cashWeight: roundWeight(cashWeight), cashDollars,
       balanceScore: Number(score.toFixed(1)), sectorWeights, alerts,
-      methodology: 'Equal-weight paper proposal, capped at 15% per holding and 35% per sector, with at least 5% cash. Peer coverage is shown as context only; it does not rank stocks. No broker orders are sent.',
+      methodology: 'Paper-only proposal, capped at 15% per holding and 35% per sector, with at least 5% cash. A bounded ±20% relative peer-strength tilt is used only when every selected candidate has fresh, verified peer metrics and at least 60% metric-weight coverage; saved target allocations take precedence. Missing evidence never receives an imputed score. Manual approval is required; no broker orders are sent.',
     };
   }
 
