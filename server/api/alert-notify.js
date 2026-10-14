@@ -74,6 +74,33 @@ async function recordSent(event) {
   } catch { /* Delivery already succeeded; in-memory dedupe still applies for this instance. */ }
 }
 
+async function inspectTelegramChat() {
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!botToken || !chatId) {
+    return { status: 'not_configured', chatId: chatId || null, label: null, message: 'Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in server environment settings.' };
+  }
+  try {
+    const response = await fetch(
+      'https://api.telegram.org/bot' + botToken + '/getChat?chat_id=' + encodeURIComponent(chatId),
+      { method: 'GET', signal: AbortSignal.timeout(8000) },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok && payload?.ok === true && payload?.result) {
+      const chat = payload.result;
+      const label = String(chat.title || [chat.first_name, chat.last_name].filter(Boolean).join(' ') || (chat.username ? '@' + chat.username : '') || '');
+      return { status: 'verified', chatId, label: label || null, message: 'Telegram can resolve this chat ID.' };
+    }
+    const description = String(payload?.description || '');
+    if (response.status === 400 && /chat not found|chat_id|chat not accessible/i.test(description)) {
+      return { status: 'invalid', chatId, label: null, message: 'Telegram cannot resolve this chat ID. Check TELEGRAM_CHAT_ID and make sure the bot has been started or added to the target group/channel.' };
+    }
+    return { status: 'unknown', chatId, label: null, message: 'Telegram chat verification could not be completed (HTTP ' + response.status + ').' };
+  } catch {
+    return { status: 'unknown', chatId, label: null, message: 'Telegram chat verification timed out or the Telegram API is unreachable.' };
+  }
+}
+
 async function sendTelegram(events) {
   const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
   const chatId = String(process.env.TELEGRAM_CHAT_ID || '').trim();
@@ -136,11 +163,13 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const botTokenConfigured = Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim());
     const chatIdConfigured = Boolean(String(process.env.TELEGRAM_CHAT_ID || '').trim());
+    const telegramChat = await inspectTelegramChat();
     return res.status(200).json({
       ok: true,
       telegram_configured: botTokenConfigured && chatIdConfigured,
       telegram_bot_token_configured: botTokenConfigured,
       telegram_chat_id_configured: chatIdConfigured,
+      telegram_chat: telegramChat,
     });
   }
 
