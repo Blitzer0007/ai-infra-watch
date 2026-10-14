@@ -69,6 +69,18 @@ def test_normalize_freshness_marks_unknown_timestamp_explicitly() -> None:
     assert result["observed_at"] is None
 
 
+
+def test_sec_filing_family_uses_longer_regulatory_freshness_window() -> None:
+    now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
+    result = normalize_freshness(
+        "filings.get_catalysts",
+        {"items": [{"title": "SEC filing", "date": "2026-08-30"}]},
+        now,
+    )
+    assert result["family"] == "regulatory_primary"
+    assert result["status"] == "AGING"
+    assert result["aging_within_hours"] == 24 * 90
+
 def test_detect_conflicts_flags_fresh_contradictory_statuses_for_same_entity() -> None:
     now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
     calls = [
