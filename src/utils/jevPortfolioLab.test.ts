@@ -162,3 +162,27 @@ test('historical backtest rejects explicitly unadjusted prices', () => {
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
   }), /Adjusted closes are required/);
 });
+
+
+test('backtest cannot claim ready evidence without explicit point-in-time decision cutoffs', () => {
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  assert.equal(result.pointInTimeVerified, false);
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('backtest marks point-in-time evidence verified only when every date has a valid cutoff', () => {
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const decisionCutoffByDate = Object.fromEntries(
+    ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
+  );
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+  });
+  assert.equal(result.pointInTimeVerified, true);
+  assert.equal(result.evidenceStatus, 'ready');
+});
