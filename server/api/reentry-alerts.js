@@ -67,6 +67,11 @@ export function telegramAccepted(httpOk, payload) {
   return httpOk === true && payload?.ok === true && Number.isInteger(payload?.result?.message_id) && payload.result.message_id > 0;
 }
 
+/** Notify only on entry into the candidate state; a failed send leaves persisted state unchanged for retry. */
+export function shouldNotifyCandidate(lastAlertSignature, candidate) {
+  return candidate === true && lastAlertSignature !== 'REENTRY_CANDIDATE';
+}
+
 async function sendTelegram(row,q) {
   const token=String(process.env.TELEGRAM_BOT_TOKEN||'').trim(), chat=String(process.env.TELEGRAM_CHAT_ID||'').trim();
   if(!token||!chat) throw new Error('Telegram credentials are not configured');
@@ -84,7 +89,7 @@ async function runScan() {
     try {
       const q=await quoteHistory(row.symbol), signal=assess(row,q);
       const candidate=signal.status==='REENTRY_CANDIDATE';
-      if(candidate && row.last_alert_signature!=='REENTRY_CANDIDATE') { await sendTelegram(row,q); sent++; }
+      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) { await sendTelegram(row,q); sent++; }
       const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:candidate?'REENTRY_CANDIDATE':'NOT_CANDIDATE',updated_at:new Date().toISOString()};
       await db('reentry_watchlist?symbol=eq.'+encodeURIComponent(row.symbol),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(patch)});
       results.push({...row,...patch,status:signal.status,reasons:signal.reasons});
