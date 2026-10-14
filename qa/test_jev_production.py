@@ -15,6 +15,12 @@ def _has_auth_fixture() -> bool:
     )
 
 
+def _has_api_auth_fixture() -> bool:
+    # The httpx API smoke can use request headers; Playwright storage state is
+    # browser-only and must not make the API test appear configured.
+    return bool(os.getenv("QA_HEADERS_JSON", "").strip())
+
+
 def _headers() -> dict[str, str]:
     raw = os.getenv("QA_HEADERS_JSON", "").strip()
     if not raw:
@@ -26,7 +32,7 @@ def _headers() -> dict[str, str]:
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not _has_auth_fixture(), reason="authenticated production smoke requires QA_HEADERS_JSON or Playwright storage state")
+@pytest.mark.skipif(not _has_api_auth_fixture(), reason="authenticated API smoke requires QA_HEADERS_JSON")
 def test_jev_read_only_api_contracts():
     """Exercise authenticated JEV read paths only; never create or mutate a paper proposal."""
     base_url = (os.getenv("QA_BASE_URL") or "https://ai-infra-watch-theta.vercel.app").rstrip("/")
@@ -61,7 +67,7 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
             api_responses.append((response.url, response.status))
 
     def capture_request(request):
-        if "/api/jev-lab" in request.url and request.method not in {"GET", "HEAD"}:
+        if ("/api/jev-lab" in request.url or "/api/jev-lab-history" in request.url) and request.method not in {"GET", "HEAD"}:
             mutating_requests.append(request.method + " " + request.url)
 
     page.on("response", capture_response)
