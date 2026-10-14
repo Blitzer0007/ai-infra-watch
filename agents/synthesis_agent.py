@@ -52,6 +52,6 @@ def synthesis_agent(state: AgentState) -> dict[str, Any]:
             "confidence": "descriptive",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
         },
-        "trace": state.get("trace", []) + ["synthesis_agent"],
+        "trace": ["synthesis_agent"],
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
