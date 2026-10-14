@@ -89,14 +89,29 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
       });
       if (requested > maxSector + 1e-9) alerts.push(`${sector} exposure capped at ${(maxSector * 100).toFixed(0)}% to protect diversification.`);
     }
+    const requestedWeight = suggestedWeights.reduce((sum, row) => sum + row.weight, 0);
+    const maxInvestedWeight = 1 - minCash;
+    if (requestedWeight > maxInvestedWeight + 1e-9) {
+      const scale = maxInvestedWeight / requestedWeight;
+      for (const row of suggestedWeights) {
+        row.weight = roundWeight(row.weight * scale);
+        row.dollars = Number((input.capital * row.weight).toFixed(2));
+      }
+      for (const sector of Object.keys(sectorWeights)) {
+        sectorWeights[sector] = roundWeight(suggestedWeights.filter(row => row.sector === sector).reduce((sum, row) => sum + row.weight, 0));
+      }
+      alerts.push('Total investment capped to preserve the minimum cash reserve.');
+    }
     const invested = suggestedWeights.reduce((sum, row) => sum + row.weight, 0);
-    const cashWeight = Math.max(0, 1 - invested);
-    if (cashWeight < minCash - 1e-9) alerts.push('Suggested allocation would breach the minimum cash reserve.');
+    const investedDollars = suggestedWeights.reduce((sum, row) => sum + row.dollars, 0);
+    const cashDollars = Number((input.capital - investedDollars).toFixed(2));
+    const cashWeight = input.capital > 0 ? cashDollars / input.capital : Math.max(0, 1 - invested);
+    if (cashWeight < minCash - 1e-6) alerts.push('Suggested allocation would breach the minimum cash reserve.');
     if (suggestedWeights.some(row => row.weight > maxPosition + 1e-9)) alerts.push('A suggested position exceeds the maximum position limit.');
     const score = Math.max(0, Math.min(100, 100 - Math.max(0, Math.max(...Object.values(sectorWeights), 0) - 0.2) * 100));
     return {
       allocationAllowed, blockedReasons, suggestedWeights: suggestedWeights.sort((a, b) => a.symbol.localeCompare(b.symbol)),
-      cashWeight: roundWeight(cashWeight), cashDollars: Number((input.capital * cashWeight).toFixed(2)),
+      cashWeight: roundWeight(cashWeight), cashDollars,
       balanceScore: Number(score.toFixed(1)), sectorWeights, alerts,
       methodology: 'Equal-weight paper proposal, capped at 15% per holding and 35% per sector, with at least 5% cash. Peer coverage is shown as context only; it does not rank stocks. No broker orders are sent.',
     };
