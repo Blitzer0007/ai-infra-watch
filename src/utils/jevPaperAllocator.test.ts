@@ -55,6 +55,24 @@ describe('JEV paper allocator evidence and risk gates', () => {
     assert.ok(result.alerts.some(alert => alert.includes('capped')));
   });
 
+  it('preserves the cash reserve and reconciles dollars for a larger universe', () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({
+      symbol: 'T' + index,
+      sector: 'sector-' + index,
+      peerCount: 1,
+    }));
+    const result = buildJevPaperAllocator({
+      candidates: many, capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    assert.equal(result.allocationAllowed, true);
+    assert.ok(result.cashWeight >= 0.05 - 1e-6);
+    assert.ok(result.suggestedWeights.every(item => item.weight <= 0.15 + 1e-9));
+    assert.equal(
+      Number((result.suggestedWeights.reduce((sum, item) => sum + item.dollars, 0) + result.cashDollars).toFixed(2)),
+      10000,
+    );
+  });
+
   it('validates candidate symbols and peer comparability values', () => {
     assert.throws(() => buildJevPaperAllocator({
       candidates: [{ symbol: 'MSFT', sector: 'software' }, { symbol: 'MSFT', sector: 'internet' }],
