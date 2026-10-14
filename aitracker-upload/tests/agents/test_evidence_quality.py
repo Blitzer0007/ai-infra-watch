@@ -98,6 +98,20 @@ def test_detect_conflicts_flags_fresh_contradictory_statuses_for_same_entity() -
     assert report["items"][0]["resolution"] == "investigate"
 
 
+
+def test_detect_conflicts_does_not_mix_different_contracts_for_same_company() -> None:
+    now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
+    calls = [
+        SimpleNamespace(ok=True, tool="news.search", output={"items": [{
+            "company": "DGXX", "status": "active", "title": "Hosting contract", "date": "2026-10-14",
+        }]}),
+        SimpleNamespace(ok=True, tool="filings.get_catalysts", output={"items": [{
+            "company": "DGXX", "status": "cancelled", "title": "Power purchase agreement", "date": "2026-10-14",
+        }]}),
+    ]
+    report = detect_conflicts(calls, now=now)
+    assert report["detected"] is False
+
 def test_detect_conflicts_ignores_unknown_and_stale_evidence() -> None:
     now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
     unknown_calls = [
