@@ -11,6 +11,7 @@ export default function Settings() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
+  const [telegramDiagnostic, setTelegramDiagnostic] = useState<{ status: string; chatId?: string | null; label?: string | null; message?: string | null } | null>(null);
   const [telegramEnabled, setTelegramEnabledState] = useState(() => isTelegramEnabled());
   const [telegramTesting, setTelegramTesting] = useState(false);
   const [telegramMessage, setTelegramMessage] = useState('');
@@ -28,7 +29,10 @@ export default function Settings() {
       try {
         const response = await authFetch('/api/alert-notify', { cache: 'no-store' });
         const data = await response.json().catch(() => ({}));
-        if (!cancelled) setTelegramConfigured(response.ok && data.telegram_configured === true);
+        if (!cancelled) {
+          setTelegramConfigured(response.ok && data.telegram_configured === true);
+          setTelegramDiagnostic(data?.telegram_chat || null);
+        }
       } catch {
         if (!cancelled) setTelegramConfigured(null);
       }
@@ -298,6 +302,15 @@ export default function Settings() {
                 {telegramConfigured === true ? 'Ready' : 'Not ready'}
               </span>
             </div>
+            {telegramDiagnostic && <div className="rounded-lg border border-white/10 bg-black/15 p-3 space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[9px]">
+                <span className="text-white/45">Configured chat ID</span>
+                <span className="font-mono text-white/70">{telegramDiagnostic.chatId || 'Not set'}</span>
+              </div>
+              <div className={'text-[9px] leading-relaxed ' + (telegramDiagnostic.status === 'verified' ? 'text-emerald-200' : telegramDiagnostic.status === 'invalid' ? 'text-rose-200' : 'text-amber-200')}>
+                {telegramDiagnostic.status === 'verified' && telegramDiagnostic.label ? 'Verified chat: ' + telegramDiagnostic.label + '. ' : ''}{telegramDiagnostic.message || 'Chat verification status unavailable.'}
+              </div>
+            </div>}
 
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={toggleTelegram} disabled={telegramConfigured !== true} className={'rounded-lg border px-3 py-2 text-[10px] font-bold transition disabled:opacity-40 ' + (telegramEnabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/5 text-white/60 hover:text-white')}>
