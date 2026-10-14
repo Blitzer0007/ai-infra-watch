@@ -100,6 +100,7 @@ jobs:
 
           python - <<'PY'
           import json
+          from datetime import datetime, timedelta, timezone
           from pathlib import Path
 
           body = json.loads(Path("/tmp/production-peer-fundamentals.json").read_text(encoding="utf-8"))
@@ -117,5 +118,12 @@ jobs:
                   raise SystemExit(f"{symbol} metrics must be an object")
               if row.get("status") not in {"partial", "insufficient-evidence", "unavailable", "not-found"}:
                   raise SystemExit(f"unexpected {symbol} evidence status: {row.get('status')!r}")
-          print("Production post-deploy smoke passed: homepage, access gates, and SEC peer fundamentals contract.")
+          nvda_size = by_symbol["NVDA"]["metrics"].get("size")
+          if not nvda_size:
+              raise SystemExit("NVDA must expose a sourced annual revenue size proxy")
+          observed = datetime.fromisoformat(nvda_size["observedAt"].replace("Z", "+00:00"))
+          age = datetime.now(timezone.utc) - observed
+          if observed.tzinfo is None or age < timedelta(0) or age > timedelta(days=550):
+              raise SystemExit(f"NVDA annual revenue evidence is stale or invalid: {nvda_size['observedAt']}")
+          print("Production post-deploy smoke passed: homepage, access gates, and fresh SEC peer fundamentals contract.")
           PY
