@@ -138,8 +138,9 @@ export function scorePeerStrength(
   }
 
   return normalized.map(snapshot => {
-    const evidence = evidenceBySymbol.get(snapshot.symbol) || {};
+    const candidateEvidence = evidenceBySymbol.get(snapshot.symbol) || {};
     const availableMetrics = KEYS.filter(key => finiteValue(usable.get(snapshot.symbol)?.[key]) && finiteValue(ranks[key]?.[snapshot.symbol]));
+    const evidence = Object.fromEntries(availableMetrics.filter(key => candidateEvidence[key]).map(key => [key, candidateEvidence[key]])) as Partial<Record<PeerMetricKey, PeerMetricEvidence>>;
     const notComparableMetrics = KEYS.filter(key => finiteValue(usable.get(snapshot.symbol)?.[key]) && !finiteValue(ranks[key]?.[snapshot.symbol]));
     const status = statusBySymbol.get(snapshot.symbol)!;
     const totalWeight = availableMetrics.reduce((sum, key) => sum + WEIGHTS[key], 0);
