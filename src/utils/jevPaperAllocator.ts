@@ -23,6 +23,7 @@ export type JevAllocatorInput = {
   conflictCount: number;
   gateAction?: string | null;
   thesisBreaches?: string[];
+  savedRulesLoaded?: boolean;
   maxPositionWeight?: number;
   maxSectorWeight?: number;
   minCashWeight?: number;
@@ -73,6 +74,7 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   const action = String(input.gateAction || '').toLowerCase();
   const blockedReasons: string[] = [];
   if (!input.candidates.length) blockedReasons.push('Select at least one candidate.');
+  if (input.savedRulesLoaded === false) blockedReasons.push('Saved portfolio rules could not be loaded; allocation is blocked until rule checks are available.');
   if (input.evidenceComplete !== true) blockedReasons.push('JEV evidence gate is incomplete.');
   if (input.evidenceFresh !== true) blockedReasons.push('Evidence freshness is not confirmed.');
   if (input.conflictCount > 0) blockedReasons.push('Resolve material evidence conflicts first.');
