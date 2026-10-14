@@ -36,12 +36,13 @@ def route_agents(state: AgentState) -> list[str]:
     return ["market_agent", "risk_agent"]
 
 
-def build_graph():
+def build_graph(market_node=market_agent, risk_node=risk_agent, synthesis_node=synthesis_agent):
+    """Build the graph with injectable specialist nodes for deterministic tests."""
     builder = StateGraph(AgentState)
     builder.add_node("supervisor", supervisor)
-    builder.add_node("market_agent", market_agent)
-    builder.add_node("risk_agent", risk_agent)
-    builder.add_node("synthesis_agent", synthesis_agent)
+    builder.add_node("market_agent", market_node)
+    builder.add_node("risk_agent", risk_node)
+    builder.add_node("synthesis_agent", synthesis_node)
 
     builder.add_edge(START, "supervisor")
     builder.add_conditional_edges("supervisor", route_agents)
