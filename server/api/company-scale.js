@@ -212,7 +212,7 @@ function annualFactRows(facts, tags) {
       form: row.form,
       tag,
       source: 'SEC EDGAR companyfacts',
-      sourceUrl: 'https://www.sec.gov/Archives/edgar/data/' + String(facts?.cik || '').replace(/^0+/, '') + '/',
+      sourceUrl: 'https://data.sec.gov/api/xbrl/companyfacts/CIK' + String(facts?.cik || '').padStart(10, '0') + '.json',
     })).filter(row => {
       const days = (Date.parse(row.end) - Date.parse(row.start)) / 86400000;
       return days >= 300 && days <= 400;
