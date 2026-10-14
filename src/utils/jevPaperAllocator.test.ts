@@ -179,3 +179,23 @@ describe('JEV paper allocator evidence and risk gates', () => {
     assert.equal(result.suggestedWeights.find(item => item.symbol === 'AAA')!.weight, 0.1);
     assert.equal(result.suggestedWeights.find(item => item.symbol === 'BBB')!.weight, 0.1);
   });
+
+  it('includes covered peer strength in the balance score and emits a low-strength risk alert', () => {
+    const strong = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 90, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 80, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    const weak = buildJevPaperAllocator({
+      candidates: [
+        { symbol: 'AAA', sector: 'software', peerStrengthScore: 20, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+        { symbol: 'BBB', sector: 'internet', peerStrengthScore: 10, peerStrengthCoverage: 1, peerStrengthEvidenceFresh: true },
+      ],
+      capital: 10000, evidenceComplete: true, evidenceFresh: true, conflictCount: 0, gateAction: 'complete',
+    });
+    assert.ok(strong.balanceScore! > weak.balanceScore!);
+    assert.ok(weak.alerts.some(alert => alert.includes('low relative peer-strength score')));
+    assert.ok(strong.alerts.some(alert => alert.includes('blends diversification')));
+  });
