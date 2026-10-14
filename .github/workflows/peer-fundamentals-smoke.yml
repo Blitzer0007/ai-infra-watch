@@ -31,7 +31,7 @@ jobs:
 
           python - <<'PY'
           import json
-          from datetime import datetime, timezone
+          from datetime import datetime, timedelta, timezone
           from pathlib import Path
 
           body = json.loads(Path("/tmp/peer-fundamentals.json").read_text(encoding="utf-8"))
@@ -72,6 +72,14 @@ jobs:
                       raise SystemExit(f"{symbol}.{metric_name} is missing filing/period timestamps")
                   if not isinstance(metric.get("value"), (int, float)):
                       raise SystemExit(f"{symbol}.{metric_name} must have a numeric value")
+
+          nvda_size = by_symbol["NVDA"]["metrics"].get("size")
+          if not nvda_size:
+              raise SystemExit("NVDA must expose a sourced annual revenue size proxy")
+          observed = datetime.fromisoformat(nvda_size["observedAt"].replace("Z", "+00:00"))
+          age = datetime.now(timezone.utc) - observed
+          if observed.tzinfo is None or age < timedelta(0) or age > timedelta(days=550):
+              raise SystemExit(f"NVDA annual revenue evidence is stale or invalid: {nvda_size['observedAt']}")
 
           print("SEC peer-fundamentals production API contract passed")
           for symbol in ("NVDA", "AMD"):
