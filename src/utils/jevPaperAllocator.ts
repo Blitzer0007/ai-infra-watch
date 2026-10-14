@@ -3,6 +3,10 @@ export type JevAllocatorCandidate = {
   sector: string;
   peerCount?: number;
   peerComparabilityScore?: number;
+  /** Evidence-gated relative score; only set from scorePeerStrength output. */
+  peerStrengthScore?: number | null;
+  peerStrengthCoverage?: number;
+  peerStrengthEvidenceFresh?: boolean;
   currentPrice?: number | null;
   averageCost?: number | null;
   quoteFresh?: boolean;
@@ -65,6 +69,8 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     if (!String(item.sector || '').trim()) throw new Error('Every candidate requires a sector.');
     if (item.peerCount != null && (!Number.isInteger(item.peerCount) || item.peerCount < 0)) throw new Error('Peer count must be a non-negative integer.');
     if (item.peerComparabilityScore != null && (!finite(item.peerComparabilityScore) || item.peerComparabilityScore < 0 || item.peerComparabilityScore > 100)) throw new Error('Peer comparability must be between 0 and 100.');
+    if (item.peerStrengthScore != null && (!finite(item.peerStrengthScore) || item.peerStrengthScore < 0 || item.peerStrengthScore > 100)) throw new Error('Peer strength must be between 0 and 100.');
+    if (item.peerStrengthCoverage != null && (!finite(item.peerStrengthCoverage) || item.peerStrengthCoverage < 0 || item.peerStrengthCoverage > 1)) throw new Error('Peer strength coverage must be between 0 and 1.');
     for (const field of ['currentWeightPct', 'targetAllocationPct', 'maxAllocationPct', 'lossLimitPct'] as const) {
       const value = item[field];
       if (value != null && (!finite(value) || value < 0 || value > 100)) throw new Error(field + ' must be between 0 and 100.');
@@ -106,12 +112,24 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   const alerts: string[] = [];
   const sectorWeights: Record<string, number> = {};
   if (allocationAllowed) {
+    const peerStrengthReady = input.candidates.length > 1 && input.candidates.every(candidate =>
+      candidate.peerStrengthScore != null && candidate.peerStrengthCoverage != null && candidate.peerStrengthCoverage >= 0.6 && candidate.peerStrengthEvidenceFresh === true
+    );
+    if (peerStrengthReady) alerts.push('Evidence-backed peer strength is available for all selected candidates; small ranking tilts apply only where no saved target allocation exists.');
+    else if (input.candidates.some(candidate => candidate.peerStrengthScore != null)) alerts.push('Peer-strength evidence is incomplete, stale, or below 60% coverage for at least one candidate; no peer-strength ranking is applied.');
     if (input.candidates.some(candidate => (candidate.peerCount ?? 0) === 0)) {
       alerts.push('Peer comparisons are unavailable for one or more candidates; suggested weights remain unranked and equal-weight unless saved targets apply.');
     }
     const equalWeight = Math.min(maxPosition, (1 - minCash) / input.candidates.length);
     const desiredWeight = (candidate: JevAllocatorCandidate) => {
-      const requested = candidate.targetAllocationPct == null ? equalWeight : candidate.targetAllocationPct / 100;
+      const savedTargetExists = candidate.targetAllocationPct != null;
+      const baseRequested = savedTargetExists ? candidate.targetAllocationPct! / 100 : equalWeight;
+      // Only tilt un-targeted candidates when every selected name has fresh,
+      // sufficiently covered peer-strength evidence. Limit the tilt to ±20%.
+      const tilt = peerStrengthReady && !savedTargetExists
+        ? 0.8 + (candidate.peerStrengthScore! / 100) * 0.4
+        : 1;
+      const requested = baseRequested * tilt;
       const savedMax = candidate.maxAllocationPct == null ? maxPosition : Math.min(maxPosition, candidate.maxAllocationPct / 100);
       return Math.max(0, Math.min(requested, savedMax, maxPosition));
     };
