@@ -115,7 +115,8 @@ export function scorePeerStrength(
     const available = normalized
       .map(item => ({ symbol: item.symbol, value: usable.get(item.symbol)?.[key] }))
       .filter((item): item is { symbol: string; value: number } => finiteValue(item.value));
-    if (!available.length) continue;
+    // A single observation cannot establish relative strength. Do not assign it a neutral 50 or let it count toward coverage.
+    if (available.length < 2) continue;
     const values = available.map(item => item.value);
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -138,7 +139,8 @@ export function scorePeerStrength(
 
   return normalized.map(snapshot => {
     const evidence = evidenceBySymbol.get(snapshot.symbol) || {};
-    const availableMetrics = KEYS.filter(key => finiteValue(usable.get(snapshot.symbol)?.[key]));
+    const availableMetrics = KEYS.filter(key => finiteValue(usable.get(snapshot.symbol)?.[key]) && finiteValue(ranks[key]?.[snapshot.symbol]));
+    const notComparableMetrics = KEYS.filter(key => finiteValue(usable.get(snapshot.symbol)?.[key]) && !finiteValue(ranks[key]?.[snapshot.symbol]));
     const status = statusBySymbol.get(snapshot.symbol)!;
     const totalWeight = availableMetrics.reduce((sum, key) => sum + WEIGHTS[key], 0);
     const coverage = Number(totalWeight.toFixed(3));
@@ -151,7 +153,7 @@ export function scorePeerStrength(
       score,
       coverage,
       availableMetrics,
-      missingMetrics: status.missing,
+      missingMetrics: [...status.missing, ...notComparableMetrics],
       staleMetrics: status.stale,
       conflictedMetrics: status.conflicted,
       evidence,
