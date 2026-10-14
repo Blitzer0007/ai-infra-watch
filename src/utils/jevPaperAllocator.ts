@@ -92,6 +92,12 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
     if (hasFreshQuote && ['price-stop', 'price-stop-loss'].includes(exitType) && Number(candidate.exitRuleValue) > 0 && price <= Number(candidate.exitRuleValue)) {
       blockedReasons.push(symbol + ' is at or below its saved price stop; review before allocating.');
     }
+    if (exitType === 'time-limit' && candidate.purchaseDate && Number(candidate.exitRuleValue) > 0) {
+      const purchaseTime = Date.parse(candidate.purchaseDate + (candidate.purchaseDate.length === 10 ? 'T00:00:00Z' : ''));
+      if (Number.isFinite(purchaseTime) && Date.now() - purchaseTime >= Number(candidate.exitRuleValue) * 86400000) {
+        blockedReasons.push(symbol + ' has reached its saved time limit; review the exit rule before allocating.');
+      }
+    }
     if (candidate.currentWeightPct != null && candidate.maxAllocationPct != null && candidate.currentWeightPct > candidate.maxAllocationPct + 0.5) {
       // Existing holdings may already be above the saved maximum; the allocator must not add to that exposure.
     }
@@ -131,6 +137,9 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
         }
         if (member.exitRuleType && String(member.exitRuleType).toLowerCase().includes('thesis')) {
           alerts.push(member.symbol.toUpperCase() + ' has a qualitative thesis rule; confirm the thesis remains valid before manual approval.');
+        }
+        if (String(member.exitRuleType || '').toLowerCase().includes('trailing')) {
+          alerts.push(member.symbol.toUpperCase() + ' has a trailing-stop rule; its peak-price reference must be checked before approval.');
         }
         if (member.quoteFresh !== true && (member.lossLimitPct != null || member.exitRuleType)) {
           alerts.push(member.symbol.toUpperCase() + ' has saved risk rules but no fresh quote to evaluate them.');
