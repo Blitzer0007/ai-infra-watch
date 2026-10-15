@@ -14,9 +14,9 @@ From the repository root, with the virtual environment active:
 python -m tests.production_validation.interactive_production_smoke
 ```
 
-The runner checks the homepage, pauses for you to sign in if needed, then checks the routes listed in `PROD_READ_ONLY_ROUTES` (defaults to `/`). Only add routes you have confirmed exist, for example:
+The runner checks the homepage, pauses for manual sign-in, verifies the authenticated dashboard shell, and then checks all 14 routes listed in `VIEW_PATHS` by default. To run a smaller subset that you have confirmed exists:
 ```powershell
-$env:PROD_READ_ONLY_ROUTES = "/,/watchlist"
+$env:PROD_READ_ONLY_ROUTES = "/overview,/watchlist"
 python -m tests.production_validation.interactive_production_smoke
 ```
 The default route list is sourced from `VIEW_PATHS` in `src/App.tsx`: `/overview`, `/contracts`, `/tracker`, `/congress`, `/macro`, `/portfolio`, `/watchlist`, `/research`, `/jev-lab`, `/quality`, `/outlook`, `/health`, `/guide`, and `/settings`. The runner checks that the dashboard navigation shell remains visible and each route renders a non-empty body. It does not click buttons or trigger scans, alerts, proposals, database writes, or trading actions. It validates navigation/rendering only, not data correctness.
