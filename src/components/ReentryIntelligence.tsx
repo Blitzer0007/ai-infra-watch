@@ -49,7 +49,7 @@ export default function ReentryIntelligence() {
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const response = await authFetch('/api/reentry-alerts?refresh=true', { cache: 'no-store' });
+      const response = await authFetch('/api/reentry-alerts', { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || 'Could not load re-entry watchlist.');
       setItems(Array.isArray(data.items) ? data.items : []);
@@ -60,6 +60,10 @@ export default function ReentryIntelligence() {
   const save = async () => {
     const symbol = draft.symbol.trim().toUpperCase();
     if (!/^[A-Z0-9.^=-]{1,20}$/.test(symbol) || !(draft.targetPrice > 0)) { setError('Enter a valid ticker and a target entry price greater than zero.'); return; }
+    if (draft.ownershipStatus === 'sold' && (!(draft.salePrice != null && draft.salePrice > 0) || !draft.saleDate)) {
+      setError('Record the actual sale price and sale date before activating sold-stock re-entry monitoring. Do not mark META sold while you still hold it.');
+      return;
+    }
     setSaving(true); setError(''); setMessage('');
     try {
       const response = await authFetch('/api/reentry-alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...draft, symbol }), cache: 'no-store' });
@@ -120,6 +124,7 @@ export default function ReentryIntelligence() {
         {research.analyst?.status === 'available' ? <><p className="mt-1 text-[10px] text-white/65">Ratings: {research.analyst.ratings ? `Strong Buy ${research.analyst.ratings.strongBuy} · Buy ${research.analyst.ratings.buy} · Hold ${research.analyst.ratings.hold} · Sell ${research.analyst.ratings.sell} · Strong Sell ${research.analyst.ratings.strongSell}` : 'Not supplied'}{research.analyst.recommendationPeriod ? ' · Period ' + research.analyst.recommendationPeriod : ''}</p><p className="mt-1 text-[10px] text-white/65">Targets: low {money(research.analyst.targets?.low)} · mean {money(research.analyst.targets?.mean)} · median {money(research.analyst.targets?.median)} · high {money(research.analyst.targets?.high)}{research.analyst.targets?.analystCount ? ' · ' + research.analyst.targets.analystCount + ' analysts' : ''}</p><p className="mt-1 text-[9px] text-white/35">Source: {research.analyst.source} · targets last updated {research.analyst.targets?.lastUpdated || 'not reported'} · retrieved {research.analyst.retrievedAt ? new Date(research.analyst.retrievedAt).toLocaleString() : 'unknown'}.</p></> : <p className="mt-1 text-[10px] text-amber-100/70">Analyst data unavailable: {research.analyst?.message || 'No consensus returned.'} Configure the server-side Finnhub key or retry later.</p>}
       </div>
       <div className="mt-3"><div className="flex items-center justify-between gap-2"><h4 className="text-[10px] font-bold text-white/80">Disclosed institutional holdings (SEC 13F)</h4><a href={research.institutionalHoldings?.autopilotReference} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[9px] text-cyan-200/70 hover:text-cyan-100">Autopilot tracker context <ExternalLink className="h-3 w-3"/></a></div><p className="mt-1 text-[9px] leading-relaxed text-amber-100/55">{research.institutionalHoldings?.asOfMeaning}</p>
+        {research.institutionalHoldings?.message && <p className="mt-1 text-[10px] text-amber-100/70">{research.institutionalHoldings.message}</p>}
         <div className="mt-2 space-y-2">{(research.institutionalHoldings?.managers || []).map((manager: any) => <div key={manager.cik} className="rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1"><div><p className="text-[10px] font-bold text-white/80">{manager.name}</p><p className="text-[9px] text-white/40">Report date {manager.reportDate || 'unknown'} · Filed {manager.filingDate || 'unknown'}</p></div><span className={'text-[8px] uppercase font-bold ' + (manager.status === 'reported_in_filing' ? 'text-emerald-200' : manager.status === 'unavailable' ? 'text-rose-200' : 'text-white/45')}>{manager.status === 'reported_in_filing' ? 'META reported' : manager.status === 'unavailable' ? 'Unavailable' : 'Not in latest filing'}</span></div>{manager.status === 'reported_in_filing' && <p className="mt-1 text-[9px] text-white/60">{manager.shares?.toLocaleString('en-US') ?? '—'} shares · reported value {money(manager.marketValueUsd)}</p>}{manager.message && <p className="mt-1 text-[9px] text-rose-100/50">{manager.message}</p>}{manager.filingUrl && <a href={manager.filingUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[9px] text-cyan-200/65 hover:text-cyan-100">Open SEC filing <ExternalLink className="h-3 w-3"/></a>}</div>)}</div>
         <p className="mt-2 text-[9px] leading-relaxed text-white/35">13F reports are delayed and show selected reportable long U.S. equity positions only. A fund not reporting META here does not prove it has no exposure elsewhere, and a filed position may have changed since quarter-end.</p>
       </div>
