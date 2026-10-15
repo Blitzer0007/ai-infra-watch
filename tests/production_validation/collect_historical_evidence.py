@@ -117,6 +117,74 @@ def build_integrity_summary(rows: list[dict[str, Any]], symbols: list[str], star
     }
 
 
+def build_session_coverage(
+    rows: list[dict[str, Any]],
+    symbols: list[str],
+    start: str,
+    end: str,
+    expected_sessions: list[str],
+    calendar_metadata: dict[str, Any],
+    collection_errors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compare observed session dates with an independent exchange-calendar model."""
+    expected = sorted({d for d in expected_sessions if start <= d < end})
+    per_symbol = {}
+    any_gaps = False
+    for symbol in symbols:
+        observed = sorted({
+            str(row.get("date", ""))[:10]
+            for row in rows
+            if row.get("symbol") == symbol and isinstance(row.get("date"), str)
+            and start <= str(row.get("date", ""))[:10] < end
+        })
+        observed_set = set(observed)
+        expected_set = set(expected)
+        missing = sorted(expected_set - observed_set)
+        unexpected = sorted(observed_set - expected_set)
+        any_gaps = any_gaps or bool(missing or unexpected)
+        per_symbol[symbol] = {
+            "expected_sessions": len(expected),
+            "observed_sessions": len(observed_set),
+            "missing_sessions": missing,
+            "unexpected_sessions": unexpected,
+            "coverage_pct": round(100 * len(expected_set & observed_set) / len(expected_set), 3) if expected_set else None,
+            "status": "PASS" if not missing and not unexpected and symbol not in {
+                str(item.get("symbol", "")).upper() for item in collection_errors
+            } else "FAIL",
+        }
+    failed_symbols = [symbol for symbol, data in per_symbol.items() if data["status"] != "PASS"]
+    return {
+        "status": "PASS" if not any_gaps and not failed_symbols and not collection_errors else "FAIL",
+        "calendar": calendar_metadata,
+        "expected_session_count": len(expected),
+        "symbols": per_symbol,
+        "collection_error_count": len(collection_errors),
+        "note": "This compares dates to the exchange_calendars XNYS schedule model. It is an independent completeness check, not a first-party exchange attestation or proof of historical data availability.",
+    }
+
+
+def load_exchange_sessions(start: str, end: str) -> tuple[list[str], dict[str, Any]]:
+    """Generate expected US equity sessions using the XNYS schedule model."""
+    import exchange_calendars as xcals
+    from importlib.metadata import version
+    from datetime import date, timedelta
+
+    end_inclusive = (date.fromisoformat(end) - timedelta(days=1)).isoformat()
+    calendar = xcals.get_calendar("XNYS")
+    sessions = calendar.sessions_in_range(start, end_inclusive)
+    session_dates = sorted({session.date().isoformat() for session in sessions})
+    metadata = {
+        "provider": "exchange_calendars",
+        "package_version": version("exchange-calendars"),
+        "calendar_id": "XNYS",
+        "range_start_inclusive": start,
+        "range_end_exclusive": end,
+        "session_count": len(session_dates),
+        "purpose": "independent exchange-session completeness cross-check",
+    }
+    return session_dates, metadata
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbols", required=True, help="Comma-separated symbols, e.g. NVDA,MU,MSFT")
