@@ -195,8 +195,9 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       if (!response.ok) throw new Error(body?.detail || body?.error || 'JEV candidate research failed.');
       setCandidateResearch(body);
       setUseSuggestedAllocation(false);
-      const availability = body?.jev?.evidence_availability || {};
       const gate = body?.jev?.evidence_gate || {};
+      // The Python agent nests the canonical matrix inside evidence_gate; preserve it when the top-level alias is absent.
+      const availability = body?.jev?.evidence_availability || gate?.evidence_availability || {};
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
       const conflicts = Number(gate?.conflict_detection?.count || gate?.conflict_count || 0);
       const action = String(gate.action || body?.jev?.action || '').toLowerCase();
@@ -302,8 +303,9 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     if (!preview) { setMessage('Target rejected by risk controls. Reduce weights or sector concentration.'); return; }
     const createdAt = new Date().toISOString();
     const clientId = `paper-${Date.now()}`;
-    const availability = candidateResearch?.jev?.evidence_availability || {};
     const gate = candidateResearch?.jev?.evidence_gate || {};
+    // Keep the paper-review snapshot aligned with the canonical nested evidence matrix.
+    const availability = candidateResearch?.jev?.evidence_availability || gate?.evidence_availability || {};
     const missing = Array.isArray(availability.missing) ? availability.missing : [];
     const conflicts = Number(gate?.conflict_detection?.count || 0);
     const action = String(gate.action || candidateResearch?.jev?.action || '').toLowerCase();
