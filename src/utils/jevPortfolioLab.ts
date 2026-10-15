@@ -282,16 +282,23 @@ export function runHistoricalPaperBacktest(args: {
   const symbols = [...new Set([...target.map(h=>h.symbol.toUpperCase()), 'SPY', 'QQQ'])];
   const byDate = new Map<string, Map<string, HistoricalPrice>>();
   for (const row of prices) {
-    if (!symbols.includes(row.symbol)) continue;
+    const symbol = String(row.symbol || '').trim().toUpperCase();
+    if (!symbols.includes(symbol)) continue;
     const t = Date.parse(row.date), available = Date.parse(row.availableAt);
-    if (!row.symbol || !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    if (!symbol || !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !finite(t) || !finite(available) || !finite(row.close) || row.close <= 0) throw new Error('Historical prices require valid dates, availability timestamps, and positive finite closes.');
+    if (t > Date.now()) throw new Error('Future-dated prices are not valid in a historical backtest.');
     if (row.adjusted === false) throw new Error('Adjusted closes are required for strategy and benchmark return calculations.');
     const cutoff = args.decisionCutoffByDate?.[row.date];
-    if (cutoff && (!finite(Date.parse(cutoff)) || available > Date.parse(cutoff) || t > Date.parse(cutoff))) throw new Error('Look-ahead data rejected by historical backtest.');
+    if (cutoff) {
+      const cutoffMs = Date.parse(cutoff);
+      if (!finite(cutoffMs) || cutoffMs > Date.now() || available > cutoffMs || t > cutoffMs) {
+        throw new Error('Look-ahead data rejected by historical backtest.');
+      }
+    }
     if (!byDate.has(row.date)) byDate.set(row.date, new Map());
     const day = byDate.get(row.date)!;
-    if (day.has(row.symbol)) throw new Error('Duplicate historical price for symbol/date.');
-    day.set(row.symbol, row);
+    if (day.has(symbol)) throw new Error('Duplicate historical price for symbol/date.');
+    day.set(symbol, { ...row, symbol });
   }
   // Do not silently drop partial dates: that can hide gaps in an input history and make a backtest look healthier than its evidence supports. Every supplied date must contain the strategy holdings and both benchmarks.
   for (const [date, day] of byDate) {
@@ -301,7 +308,7 @@ export function runHistoricalPaperBacktest(args: {
   const dates = [...byDate.keys()].sort((a,b)=>Date.parse(a)-Date.parse(b));
   if (dates.length < 2) throw new Error('Insufficient common historical dates for strategy and both benchmarks.');
   for (let i=1;i<dates.length;i++) if (Date.parse(dates[i]) <= Date.parse(dates[i-1])) throw new Error('Historical dates must be strictly increasing.');
-  const relevantPrices = prices.filter(row => symbols.includes(row.symbol.toUpperCase()));
+  const relevantPrices = prices.filter(row => symbols.includes(String(row.symbol || '').trim().toUpperCase()));
   const adjustedPricesComplete = relevantPrices.every(row => row.adjusted === true);
   // Provider labels alone cannot prove point-in-time integrity: every decision date
   // needs an explicit cutoff and every used price must have been available by it.
