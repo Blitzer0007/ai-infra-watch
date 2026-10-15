@@ -66,3 +66,23 @@ test('partial/error scan is not reported as a completed clean evaluation', () =>
 test('partial evaluation without explicit errors is reported as incomplete', () => {
   assert.equal(classifyScan({ activeRows: 3, evaluatedRows: 2, qualifyingCandidates: 0, notifyEligibleCandidates: 0, telegramSent: 0, errors: 0 }), 'incomplete_scan');
 });
+
+
+import { buildDeliveryKey } from './reentry-alerts.js';
+
+test('durable delivery key is stable for the same configured thesis and target', () => {
+  const row = { symbol: 'nvda', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth' };
+  assert.equal(buildDeliveryKey(row), buildDeliveryKey({ ...row, symbol: 'NVDA' }));
+});
+
+test('changing target or thesis creates a distinct delivery episode key', () => {
+  const row = { symbol: 'NVDA', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth' };
+  assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, target_price: 110 }));
+  assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, thesis: 'Changed thesis' }));
+});
+
+test('durable delivery key does not contain raw thesis text', () => {
+  const key = buildDeliveryKey({ symbol: 'NVDA', target_price: 120, thesis: 'private thesis text' });
+  assert.match(key, /^[a-f0-9]{64}$/);
+  assert.equal(key.includes('private thesis text'), false);
+});
