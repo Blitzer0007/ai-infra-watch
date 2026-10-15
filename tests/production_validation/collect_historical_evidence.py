@@ -245,6 +245,24 @@ def main(argv: list[str] | None = None) -> int:
     report["integrity_checks"] = build_integrity_summary(
         report["price_rows"], symbols, args.start, args.end, report["errors"]
     )
+    try:
+        expected_sessions, calendar_metadata = load_exchange_sessions(args.start, args.end)
+        report["session_coverage"] = build_session_coverage(
+            report["price_rows"], symbols, args.start, args.end,
+            expected_sessions, calendar_metadata, report["errors"]
+        )
+    except Exception as exc:
+        report["session_coverage"] = {
+            "status": "BLOCKED",
+            "calendar": {
+                "provider": "exchange_calendars",
+                "calendar_id": "XNYS",
+                "range_start_inclusive": args.start,
+                "range_end_exclusive": args.end,
+            },
+            "error": f"Exchange session calendar unavailable: {type(exc).__name__}: {exc}",
+            "note": "Do not treat missing calendar calculation as a coverage pass.",
+        }
     membership_validation = validate_universe_membership(read_json(args.membership_json))
     report["validation"] = {
         "price_evidence": {
@@ -262,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     report["raw_response_directory"] = str(raw_dir)
     report["release_evidence_summary"] = {
         "structural_integrity": report["integrity_checks"]["status"],
+        "exchange_session_coverage": report["session_coverage"]["status"],
         "historical_price_availability": "BLOCKED",
         "historical_universe_membership": membership_validation["status"],
         "raw_response_files_preserved": len(report["sources"]),
@@ -279,8 +298,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Report SHA-256: {digest}")
     print(f"Raw provider responses: {raw_dir.resolve()}")
     print(f"Structural integrity: {report['integrity_checks']['status']}")
+    print(f"Exchange session coverage: {report['session_coverage']['status']}")
+    if report["session_coverage"]["status"] == "PASS":
+        for symbol, coverage in report["session_coverage"]["symbols"].items():
+            print(f"  {symbol}: {coverage['observed_sessions']}/{coverage['expected_sessions']} sessions; missing={len(coverage['missing_sessions'])}; unexpected={len(coverage['unexpected_sessions'])}")
     print(f"Price gate: BLOCKED; universe gate: {membership_validation['status']}; release ready: NO")
-    return 1 if report["errors"] or report["integrity_checks"]["status"] != "PASS" else 0
+    return 1 if (
+        report["errors"]
+        or report["integrity_checks"]["status"] != "PASS"
+        or report["session_coverage"]["status"] != "PASS"
+    ) else 0
 
 
 if __name__ == "__main__":
