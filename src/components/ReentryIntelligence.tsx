@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, BellRing, ExternalLink, RefreshCw, Save, Trash2, FlaskConical } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
-import { assessReentry, type ReentryAssessment, type ReentryQuote, type ReentryStatus } from '../utils/reentryIntelligence';
+import { type ReentryStatus } from '../utils/reentryIntelligence';
 
 type Item = {
   symbol: string; ownershipStatus: 'holding' | 'sold'; salePrice: number | null; saleDate: string | null;
@@ -21,17 +21,6 @@ const STATUS: Record<ReentryStatus, { label: string; tone: string }> = {
 };
 const numberOrNull = (value: unknown) => Number.isFinite(Number(value)) && value !== null && value !== '' ? Number(value) : null;
 const money = (value: number | null | undefined) => value == null ? '—' : '$' + value.toLocaleString('en-US', { maximumFractionDigits: 2 });
-export default function ReentryIntelligence() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [draft, setDraft] = useState<Item>(initialDraft());
-  const [research, setResearch] = useState<any>(null);
-  const [researchLoading, setResearchLoading] = useState(false);
-  const [researchError, setResearchError] = useState('');
-
 const initialDraft = (): Item => ({
   symbol: 'META',
   ownershipStatus: 'holding',
@@ -44,6 +33,18 @@ const initialDraft = (): Item => ({
   thesisInvalidated: false,
   active: true,
 });
+export default function ReentryIntelligence() {
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [draft, setDraft] = useState<Item>(initialDraft());
+  const [research, setResearch] = useState<any>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchError, setResearchError] = useState('');
+
+
   const [editing, setEditing] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
