@@ -72,7 +72,7 @@ begin
 
   update public.reentry_telegram_deliveries
   set status = p_status,
-      telegram_message_id = case when p_status = 'accepted' then p_message_id else null end,
+      telegram_message_id = case when p_status in ('accepted', 'uncertain') then p_message_id else null end,
       last_error = left(p_error, 1000),
       completed_at = now(),
       updated_at = now()
