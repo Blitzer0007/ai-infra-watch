@@ -174,6 +174,31 @@ async function fetchManagerMetaPosition(manager) {
   }
 }
 
+async function fetchResearchPrice(symbol) {
+  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+    encodeURIComponent(symbol) + '?range=5d&interval=1d';
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'ai-infra-watch/1.0' },
+    signal: AbortSignal.timeout(3000),
+  });
+  if (!response.ok) throw new Error('Yahoo Finance returned HTTP ' + response.status);
+  const payload = await response.json();
+  const result = payload?.chart?.result?.[0];
+  const meta = result?.meta;
+  const closes = result?.indicators?.quote?.[0]?.close;
+  const valid = Array.isArray(closes) ? closes.filter(Number.isFinite) : [];
+  const price = Number.isFinite(meta?.regularMarketPrice) ? meta.regularMarketPrice : valid.at(-1);
+  if (!(price > 0)) throw new Error('No current reference price available');
+  return {
+    price,
+    retrievedAt: new Date().toISOString(),
+    marketTime: Number.isFinite(Number(meta?.regularMarketTime))
+      ? new Date(Number(meta.regularMarketTime) * 1000).toISOString()
+      : null,
+    source: 'Yahoo Finance chart endpoint',
+  };
+}
+
 async function fetchReentryResearch(symbol) {
   const cacheKey = String(symbol).toUpperCase();
   const cached = RESEARCH_CACHE.get(cacheKey);
@@ -181,7 +206,7 @@ async function fetchReentryResearch(symbol) {
   const [analyst, managers, quote] = await Promise.all([
     fetchAnalystResearch(cacheKey).catch(error => ({ status: 'unavailable', source: 'Finnhub', message: String(error?.message || error), retrievedAt: new Date().toISOString() })),
     cacheKey === 'META' ? Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)) : Promise.resolve([]),
-    quoteHistory(cacheKey).catch(error => ({ price: null, sma20: null, sma50: null, drawdownFrom52WeekHighPct: null, retrievedAt: new Date().toISOString(), error: String(error?.message || error) })),
+    fetchResearchPrice(cacheKey).catch(error => ({ price: null, retrievedAt: new Date().toISOString(), source: null, error: String(error?.message || error) })),
   ]);
   const targetMean = analyst?.targets?.mean;
   const targetMedian = analyst?.targets?.median;
