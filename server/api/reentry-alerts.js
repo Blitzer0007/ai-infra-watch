@@ -95,7 +95,8 @@ export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, re
     const status = error?.deliveryStatus === 'rejected' ? 'rejected' : 'uncertain';
     let deliveryRecordPersisted = false;
     try {
-      await recordFailure(status, null, String(error?.message || error));
+      const recorded = await recordFailure(status, null, String(error?.message || error));
+      if (recorded !== true) throw new Error('Delivery failure state update was not confirmed');
       deliveryRecordPersisted = true;
     } catch {
       // The original durable claim remains in "sending", suppressing automatic retries.
@@ -111,14 +112,16 @@ export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, re
   }
 
   try {
-    await recordAccepted(messageId);
+    const recorded = await recordAccepted(messageId);
+    if (recorded !== true) throw new Error('Telegram acceptance state update was not confirmed');
     return { status: 'accepted', messageId, attempted: true, deliveryRecordPersisted: true };
   } catch (error) {
     const message = String(error?.message || error);
     let deliveryRecordPersisted = false;
     try {
       // We know Telegram returned this ID. Preserve it even while marking the DB outcome uncertain.
-      await recordFailure('uncertain', messageId, message);
+      const recorded = await recordFailure('uncertain', messageId, message);
+      if (recorded !== true) throw new Error('Uncertain delivery state update was not confirmed');
       deliveryRecordPersisted = true;
     } catch {
       // The claim remains durable if the database update cannot be confirmed.
