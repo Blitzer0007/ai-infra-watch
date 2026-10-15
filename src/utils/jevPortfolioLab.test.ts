@@ -188,7 +188,7 @@ test('backtest cannot claim ready evidence without explicit point-in-time decisi
 });
 
 test('backtest reaches evidence-ready only with source-backed membership intervals covering every decision date', () => {
-  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const prices = verifiedHistory();
   const decisionCutoffByDate = Object.fromEntries(
     ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
   );
@@ -209,7 +209,7 @@ test('backtest reaches evidence-ready only with source-backed membership interva
 });
 
 test('backtest remains insufficient when point-in-time universe membership is not verified', () => {
-  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const prices = verifiedHistory();
   const decisionCutoffByDate = Object.fromEntries(
     ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
   );
@@ -257,7 +257,7 @@ test('membership evidence whose effective interval misses one decision date is i
 });
 
 test('assumed membership evidence can never make the backtest evidence-ready', () => {
-  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const prices = verifiedHistory();
   const decisionCutoffByDate = Object.fromEntries(
     ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
   );
