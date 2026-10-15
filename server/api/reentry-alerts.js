@@ -67,8 +67,8 @@ const TRACKED_MANAGERS = [
 ];
 const AUTOPILOT_HOLDINGS_REFERENCE = 'https://start.joinautopilot.com/blog/hedge-fund-and-wall-street-portfolios';
 
-async function researchFetchJson(url, headers = {}) {
-  const response = await fetch(url, { headers: { Accept: 'application/json', ...headers }, signal: AbortSignal.timeout(7000) });
+async function researchFetchJson(url, headers = {}, timeoutMs = 7000) {
+  const response = await fetch(url, { headers: { Accept: 'application/json', ...headers }, signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new Error('Source returned HTTP ' + response.status);
   return response.json();
 }
@@ -85,8 +85,8 @@ async function fetchAnalystResearch(symbol) {
   const ratingsRows = ratingsResult.status === 'fulfilled' && Array.isArray(ratingsResult.value) ? ratingsResult.value : [];
   const currentRatings = ratingsRows.filter(row => row && typeof row.period === 'string').sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] || null;
   const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : null;
-  const targetMeanAvailable = Number.isFinite(Number(targets?.targetMean));
-  const targetMedianAvailable = Number.isFinite(Number(targets?.targetMedian));
+  const targetMeanAvailable = targets?.targetMean != null && Number.isFinite(Number(targets.targetMean)) && Number(targets.targetMean) > 0;
+  const targetMedianAvailable = targets?.targetMedian != null && Number.isFinite(Number(targets.targetMedian)) && Number(targets.targetMedian) > 0;
   const available = Boolean(currentRatings) || Boolean(targets && (targetMeanAvailable || targetMedianAvailable));
   return {
     status: available ? 'available' : 'unavailable',
@@ -95,11 +95,11 @@ async function fetchAnalystResearch(symbol) {
     recommendationPeriod: currentRatings?.period || null,
     ratings: currentRatings ? { strongBuy: Number(currentRatings.strongBuy) || 0, buy: Number(currentRatings.buy) || 0, hold: Number(currentRatings.hold) || 0, sell: Number(currentRatings.sell) || 0, strongSell: Number(currentRatings.strongSell) || 0 } : null,
     targets: targets ? {
-      low: Number.isFinite(Number(targets.targetLow)) ? Number(targets.targetLow) : null,
-      mean: Number.isFinite(Number(targets.targetMean)) ? Number(targets.targetMean) : null,
-      median: Number.isFinite(Number(targets.targetMedian)) ? Number(targets.targetMedian) : null,
-      high: Number.isFinite(Number(targets.targetHigh)) ? Number(targets.targetHigh) : null,
-      analystCount: Number.isFinite(Number(targets.numberAnalysts)) ? Number(targets.numberAnalysts) : null,
+      low: targets.targetLow != null && Number(targets.targetLow) > 0 ? Number(targets.targetLow) : null,
+      mean: targets.targetMean != null && Number(targets.targetMean) > 0 ? Number(targets.targetMean) : null,
+      median: targets.targetMedian != null && Number(targets.targetMedian) > 0 ? Number(targets.targetMedian) : null,
+      high: targets.targetHigh != null && Number(targets.targetHigh) > 0 ? Number(targets.targetHigh) : null,
+      analystCount: targets.numberAnalysts != null && Number(targets.numberAnalysts) >= 0 ? Number(targets.numberAnalysts) : null,
       lastUpdated: targets.lastUpdated || null,
     } : null,
     errors: [...(ratingsResult.status === 'rejected' ? ['Rating consensus unavailable.'] : []), ...(targetsResult.status === 'rejected' ? ['Price targets unavailable.'] : [])],
@@ -129,7 +129,7 @@ export function parseMeta13fPosition(xml) {
 async function fetchManagerMetaPosition(manager) {
   const ua = String(process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research; contact: configured-admin@example.com)');
   try {
-    const submissions = await researchFetchJson('https://data.sec.gov/submissions/CIK' + manager.cik + '.json', { 'User-Agent': ua, Accept: 'application/json' });
+    const submissions = await researchFetchJson('https://data.sec.gov/submissions/CIK' + manager.cik + '.json', { 'User-Agent': ua, Accept: 'application/json' }, 3500);
     const recent = submissions?.filings?.recent;
     if (!recent) throw new Error('No recent SEC submissions');
     const filings = [];
@@ -142,7 +142,7 @@ async function fetchManagerMetaPosition(manager) {
     if (!filing) throw new Error('No original 13F-HR filing found');
     const accessionPath = filing.accession.replaceAll('-', '');
     const baseUrl = 'https://www.sec.gov/Archives/edgar/data/' + Number(manager.cik) + '/' + accessionPath + '/';
-    const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(7000) });
+    const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(3500) });
     if (!indexResponse.ok) throw new Error('SEC filing index returned HTTP ' + indexResponse.status);
     const indexHtml = await indexResponse.text();
     const filingRows = indexHtml.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
@@ -158,7 +158,7 @@ async function fetchManagerMetaPosition(manager) {
       if (fallback) infoHref = new URL(fallback[1], 'https://www.sec.gov').toString();
     }
     if (!infoHref) throw new Error('SEC information table link not found');
-    const tableResponse = await fetch(infoHref, { headers: { 'User-Agent': ua, Accept: 'application/xml, text/html' }, signal: AbortSignal.timeout(7000) });
+    const tableResponse = await fetch(infoHref, { headers: { 'User-Agent': ua, Accept: 'application/xml, text/html' }, signal: AbortSignal.timeout(3500) });
     if (!tableResponse.ok) throw new Error('SEC information table returned HTTP ' + tableResponse.status);
     const position = parseMeta13fPosition(await tableResponse.text());
     return {
@@ -422,6 +422,8 @@ export default async function handler(req,res) {
       const ownershipStatus=req.body?.ownershipStatus==='holding'?'holding':'sold';
       const plannedExit=Number(req.body?.plannedExitPrice);
       const upperReview=Number(req.body?.upperReviewPrice);
+      const saleDateInput=String(req.body?.saleDate||'');
+      if (ownershipStatus === 'sold' && (!(salePrice > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(saleDateInput))) return res.status(400).json({ok:false,error:'Enter the actual sale price and sale date before enabling sold-stock re-entry monitoring.'});
       if ((req.body?.plannedExitPrice!=null && req.body?.plannedExitPrice!=='' && (!(plannedExit>0)||!Number.isFinite(plannedExit))) || (req.body?.upperReviewPrice!=null && req.body?.upperReviewPrice!=='' && (!(upperReview>0)||!Number.isFinite(upperReview)))) return res.status(400).json({ok:false,error:'Exit and upper review prices must be positive numbers when set.'});
       const payload={symbol,ownership_status:ownershipStatus,sale_price:ownershipStatus==='sold'&&Number.isFinite(salePrice)&&salePrice>0?salePrice:null,sale_date:ownershipStatus==='sold'&&/^\d{4}-\d{2}-\d{2}$/.test(String(req.body?.saleDate||''))?String(req.body.saleDate):null,planned_exit_price:Number.isFinite(plannedExit)&&plannedExit>0?plannedExit:null,upper_review_price:Number.isFinite(upperReview)&&upperReview>0?upperReview:null,target_price:target,thesis,thesis_invalidated:Boolean(req.body?.thesisInvalidated),active:req.body?.active!==false,updated_at:new Date().toISOString()};
       const saved=await db('reentry_watchlist?on_conflict=symbol',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify(payload)});
