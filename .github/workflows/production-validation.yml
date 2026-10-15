@@ -1,0 +1,67 @@
+name: Production Evidence Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_authenticated_checks:
+        description: Run authenticated checks (requires secure QA secrets)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-evidence-validation
+  cancel-in-progress: false
+
+jobs:
+  historical-validator-tests:
+    name: Historical evidence validator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/production_validation/requirements.txt
+      - name: Install validation dependencies
+        run: python -m pip install -r tests/production_validation/requirements.txt
+      - name: Run deterministic validator tests
+        run: python -m pytest -q tests/production_validation/test_historical_evidence.py
+
+  production-read-only-smoke:
+    name: Read-only production Playwright
+    if: ${{ github.event.inputs.run_authenticated_checks != 'true' || (secrets.PROD_STORAGE_STATE_B64 != '' && secrets.PROD_AUTHENTICATED_MARKER != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/production_validation/requirements.txt
+      - name: Install Playwright
+        run: |
+          python -m pip install -r tests/production_validation/requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Run read-only production smoke tests
+        env:
+          PROD_BASE_URL: ${{ vars.PROD_BASE_URL || 'https://ai-infra-watch-theta.vercel.app' }}
+          PROD_SMOKE_PATHS: ${{ vars.PROD_SMOKE_PATHS || '/' }}
+          PROD_STORAGE_STATE_B64: ${{ github.event.inputs.run_authenticated_checks == 'true' && secrets.PROD_STORAGE_STATE_B64 || '' }}
+          PROD_AUTHENTICATED_MARKER: ${{ github.event.inputs.run_authenticated_checks == 'true' && secrets.PROD_AUTHENTICATED_MARKER || '' }}
+        run: python -m pytest -q tests/production_validation/test_production_smoke.py -rs
+
+  auth-prerequisite:
+    name: Authenticated QA session prerequisite
+    if: ${{ github.event.inputs.run_authenticated_checks == 'true' && (secrets.PROD_STORAGE_STATE_B64 == '' || secrets.PROD_AUTHENTICATED_MARKER == '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report blocked authenticated checks
+        run: |
+          echo "::warning::Authenticated production checks are BLOCKED: configure PROD_STORAGE_STATE_B64 and PROD_AUTHENTICATED_MARKER secrets."
+          echo "No credentials were supplied and no authenticated pass is claimed."
