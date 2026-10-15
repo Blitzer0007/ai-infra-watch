@@ -194,15 +194,26 @@ async function fetchManagerMetaPosition(manager) {
     const recent = submissions?.filings?.recent;
     if (!recent) throw new Error('No recent SEC submissions');
     const filings = [];
+    const amendments = [];
     for (let i = 0; i < (recent.form || []).length; i++) {
-      if (recent.form[i] !== '13F-HR' || !recent.accessionNumber?.[i] || !recent.filingDate?.[i]) continue;
-      filings.push({ accession: recent.accessionNumber[i], filingDate: recent.filingDate[i], reportDate: recent.reportDate?.[i] || null });
+      const form = recent.form[i];
+      if (!['13F-HR', '13F-HR/A'].includes(form) || !recent.accessionNumber?.[i] || !recent.filingDate?.[i]) continue;
+      const row = { accession: recent.accessionNumber[i], filingDate: recent.filingDate[i], reportDate: recent.reportDate?.[i] || null };
+      if (form === '13F-HR') filings.push(row);
+      else amendments.push(row);
     }
     filings.sort((a, b) => String(b.filingDate).localeCompare(String(a.filingDate)));
     const filing = filings[0];
     if (!filing) throw new Error('No original 13F-HR filing found');
+    const samePeriodAmendments = amendments.filter(row =>
+      row.filingDate > filing.filingDate && (filing.reportDate ? row.reportDate === filing.reportDate : true)
+    ).sort((a, b) => String(b.filingDate).localeCompare(String(a.filingDate)));
+    const amendment = samePeriodAmendments[0] || null;
     const accessionPath = filing.accession.replaceAll('-', '');
     const baseUrl = 'https://www.sec.gov/Archives/edgar/data/' + Number(manager.cik) + '/' + accessionPath + '/';
+    const amendmentUrl = amendment
+      ? 'https://www.sec.gov/Archives/edgar/data/' + Number(manager.cik) + '/' + amendment.accession.replaceAll('-', '') + '/' + amendment.accession + '-index.html'
+      : null;
     const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(2500) });
     if (!indexResponse.ok) throw new Error('SEC filing index returned HTTP ' + indexResponse.status);
     const indexHtml = await indexResponse.text();
@@ -213,11 +224,13 @@ async function fetchManagerMetaPosition(manager) {
     const position = parseMeta13fPosition(await tableResponse.text());
     return {
       ...manager, ...position, reportDate: filing.reportDate, filingDate: filing.filingDate,
-      filingUrl: baseUrl + filing.accession + '-index.html', source: 'SEC EDGAR Form 13F-HR',
+      filingUrl: baseUrl + filing.accession + '-index.html',
+      amendmentDate: amendment?.filingDate || null, amendmentUrl,
+      source: 'SEC EDGAR Form 13F-HR',
       status: position.reported ? 'reported_in_filing' : 'not_listed_in_latest_filing',
     };
   } catch (error) {
-    return { ...manager, status: 'unavailable', reported: null, shares: null, marketValueUsd: null, reportDate: null, filingDate: null, filingUrl: null, source: 'SEC EDGAR', message: String(error?.message || error) };
+    return { ...manager, status: 'unavailable', reported: null, shares: null, marketValueUsd: null, reportDate: null, filingDate: null, filingUrl: null, amendmentDate: null, amendmentUrl: null, source: 'SEC EDGAR', message: String(error?.message || error) };
   }
 }
 
