@@ -90,23 +90,29 @@ async function fetchAnalystResearch(symbol) {
   const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : null;
   const targetMeanAvailable = targets?.targetMean != null && Number.isFinite(Number(targets.targetMean)) && Number(targets.targetMean) > 0;
   const targetMedianAvailable = targets?.targetMedian != null && Number.isFinite(Number(targets.targetMedian)) && Number(targets.targetMedian) > 0;
-  const available = Boolean(currentRatings) || Boolean(targets && (targetMeanAvailable || targetMedianAvailable));
+  const targetUpdatedAt = Date.parse(String(targets?.lastUpdated || ''));
+  const targetDateValid = Number.isFinite(targetUpdatedAt) && targetUpdatedAt <= Date.now() + 86400000;
+  const targetFresh = targetDateValid && Date.now() - targetUpdatedAt <= 180 * 86400000;
+  const targetsUsable = Boolean(targets && targetFresh && (targetMeanAvailable || targetMedianAvailable));
+  const available = Boolean(currentRatings) || targetsUsable;
+  const staleTargetsOnly = Boolean(targets && (targetMeanAvailable || targetMedianAvailable) && !targetFresh && !currentRatings);
   return {
-    status: available ? 'available' : 'unavailable',
+    status: available ? 'available' : staleTargetsOnly ? 'stale' : 'unavailable',
     source: 'Finnhub',
     retrievedAt: new Date().toISOString(),
     recommendationPeriod: currentRatings?.period || null,
     ratings: currentRatings ? { strongBuy: Number(currentRatings.strongBuy) || 0, buy: Number(currentRatings.buy) || 0, hold: Number(currentRatings.hold) || 0, sell: Number(currentRatings.sell) || 0, strongSell: Number(currentRatings.strongSell) || 0 } : null,
     targets: targets ? {
       low: targets.targetLow != null && Number(targets.targetLow) > 0 ? Number(targets.targetLow) : null,
-      mean: targets.targetMean != null && Number(targets.targetMean) > 0 ? Number(targets.targetMean) : null,
-      median: targets.targetMedian != null && Number(targets.targetMedian) > 0 ? Number(targets.targetMedian) : null,
+      mean: targetMeanAvailable ? Number(targets.targetMean) : null,
+      median: targetMedianAvailable ? Number(targets.targetMedian) : null,
       high: targets.targetHigh != null && Number(targets.targetHigh) > 0 ? Number(targets.targetHigh) : null,
-      analystCount: targets.numberAnalysts != null && Number(targets.numberAnalysts) >= 0 ? Number(targets.numberAnalysts) : null,
+      analystCount: targets.numberOfAnalysts != null && Number(targets.numberOfAnalysts) > 0 ? Number(targets.numberOfAnalysts) : null,
       lastUpdated: targets.lastUpdated || null,
+      freshness: targetFresh ? 'fresh' : targetDateValid ? 'stale' : 'date_unavailable',
     } : null,
     errors: [...(ratingsResult.status === 'rejected' ? ['Rating consensus unavailable.'] : []), ...(targetsResult.status === 'rejected' ? ['Price targets unavailable.'] : [])],
-    message: available ? null : 'Finnhub returned no usable ratings or price targets.',
+    message: available ? null : staleTargetsOnly ? 'Finnhub price targets are more than 180 days old; stale targets are excluded from price-context calculations.' : 'Finnhub returned no usable ratings or fresh price targets.',
   };
 }
 
