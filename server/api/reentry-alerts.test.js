@@ -34,3 +34,26 @@ test('a failed delivery leaves the previous non-candidate signature eligible for
   assert.equal(shouldNotifyCandidate(persistedSignature, true), true);
   assert.equal(shouldNotifyCandidate(persistedSignature, true), true);
 });
+
+
+import { classifyScan } from './reentry-alerts.js';
+
+test('empty watchlist is not reported as a successful no-candidate evaluation', () => {
+  assert.equal(classifyScan({ activeRows: 0, evaluatedRows: 0, qualifyingCandidates: 0, telegramSent: 0, errors: 0 }), 'empty_watchlist');
+});
+
+test('evaluated watchlist with no qualifying candidate is reported distinctly', () => {
+  assert.equal(classifyScan({ activeRows: 4, evaluatedRows: 4, qualifyingCandidates: 0, telegramSent: 0, errors: 0 }), 'evaluated_no_qualifying_candidate');
+});
+
+test('candidate with accepted Telegram message is explicitly identified', () => {
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, telegramSent: 1, errors: 0 }), 'telegram_delivery_confirmed');
+});
+
+test('candidate without accepted Telegram message is not reported as delivered', () => {
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, telegramSent: 0, errors: 0 }), 'candidate_not_delivered');
+});
+
+test('partial/error scan is not reported as a completed clean evaluation', () => {
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 0, telegramSent: 0, errors: 1 }), 'completed_with_errors');
+});
