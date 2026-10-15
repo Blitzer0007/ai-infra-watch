@@ -83,3 +83,49 @@ def test_integrity_summary_keeps_collection_failure_visible():
     assert result["status"] == "FAIL"
     assert result["symbols_with_rows"]["XYZ"] == 0
     assert result["errors"]
+
+
+from .collect_historical_evidence import build_session_coverage, load_exchange_sessions
+
+
+def test_session_coverage_passes_when_every_expected_session_is_present():
+    sessions = ["2025-01-02", "2025-01-03"]
+    rows = [
+        {"symbol": "NVDA", "date": "2025-01-02T14:30:00Z"},
+        {"symbol": "NVDA", "date": "2025-01-03T14:30:00Z"},
+    ]
+    result = build_session_coverage(rows, ["NVDA"], "2025-01-01", "2025-01-06", sessions, {"calendar_id": "TEST"}, [])
+    assert result["status"] == "PASS"
+    assert result["symbols"]["NVDA"]["missing_sessions"] == []
+    assert result["symbols"]["NVDA"]["unexpected_sessions"] == []
+    assert result["symbols"]["NVDA"]["coverage_pct"] == 100.0
+
+
+def test_session_coverage_flags_missing_exchange_session():
+    rows = [{"symbol": "NVDA", "date": "2025-01-02T14:30:00Z"}]
+    result = build_session_coverage(
+        rows, ["NVDA"], "2025-01-01", "2025-01-06",
+        ["2025-01-02", "2025-01-03"], {"calendar_id": "TEST"}, []
+    )
+    assert result["status"] == "FAIL"
+    assert result["symbols"]["NVDA"]["missing_sessions"] == ["2025-01-03"]
+    assert result["symbols"]["NVDA"]["coverage_pct"] == 50.0
+
+
+def test_session_coverage_flags_unexpected_provider_date():
+    rows = [{"symbol": "NVDA", "date": "2025-01-04T14:30:00Z"}]
+    result = build_session_coverage(
+        rows, ["NVDA"], "2025-01-01", "2025-01-06",
+        ["2025-01-02", "2025-01-03"], {"calendar_id": "TEST"}, []
+    )
+    assert result["status"] == "FAIL"
+    assert result["symbols"]["NVDA"]["unexpected_sessions"] == ["2025-01-04"]
+    assert result["symbols"]["NVDA"]["missing_sessions"] == ["2025-01-02", "2025-01-03"]
+
+
+def test_calendar_model_excludes_new_years_day_and_includes_january_second():
+    sessions, metadata = load_exchange_sessions("2025-01-01", "2025-01-04")
+    assert sessions == ["2025-01-02", "2025-01-03"]
+    assert metadata["calendar_id"] == "XNYS"
+    assert metadata["provider"] == "exchange_calendars"
+    assert metadata["session_count"] == 2
