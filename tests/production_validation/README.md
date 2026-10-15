@@ -39,7 +39,16 @@ The pure validators enforce:
 - source name and URL provenance;
 - point-in-time universe membership with effective dates.
 
-Unit tests use synthetic fixtures only and validate the validator logic. They do **not** prove that a real market-data provider is trustworthy. Before any backtest can be labeled evidence-ready, ingest actual vendor records, record retrieval time and licensing/source metadata, and independently substantiate the historical membership dataset. Unknown or assumed membership must remain insufficient.
+Unit tests use synthetic fixtures only and validate the validator logic. They do **not** prove that a real market-data provider is trustworthy.
+
+### Collect source-attributed price observations
+From the repository root, with the virtual environment active:
+```powershell
+python -m tests.production_validation.collect_historical_evidence --symbols NVDA,MU,MSFT --start 2025-01-01 --end 2026-01-01 --output historical-evidence-report.json
+```
+This makes read-only requests to the Yahoo Finance chart endpoint, records the exact source URL, retrieval time, adjusted-close observations, and SHA-256 of each raw response, then writes a JSON report. Pick symbols and date ranges appropriate to the intended backtest. Do not commit private portfolio exports or tokens.
+
+**The collector intentionally leaves the price gate BLOCKED.** A provider's current retrieval time does not prove when each historical price was first available to a strategy. Do not substitute the download timestamp for `available_at` or a decision cutoff. The universe-membership gate also remains BLOCKED when no independently sourced effective-dated membership file is provided. The report is auditable source evidence, not approval to run a point-in-time backtest.
 
 ## Telegram natural-run evidence
 This suite deliberately does not trigger the scan. Capture evidence from the naturally scheduled workflow:
