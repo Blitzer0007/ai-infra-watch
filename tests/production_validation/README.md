@@ -67,3 +67,9 @@ A scan with no qualifying candidate proves a clean evaluation only if all active
 - `validation.universe_membership.status` remains `BLOCKED` without independently sourced effective-dated membership rows.
 - `release_evidence_summary.release_ready` must remain `false` until all release gates are independently satisfied.
 - Preserve the report and its sibling raw-response directory together. Do not treat a raw-response hash alone as proof of the provider's historical publication time.
+
+
+### Exchange-session coverage
+The collector now compares each ticker's observed dates with the `XNYS` session schedule from the pinned-range `exchange-calendars` dependency. It reports expected/observed sessions, missing dates, unexpected dates, and coverage percentage per symbol. The provider/calendar library identifier and package version are included in the report.
+
+This schedule is an independent software calendar model, **not a first-party exchange attestation**. Review discrepancies before interpreting them. A successful date-coverage check does not prove that a daily bar's values were available at the decision time, that adjusted-close values were knowable then, or that the full investable universe is free of survivorship bias. The price availability and universe membership gates remain separate and blocked.
