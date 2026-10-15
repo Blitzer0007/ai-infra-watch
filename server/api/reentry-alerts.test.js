@@ -54,6 +54,13 @@ test('candidate without accepted Telegram message is not reported as delivered',
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 1, telegramSent: 0, errors: 0 }), 'candidate_not_delivered');
 });
 
+test('a previously accepted outbox record reconciled this scan is delivery evidence', () => {
+  assert.equal(classifyScan({
+    activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 1,
+    notifyEligibleCandidates: 1, telegramSent: 0, telegramPreviouslyAccepted: 1, errors: 0,
+  }), 'telegram_delivery_confirmed');
+});
+
 test('an already-active candidate without a new transition is not falsely called undelivered', () => {
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 1, notifyEligibleCandidates: 0, telegramSent: 0, errors: 0 }), 'evaluated_existing_candidate_no_new_alert');
 });
@@ -162,6 +169,42 @@ test('Telegram rejection is recorded as rejected, not successful delivery', asyn
   assert.equal(failureRecord.status, 'rejected');
 });
 
+test('a definitively rejected delivery can be retried after the durable claim is reclaimed', async () => {
+  let persistedStatus = 'new';
+  let sendCount = 0;
+  const attempt = () => sendOnceWithDurableClaim({
+    claim: async () => {
+      // Mirrors the atomic database rule: insert new claim or reclaim only rejected status.
+      if (persistedStatus === 'new' || persistedStatus === 'rejected') {
+        persistedStatus = 'sending';
+        return true;
+      }
+      return false;
+    },
+    inspectExistingClaim: async () => ({
+      status: persistedStatus,
+      telegram_message_id: persistedStatus === 'accepted' ? 5566 : null,
+    }),
+    send: async () => {
+      sendCount++;
+      if (sendCount === 1) {
+        const rejected = new Error('Telegram definitively rejected request');
+        rejected.deliveryStatus = 'rejected';
+        throw rejected;
+      }
+      return 5566;
+    },
+    recordAccepted: async () => { persistedStatus = 'accepted'; return true; },
+    recordFailure: async status => { persistedStatus = status; return true; },
+  });
+  const first = await attempt();
+  assert.equal(first.status, 'rejected');
+  const retry = await attempt();
+  assert.equal(retry.status, 'accepted');
+  assert.equal(sendCount, 2);
+  assert.equal(persistedStatus, 'accepted');
+});
+
 test('accepted Telegram delivery is confirmed only after delivery record persistence', async () => {
   const result = await sendOnceWithDurableClaim({
     claim: async () => true,
@@ -172,6 +215,22 @@ test('accepted Telegram delivery is confirmed only after delivery record persist
   assert.equal(result.status, 'accepted');
   assert.equal(result.messageId, 42);
   assert.equal(result.deliveryRecordPersisted, true);
+});
+
+test('accepted existing claim is reconciled without sending a duplicate message', async () => {
+  let sendCount = 0;
+  const result = await sendOnceWithDurableClaim({
+    claim: async () => false,
+    inspectExistingClaim: async () => ({ status: 'accepted', telegram_message_id: 7654 }),
+    send: async () => { sendCount++; return 7655; },
+    recordAccepted: async () => true,
+    recordFailure: async () => true,
+  });
+  assert.equal(result.status, 'already_accepted');
+  assert.equal(result.messageId, 7654);
+  assert.equal(result.attempted, false);
+  assert.equal(result.deliveryRecordPersisted, true);
+  assert.equal(sendCount, 0);
 });
 
 
