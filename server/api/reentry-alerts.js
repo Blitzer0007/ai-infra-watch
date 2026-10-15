@@ -72,6 +72,15 @@ export function shouldNotifyCandidate(lastAlertSignature, candidate) {
   return candidate === true && lastAlertSignature !== 'REENTRY_CANDIDATE';
 }
 
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, telegramSent, errors }) {
+  if (activeRows === 0) return 'empty_watchlist';
+  if (errors > 0) return 'completed_with_errors';
+  if (qualifyingCandidates > 0 && telegramSent > 0) return 'telegram_delivery_confirmed';
+  if (qualifyingCandidates > 0) return 'candidate_not_delivered';
+  if (evaluatedRows === activeRows) return 'evaluated_no_qualifying_candidate';
+  return 'incomplete_scan';
+}
+
 async function sendTelegram(row,q) {
   const token=String(process.env.TELEGRAM_BOT_TOKEN||'').trim(), chat=String(process.env.TELEGRAM_CHAT_ID||'').trim();
   if(!token||!chat) throw new Error('Telegram credentials are not configured');
@@ -84,15 +93,24 @@ async function sendTelegram(row,q) {
 }
 async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; const errors=[];
+  const results=[]; let sent=0; let qualifyingCandidates=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
       const q=await quoteHistory(row.symbol), signal=assess(row,q);
       const candidate=signal.status==='REENTRY_CANDIDATE';
-      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) { acceptedMessageId = await sendTelegram(row,q); sent++; }
+      if (candidate) qualifyingCandidates++;
+      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) {
+        acceptedMessageId = await sendTelegram(row,q);
+        sent++;
+        deliveryEvidence.push({symbol:row.symbol,messageId:acceptedMessageId,statePersisted:false});
+      }
       const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:candidate?'REENTRY_CANDIDATE':'NOT_CANDIDATE',updated_at:new Date().toISOString()};
       await db('reentry_watchlist?symbol=eq.'+encodeURIComponent(row.symbol),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(patch)});
+      if (acceptedMessageId) {
+        const evidence = deliveryEvidence.find(item => item.symbol === row.symbol && item.messageId === acceptedMessageId);
+        if (evidence) evidence.statePersisted = true;
+      }
       results.push({...row,...patch,status:signal.status,reasons:signal.reasons});
     } catch(e) {
       const detail = String(e?.message||e);
@@ -105,7 +123,8 @@ async function runScan() {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  return {ok:errors.length===0,scanned:results.length,telegramSent:sent,errors,items:results};
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, telegramSent: sent, errors: errors.length };
+  return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
   return {symbol:row.symbol,salePrice:row.sale_price==null?null:Number(row.sale_price),saleDate:row.sale_date||null,targetPrice:Number(row.target_price),thesis:row.thesis||'',thesisInvalidated:Boolean(row.thesis_invalidated),active:Boolean(row.active),lastPrice:row.last_price==null?null:Number(row.last_price),sma20:row.sma20==null?null:Number(row.sma20),sma50:row.sma50==null?null:Number(row.sma50),drawdownFrom52WeekHighPct:row.drawdown_from_52_week_high_pct==null?null:Number(row.drawdown_from_52_week_high_pct),retrievedAt:row.retrieved_at||null,status:row.status||'INSUFFICIENT_DATA',reasons:row.reasons||['Refresh market data for a current assessment.']};
