@@ -54,8 +54,8 @@ Track progress in [Issue #110](https://github.com/Blitzer0007/ai-infra-watch/iss
 The two `AI_Engineering_Roadmap*.md` files describe study plans, courses, and career development. Reconcile/maintain those as a learning plan separately; do not mix course completion with product release status.
 
 ## Current release-gate state — 2026-10-15
-- Integrated implementation and test harness are on draft PR #115; the latest head must have all required CI re-run after its final commit.
-- GitGuardian incident `38232645` is scoped to historical disposable-CI test credentials. The `@gitguardian` note is recorded, but the actual `Skip: test credential` check-run action has not been confirmed and the check still fails.
+- Integrated implementation and test harness are on clean single-commit draft PR #116. On initial integrated head `f7efe72111ac099606da2f21d3ace6063aa11aed`, frontend CI, historical-validator CI, API/DB validation, disposable PostgreSQL outbox integration, mocked Playwright, and the PR's own GitGuardian check passed. Re-run/confirm required checks after any subsequent commit.
+- Historical GitGuardian incident `38232645` is scoped to disposable-CI test credentials found in the superseded multi-commit PR #115. The PR #116 check passes because its clean one-commit diff excludes that historical commit; this does not itself classify or dismiss the original dashboard incident. The approved `Skip: test credential` disposition for incident `38232645` remains unconfirmed.
 - The production schema/outbox migration has not been applied. Production `reentry_watchlist` has no active rows, so a naturally scheduled run cannot currently prove message delivery.
 - Historical publication timestamps and independent effective-dated universe membership have not been supplied; backtest evidence-ready remains blocked.
 - JEV remains paper-only, US equities, weekly review, SPY + QQQ benchmarks, manual approval only. No merge, production migration, scan invocation, or deployment without explicit approval.
