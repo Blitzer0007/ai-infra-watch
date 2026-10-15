@@ -1,16 +1,9 @@
-"""Collect auditable Yahoo Finance daily price observations for offline validation.
-
-This collector is read-only and does not claim point-in-time availability. Yahoo's
-chart response does not establish when a historical value was first available to a
-strategy, nor does it provide historical universe membership. Those gates stay
-BLOCKED until separately sourced evidence is supplied.
-"""
+"""Collect auditable Yahoo Finance observations without overstating point-in-time validity."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
 import sys
 import urllib.error
 import urllib.parse
@@ -19,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .historical_evidence import validate_price_evidence, validate_universe_membership
+from .historical_evidence import validate_universe_membership
 
 USER_AGENT = "AI-Infra-Watch-Historical-Evidence/1.0"
 
@@ -44,7 +37,7 @@ def fetch_chart(symbol: str, period1: int, period2: int) -> tuple[dict[str, Any]
     errors = (body.get("chart") or {}).get("error")
     if errors or not result:
         raise RuntimeError(f"No Yahoo chart result for {symbol}: {errors or 'empty result'}")
-    return {"raw": body, "raw_sha256": hashlib.sha256(raw).hexdigest()}, url
+    return {"raw": body, "raw_bytes": raw, "raw_sha256": hashlib.sha256(raw).hexdigest()}, url
 
 
 def extract_price_rows(symbol: str, payload: dict[str, Any], source_url: str, retrieved_at: str) -> list[dict[str, Any]]:
@@ -61,7 +54,6 @@ def extract_price_rows(symbol: str, payload: dict[str, Any], source_url: str, re
         if not isinstance(epoch, (int, float)) or not isinstance(adj_close, (int, float)):
             continue
         observed_at = datetime.fromtimestamp(epoch, timezone.utc).isoformat().replace("+00:00", "Z")
-        # A chart observation timestamp is not evidence of publication/availability.
         rows.append({
             "symbol": symbol,
             "date": observed_at,
@@ -87,6 +79,44 @@ def read_json(path: str | None) -> Any:
         return json.load(file)
 
 
+def build_integrity_summary(rows: list[dict[str, Any]], symbols: list[str], start: str, end: str, collection_errors: list[dict[str, Any]]) -> dict[str, Any]:
+    keys = [(row.get("symbol"), row.get("date")) for row in rows]
+    duplicate_count = len(keys) - len(set(keys))
+    invalid_value_count = sum(
+        not isinstance(row.get("close"), (int, float)) or row.get("close") <= 0
+        or not isinstance(row.get("adjusted_close"), (int, float)) or row.get("adjusted_close") <= 0
+        for row in rows
+    )
+    out_of_range_count = sum(not (start <= str(row.get("date", ""))[:10] < end) for row in rows)
+    weekend_count = sum(
+        datetime.fromisoformat(str(row["date"]).replace("Z", "+00:00")).weekday() >= 5
+        for row in rows if isinstance(row.get("date"), str)
+    )
+    per_symbol = {symbol: sum(1 for row in rows if row.get("symbol") == symbol) for symbol in symbols}
+    errors = []
+    if duplicate_count:
+        errors.append(f"Found {duplicate_count} duplicate symbol/date rows.")
+    if invalid_value_count:
+        errors.append(f"Found {invalid_value_count} missing, non-numeric, or non-positive close values.")
+    if out_of_range_count:
+        errors.append(f"Found {out_of_range_count} observations outside the requested date range.")
+    if weekend_count:
+        errors.append(f"Found {weekend_count} weekend observations; verify provider timestamps/calendar.")
+    if collection_errors:
+        errors.append(f"Provider collection failed for {len(collection_errors)} symbol(s).")
+    return {
+        "status": "PASS" if not errors else "FAIL",
+        "symbols_with_rows": per_symbol,
+        "total_rows": len(rows),
+        "duplicate_symbol_date_rows": duplicate_count,
+        "invalid_price_rows": invalid_value_count,
+        "out_of_range_rows": out_of_range_count,
+        "weekend_rows": weekend_count,
+        "errors": errors,
+        "note": "This does not prove every exchange session is present. Validate against an explicit exchange calendar before backtesting.",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbols", required=True, help="Comma-separated symbols, e.g. NVDA,MU,MSFT")
@@ -94,12 +124,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", required=True, help="UTC end date YYYY-MM-DD (exclusive)")
     parser.add_argument("--membership-json", help="Separately sourced, effective-dated universe membership JSON")
     parser.add_argument("--output", default="historical-evidence-report.json")
+    parser.add_argument("--raw-dir", help="Directory for exact raw provider response bodies; defaults to <output-stem>_raw")
     args = parser.parse_args(argv)
 
     try:
-        start = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        if end <= start:
+        start_dt = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        end_dt = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        if end_dt <= start_dt:
             raise ValueError("--end must be after --start")
         symbols = sorted({s.strip().upper() for s in args.symbols.split(",") if s.strip()})
         if not symbols:
@@ -107,8 +138,11 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
 
+    output = Path(args.output)
+    raw_dir = Path(args.raw_dir) if args.raw_dir else output.with_name(output.stem + "_raw")
+    raw_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": utc_now(),
         "collector": "tests.production_validation.collect_historical_evidence",
         "period": {"start_utc": args.start, "end_utc_exclusive": args.end},
@@ -117,12 +151,14 @@ def main(argv: list[str] | None = None) -> int:
         "price_rows": [],
         "errors": [],
     }
-    period1, period2 = int(start.timestamp()), int(end.timestamp())
+    period1, period2 = int(start_dt.timestamp()), int(end_dt.timestamp())
     for symbol in symbols:
         try:
             payload, url = fetch_chart(symbol, period1, period2)
             retrieved_at = utc_now()
             rows = extract_price_rows(symbol, payload, url, retrieved_at)
+            raw_path = raw_dir / f"{symbol}.response.json"
+            raw_path.write_bytes(payload["raw_bytes"])
             report["price_rows"].extend(rows)
             report["sources"].append({
                 "symbol": symbol,
@@ -130,43 +166,53 @@ def main(argv: list[str] | None = None) -> int:
                 "source_url": url,
                 "retrieved_at": retrieved_at,
                 "raw_response_sha256": payload["raw_sha256"],
+                "raw_response_file": str(raw_path),
                 "rows_collected": len(rows),
             })
-            print(f"{symbol}: collected {len(rows)} adjusted-close observations; availability time remains unverified")
-        except (urllib.error.URLError, TimeoutError, RuntimeError, ValueError, KeyError) as exc:
+            print(f"{symbol}: collected {len(rows)} adjusted-close observations; raw response preserved; availability time remains unverified")
+        except (urllib.error.URLError, TimeoutError, RuntimeError, ValueError, KeyError, OSError) as exc:
             report["errors"].append({"symbol": symbol, "error": str(exc)})
             print(f"{symbol}: ERROR {exc}", file=sys.stderr)
 
-    # Intentionally BLOCKED: vendor retrieval time is not substituted for historical availability.
-    price_validation = {
-        "status": "BLOCKED",
-        "checked": len(report["price_rows"]),
-        "errors": [
-            "Yahoo chart data alone does not prove when each historical observation was first available.",
-            "No strategy-specific decision_cutoff/available_at evidence was inferred from retrieval time.",
-        ],
-    }
-    membership = read_json(args.membership_json)
-    membership_validation = validate_universe_membership(membership)
+    report["integrity_checks"] = build_integrity_summary(
+        report["price_rows"], symbols, args.start, args.end, report["errors"]
+    )
+    membership_validation = validate_universe_membership(read_json(args.membership_json))
     report["validation"] = {
-        "price_evidence": price_validation,
+        "price_evidence": {
+            "status": "BLOCKED",
+            "checked": len(report["price_rows"]),
+            "errors": [
+                "Yahoo chart data alone does not prove when each historical observation was first available.",
+                "No strategy-specific decision_cutoff/available_at evidence was inferred from retrieval time.",
+                "Adjusted-close values can incorporate later corporate-action adjustments and require point-in-time semantics review.",
+            ],
+        },
         "universe_membership": membership_validation,
         "overall_status": "BLOCKED",
     }
+    report["raw_response_directory"] = str(raw_dir)
+    report["release_evidence_summary"] = {
+        "structural_integrity": report["integrity_checks"]["status"],
+        "historical_price_availability": "BLOCKED",
+        "historical_universe_membership": membership_validation["status"],
+        "raw_response_files_preserved": len(report["sources"]),
+        "provider_collection_errors": len(report["errors"]),
+        "release_ready": False,
+    }
     report["release_note"] = (
-        "Collected prices are source-attributed observations, not a validated point-in-time backtest dataset. "
-        "Attach independently sourced publication/availability timestamps, decision cutoffs, and effective-dated "
-        "universe membership before upgrading either gate."
+        "Source-attributed observations and raw response bodies are preserved for audit. "
+        "They are not a validated point-in-time backtest dataset. Attach independently sourced publication/availability "
+        "timestamps, decision cutoffs, an exchange calendar, and effective-dated universe membership before upgrading gates."
     )
-    output = Path(args.output)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     print(f"Report: {output.resolve()}")
     print(f"Report SHA-256: {digest}")
-    print(f"Price gate: {price_validation['status']}; universe gate: {membership_validation['status']}")
-    if report["errors"]:
-        return 1
-    return 0
+    print(f"Raw provider responses: {raw_dir.resolve()}")
+    print(f"Structural integrity: {report['integrity_checks']['status']}")
+    print(f"Price gate: BLOCKED; universe gate: {membership_validation['status']}; release ready: NO")
+    return 1 if report["errors"] or report["integrity_checks"]["status"] != "PASS" else 0
 
 
 if __name__ == "__main__":
