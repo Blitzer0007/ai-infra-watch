@@ -59,6 +59,45 @@ BEGIN
   END IF;
 
   SELECT public.claim_reentry_telegram_delivery(
+    'ci-accepted-episode','NVDA','ci-test-chat'
+  ) INTO duplicate_claim;
+  IF duplicate_claim IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'accepted delivery must not be reclaimed or sent again';
+  END IF;
+
+  -- A definitive Telegram rejection means the provider did not accept the message.
+  -- It may be retried by the next scheduled scan using the same idempotency key.
+  SELECT public.claim_reentry_telegram_delivery(
+    'ci-rejected-episode','AMD','ci-test-chat'
+  ) INTO first_claim;
+  IF first_claim IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'first rejected-episode claim must succeed';
+  END IF;
+  SELECT public.finish_reentry_telegram_delivery(
+    'ci-rejected-episode','rejected',NULL,'simulated definitive Telegram rejection'
+  ) INTO finished;
+  IF finished IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'rejected finalization must update a sending row';
+  END IF;
+  SELECT public.claim_reentry_telegram_delivery(
+    'ci-rejected-episode','AMD','ci-test-chat'
+  ) INTO first_claim;
+  IF first_claim IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'definitively rejected delivery must be claimable for retry';
+  END IF;
+  SELECT status, telegram_message_id INTO current_status, current_message_id
+    FROM public.reentry_telegram_deliveries WHERE delivery_key='ci-rejected-episode';
+  IF current_status <> 'sending' OR current_message_id IS NOT NULL THEN
+    RAISE EXCEPTION 'retry must atomically reset rejected claim to sending without a message ID';
+  END IF;
+  SELECT public.claim_reentry_telegram_delivery(
+    'ci-rejected-episode','AMD','ci-test-chat'
+  ) INTO duplicate_claim;
+  IF duplicate_claim IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'a retried sending claim must still suppress concurrent duplicate attempts';
+  END IF;
+
+  SELECT public.claim_reentry_telegram_delivery(
     'ci-uncertain-episode','MU','ci-test-chat'
   ) INTO first_claim;
   IF first_claim IS DISTINCT FROM true THEN
@@ -74,6 +113,12 @@ BEGIN
     FROM public.reentry_telegram_deliveries WHERE delivery_key='ci-uncertain-episode';
   IF current_status <> 'uncertain' OR current_message_id <> 4321 THEN
     RAISE EXCEPTION 'uncertain state should retain a known Telegram message ID';
+  END IF;
+  SELECT public.claim_reentry_telegram_delivery(
+    'ci-uncertain-episode','MU','ci-test-chat'
+  ) INTO duplicate_claim;
+  IF duplicate_claim IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'uncertain delivery must never be automatically reclaimed';
   END IF;
 
   RAISE NOTICE 'Telegram delivery outbox migration contract assertions passed';
