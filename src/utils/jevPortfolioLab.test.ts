@@ -310,3 +310,44 @@ test('a verified availability label without source proof cannot make a backtest 
   assert.equal(result.availabilityStatus, 'unknown');
   assert.equal(result.evidenceStatus, 'insufficient');
 });
+
+
+test('historical backtest rejects future-dated price rows and future decision cutoffs', () => {
+  const futurePrices = history().map(row => ({
+    ...row,
+    date: '2099-01-01',
+    availableAt: '2099-01-01T22:00:00Z',
+  }));
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: futurePrices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+  }), /Future-dated prices/);
+
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: history(),
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+    decisionCutoffByDate: Object.fromEntries(
+      ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, '2099-01-01T23:00:00Z']),
+    ),
+  }), /Look-ahead data rejected/);
+});
+
+test('historical backtest normalizes ticker symbols before aligning all benchmark dates', () => {
+  const uppercase = runHistoricalPaperBacktest({
+    prices: history(),
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  const lowercasePrices = history().map(row => ({ ...row, symbol: row.symbol.toLowerCase() }));
+  const lowercase = runHistoricalPaperBacktest({
+    prices: lowercasePrices,
+    target: [{ symbol: 'msft', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  assert.equal(lowercase.startDate, uppercase.startDate);
+  assert.equal(lowercase.endDate, uppercase.endDate);
+  assert.equal(lowercase.strategyNetReturnPct, uppercase.strategyNetReturnPct);
+  assert.equal(lowercase.spyReturnPct, uppercase.spyReturnPct);
+  assert.equal(lowercase.qqqReturnPct, uppercase.qqqReturnPct);
+});
