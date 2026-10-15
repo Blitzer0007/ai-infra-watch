@@ -86,14 +86,24 @@ async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
   const results=[]; let sent=0; const errors=[];
   for(const row of Array.isArray(rows)?rows:[]) {
+    let acceptedMessageId = null;
     try {
       const q=await quoteHistory(row.symbol), signal=assess(row,q);
       const candidate=signal.status==='REENTRY_CANDIDATE';
-      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) { await sendTelegram(row,q); sent++; }
+      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) { acceptedMessageId = await sendTelegram(row,q); sent++; }
       const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:candidate?'REENTRY_CANDIDATE':'NOT_CANDIDATE',updated_at:new Date().toISOString()};
       await db('reentry_watchlist?symbol=eq.'+encodeURIComponent(row.symbol),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(patch)});
       results.push({...row,...patch,status:signal.status,reasons:signal.reasons});
-    } catch(e) { errors.push(row.symbol+': '+String(e?.message||e)); results.push({...row,status:'INSUFFICIENT_DATA',reasons:['Could not refresh quote/history; no alert sent.']}); }
+    } catch(e) {
+      const detail = String(e?.message||e);
+      const deliveryNote = acceptedMessageId
+        ? ' Telegram accepted message ID '+acceptedMessageId+', but watchlist state persistence failed; the next scan may send a duplicate alert.'
+        : '';
+      errors.push(row.symbol+': '+detail+deliveryNote);
+      results.push({...row,status:'INSUFFICIENT_DATA',reasons:[acceptedMessageId
+        ? 'Telegram accepted the alert, but delivery state could not be persisted; duplicate delivery is possible on a later scan.'
+        : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
+    }
   }
   return {ok:errors.length===0,scanned:results.length,telegramSent:sent,errors,items:results};
 }
