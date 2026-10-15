@@ -86,3 +86,89 @@ test('durable delivery key does not contain raw thesis text', () => {
   assert.match(key, /^[a-f0-9]{64}$/);
   assert.equal(key.includes('private thesis text'), false);
 });
+
+
+import { sendOnceWithDurableClaim } from './reentry-alerts.js';
+
+test('failure injection: accepted Telegram message ID survives delivery-state persistence failure', async () => {
+  let claimed = false;
+  let sendCount = 0;
+  const failureRecords = [];
+  const result = await sendOnceWithDurableClaim({
+    claim: async () => {
+      if (claimed) return false;
+      claimed = true;
+      return true;
+    },
+    send: async () => { sendCount += 1; return 9876; },
+    recordAccepted: async () => { throw new Error('simulated database timeout after Telegram acceptance'); },
+    recordFailure: async (status, messageId, error) => {
+      failureRecords.push({ status, messageId, error });
+    },
+  });
+
+  assert.equal(result.status, 'accepted_state_persistence_failed');
+  assert.equal(result.messageId, 9876);
+  assert.equal(result.deliveryRecordPersisted, true);
+  assert.equal(result.reconciliationRequired, true);
+  assert.deepEqual(failureRecords, [{
+    status: 'uncertain',
+    messageId: 9876,
+    error: 'simulated database timeout after Telegram acceptance',
+  }]);
+
+  const retry = await sendOnceWithDurableClaim({
+    claim: async () => false,
+    send: async () => { sendCount += 1; return 1111; },
+    recordAccepted: async () => {},
+    recordFailure: async () => {},
+  });
+  assert.equal(retry.status, 'existing_claim_suppressed');
+  assert.equal(retry.attempted, false);
+  assert.equal(sendCount, 1, 'no duplicate automatic Telegram send after ambiguous persistence');
+});
+
+test('failure injection: ambiguous Telegram timeout records uncertain and suppresses retry', async () => {
+  let failureRecord = null;
+  const result = await sendOnceWithDurableClaim({
+    claim: async () => true,
+    send: async () => { throw new Error('simulated timeout with unknown Telegram outcome'); },
+    recordAccepted: async () => {},
+    recordFailure: async (status, messageId, error) => { failureRecord = { status, messageId, error }; },
+  });
+  assert.equal(result.status, 'uncertain');
+  assert.equal(result.messageId, null);
+  assert.equal(result.reconciliationRequired, true);
+  assert.deepEqual(failureRecord, {
+    status: 'uncertain',
+    messageId: null,
+    error: 'simulated timeout with unknown Telegram outcome',
+  });
+});
+
+test('Telegram rejection is recorded as rejected, not successful delivery', async () => {
+  let failureRecord = null;
+  const error = new Error('Telegram rejected request');
+  error.deliveryStatus = 'rejected';
+  const result = await sendOnceWithDurableClaim({
+    claim: async () => true,
+    send: async () => { throw error; },
+    recordAccepted: async () => {},
+    recordFailure: async (status, messageId, message) => { failureRecord = { status, messageId, message }; },
+  });
+  assert.equal(result.status, 'rejected');
+  assert.equal(result.messageId, null);
+  assert.equal(failureRecord.status, 'rejected');
+});
+
+test('accepted Telegram delivery is confirmed only after delivery record persistence', async () => {
+  const result = await sendOnceWithDurableClaim({
+    claim: async () => true,
+    send: async () => 42,
+    recordAccepted: async (messageId) => { assert.equal(messageId, 42); },
+    recordFailure: async () => assert.fail('failure finalizer should not be called'),
+  });
+  assert.equal(result.status, 'accepted');
+  assert.equal(result.messageId, 42);
+  assert.equal(result.deliveryRecordPersisted, true);
+});
