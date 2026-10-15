@@ -82,8 +82,8 @@ const BILLIONAIRE_ASSOCIATED_FUNDS = [
 ];
 function normalizeFundName(value) {
   return String(value || '').toUpperCase().replace(/&/g, ' AND ').replace(/[^A-Z0-9]+/g, ' ').trim()
-    .replace(/\\b(INCORPORATED|INC|CORPORATION|CORP|LIMITED|LTD|LLC|LP|L P|LLP|PLC|CO|COMPANY)\\b/g, ' ')
-    .replace(/\\s+/g, ' ').trim();
+    .replace(/\b(INCORPORATED|INC|CORPORATION|CORP|LIMITED|LTD|LLC|LP|L P|LLP|PLC|CO|COMPANY)\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 function associatedManager(name) {
   const normalized = normalizeFundName(name);
