@@ -71,12 +71,12 @@ test('partial evaluation without explicit errors is reported as incomplete', () 
 import { buildDeliveryKey } from './reentry-alerts.js';
 
 test('durable delivery key is stable for the same configured thesis and target', () => {
-  const row = { symbol: 'nvda', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth' };
+  const row = { symbol: 'nvda', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth', updated_at: '2026-10-15T05:00:00Z' };
   assert.equal(buildDeliveryKey(row), buildDeliveryKey({ ...row, symbol: 'NVDA' }));
 });
 
 test('changing target or thesis creates a distinct delivery episode key', () => {
-  const row = { symbol: 'NVDA', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth' };
+  const row = { symbol: 'NVDA', target_price: 120, sale_date: '2026-01-10', thesis: 'AI infra growth', updated_at: '2026-10-15T05:00:00Z' };
   assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, target_price: 110 }));
   assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, thesis: 'Changed thesis' }));
 });
@@ -198,4 +198,21 @@ test('failure injection: durable finalization outage still retains accepted ID a
   const second = await attempt();
   assert.equal(second.status, 'existing_claim_suppressed');
   assert.equal(sendCount, 1);
+});
+
+
+test('a later candidate episode gets a new key while retry within the same episode stays stable', async () => {
+  const base = {
+    symbol: 'NVDA',
+    target_price: 120,
+    sale_date: '2026-01-10',
+    thesis: 'AI infra growth',
+    updated_at: '2026-10-15T05:00:00Z',
+  };
+  assert.equal(buildDeliveryKey(base), buildDeliveryKey({ ...base }));
+  assert.notEqual(
+    buildDeliveryKey(base),
+    buildDeliveryKey({ ...base, updated_at: '2026-10-15T14:15:00Z' }),
+    'a persisted state transition should create a new notification episode key',
+  );
 });
