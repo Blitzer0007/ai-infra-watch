@@ -32,9 +32,14 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://ai-infra-watch-theta.vercel.app/api/reentry-alerts?run=true"
-          CODE=$(curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
-          if [ "$CODE" != "200" ] && [ -n "${FALLBACK_TOKEN:-}" ]; then
-            CODE=$(curl --silent --show-error --retry 2 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
+          # This endpoint can send Telegram messages. Never automatically retry a
+          # request with an ambiguous outcome: the first request may have sent an
+          # alert even if its HTTP response was lost or a later DB write failed.
+          CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
+          # A 401/403 means auth was rejected before the scan handler runs, so a
+          # single legacy-auth fallback is safe. Never fallback on 5xx/network errors.
+          if { [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; } && [ -n "${FALLBACK_TOKEN:-}" ]; then
+            CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
           fi
           cat response.json
           test "$CODE" = "200"
