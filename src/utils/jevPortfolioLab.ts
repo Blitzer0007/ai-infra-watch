@@ -96,6 +96,9 @@ export type HistoricalAvailabilityEvidence = {
   sourceUrl: string;
   /** Vendor/archive record identifier that supports the stated availability timestamp. */
   recordId: string;
+  symbol: string;
+  observationDate: string;
+  availableAt: string;
 };
 
 export type HistoricalPrice = {
@@ -111,92 +114,82 @@ export type HistoricalPrice = {
 
 function hasVerifiedAvailabilityEvidence(row: HistoricalPrice): boolean {
   const evidence = row.availabilityEvidence;
-  if (!evidence || !String(evidence.source || '').trim() || !String(evidence.recordId || '').trim()) return false;
+  if (!evidence ||
+      String(evidence.symbol || '').trim().toUpperCase() !== String(row.symbol || '').trim().toUpperCase() ||
+      String(evidence.observationDate || '').trim() !== String(row.date || '').trim() ||
+      Date.parse(String(evidence.availableAt || '')) !== Date.parse(String(row.availableAt || '')) ||
+      !validEvidenceReference(evidence.source, evidence.sourceUrl, evidence.recordId)) return false;
+  return true;
+}
+
+export type HistoricalUniverseSnapshotEvidence = {
+  universeId: string;
+  /** Exact effective date for this complete constituent snapshot (UTC YYYY-MM-DD). */
+  asOf: string;
+  /** Must be true only when the source record is the complete universe, not a shortlist/sample. */
+  complete: boolean;
+  members: string[];
+  status: 'verified' | 'assumed' | 'unknown';
+  source: string;
+  sourceUrl: string;
+  /** Stable identifier for the source record/filing/snapshot. */
+  recordId: string;
+};
+
+function validEvidenceReference(source: unknown, sourceUrl: unknown, recordId: unknown): boolean {
+  if (!String(source || '').trim() || !String(recordId || '').trim()) return false;
   try {
-    const url = new URL(String(evidence.sourceUrl || ''));
+    const url = new URL(String(sourceUrl || ''));
     return url.protocol === 'https:' && Boolean(url.hostname);
   } catch {
     return false;
   }
 }
 
-export type HistoricalUniverseMembershipEvidence = {
-  symbol: string;
-  universeId: string;
-  effectiveFrom: string;
-  /** Inclusive effective-end date/time. A date-only end is interpreted through that UTC day. */
-  effectiveTo?: string | null;
-  status: 'verified' | 'assumed' | 'unknown';
-  source: string;
-  sourceUrl: string;
-};
-
-function parseMembershipBound(value: string, isEnd = false): number {
-  const text = String(value || '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    return Date.parse(text + (isEnd ? 'T23:59:59.999Z' : 'T00:00:00.000Z'));
-  }
-  return Date.parse(text);
-}
-
 /**
- * A scalar "verified" flag is not membership evidence. To report verified membership,
- * the caller must supply source-backed effective intervals that cover every target
- * security at every decision cutoff for one explicitly named universe.
+ * A scalar status or a list of target-only membership intervals is insufficient to
+ * rule out survivorship bias. Every decision date needs a source-backed complete
+ * constituent snapshot for the named universe, and each target must be present.
  */
 export function resolveHistoricalUniverseMembershipStatus(args: {
   target: PaperHolding[];
   dates: string[];
   decisionCutoffByDate?: Record<string, string>;
   universeId?: string;
-  evidence?: HistoricalUniverseMembershipEvidence[];
+  evidence?: HistoricalUniverseSnapshotEvidence[];
 }): 'verified' | 'assumed' | 'unknown' {
   const universeId = String(args.universeId || '').trim().toUpperCase();
   const evidence = Array.isArray(args.evidence) ? args.evidence : [];
   if (!universeId || !args.target.length || !args.dates.length || !evidence.length) return 'unknown';
-
-  const valid = evidence.filter(row => {
-    if (!row || typeof row.symbol !== 'string' || !row.symbol.trim() ||
-        typeof row.universeId !== 'string' || row.universeId.trim().toUpperCase() !== universeId ||
-        !['verified', 'assumed', 'unknown'].includes(row.status) ||
-        !String(row.source || '').trim()) return false;
-    const from = parseMembershipBound(row.effectiveFrom);
-    const to = row.effectiveTo == null || String(row.effectiveTo).trim() === ''
-      ? Number.POSITIVE_INFINITY
-      : parseMembershipBound(String(row.effectiveTo), true);
-    if (!Number.isFinite(from) || to < from) return false;
-    try {
-      const url = new URL(String(row.sourceUrl || ''));
-      return url.protocol === 'https:' && Boolean(url.hostname);
-    } catch {
-      return false;
-    }
-  });
-
   let assumed = false;
-  for (const holding of args.target) {
-    const symbol = String(holding.symbol || '').trim().toUpperCase();
-    if (!symbol) return 'unknown';
-    for (const date of args.dates) {
-      const cutoff = Date.parse(String(args.decisionCutoffByDate?.[date] || ''));
-      if (!Number.isFinite(cutoff)) return 'unknown';
-      const covering = valid.filter(row => {
-        if (row.symbol.trim().toUpperCase() !== symbol) return false;
-        const from = parseMembershipBound(row.effectiveFrom);
-        const to = row.effectiveTo == null || String(row.effectiveTo).trim() === ''
-          ? Number.POSITIVE_INFINITY
-          : parseMembershipBound(String(row.effectiveTo), true);
-        return from <= cutoff && cutoff <= to;
-      });
-      if (!covering.length) return 'unknown';
-      const statuses = new Set(covering.map(row => row.status));
-      // Ambiguous overlapping evidence must not be resolved by optimistic selection.
-      if (statuses.size !== 1) return 'unknown';
-      const status = covering[0].status;
-      if (status === 'unknown') return 'unknown';
-      if (status === 'assumed') assumed = true;
-      for (const row of covering) if (row.status === 'verified' && !row.sourceUrl) return 'unknown';
+
+  for (const date of args.dates) {
+    const cutoff = Date.parse(String(args.decisionCutoffByDate?.[date] || ''));
+    if (!Number.isFinite(cutoff)) return 'unknown';
+    // Require the complete source snapshot for that actual decision date; do not
+    // carry today's membership backwards or accept stale snapshots as point-in-time proof.
+    const snapshots = evidence.filter(row =>
+      row && String(row.universeId || '').trim().toUpperCase() === universeId &&
+      row.asOf === date
+    );
+    if (snapshots.length !== 1) return 'unknown';
+    const snapshot = snapshots[0];
+    if (Date.parse(snapshot.asOf + 'T00:00:00.000Z') > cutoff ||
+        snapshot.complete !== true ||
+        !Array.isArray(snapshot.members) || snapshot.members.length === 0 ||
+        !validEvidenceReference(snapshot.source, snapshot.sourceUrl, snapshot.recordId)) return 'unknown';
+    const members = new Set(snapshot.members
+      .filter(symbol => typeof symbol === 'string')
+      .map(symbol => symbol.trim().toUpperCase())
+      .filter(Boolean));
+    if (!members.size) return 'unknown';
+    for (const holding of args.target) {
+      const symbol = String(holding.symbol || '').trim().toUpperCase();
+      if (!symbol || !members.has(symbol)) return 'unknown';
     }
+    if (snapshot.status === 'unknown') return 'unknown';
+    if (snapshot.status === 'assumed') assumed = true;
+    if (snapshot.status !== 'verified' && snapshot.status !== 'assumed') return 'unknown';
   }
   return assumed ? 'assumed' : 'verified';
 }
