@@ -46,7 +46,7 @@ From the repository root, with the virtual environment active:
 ```powershell
 python -m tests.production_validation.collect_historical_evidence --symbols NVDA,MU,MSFT --start 2025-01-01 --end 2026-01-01 --output historical-evidence-report.json
 ```
-This makes read-only requests to the Yahoo Finance chart endpoint, records the exact source URL, retrieval time, adjusted-close observations, and SHA-256 of each raw response, then writes a JSON report. Pick symbols and date ranges appropriate to the intended backtest. Do not commit private portfolio exports or tokens.
+This makes read-only requests to the Yahoo Finance chart endpoint, records the exact source URL, retrieval time, adjusted-close observations, and SHA-256 of each raw response, preserves the exact raw response bodies in a sibling `historical-evidence-report_raw/` directory, and writes a JSON report with a release-evidence summary. The report links each response file and its SHA-256 hash. The collector runs structural checks for duplicate symbol/date rows, invalid prices, out-of-range dates, weekend observations, and provider collection failures. A PASS is only a structural result; it does not prove all expected exchange sessions are present, so compare against an explicit exchange calendar before backtesting. Pick symbols and date ranges appropriate to the intended backtest. Do not commit private portfolio exports or tokens.
 
 **The collector intentionally leaves the price gate BLOCKED.** A provider's current retrieval time does not prove when each historical price was first available to a strategy. Do not substitute the download timestamp for `available_at` or a decision cutoff. The universe-membership gate also remains BLOCKED when no independently sourced effective-dated membership file is provided. The report is auditable source evidence, not approval to run a point-in-time backtest.
 
@@ -59,3 +59,11 @@ This suite deliberately does not trigger the scan. Capture evidence from the nat
 - any failure/retry or duplicate-risk indicators.
 
 A scan with no qualifying candidate proves a clean evaluation only if all active watchlist rows were evaluated with no errors. It is not proof of Telegram delivery.
+
+
+### Interpreting the report
+- `integrity_checks.status` describes structural checks only.
+- `validation.price_evidence.status` remains `BLOCKED` until genuine provider publication/availability evidence and strategy decision cutoffs are supplied.
+- `validation.universe_membership.status` remains `BLOCKED` without independently sourced effective-dated membership rows.
+- `release_evidence_summary.release_ready` must remain `false` until all release gates are independently satisfied.
+- Preserve the report and its sibling raw-response directory together. Do not treat a raw-response hash alone as proof of the provider's historical publication time.
