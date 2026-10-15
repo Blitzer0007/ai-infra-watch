@@ -172,3 +172,29 @@ test('accepted Telegram delivery is confirmed only after delivery record persist
   assert.equal(result.messageId, 42);
   assert.equal(result.deliveryRecordPersisted, true);
 });
+
+
+test('failure injection: durable finalization outage still retains accepted ID and suppresses a second send', async () => {
+  let claimed = false;
+  let sendCount = 0;
+  const attempt = () => sendOnceWithDurableClaim({
+    claim: async () => {
+      if (claimed) return false;
+      claimed = true;
+      return true;
+    },
+    send: async () => { sendCount += 1; return 7654; },
+    recordAccepted: async () => { throw new Error('simulated accepted-state DB outage'); },
+    recordFailure: async () => { throw new Error('simulated uncertainty-state DB outage'); },
+  });
+
+  const first = await attempt();
+  assert.equal(first.status, 'accepted_state_persistence_failed');
+  assert.equal(first.messageId, 7654);
+  assert.equal(first.deliveryRecordPersisted, false);
+  assert.equal(first.reconciliationRequired, true);
+
+  const second = await attempt();
+  assert.equal(second.status, 'existing_claim_suppressed');
+  assert.equal(sendCount, 1);
+});
