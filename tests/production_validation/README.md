@@ -6,16 +6,31 @@
 - Never commit credentials, cookies, browser storage state, or screenshots containing private portfolio data.
 - JEV remains paper-only with manual approval; this test suite does not execute trades.
 
-## Production Playwright
-Configure GitHub Actions repository secrets:
-- `PROD_STORAGE_STATE_B64`: base64-encoded Playwright storage-state JSON from an approved QA session. Use a dedicated least-privilege test account and short-lived session.
-- `PROD_AUTHENTICATED_MARKER`: a stable CSS selector visible only after authenticated app load (for example, a dedicated test-id on the signed-in shell). Do not use private account data as the marker.
+## Local interactive production smoke test (recommended)
+Use this when you do not have a separate QA account. It opens a fresh local Chromium context so you can sign in manually to the production app. It does not import or save cookies/storage state, and it does not upload browser data.
+
+From the repository root, with the virtual environment active:
+```powershell
+python -m tests.production_validation.interactive_production_smoke
+```
+
+The runner checks the homepage, pauses for you to sign in if needed, then checks the routes listed in `PROD_READ_ONLY_ROUTES` (defaults to `/`). Only add routes you have confirmed exist, for example:
+```powershell
+$env:PROD_READ_ONLY_ROUTES = "/,/watchlist"
+python -m tests.production_validation.interactive_production_smoke
+```
+The route list is illustrative; confirm each path against the current app before using it. The runner does not click buttons or trigger scans, alerts, proposals, database writes, or trading actions. It validates navigation/rendering only, not data correctness.
+
+## Production Playwright in GitHub Actions
+The separate workflow can optionally use repository secrets:
+- `PROD_STORAGE_STATE_B64`: base64-encoded Playwright storage-state JSON from an approved session.
+- `PROD_AUTHENTICATED_MARKER`: a stable CSS selector visible only after authenticated app load.
+
+Prefer the local interactive runner above when possible. Never paste production credentials, cookies, or session tokens into chat or commit them. The workflow intentionally does not upload browser storage state, screenshots, traces, or cookies as artifacts. If secure session secrets are missing, authenticated tests are reported as skipped/blocked rather than passed.
 
 Optional repository variables:
 - `PROD_BASE_URL`: defaults to the production dashboard URL.
 - `PROD_SMOKE_PATHS`: comma-separated same-origin routes to check; defaults to `/`. Confirm actual route paths before expanding this list.
-
-The workflow intentionally does not upload browser storage state, screenshots, traces, or cookies as artifacts. If the secure session secrets are missing, authenticated tests are reported as skipped/blocked rather than passed.
 
 ## Historical evidence
 The pure validators enforce:
