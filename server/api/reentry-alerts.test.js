@@ -216,3 +216,41 @@ test('a later candidate episode gets a new key while retry within the same episo
     'a persisted state transition should create a new notification episode key',
   );
 });
+
+
+test('SEC 13F parser sums META positions by CUSIP and converts reported value from thousands to dollars', async () => {
+  const { parseMeta13fPosition } = await import('./reentry-alerts.js');
+  const xml = `<informationTable>
+    <infoTable><nameOfIssuer>META PLATFORMS INC</nameOfIssuer><cusip>30303M102</cusip><value>125000</value><shrsOrPrnAmt><sshPrnamt>100000</sshPrnamt></shrsOrPrnAmt></infoTable>
+    <infoTable><nameOfIssuer>META PLATFORMS INC</nameOfIssuer><cusip>30303M102</cusip><value>25000</value><shrsOrPrnAmt><sshPrnamt>20000</sshPrnamt></shrsOrPrnAmt></infoTable>
+    <infoTable><nameOfIssuer>OTHER INC</nameOfIssuer><cusip>000000000</cusip><value>900000</value><shrsOrPrnAmt><sshPrnamt>900000</sshPrnamt></shrsOrPrnAmt></infoTable>
+  </informationTable>`;
+  assert.deepEqual(parseMeta13fPosition(xml), { reported: true, shares: 120000, marketValueUsd: 150000000 });
+});
+
+test('SEC 13F parser explicitly marks META absent rather than inferring a zero holding', async () => {
+  const { parseMeta13fPosition } = await import('./reentry-alerts.js');
+  assert.deepEqual(parseMeta13fPosition('<informationTable><infoTable><cusip>037833100</cusip><value>100</value></infoTable></informationTable>'), {
+    reported: false, shares: null, marketValueUsd: null,
+  });
+});
+
+test('only a transition into an actionable review state generates a Telegram notification', async () => {
+  const { shouldNotifySignal } = await import('./reentry-alerts.js');
+  assert.equal(shouldNotifySignal('HOLDING', 'EXIT_REVIEW'), true);
+  assert.equal(shouldNotifySignal('EXIT_REVIEW', 'EXIT_REVIEW'), false);
+  assert.equal(shouldNotifySignal('NOT_READY', 'EVIDENCE_REVIEW_REQUIRED'), true);
+  assert.equal(shouldNotifySignal('EVIDENCE_REVIEW_REQUIRED', 'EVIDENCE_REVIEW_REQUIRED'), false);
+  assert.equal(shouldNotifySignal('HOLDING', 'HOLDING'), false);
+});
+
+test('delivery claim key changes when ownership mode or the upper evidence threshold changes', async () => {
+  const { buildDeliveryKey } = await import('./reentry-alerts.js');
+  const row = {
+    symbol: 'META', target_price: 720, sale_date: null, thesis: 'META long-term AI thesis',
+    ownership_status: 'holding', planned_exit_price: 770, upper_review_price: 770,
+    updated_at: '2026-10-15T00:00:00Z',
+  };
+  assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, ownership_status: 'sold', sale_date: '2026-10-16' }));
+  assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, upper_review_price: 800 }));
+});
