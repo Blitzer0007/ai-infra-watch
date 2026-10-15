@@ -144,9 +144,78 @@ async function researchFetchJson(url, headers = {}, timeoutMs = 7000) {
   return response.json();
 }
 
+export function normalizeAnalystResearch(ratingsRows, targets, nowMs = Date.now()) {
+  const currentRatings = (Array.isArray(ratingsRows) ? ratingsRows : [])
+    .filter(row => row && typeof row.period === 'string')
+    .sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] || null;
+  const periodText = String(currentRatings?.period || '');
+  const isMonthPeriod = periodText.length === 7 && periodText[4] === '-' &&
+    Number.isInteger(Number(periodText.slice(0, 4))) &&
+    Number.isInteger(Number(periodText.slice(5, 7))) &&
+    Number(periodText.slice(5, 7)) >= 1 && Number(periodText.slice(5, 7)) <= 12;
+  const ratingsUpdatedAt = isMonthPeriod
+    ? Date.parse(periodText + '-01T00:00:00.000Z')
+    : Date.parse(periodText);
+  const ratingsDateValid = Number.isFinite(ratingsUpdatedAt) && ratingsUpdatedAt <= nowMs + 86400000;
+  const ratingsFresh = Boolean(currentRatings && ratingsDateValid && nowMs - ratingsUpdatedAt <= 180 * 86400000);
+  const usableRatings = Boolean(currentRatings && ratingsFresh);
+
+  const targetMeanAvailable = targets?.targetMean != null && Number.isFinite(Number(targets.targetMean)) && Number(targets.targetMean) > 0;
+  const targetMedianAvailable = targets?.targetMedian != null && Number.isFinite(Number(targets.targetMedian)) && Number(targets.targetMedian) > 0;
+  const targetUpdatedAt = Date.parse(String(targets?.lastUpdated || ''));
+  const targetDateValid = Number.isFinite(targetUpdatedAt) && targetUpdatedAt <= nowMs + 86400000;
+  const targetFresh = targetDateValid && nowMs - targetUpdatedAt <= 180 * 86400000;
+  const hasAnyTarget = Boolean(targets && (targetMeanAvailable || targetMedianAvailable));
+  const targetsUsable = Boolean(targetFresh && (targetMeanAvailable || targetMedianAvailable));
+  const available = usableRatings || targetsUsable;
+  const staleReturnedSources = Boolean((currentRatings && !ratingsFresh) || (hasAnyTarget && !targetFresh));
+  const staleOnly = !available && staleReturnedSources;
+  let message = null;
+  if (available && currentRatings && !ratingsFresh && targetsUsable) {
+    message = 'The latest recommendation counts are stale and excluded; fresh price targets remain available.';
+  } else if (available && targets && hasAnyTarget && !targetFresh) {
+    message = 'Price targets are stale or lack a usable update date; they are excluded from price-context calculations.';
+  } else if (staleOnly) {
+    message = 'Finnhub returned analyst data, but available records are stale or lack a usable update date; stale figures are excluded from current consensus.';
+  } else if (!available) {
+    message = 'Finnhub returned no usable fresh ratings or price targets.';
+  }
+
+  return {
+    status: available ? 'available' : staleOnly ? 'stale' : 'unavailable',
+    source: 'Finnhub',
+    retrievedAt: new Date(nowMs).toISOString(),
+    recommendationPeriod: currentRatings?.period || null,
+    ratingFreshness: !currentRatings ? 'unavailable' : ratingsFresh ? 'fresh' : ratingsDateValid ? 'stale' : 'date_unavailable',
+    ratings: usableRatings ? {
+      strongBuy: Number(currentRatings.strongBuy) || 0,
+      buy: Number(currentRatings.buy) || 0,
+      hold: Number(currentRatings.hold) || 0,
+      sell: Number(currentRatings.sell) || 0,
+      strongSell: Number(currentRatings.strongSell) || 0,
+    } : null,
+    targets: targets ? {
+      low: targets.targetLow != null && Number.isFinite(Number(targets.targetLow)) && Number(targets.targetLow) > 0 ? Number(targets.targetLow) : null,
+      mean: targetMeanAvailable ? Number(targets.targetMean) : null,
+      median: targetMedianAvailable ? Number(targets.targetMedian) : null,
+      high: targets.targetHigh != null && Number.isFinite(Number(targets.targetHigh)) && Number(targets.targetHigh) > 0 ? Number(targets.targetHigh) : null,
+      analystCount: targets.numberOfAnalysts != null && Number.isFinite(Number(targets.numberOfAnalysts)) && Number(targets.numberOfAnalysts) > 0 ? Number(targets.numberOfAnalysts) : null,
+      lastUpdated: targets.lastUpdated || null,
+      freshness: targetFresh ? 'fresh' : targetDateValid ? 'stale' : 'date_unavailable',
+    } : null,
+    errors: [],
+    message,
+  };
+}
+
 async function fetchAnalystResearch(symbol) {
   const apiKey = String(process.env.FINNHUB_API_KEY || '').trim();
-  if (!apiKey) return { status: 'unavailable', source: 'Finnhub', message: 'FINNHUB_API_KEY is not configured for server-side research.', retrievedAt: new Date().toISOString() };
+  if (!apiKey) return {
+    status: 'unavailable', source: 'Finnhub', ratingFreshness: 'unavailable',
+    ratings: null, targets: null, errors: [],
+    message: 'FINNHUB_API_KEY is not configured for server-side research.',
+    retrievedAt: new Date().toISOString(),
+  };
   const base = 'https://finnhub.io/api/v1/stock/';
   const query = 'symbol=' + encodeURIComponent(symbol) + '&token=' + encodeURIComponent(apiKey);
   const [ratingsResult, targetsResult] = await Promise.allSettled([
@@ -154,36 +223,14 @@ async function fetchAnalystResearch(symbol) {
     researchFetchJson(base + 'price-target?' + query),
   ]);
   const ratingsRows = ratingsResult.status === 'fulfilled' && Array.isArray(ratingsResult.value) ? ratingsResult.value : [];
-  const currentRatings = ratingsRows.filter(row => row && typeof row.period === 'string').sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] || null;
   const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : null;
-  const targetMeanAvailable = targets?.targetMean != null && Number.isFinite(Number(targets.targetMean)) && Number(targets.targetMean) > 0;
-  const targetMedianAvailable = targets?.targetMedian != null && Number.isFinite(Number(targets.targetMedian)) && Number(targets.targetMedian) > 0;
-  const targetUpdatedAt = Date.parse(String(targets?.lastUpdated || ''));
-  const targetDateValid = Number.isFinite(targetUpdatedAt) && targetUpdatedAt <= Date.now() + 86400000;
-  const targetFresh = targetDateValid && Date.now() - targetUpdatedAt <= 180 * 86400000;
-  const targetsUsable = Boolean(targets && targetFresh && (targetMeanAvailable || targetMedianAvailable));
-  const available = Boolean(currentRatings) || targetsUsable;
-  const staleTargetsOnly = Boolean(targets && (targetMeanAvailable || targetMedianAvailable) && !targetFresh && !currentRatings);
-  return {
-    status: available ? 'available' : staleTargetsOnly ? 'stale' : 'unavailable',
-    source: 'Finnhub',
-    retrievedAt: new Date().toISOString(),
-    recommendationPeriod: currentRatings?.period || null,
-    ratings: currentRatings ? { strongBuy: Number(currentRatings.strongBuy) || 0, buy: Number(currentRatings.buy) || 0, hold: Number(currentRatings.hold) || 0, sell: Number(currentRatings.sell) || 0, strongSell: Number(currentRatings.strongSell) || 0 } : null,
-    targets: targets ? {
-      low: targets.targetLow != null && Number(targets.targetLow) > 0 ? Number(targets.targetLow) : null,
-      mean: targetMeanAvailable ? Number(targets.targetMean) : null,
-      median: targetMedianAvailable ? Number(targets.targetMedian) : null,
-      high: targets.targetHigh != null && Number(targets.targetHigh) > 0 ? Number(targets.targetHigh) : null,
-      analystCount: targets.numberOfAnalysts != null && Number(targets.numberOfAnalysts) > 0 ? Number(targets.numberOfAnalysts) : null,
-      lastUpdated: targets.lastUpdated || null,
-      freshness: targetFresh ? 'fresh' : targetDateValid ? 'stale' : 'date_unavailable',
-    } : null,
-    errors: [...(ratingsResult.status === 'rejected' ? ['Rating consensus unavailable.'] : []), ...(targetsResult.status === 'rejected' ? ['Price targets unavailable.'] : [])],
-    message: available ? null : staleTargetsOnly ? 'Finnhub price targets are more than 180 days old; stale targets are excluded from price-context calculations.' : 'Finnhub returned no usable ratings or fresh price targets.',
-  };
+  const normalized = normalizeAnalystResearch(ratingsRows, targets);
+  const errors = [
+    ...(ratingsResult.status === 'rejected' ? ['Rating consensus unavailable.'] : []),
+    ...(targetsResult.status === 'rejected' ? ['Price targets unavailable.'] : []),
+  ];
+  return { ...normalized, errors };
 }
-
 function textTag(block, tag) {
   const match = String(block || '').match(new RegExp('<' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + tag + '>', 'i'));
   return match ? match[1].replace(/<[^>]+>/g, '').trim() : '';

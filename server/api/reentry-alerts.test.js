@@ -366,6 +366,43 @@ test('SEC 13F parser separates META common shares from call and put option discl
 });
 
 
+test('fresh analyst consensus is available and its recommendation period is labelled fresh', async () => {
+  const { normalizeAnalystResearch } = await import('./reentry-alerts.js');
+  const now = Date.parse('2026-10-15T00:00:00Z');
+  const result = normalizeAnalystResearch([
+    { period: '2026-04', strongBuy: 9, buy: 4, hold: 2, sell: 1, strongSell: 0 },
+    { period: '2026-10', strongBuy: 8, buy: 3, hold: 1, sell: 0, strongSell: 0 },
+  ], { targetMean: 220, targetMedian: 225, lastUpdated: '2026-10-10', numberOfAnalysts: 12 }, now);
+  assert.equal(result.status, 'available');
+  assert.equal(result.ratingFreshness, 'fresh');
+  assert.equal(result.recommendationPeriod, '2026-10');
+  assert.equal(result.ratings.strongBuy, 8);
+  assert.equal(result.targets.freshness, 'fresh');
+});
+
+test('stale analyst counts are excluded rather than making research appear current', async () => {
+  const { normalizeAnalystResearch } = await import('./reentry-alerts.js');
+  const result = normalizeAnalystResearch([
+    { period: '2026-03', strongBuy: 99, buy: 99, hold: 0, sell: 0, strongSell: 0 },
+  ], null, Date.parse('2026-10-15T00:00:00Z'));
+  assert.equal(result.status, 'stale');
+  assert.equal(result.ratingFreshness, 'stale');
+  assert.equal(result.ratings, null);
+  assert.match(result.message, /stale/i);
+});
+
+test('fresh targets may remain available while stale analyst counts are explicitly excluded', async () => {
+  const { normalizeAnalystResearch } = await import('./reentry-alerts.js');
+  const result = normalizeAnalystResearch([
+    { period: '2026-03', strongBuy: 99, buy: 99, hold: 0, sell: 0, strongSell: 0 },
+  ], { targetMean: 220, targetMedian: 225, lastUpdated: '2026-10-10', numberOfAnalysts: 12 }, Date.parse('2026-10-15T00:00:00Z'));
+  assert.equal(result.status, 'available');
+  assert.equal(result.ratingFreshness, 'stale');
+  assert.equal(result.ratings, null);
+  assert.equal(result.targets.freshness, 'fresh');
+  assert.match(result.message, /stale and excluded/i);
+});
+
 test('fund ownership research matches associated managers for any selected ticker', async () => {
   const { normalizeFundOwnership } = await import('./reentry-alerts.js');
   const result = normalizeFundOwnership('NVDA', {
