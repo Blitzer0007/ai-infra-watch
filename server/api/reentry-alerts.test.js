@@ -225,13 +225,27 @@ test('SEC 13F parser sums META positions by CUSIP and converts reported value fr
     <infoTable><nameOfIssuer>META PLATFORMS INC</nameOfIssuer><cusip>30303M102</cusip><value>25000</value><shrsOrPrnAmt><sshPrnamt>20000</sshPrnamt></shrsOrPrnAmt></infoTable>
     <infoTable><nameOfIssuer>OTHER INC</nameOfIssuer><cusip>000000000</cusip><value>900000</value><shrsOrPrnAmt><sshPrnamt>900000</sshPrnamt></shrsOrPrnAmt></infoTable>
   </informationTable>`;
-  assert.deepEqual(parseMeta13fPosition(xml), { reported: true, shares: 120000, marketValueUsd: 150000000 });
+  assert.deepEqual(parseMeta13fPosition(xml), {
+    reported: true,
+    commonStockReported: true,
+    shares: 120000,
+    marketValueUsd: 150000000,
+    options: {
+      call: { reported: false, contractsOrShares: null, marketValueUsd: null },
+      put: { reported: false, contractsOrShares: null, marketValueUsd: null },
+    },
+    otherReportableLines: 0,
+  });
 });
 
 test('SEC 13F parser explicitly marks META absent rather than inferring a zero holding', async () => {
   const { parseMeta13fPosition } = await import('./reentry-alerts.js');
   assert.deepEqual(parseMeta13fPosition('<informationTable><infoTable><cusip>037833100</cusip><value>100</value></infoTable></informationTable>'), {
-    reported: false, shares: null, marketValueUsd: null,
+    reported: false, shares: null, marketValueUsd: null, commonStockReported: false,
+    options: {
+      call: { reported: false, contractsOrShares: null, marketValueUsd: null },
+      put: { reported: false, contractsOrShares: null, marketValueUsd: null },
+    },
   });
 });
 
@@ -275,4 +289,19 @@ test('SEC 13F selector does not silently fall back to an HTML information table'
     find13fInformationTableXmlHref('<tr><td><a href="table.html">Information Table</a></td></tr>', 'https://www.sec.gov/archive/'),
     null,
   );
+});
+
+
+test('SEC 13F parser separates META common shares from call and put option disclosures', async () => {
+  const { parseMeta13fPosition } = await import('./reentry-alerts.js');
+  const xml = `<informationTable>
+    <infoTable><cusip>30303M102</cusip><value>1000</value><shrsOrPrnAmt><sshPrnamt>100</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt></infoTable>
+    <infoTable><cusip>30303M102</cusip><value>250</value><shrsOrPrnAmt><sshPrnamt>5</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt><putCall>Call</putCall></infoTable>
+    <infoTable><cusip>30303M102</cusip><value>80</value><shrsOrPrnAmt><sshPrnamt>2</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt><putCall>Put</putCall></infoTable>
+  </informationTable>`;
+  const result = parseMeta13fPosition(xml);
+  assert.equal(result.shares, 100);
+  assert.equal(result.marketValueUsd, 1000000);
+  assert.deepEqual(result.options.call, { reported: true, contractsOrShares: 5, marketValueUsd: 250000 });
+  assert.deepEqual(result.options.put, { reported: true, contractsOrShares: 2, marketValueUsd: 80000 });
 });
