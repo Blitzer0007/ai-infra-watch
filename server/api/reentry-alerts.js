@@ -70,6 +70,74 @@ const TRACKED_MANAGERS = [
 ];
 const AUTOPILOT_HOLDINGS_REFERENCE = 'https://start.joinautopilot.com/blog/hedge-fund-and-wall-street-portfolios';
 
+const BILLIONAIRE_ASSOCIATED_FUNDS = [
+  { name: 'Berkshire Hathaway', aliases: ['BERKSHIRE HATHAWAY'], context: 'Warren Buffett-associated manager; this is the firm’s disclosed portfolio, not Buffett’s personal account.' },
+  { name: 'Pershing Square Capital Management', aliases: ['PERSHING SQUARE CAPITAL MANAGEMENT', 'PERSHING SQUARE'], context: 'Bill Ackman-associated fund manager.' },
+  { name: 'Bridgewater Associates', aliases: ['BRIDGEWATER ASSOCIATES'], context: 'Ray Dalio-founded manager; reported firm holdings, not a personal portfolio.' },
+  { name: 'Citadel Advisors', aliases: ['CITADEL ADVISORS'], context: 'Ken Griffin-associated institutional manager.' },
+  { name: 'Appaloosa LP', aliases: ['APPALOOSA', 'APPALOOSA LP'], context: 'David Tepper-associated fund manager.' },
+  { name: 'Tiger Global Management', aliases: ['TIGER GLOBAL MANAGEMENT', 'TIGER GLOBAL'], context: 'Chase Coleman-associated investment manager.' },
+  { name: 'Renaissance Technologies', aliases: ['RENAISSANCE TECHNOLOGIES'], context: 'Institutional investment manager; association is to the firm, not a current personal holding.' },
+  { name: 'Scion Asset Management', aliases: ['SCION ASSET MANAGEMENT', 'SCION'], context: 'Michael Burry-associated investment manager.' },
+];
+function normalizeFundName(value) {
+  return String(value || '').toUpperCase().replace(/&/g, ' AND ').replace(/[^A-Z0-9]+/g, ' ').trim()
+    .replace(/\\b(INCORPORATED|INC|CORPORATION|CORP|LIMITED|LTD|LLC|LP|L P|LLP|PLC|CO|COMPANY)\\b/g, ' ')
+    .replace(/\\s+/g, ' ').trim();
+}
+function associatedManager(name) {
+  const normalized = normalizeFundName(name);
+  return BILLIONAIRE_ASSOCIATED_FUNDS.find(manager =>
+    manager.aliases.some(alias => normalized === normalizeFundName(alias) || normalized.startsWith(normalizeFundName(alias) + ' '))
+  ) || null;
+}
+export function normalizeFundOwnership(symbol, payload) {
+  const raw = Array.isArray(payload?.ownership) ? payload.ownership : [];
+  const funds = raw.filter(row => row && typeof row.name === 'string' && row.name.trim()).map(row => {
+    const matched = associatedManager(row.name);
+    return {
+      name: row.name.trim(),
+      shares: row.share != null && Number.isFinite(Number(row.share)) ? Number(row.share) : null,
+      shareChange: row.change != null && Number.isFinite(Number(row.change)) ? Number(row.change) : null,
+      filingDate: row.filingDate || null,
+      portfolioPercent: row.portfolioPercent != null && Number.isFinite(Number(row.portfolioPercent)) ? Number(row.portfolioPercent) : null,
+      billionaireAssociation: matched ? matched.name : null,
+      context: matched?.context || 'Institutional/fund ownership record returned by Finnhub; no billionaire association asserted.',
+      source: 'Finnhub fund-ownership',
+    };
+  });
+  const associated = funds.filter(row => row.billionaireAssociation);
+  return {
+    symbol: String(symbol || '').toUpperCase(),
+    source: 'Finnhub fund-ownership',
+    retrievedAt: new Date().toISOString(),
+    status: funds.length ? 'available' : 'no_records_returned',
+    funds,
+    billionaireAssociatedFunds: associated,
+    message: funds.length
+      ? null
+      : 'Finnhub returned no fund ownership rows for this ticker. This is not proof that the stock has no institutional or billionaire-associated holders.',
+  };
+}
+async function fetchFundOwnership(symbol) {
+  const apiKey = String(process.env.FINNHUB_API_KEY || '').trim();
+  if (!apiKey) return {
+    symbol, source: 'Finnhub fund-ownership', status: 'unavailable', funds: [], billionaireAssociatedFunds: [],
+    retrievedAt: new Date().toISOString(), message: 'FINNHUB_API_KEY is not configured for server-side research.',
+  };
+  const query = new URLSearchParams({ symbol, limit: '100', token: apiKey });
+  try {
+    const payload = await researchFetchJson('https://finnhub.io/api/v1/stock/fund-ownership?' + query.toString(), {}, 7000);
+    return normalizeFundOwnership(symbol, payload);
+  } catch (error) {
+    return {
+      symbol, source: 'Finnhub fund-ownership', status: 'unavailable', funds: [], billionaireAssociatedFunds: [],
+      retrievedAt: new Date().toISOString(), message: String(error?.message || error),
+    };
+  }
+}
+
+
 async function researchFetchJson(url, headers = {}, timeoutMs = 7000) {
   const response = await fetch(url, { headers: { Accept: 'application/json', ...headers }, signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new Error('Source returned HTTP ' + response.status);
@@ -263,9 +331,9 @@ async function fetchReentryResearch(symbol) {
   const cacheKey = String(symbol).toUpperCase();
   const cached = RESEARCH_CACHE.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < 15 * 60 * 1000) return { ...cached.data, cached: true };
-  const [analyst, managers, quote] = await Promise.all([
+  const [analyst, institutionalHoldings, quote] = await Promise.all([
     fetchAnalystResearch(cacheKey).catch(error => ({ status: 'unavailable', source: 'Finnhub', message: String(error?.message || error), retrievedAt: new Date().toISOString() })),
-    cacheKey === 'META' ? Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)) : Promise.resolve([]),
+    fetchFundOwnership(cacheKey),
     fetchResearchPrice(cacheKey).catch(error => ({ price: null, retrievedAt: new Date().toISOString(), source: null, error: String(error?.message || error) })),
   ]);
   const targetMean = analyst?.targets?.freshness === 'fresh' ? analyst.targets.mean : null;
@@ -282,11 +350,10 @@ async function fetchReentryResearch(symbol) {
   const data = {
     ok: true, symbol: cacheKey, requestedAt: new Date().toISOString(), analyst, priceContext,
     institutionalHoldings: {
-      status: cacheKey === 'META' ? 'available' : 'unsupported_symbol',
-      message: cacheKey === 'META' ? null : 'Institutional 13F matching is currently configured only for META; no other ticker is inferred from META filings.',
-      source: 'SEC EDGAR Form 13F-HR',
-      asOfMeaning: 'Positions are as of the reported quarter-end, not live holdings. Filings may arrive up to 45 days after quarter-end.',
-      autopilotReference: AUTOPILOT_HOLDINGS_REFERENCE, cusip: cacheKey === 'META' ? META_CUSIP : null, managers,
+      ...institutionalHoldings,
+      asOfMeaning: 'Fund ownership records are disclosure-based snapshots, not live positions. Filing dates describe the source record and can lag the current date; provider coverage varies by ticker.',
+      billionaireAssociationNote: 'Manager associations are labels for the investment firm, not assertions about a billionaire’s personal account. A fund missing from the returned list is not proof of zero exposure.',
+      autopilotReference: AUTOPILOT_HOLDINGS_REFERENCE,
     },
     executionPolicy: 'Research context only. No automated trade or re-entry approval.',
   };
