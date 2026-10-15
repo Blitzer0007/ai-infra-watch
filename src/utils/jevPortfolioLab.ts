@@ -91,6 +91,13 @@ export const PAPER_LAB_DEFAULTS = {
 };
 
 
+export type HistoricalAvailabilityEvidence = {
+  source: string;
+  sourceUrl: string;
+  /** Vendor/archive record identifier that supports the stated availability timestamp. */
+  recordId: string;
+};
+
 export type HistoricalPrice = {
   symbol: string;
   date: string;
@@ -98,7 +105,20 @@ export type HistoricalPrice = {
   availableAt: string;
   adjusted?: boolean;
   availabilityStatus?: 'verified' | 'assumed' | 'unknown';
+  /** Required before availabilityStatus=verified can contribute to evidence-ready status. */
+  availabilityEvidence?: HistoricalAvailabilityEvidence;
 };
+
+function hasVerifiedAvailabilityEvidence(row: HistoricalPrice): boolean {
+  const evidence = row.availabilityEvidence;
+  if (!evidence || !String(evidence.source || '').trim() || !String(evidence.recordId || '').trim()) return false;
+  try {
+    const url = new URL(String(evidence.sourceUrl || ''));
+    return url.protocol === 'https:' && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 export type HistoricalUniverseMembershipEvidence = {
   symbol: string;
@@ -292,11 +312,17 @@ export function runHistoricalPaperBacktest(args: {
     const day = byDate.get(date)!;
     return [...day.values()].every(row => Date.parse(row.availableAt) <= cutoff && Date.parse(row.date) <= cutoff);
   });
-  const availabilityStatuses = relevantPrices.map(row => row.availabilityStatus || 'unknown');
+  const availabilityStatuses = relevantPrices.map(row => {
+    const status = row.availabilityStatus || 'unknown';
+    // A caller-supplied "verified" label alone is not provenance. Require a source URL and
+    // provider/archive record identifier for the claim that the price was available by availableAt.
+    return status === 'verified' && hasVerifiedAvailabilityEvidence(row) ? 'verified' : status === 'assumed' ? 'assumed' : 'unknown';
+  });
   const availabilityStatus: HistoricalBacktestResult['availabilityStatus'] =
     availabilityStatuses.length > 0 && availabilityStatuses.every(status => status === 'verified')
       ? 'verified'
-      : availabilityStatuses.some(status => status === 'assumed') ? 'assumed' : 'unknown';
+      : availabilityStatuses.some(status => status === 'unknown') ? 'unknown'
+        : availabilityStatuses.some(status => status === 'assumed') ? 'assumed' : 'unknown';
   // Price timestamps do not establish which securities were actually investable at each historical date.
   // Require source-backed effective-dated membership intervals for every target symbol at every cutoff.
   const universeMembershipStatus = resolveHistoricalUniverseMembershipStatus({
