@@ -464,7 +464,8 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
           <div><p className="text-xs text-white/45">QQQ return</p><p className="text-lg font-semibold">{backtest.qqqReturnPct.toFixed(2)}%</p><p className="text-xs text-white/40">Excess: {backtest.excessVsQqqPct.toFixed(2)} pp</p></div>
           <div><p className="text-xs text-white/45">Max drawdown</p><p className="text-lg font-semibold">{backtest.maxDrawdownPct.toFixed(2)}%</p><p className="text-xs text-white/40">Trading costs: {backtest.totalTransactionCostsPct.toFixed(3)}% of starting capital</p></div>
         </div>
-        <p className="text-xs text-amber-200/80">Adjusted closes and benchmark dates were aligned. Provider availability is currently assumed after the UTC calendar day, not independently verified; this result is not a validated forecast, evidence-backed JEV strategy, or proof of alpha.</p>
+        <p className="text-xs text-amber-200/80">Point-in-time checks: price availability <strong>{backtest.availabilityStatus}</strong> · decision cutoffs {backtest.pointInTimeVerified ? 'provided and passed' : 'missing or unverified'} · historical universe membership <strong>{backtest.universeMembershipStatus}</strong>.</p>
+        <p className="text-xs text-amber-200/80">Daily-bar availability is currently only assumed from the UTC calendar date, not independently verified. Unless price publication times and source-backed effective-dated membership cover every decision date and target security, this result remains exploratory/insufficient—not a validated forecast, evidence-backed JEV strategy, or proof of alpha.</p>
       </div>}
       <p role="status" className="text-sm text-white/60">{message}{review ? ' Last saved: ' + new Date(review).toLocaleString() : ''}</p>
       <div className="mt-3 border-t border-white/10 pt-3">
