@@ -231,8 +231,8 @@ test('SEC 13F parser sums META positions by CUSIP and converts reported value fr
     shares: 120000,
     marketValueUsd: 150000000,
     options: {
-      call: { reported: false, contractsOrShares: null, marketValueUsd: null },
-      put: { reported: false, contractsOrShares: null, marketValueUsd: null },
+      call: { reported: false, reportedQuantity: null, marketValueUsd: null },
+      put: { reported: false, reportedQuantity: null, marketValueUsd: null },
     },
     otherReportableLines: 0,
   });
@@ -243,8 +243,8 @@ test('SEC 13F parser explicitly marks META absent rather than inferring a zero h
   assert.deepEqual(parseMeta13fPosition('<informationTable><infoTable><cusip>037833100</cusip><value>100</value></infoTable></informationTable>'), {
     reported: false, shares: null, marketValueUsd: null, commonStockReported: false,
     options: {
-      call: { reported: false, contractsOrShares: null, marketValueUsd: null },
-      put: { reported: false, contractsOrShares: null, marketValueUsd: null },
+      call: { reported: false, reportedQuantity: null, marketValueUsd: null },
+      put: { reported: false, reportedQuantity: null, marketValueUsd: null },
     },
   });
 });
@@ -302,6 +302,6 @@ test('SEC 13F parser separates META common shares from call and put option discl
   const result = parseMeta13fPosition(xml);
   assert.equal(result.shares, 100);
   assert.equal(result.marketValueUsd, 1000000);
-  assert.deepEqual(result.options.call, { reported: true, contractsOrShares: 5, marketValueUsd: 250000 });
-  assert.deepEqual(result.options.put, { reported: true, contractsOrShares: 2, marketValueUsd: 80000 });
+  assert.deepEqual(result.options.call, { reported: true, reportedQuantity: 5, marketValueUsd: 250000 });
+  assert.deepEqual(result.options.put, { reported: true, reportedQuantity: 2, marketValueUsd: 80000 });
 });
