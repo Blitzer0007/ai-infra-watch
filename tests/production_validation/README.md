@@ -19,7 +19,7 @@ The runner checks the homepage, pauses for you to sign in if needed, then checks
 $env:PROD_READ_ONLY_ROUTES = "/,/watchlist"
 python -m tests.production_validation.interactive_production_smoke
 ```
-The route list is illustrative; confirm each path against the current app before using it. The runner does not click buttons or trigger scans, alerts, proposals, database writes, or trading actions. It validates navigation/rendering only, not data correctness.
+The default route list is sourced from `VIEW_PATHS` in `src/App.tsx`: `/overview`, `/contracts`, `/tracker`, `/congress`, `/macro`, `/portfolio`, `/watchlist`, `/research`, `/jev-lab`, `/quality`, `/outlook`, `/health`, `/guide`, and `/settings`. The runner checks that the dashboard navigation shell remains visible and each route renders a non-empty body. It does not click buttons or trigger scans, alerts, proposals, database writes, or trading actions. It validates navigation/rendering only, not data correctness.
 
 ## Production Playwright in GitHub Actions
 The separate workflow can optionally use repository secrets:
