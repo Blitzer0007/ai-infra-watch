@@ -72,6 +72,11 @@ export function shouldNotifyCandidate(lastAlertSignature, candidate) {
   return candidate === true && lastAlertSignature !== 'REENTRY_CANDIDATE';
 }
 
+export function buildDeliveryKey(row) {
+  const keyMaterial=[String(row?.symbol||'').toUpperCase(),String(row?.target_price??''),String(row?.sale_date||''),String(row?.thesis||'')].join('|');
+  return createHash('sha256').update(keyMaterial).digest('hex');
+}
+
 export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, telegramSent, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
@@ -116,8 +121,7 @@ async function runScan() {
         if(!chatId) throw new Error('Telegram chat ID is not configured');
         // One notification per configured thesis/target episode. Changing the thesis,
         // sale date, or target creates a new key. Existing claims are never auto-retried.
-        const keyMaterial=[String(row.symbol).toUpperCase(),String(row.target_price),String(row.sale_date||''),String(row.thesis||'')].join('|');
-        const deliveryKey=createHash('sha256').update(keyMaterial).digest('hex');
+        const deliveryKey=buildDeliveryKey(row);
         const claimed=await db('rpc/claim_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_symbol:row.symbol,p_chat_id:chatId})});
         if(claimed!==true) {
           deliveryEvidence.push({symbol:row.symbol,status:'existing_claim_suppressed',messageId:null,statePersisted:false});
