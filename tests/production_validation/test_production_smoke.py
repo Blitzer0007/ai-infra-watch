@@ -6,7 +6,6 @@ PROD_AUTHENTICATED_MARKER. Never commit storage-state files or print their conte
 from __future__ import annotations
 
 import base64
-import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
