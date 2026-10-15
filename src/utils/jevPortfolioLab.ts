@@ -100,6 +100,87 @@ export type HistoricalPrice = {
   availabilityStatus?: 'verified' | 'assumed' | 'unknown';
 };
 
+export type HistoricalUniverseMembershipEvidence = {
+  symbol: string;
+  universeId: string;
+  effectiveFrom: string;
+  /** Inclusive effective-end date/time. A date-only end is interpreted through that UTC day. */
+  effectiveTo?: string | null;
+  status: 'verified' | 'assumed' | 'unknown';
+  source: string;
+  sourceUrl: string;
+};
+
+function parseMembershipBound(value: string, isEnd = false): number {
+  const text = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return Date.parse(text + (isEnd ? 'T23:59:59.999Z' : 'T00:00:00.000Z'));
+  }
+  return Date.parse(text);
+}
+
+/**
+ * A scalar "verified" flag is not membership evidence. To report verified membership,
+ * the caller must supply source-backed effective intervals that cover every target
+ * security at every decision cutoff for one explicitly named universe.
+ */
+export function resolveHistoricalUniverseMembershipStatus(args: {
+  target: PaperHolding[];
+  dates: string[];
+  decisionCutoffByDate?: Record<string, string>;
+  universeId?: string;
+  evidence?: HistoricalUniverseMembershipEvidence[];
+}): 'verified' | 'assumed' | 'unknown' {
+  const universeId = String(args.universeId || '').trim().toUpperCase();
+  const evidence = Array.isArray(args.evidence) ? args.evidence : [];
+  if (!universeId || !args.target.length || !args.dates.length || !evidence.length) return 'unknown';
+
+  const valid = evidence.filter(row => {
+    if (!row || typeof row.symbol !== 'string' || !row.symbol.trim() ||
+        typeof row.universeId !== 'string' || row.universeId.trim().toUpperCase() !== universeId ||
+        !['verified', 'assumed', 'unknown'].includes(row.status) ||
+        !String(row.source || '').trim()) return false;
+    const from = parseMembershipBound(row.effectiveFrom);
+    const to = row.effectiveTo == null || String(row.effectiveTo).trim() === ''
+      ? Number.POSITIVE_INFINITY
+      : parseMembershipBound(String(row.effectiveTo), true);
+    if (!Number.isFinite(from) || to < from) return false;
+    try {
+      const url = new URL(String(row.sourceUrl || ''));
+      return url.protocol === 'https:' && Boolean(url.hostname);
+    } catch {
+      return false;
+    }
+  });
+
+  let assumed = false;
+  for (const holding of args.target) {
+    const symbol = String(holding.symbol || '').trim().toUpperCase();
+    if (!symbol) return 'unknown';
+    for (const date of args.dates) {
+      const cutoff = Date.parse(String(args.decisionCutoffByDate?.[date] || ''));
+      if (!Number.isFinite(cutoff)) return 'unknown';
+      const covering = valid.filter(row => {
+        if (row.symbol.trim().toUpperCase() !== symbol) return false;
+        const from = parseMembershipBound(row.effectiveFrom);
+        const to = row.effectiveTo == null || String(row.effectiveTo).trim() === ''
+          ? Number.POSITIVE_INFINITY
+          : parseMembershipBound(String(row.effectiveTo), true);
+        return from <= cutoff && cutoff <= to;
+      });
+      if (!covering.length) return 'unknown';
+      const statuses = new Set(covering.map(row => row.status));
+      // Ambiguous overlapping evidence must not be resolved by optimistic selection.
+      if (statuses.size !== 1) return 'unknown';
+      const status = covering[0].status;
+      if (status === 'unknown') return 'unknown';
+      if (status === 'assumed') assumed = true;
+      for (const row of covering) if (row.status === 'verified' && !row.sourceUrl) return 'unknown';
+    }
+  }
+  return assumed ? 'assumed' : 'verified';
+}
+
 export type HistoricalBacktestResult = {
   startDate: string;
   endDate: string;
@@ -138,8 +219,9 @@ export function runHistoricalPaperBacktest(args: {
   maxSectorWeight?: number;
   minCashWeight?: number;
   rebalanceEverySessions?: number;
-  /** Must reflect point-in-time membership history, not today's ticker list. */
-  universeMembershipStatus?: 'verified' | 'assumed' | 'unknown';
+  /** Explicit universe identifier and effective-dated evidence; scalar status flags are insufficient. */
+  universeId?: string;
+  universeMembershipEvidence?: HistoricalUniverseMembershipEvidence[];
 }): HistoricalBacktestResult {
   const { prices, target, startCapital } = args;
   const costBps = args.costBps ?? 10;
@@ -216,8 +298,14 @@ export function runHistoricalPaperBacktest(args: {
       ? 'verified'
       : availabilityStatuses.some(status => status === 'assumed') ? 'assumed' : 'unknown';
   // Price timestamps do not establish which securities were actually investable at each historical date.
-  // Without point-in-time universe membership evidence, survivorship bias remains unresolved.
-  const universeMembershipStatus = args.universeMembershipStatus ?? 'unknown';
+  // Require source-backed effective-dated membership intervals for every target symbol at every cutoff.
+  const universeMembershipStatus = resolveHistoricalUniverseMembershipStatus({
+    target,
+    dates,
+    decisionCutoffByDate: args.decisionCutoffByDate,
+    universeId: args.universeId,
+    evidence: args.universeMembershipEvidence,
+  });
 
   let strategyValue = startCapital;
   let spyValue = startCapital;
