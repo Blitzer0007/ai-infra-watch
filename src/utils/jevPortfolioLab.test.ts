@@ -174,15 +174,21 @@ test('backtest cannot claim ready evidence without explicit point-in-time decisi
   assert.equal(result.evidenceStatus, 'insufficient');
 });
 
-test('backtest marks point-in-time evidence verified only when every date has a valid cutoff', () => {
+test('backtest reaches evidence-ready only with source-backed membership intervals covering every decision date', () => {
   const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
   const decisionCutoffByDate = Object.fromEntries(
     ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
   );
+  const universeMembershipEvidence = [{
+    symbol: 'MSFT', universeId: 'TEST-US-EQUITIES', effectiveFrom: '2025-01-01',
+    effectiveTo: '2026-12-31', status: 'verified' as const,
+    source: 'Unit-test historical membership fixture',
+    sourceUrl: 'https://example.test/universe/MSFT',
+  }];
   const result = runHistoricalPaperBacktest({
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
-    universeMembershipStatus: 'verified',
+    universeId: 'TEST-US-EQUITIES', universeMembershipEvidence,
   });
   assert.equal(result.pointInTimeVerified, true);
   assert.equal(result.universeMembershipStatus, 'verified');
@@ -201,4 +207,72 @@ test('backtest remains insufficient when point-in-time universe membership is no
   assert.equal(result.pointInTimeVerified, true);
   assert.equal(result.universeMembershipStatus, 'unknown');
   assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+
+test('scalar universe membership status cannot bypass the effective-dated evidence gate', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates: ['2026-01-01', '2026-01-08'],
+    decisionCutoffByDate: {
+      '2026-01-01': '2026-01-01T23:00:00Z',
+      '2026-01-08': '2026-01-08T23:00:00Z',
+    },
+    universeId: 'TEST-US-EQUITIES',
+    evidence: [],
+  }), 'unknown');
+});
+
+test('membership evidence whose effective interval misses one decision date is insufficient', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates: ['2026-01-01', '2026-01-08', '2026-01-15'],
+    decisionCutoffByDate: {
+      '2026-01-01': '2026-01-01T23:00:00Z',
+      '2026-01-08': '2026-01-08T23:00:00Z',
+      '2026-01-15': '2026-01-15T23:00:00Z',
+    },
+    universeId: 'TEST-US-EQUITIES',
+    evidence: [{
+      symbol: 'MSFT', universeId: 'TEST-US-EQUITIES', effectiveFrom: '2025-01-01',
+      effectiveTo: '2026-01-10', status: 'verified',
+      source: 'Unit-test source', sourceUrl: 'https://example.test/membership',
+    }],
+  }), 'unknown');
+});
+
+test('assumed membership evidence can never make the backtest evidence-ready', () => {
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const decisionCutoffByDate = Object.fromEntries(
+    ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
+  );
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES',
+    universeMembershipEvidence: [{
+      symbol: 'MSFT', universeId: 'TEST-US-EQUITIES', effectiveFrom: '2025-01-01',
+      effectiveTo: '2026-12-31', status: 'assumed',
+      source: 'Unit-test assumption', sourceUrl: 'https://example.test/membership',
+    }],
+  });
+  assert.equal(result.universeMembershipStatus, 'assumed');
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('membership evidence without an HTTPS source URL is not verified', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates: ['2026-01-01'],
+    decisionCutoffByDate: { '2026-01-01': '2026-01-01T23:00:00Z' },
+    universeId: 'TEST-US-EQUITIES',
+    evidence: [{
+      symbol: 'MSFT', universeId: 'TEST-US-EQUITIES', effectiveFrom: '2025-01-01',
+      effectiveTo: '2026-12-31', status: 'verified',
+      source: 'Unit-test source', sourceUrl: 'http://example.test/membership',
+    }],
+  }), 'unknown');
 });
