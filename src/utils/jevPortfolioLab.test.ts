@@ -69,6 +69,19 @@ function history(): HistoricalPrice[] {
   return rows;
 }
 
+function verifiedHistory(): HistoricalPrice[] {
+  return history().map(row => ({
+    ...row,
+    adjusted: true,
+    availabilityStatus: 'verified' as const,
+    availabilityEvidence: {
+      source: 'Unit-test provider snapshot',
+      sourceUrl: `https://example.test/market-history/${row.symbol}/${row.date}`,
+      recordId: `${row.symbol}:${row.date}`,
+    },
+  }));
+}
+
 test('historical backtest compares strategy with both benchmarks and applies costs', () => {
   const result = runHistoricalPaperBacktest({
     prices: history(), target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
@@ -165,7 +178,7 @@ test('historical backtest rejects explicitly unadjusted prices', () => {
 
 
 test('backtest cannot claim ready evidence without explicit point-in-time decision cutoffs', () => {
-  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const prices = verifiedHistory();
   const result = runHistoricalPaperBacktest({
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2,
@@ -275,4 +288,25 @@ test('membership evidence without an HTTPS source URL is not verified', async ()
       source: 'Unit-test source', sourceUrl: 'http://example.test/membership',
     }],
   }), 'unknown');
+});
+
+
+test('a verified availability label without source proof cannot make a backtest evidence-ready', () => {
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const decisionCutoffByDate = Object.fromEntries(
+    ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, date + 'T23:00:00Z']),
+  );
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES',
+    universeMembershipEvidence: [{
+      symbol: 'MSFT', universeId: 'TEST-US-EQUITIES', effectiveFrom: '2025-01-01',
+      effectiveTo: '2026-12-31', status: 'verified',
+      source: 'Unit-test membership source', sourceUrl: 'https://example.test/membership/MSFT',
+    }],
+  });
+  assert.equal(result.pointInTimeVerified, true);
+  assert.equal(result.availabilityStatus, 'unknown');
+  assert.equal(result.evidenceStatus, 'insufficient');
 });
