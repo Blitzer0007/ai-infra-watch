@@ -127,7 +127,7 @@ export function parseMeta13fPosition(xml) {
   if (!matches.length) {
     return {
       reported: false, shares: null, marketValueUsd: null, commonStockReported: false,
-      options: { call: { reported: false, contractsOrShares: null, marketValueUsd: null }, put: { reported: false, contractsOrShares: null, marketValueUsd: null } },
+      options: { call: { reported: false, reportedQuantity: null, marketValueUsd: null }, put: { reported: false, reportedQuantity: null, marketValueUsd: null } },
     };
   }
 
