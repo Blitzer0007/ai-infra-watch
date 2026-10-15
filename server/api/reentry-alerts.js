@@ -73,7 +73,16 @@ export function shouldNotifyCandidate(lastAlertSignature, candidate) {
 }
 
 export function buildDeliveryKey(row) {
-  const keyMaterial=[String(row?.symbol||'').toUpperCase(),String(row?.target_price??''),String(row?.sale_date||''),String(row?.thesis||'')].join('|');
+  // updated_at is the persisted episode seed: retries before a state transition
+  // reuse the same key, while a later candidate episode after a non-candidate
+  // scan gets a new key because that scan persists a new updated_at.
+  const keyMaterial=[
+    String(row?.symbol||'').toUpperCase(),
+    String(row?.target_price??''),
+    String(row?.sale_date||''),
+    String(row?.thesis||''),
+    String(row?.updated_at||''),
+  ].join('|');
   return createHash('sha256').update(keyMaterial).digest('hex');
 }
 
