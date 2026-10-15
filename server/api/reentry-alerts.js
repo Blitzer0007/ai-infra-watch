@@ -85,7 +85,9 @@ async function fetchAnalystResearch(symbol) {
   const ratingsRows = ratingsResult.status === 'fulfilled' && Array.isArray(ratingsResult.value) ? ratingsResult.value : [];
   const currentRatings = ratingsRows.filter(row => row && typeof row.period === 'string').sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] || null;
   const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : null;
-  const available = Boolean(currentRatings || (targets && (Number.isFinite(Number(targets.targetMean)) || Number.isFinite(Number(targets.targetMedian))));
+  const targetMeanAvailable = Number.isFinite(Number(targets?.targetMean));
+  const targetMedianAvailable = Number.isFinite(Number(targets?.targetMedian));
+  const available = Boolean(currentRatings) || Boolean(targets && (targetMeanAvailable || targetMedianAvailable));
   return {
     status: available ? 'available' : 'unavailable',
     source: 'Finnhub',
@@ -175,14 +177,16 @@ async function fetchReentryResearch(symbol) {
   if (cached && Date.now() - cached.cachedAt < 15 * 60 * 1000) return { ...cached.data, cached: true };
   const [analyst, managers] = await Promise.all([
     fetchAnalystResearch(cacheKey).catch(error => ({ status: 'unavailable', source: 'Finnhub', message: String(error?.message || error), retrievedAt: new Date().toISOString() })),
-    Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)),
+    cacheKey === 'META' ? Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)) : Promise.resolve([]),
   ]);
   const data = {
     ok: true, symbol: cacheKey, requestedAt: new Date().toISOString(), analyst,
     institutionalHoldings: {
+      status: cacheKey === 'META' ? 'available' : 'unsupported_symbol',
+      message: cacheKey === 'META' ? null : 'Institutional 13F matching is currently configured only for META; no other ticker is inferred from META filings.',
       source: 'SEC EDGAR Form 13F-HR',
       asOfMeaning: 'Positions are as of the reported quarter-end, not live holdings. Filings may arrive up to 45 days after quarter-end.',
-      autopilotReference: AUTOPILOT_HOLDINGS_REFERENCE, cusip: META_CUSIP, managers,
+      autopilotReference: AUTOPILOT_HOLDINGS_REFERENCE, cusip: cacheKey === 'META' ? META_CUSIP : null, managers,
     },
     executionPolicy: 'Research context only. No automated trade or re-entry approval.',
   };
@@ -234,6 +238,9 @@ export function buildDeliveryKey(row) {
     String(row?.target_price??''),
     String(row?.sale_date||''),
     String(row?.thesis||''),
+    String(row?.ownership_status||'sold'),
+    String(row?.planned_exit_price??''),
+    String(row?.upper_review_price??''),
     String(row?.updated_at||''),
   ].join('|');
   return createHash('sha256').update(keyMaterial).digest('hex');
@@ -312,7 +319,7 @@ export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, 
 async function sendTelegram(row,q,signal=assess(row,q)) {
   const token=String(process.env.TELEGRAM_BOT_TOKEN||'').trim(), chat=String(process.env.TELEGRAM_CHAT_ID||'').trim();
   if(!token||!chat) throw new Error('Telegram credentials are not configured');
-  const message=['🔔 AI Infra Watch · Re-entry / Exit Review','',row.symbol+' · '+signal.status,'Latest price: $'+q.price.toFixed(2),'Lower re-entry target: $'+Number(row.target_price).toFixed(2),'Planned exit review: '+(Number(row.planned_exit_price)>0?'$'+Number(row.planned_exit_price).toFixed(2):'not set'),'Upper evidence review: '+(Number(row.upper_review_price)>0?'$'+Number(row.upper_review_price).toFixed(2):'not set'),'20-day average: $'+q.sma20.toFixed(2),'50-day average: $'+q.sma50.toFixed(2),'52-week high drawdown: '+(q.drawdownFrom52WeekHighPct==null?'unavailable':q.drawdownFrom52WeekHighPct.toFixed(1)+'%'),'Saved thesis: '+String(row.thesis||'not recorded'),'','Why now: target reached and trend confirmation met.','Before acting, re-check current valuation, earnings, fresh company evidence, and portfolio concentration.','Review alert only — no automatic buy/sell instruction.'].join('\n');
+  const message=['🔔 AI Infra Watch · Re-entry / Exit Review','',row.symbol+' · '+signal.status,'Latest price: $'+q.price.toFixed(2),'Lower re-entry target: $'+Number(row.target_price).toFixed(2),'Planned exit review: '+(Number(row.planned_exit_price)>0?'$'+Number(row.planned_exit_price).toFixed(2):'not set'),'Upper evidence review: '+(Number(row.upper_review_price)>0?'$'+Number(row.upper_review_price).toFixed(2):'not set'),'20-day average: $'+q.sma20.toFixed(2),'50-day average: $'+q.sma50.toFixed(2),'52-week high drawdown: '+(q.drawdownFrom52WeekHighPct==null?'unavailable':q.drawdownFrom52WeekHighPct.toFixed(1)+'%'),'Saved thesis: '+String(row.thesis||'not recorded'),'','Why this alert: '+signal.reasons.join(' ')+ '','Before acting, re-check current valuation, earnings, analyst consensus, latest disclosed institutional holdings, and portfolio concentration.','Review alert only — no automatic buy/sell instruction.'].join('\n');
   const response=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chat,text:message}),signal:AbortSignal.timeout(10000)});
   const payload=await response.json().catch(()=>null);
   if(!response.ok) {
