@@ -305,3 +305,45 @@ test('SEC 13F parser separates META common shares from call and put option discl
   assert.deepEqual(result.options.call, { reported: true, reportedQuantity: 5, marketValueUsd: 250000 });
   assert.deepEqual(result.options.put, { reported: true, reportedQuantity: 2, marketValueUsd: 80000 });
 });
+
+
+test('fund ownership research matches associated managers for any selected ticker', async () => {
+  const { normalizeFundOwnership } = await import('./reentry-alerts.js');
+  const result = normalizeFundOwnership('NVDA', {
+    symbol: 'NVDA',
+    ownership: [
+      { name: 'Berkshire Hathaway Inc.', share: 100000, change: 1200, filingDate: '2026-08-14', portfolioPercent: 2.1 },
+      { name: 'Pershing Square Capital Management, L.P.', share: 50000, change: -100, filingDate: '2026-08-14', portfolioPercent: 1.5 },
+      { name: 'Example Institutional Partners LLC', share: 20000, change: 300, filingDate: '2026-08-14', portfolioPercent: 0.8 },
+    ],
+  });
+  assert.equal(result.symbol, 'NVDA');
+  assert.equal(result.status, 'available');
+  assert.equal(result.funds.length, 3);
+  assert.deepEqual(result.billionaireAssociatedFunds.map(fund => fund.name), [
+    'Berkshire Hathaway Inc.',
+    'Pershing Square Capital Management, L.P.',
+  ]);
+  assert.equal(result.billionaireAssociatedFunds[0].shares, 100000);
+  assert.equal(result.billionaireAssociatedFunds[0].shareChange, 1200);
+  assert.equal(result.billionaireAssociatedFunds[0].filingDate, '2026-08-14');
+  assert.equal(result.funds[2].billionaireAssociation, null);
+});
+
+test('empty generic fund ownership response is not represented as zero ownership', async () => {
+  const { normalizeFundOwnership } = await import('./reentry-alerts.js');
+  const result = normalizeFundOwnership('DGXX', { symbol: 'DGXX', ownership: [] });
+  assert.equal(result.status, 'no_records_returned');
+  assert.equal(result.funds.length, 0);
+  assert.match(result.message, /not proof/i);
+});
+
+test('missing fund ownership fields remain unavailable instead of becoming zeros', async () => {
+  const { normalizeFundOwnership } = await import('./reentry-alerts.js');
+  const result = normalizeFundOwnership('META', {
+    ownership: [{ name: 'Berkshire Hathaway', filingDate: '2026-08-14' }],
+  });
+  assert.equal(result.billionaireAssociatedFunds[0].shares, null);
+  assert.equal(result.billionaireAssociatedFunds[0].shareChange, null);
+  assert.equal(result.billionaireAssociatedFunds[0].portfolioPercent, null);
+});
