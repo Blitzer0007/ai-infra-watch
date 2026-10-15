@@ -304,8 +304,9 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     if (!preview) { setMessage('Target rejected by risk controls. Reduce weights or sector concentration.'); return; }
     const createdAt = new Date().toISOString();
     const clientId = `paper-${Date.now()}`;
-    const availability = candidateResearch?.jev?.evidence_availability || {};
     const gate = candidateResearch?.jev?.evidence_gate || {};
+    // Keep the persisted paper-review snapshot aligned with the canonical nested evidence matrix.
+    const availability = candidateResearch?.jev?.evidence_availability || gate?.evidence_availability || {};
     const missing = Array.isArray(availability.missing) ? availability.missing : [];
     const conflicts = Number(gate?.conflict_detection?.count || 0);
     const action = String(gate.action || candidateResearch?.jev?.action || '').toLowerCase();
