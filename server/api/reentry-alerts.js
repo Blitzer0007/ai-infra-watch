@@ -129,6 +129,19 @@ export function parseMeta13fPosition(xml) {
   return { reported: true, shares: Number.isFinite(shares) ? shares : null, marketValueUsd: Number.isFinite(marketValueUsd) ? marketValueUsd : null };
 }
 
+export function find13fInformationTableXmlHref(indexHtml, baseUrl) {
+  const rows = String(indexHtml || '').match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
+  const candidates = [];
+  for (const row of rows) {
+    if (!/INFORMATION\s+TABLE/i.test(row)) continue;
+    for (const match of row.matchAll(/href=["']([^"']+)["']/gi)) {
+      const href = match[1];
+      if (/\.xml(?:[?#].*)?$/i.test(href)) candidates.push(new URL(href, baseUrl).toString());
+    }
+  }
+  return candidates[0] || null;
+}
+
 async function fetchManagerMetaPosition(manager) {
   const ua = String(process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research; contact: configured-admin@example.com)');
   try {
@@ -148,19 +161,8 @@ async function fetchManagerMetaPosition(manager) {
     const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(2500) });
     if (!indexResponse.ok) throw new Error('SEC filing index returned HTTP ' + indexResponse.status);
     const indexHtml = await indexResponse.text();
-    const filingRows = indexHtml.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
-    let infoHref = null;
-    for (const row of filingRows) {
-      if (!/INFORMATION\s+TABLE/i.test(row)) continue;
-      const href = row.match(/href=["']([^"']+)["']/i)?.[1];
-      if (href) { infoHref = new URL(href, 'https://www.sec.gov').toString(); break; }
-    }
-    if (!infoHref) {
-      const anchors = [...indexHtml.matchAll(/href=["']([^"']+\.(?:xml|html))["'][^>]*>([^<]*)/gi)];
-      const fallback = anchors.find(match => /info.?table|holding/i.test(match[1] + ' ' + match[2]) && !/primary_doc/i.test(match[1]));
-      if (fallback) infoHref = new URL(fallback[1], 'https://www.sec.gov').toString();
-    }
-    if (!infoHref) throw new Error('SEC information table link not found');
+    const infoHref = find13fInformationTableXmlHref(indexHtml, baseUrl);
+    if (!infoHref) throw new Error('SEC XML information table link not found');
     const tableResponse = await fetch(infoHref, { headers: { 'User-Agent': ua, Accept: 'application/xml, text/html' }, signal: AbortSignal.timeout(3500) });
     if (!tableResponse.ok) throw new Error('SEC information table returned HTTP ' + tableResponse.status);
     const position = parseMeta13fPosition(await tableResponse.text());
