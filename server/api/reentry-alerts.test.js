@@ -43,7 +43,7 @@ test('empty watchlist is not reported as a successful no-candidate evaluation', 
 });
 
 test('evaluated watchlist with no qualifying candidate is reported distinctly', () => {
-  assert.equal(classifyScan({ activeRows: 4, evaluatedRows: 4, qualifyingCandidates: 0, telegramSent: 0, errors: 0 }), 'evaluated_no_qualifying_candidate');
+  assert.equal(classifyScan({ activeRows: 4, evaluatedRows: 4, qualifyingCandidates: 0, notifyEligibleCandidates: 0, telegramSent: 0, errors: 0 }), 'evaluated_no_qualifying_candidate');
 });
 
 test('candidate with accepted Telegram message is explicitly identified', () => {
@@ -59,5 +59,10 @@ test('an already-active candidate without a new transition is not falsely called
 });
 
 test('partial/error scan is not reported as a completed clean evaluation', () => {
-  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 0, telegramSent: 0, errors: 1 }), 'completed_with_errors');
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 0, notifyEligibleCandidates: 0, telegramSent: 0, errors: 1 }), 'completed_with_errors');
+});
+
+
+test('partial evaluation without explicit errors is reported as incomplete', () => {
+  assert.equal(classifyScan({ activeRows: 3, evaluatedRows: 2, qualifyingCandidates: 0, notifyEligibleCandidates: 0, telegramSent: 0, errors: 0 }), 'incomplete_scan');
 });
