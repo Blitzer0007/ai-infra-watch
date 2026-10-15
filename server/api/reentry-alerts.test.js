@@ -254,3 +254,25 @@ test('delivery claim key changes when ownership mode or the upper evidence thres
   assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, ownership_status: 'sold', sale_date: '2026-10-16' }));
   assert.notEqual(buildDeliveryKey(row), buildDeliveryKey({ ...row, upper_review_price: 800 }));
 });
+
+
+test('SEC 13F research selects the XML information table rather than the HTML display table', async () => {
+  const { find13fInformationTableXmlHref } = await import('./reentry-alerts.js');
+  const indexHtml = `<html><table>
+    <tr><td><a href="56757.html">56757.html</a></td><td>INFORMATION TABLE FOR FORM 13F</td></tr>
+    <tr><td><a href="56757.xml">56757.xml</a></td><td>INFORMATION TABLE FOR FORM 13F</td></tr>
+    <tr><td><a href="primary_doc.xml">primary document</a></td><td>13F-HR</td></tr>
+  </table></html>`;
+  assert.equal(
+    find13fInformationTableXmlHref(indexHtml, 'https://www.sec.gov/Archives/edgar/data/1067983/000119312526352200/'),
+    'https://www.sec.gov/Archives/edgar/data/1067983/000119312526352200/56757.xml',
+  );
+});
+
+test('SEC 13F selector does not silently fall back to an HTML information table', async () => {
+  const { find13fInformationTableXmlHref } = await import('./reentry-alerts.js');
+  assert.equal(
+    find13fInformationTableXmlHref('<tr><td><a href="table.html">Information Table</a></td></tr>', 'https://www.sec.gov/archive/'),
+    null,
+  );
+});
