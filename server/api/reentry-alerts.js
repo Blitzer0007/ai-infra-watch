@@ -216,8 +216,8 @@ async function fetchReentryResearch(symbol) {
     cacheKey === 'META' ? Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)) : Promise.resolve([]),
     fetchResearchPrice(cacheKey).catch(error => ({ price: null, retrievedAt: new Date().toISOString(), source: null, error: String(error?.message || error) })),
   ]);
-  const targetMean = analyst?.targets?.mean;
-  const targetMedian = analyst?.targets?.median;
+  const targetMean = analyst?.targets?.freshness === 'fresh' ? analyst.targets.mean : null;
+  const targetMedian = analyst?.targets?.freshness === 'fresh' ? analyst.targets.median : null;
   const currentPrice = Number.isFinite(Number(quote?.price)) && Number(quote.price) > 0 ? Number(quote.price) : null;
   const priceContext = {
     currentPrice,
