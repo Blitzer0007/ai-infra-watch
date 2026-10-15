@@ -43,4 +43,4 @@ jobs:
           fi
           cat response.json
           test "$CODE" = "200"
-          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.errors?.length){console.error(d.errors.join('\\n'));process.exit(1)}"
+          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.scanned===0||d.scanStatus==='empty_watchlist'){console.error('Empty active re-entry watchlist: no entries were evaluated; this is not a successful no-candidate scan.');process.exit(1)}if(d.scanStatus==='incomplete_scan'||d.scanStatus==='completed_with_errors'||d.errors?.length){console.error((d.errors||[]).join('\\n')||('Scan status: '+d.scanStatus));process.exit(1)}"
