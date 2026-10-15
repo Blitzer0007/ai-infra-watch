@@ -232,9 +232,9 @@ export function runHistoricalPaperBacktest(args: {
   maxSectorWeight?: number;
   minCashWeight?: number;
   rebalanceEverySessions?: number;
-  /** Explicit universe identifier and effective-dated evidence; scalar status flags are insufficient. */
+  /** Explicit universe identifier and complete source-backed per-date constituent snapshots. */
   universeId?: string;
-  universeMembershipEvidence?: HistoricalUniverseMembershipEvidence[];
+  universeMembershipEvidence?: HistoricalUniverseSnapshotEvidence[];
 }): HistoricalBacktestResult {
   const { prices, target, startCapital } = args;
   const costBps = args.costBps ?? 10;
