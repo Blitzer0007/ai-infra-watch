@@ -124,17 +124,56 @@ function textTag(block, tag) {
 export function parseMeta13fPosition(xml) {
   const rows = String(xml || '').match(/<infoTable(?:\s[^>]*)?>[\s\S]*?<\/infoTable>/gi) || [];
   const matches = rows.filter(row => textTag(row, 'cusip').replace(/\s/g, '').toUpperCase() === META_CUSIP);
-  if (!matches.length) return { reported: false, shares: null, marketValueUsd: null };
-  let shares = 0, marketValueUsd = 0;
-  for (const row of matches) {
-    const amount = Number(textTag(row, 'sshPrnamt').replace(/,/g, ''));
-    const valueThousands = Number(textTag(row, 'value').replace(/,/g, ''));
-    if (Number.isFinite(amount)) shares += amount;
-    if (Number.isFinite(valueThousands)) marketValueUsd += valueThousands * 1000;
+  if (!matches.length) {
+    return {
+      reported: false, shares: null, marketValueUsd: null, commonStockReported: false,
+      options: { call: { reported: false, contractsOrShares: null, marketValueUsd: null }, put: { reported: false, contractsOrShares: null, marketValueUsd: null } },
+    };
   }
-  return { reported: true, shares: Number.isFinite(shares) ? shares : null, marketValueUsd: Number.isFinite(marketValueUsd) ? marketValueUsd : null };
-}
 
+  const totals = {
+    common: { count: 0, shares: 0, valueUsd: 0 },
+    call: { count: 0, quantity: 0, valueUsd: 0 },
+    put: { count: 0, quantity: 0, valueUsd: 0 },
+  };
+  const other = { count: 0, quantity: 0, valueUsd: 0 };
+  for (const row of matches) {
+    const quantity = Number(textTag(row, 'sshPrnamt').replace(/,/g, ''));
+    const valueThousands = Number(textTag(row, 'value').replace(/,/g, ''));
+    const valueUsd = Number.isFinite(valueThousands) ? valueThousands * 1000 : null;
+    const putCall = textTag(row, 'putCall').toUpperCase();
+    const amountType = textTag(row, 'sshPrnamtType').toUpperCase();
+    if (putCall === 'CALL' || putCall === 'PUT') {
+      const bucket = totals[putCall.toLowerCase()];
+      bucket.count += 1;
+      if (Number.isFinite(quantity)) bucket.quantity += quantity;
+      if (valueUsd != null) bucket.valueUsd += valueUsd;
+    } else if (!putCall && (!amountType || amountType === 'SH')) {
+      totals.common.count += 1;
+      if (Number.isFinite(quantity)) totals.common.shares += quantity;
+      if (valueUsd != null) totals.common.valueUsd += valueUsd;
+    } else {
+      other.count += 1;
+      if (Number.isFinite(quantity)) other.quantity += quantity;
+      if (valueUsd != null) other.valueUsd += valueUsd;
+    }
+  }
+
+  const hasCommon = totals.common.count > 0;
+  const optionSummary = kind => ({
+    reported: totals[kind].count > 0,
+    contractsOrShares: totals[kind].count > 0 ? totals[kind].quantity : null,
+    marketValueUsd: totals[kind].count > 0 ? totals[kind].valueUsd : null,
+  });
+  return {
+    reported: true,
+    commonStockReported: hasCommon,
+    shares: hasCommon ? totals.common.shares : null,
+    marketValueUsd: hasCommon ? totals.common.valueUsd : null,
+    options: { call: optionSummary('call'), put: optionSummary('put') },
+    otherReportableLines: other.count,
+  };
+}
 export function find13fInformationTableXmlHref(indexHtml, baseUrl) {
   const rows = String(indexHtml || '').match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
   const candidates = [];
