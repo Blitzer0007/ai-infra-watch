@@ -72,12 +72,13 @@ export function shouldNotifyCandidate(lastAlertSignature, candidate) {
   return candidate === true && lastAlertSignature !== 'REENTRY_CANDIDATE';
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, telegramSent, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, telegramSent, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
-  if (qualifyingCandidates > 0 && telegramSent > 0) return 'telegram_delivery_confirmed';
-  if (qualifyingCandidates > 0) return 'candidate_not_delivered';
-  if (evaluatedRows === activeRows) return 'evaluated_no_qualifying_candidate';
+  if (notifyEligibleCandidates > 0 && telegramSent > 0) return 'telegram_delivery_confirmed';
+  if (notifyEligibleCandidates > 0) return 'candidate_not_delivered';
+  if (evaluatedRows === activeRows && qualifyingCandidates === 0) return 'evaluated_no_qualifying_candidate';
+  if (evaluatedRows === activeRows) return 'evaluated_existing_candidate_no_new_alert';
   return 'incomplete_scan';
 }
 
@@ -93,14 +94,16 @@ async function sendTelegram(row,q) {
 }
 async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let qualifyingCandidates=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
       const q=await quoteHistory(row.symbol), signal=assess(row,q);
       const candidate=signal.status==='REENTRY_CANDIDATE';
       if (candidate) qualifyingCandidates++;
-      if(shouldNotifyCandidate(row.last_alert_signature, candidate)) {
+      const notifyEligible = shouldNotifyCandidate(row.last_alert_signature, candidate);
+      if (notifyEligible) notifyEligibleCandidates++;
+      if(notifyEligible) {
         acceptedMessageId = await sendTelegram(row,q);
         sent++;
         deliveryEvidence.push({symbol:row.symbol,messageId:acceptedMessageId,statePersisted:false});
@@ -123,7 +126,7 @@ async function runScan() {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, telegramSent: sent, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, telegramSent: sent, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
