@@ -59,11 +59,14 @@ async function quoteHistory(symbol) {
 const RESEARCH_CACHE = new Map();
 const META_CUSIP = '30303M102';
 const TRACKED_MANAGERS = [
-  { name: 'Berkshire Hathaway', cik: '0001067983', context: 'Autopilot-style public 13F tracker' },
-  { name: 'Bridgewater Associates', cik: '0001350694', context: 'Institutional manager 13F' },
-  { name: 'Citadel Advisors', cik: '0001423053', context: 'Institutional manager 13F' },
-  { name: 'Renaissance Technologies', cik: '0001037389', context: 'Institutional manager 13F' },
-  { name: 'Scion Asset Management', cik: '0001649339', context: 'Institutional manager 13F' },
+  { name: 'Berkshire Hathaway', cik: '0001067983', context: 'Institutional filing commonly associated with Warren Buffett; not his personal portfolio' },
+  { name: 'Pershing Square Capital Management', cik: '0001336528', context: 'Bill Ackman-associated fund manager filing' },
+  { name: 'Bridgewater Associates', cik: '0001350694', context: 'Institutional manager filing; not a live individual portfolio' },
+  { name: 'Citadel Advisors', cik: '0001423053', context: 'Ken Griffin-associated institutional manager filing' },
+  { name: 'Appaloosa LP', cik: '0001656456', context: 'David Tepper-associated institutional manager filing' },
+  { name: 'Tiger Global Management', cik: '0001167483', context: 'Chase Coleman-associated institutional manager filing' },
+  { name: 'Renaissance Technologies', cik: '0001037389', context: 'Institutional manager 13F filing' },
+  { name: 'Scion Asset Management', cik: '0001649339', context: 'Michael Burry-associated manager filing; subject to filing availability' },
 ];
 const AUTOPILOT_HOLDINGS_REFERENCE = 'https://start.joinautopilot.com/blog/hedge-fund-and-wall-street-portfolios';
 
@@ -129,7 +132,7 @@ export function parseMeta13fPosition(xml) {
 async function fetchManagerMetaPosition(manager) {
   const ua = String(process.env.EDGAR_USER_AGENT || 'AI Infra Watch/1.0 (research; contact: configured-admin@example.com)');
   try {
-    const submissions = await researchFetchJson('https://data.sec.gov/submissions/CIK' + manager.cik + '.json', { 'User-Agent': ua, Accept: 'application/json' }, 3500);
+    const submissions = await researchFetchJson('https://data.sec.gov/submissions/CIK' + manager.cik + '.json', { 'User-Agent': ua, Accept: 'application/json' }, 2500);
     const recent = submissions?.filings?.recent;
     if (!recent) throw new Error('No recent SEC submissions');
     const filings = [];
@@ -142,7 +145,7 @@ async function fetchManagerMetaPosition(manager) {
     if (!filing) throw new Error('No original 13F-HR filing found');
     const accessionPath = filing.accession.replaceAll('-', '');
     const baseUrl = 'https://www.sec.gov/Archives/edgar/data/' + Number(manager.cik) + '/' + accessionPath + '/';
-    const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(3500) });
+    const indexResponse = await fetch(baseUrl + filing.accession + '-index.html', { headers: { 'User-Agent': ua, Accept: 'text/html' }, signal: AbortSignal.timeout(2500) });
     if (!indexResponse.ok) throw new Error('SEC filing index returned HTTP ' + indexResponse.status);
     const indexHtml = await indexResponse.text();
     const filingRows = indexHtml.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
@@ -175,12 +178,23 @@ async function fetchReentryResearch(symbol) {
   const cacheKey = String(symbol).toUpperCase();
   const cached = RESEARCH_CACHE.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < 15 * 60 * 1000) return { ...cached.data, cached: true };
-  const [analyst, managers] = await Promise.all([
+  const [analyst, managers, quote] = await Promise.all([
     fetchAnalystResearch(cacheKey).catch(error => ({ status: 'unavailable', source: 'Finnhub', message: String(error?.message || error), retrievedAt: new Date().toISOString() })),
     cacheKey === 'META' ? Promise.all(TRACKED_MANAGERS.map(fetchManagerMetaPosition)) : Promise.resolve([]),
+    quoteHistory(cacheKey).catch(error => ({ price: null, sma20: null, sma50: null, drawdownFrom52WeekHighPct: null, retrievedAt: new Date().toISOString(), error: String(error?.message || error) })),
   ]);
+  const targetMean = analyst?.targets?.mean;
+  const targetMedian = analyst?.targets?.median;
+  const currentPrice = Number.isFinite(Number(quote?.price)) && Number(quote.price) > 0 ? Number(quote.price) : null;
+  const priceContext = {
+    currentPrice,
+    quoteSource: currentPrice ? 'Yahoo Finance chart endpoint' : null,
+    quoteRetrievedAt: quote?.retrievedAt || null,
+    meanTargetUpsidePct: currentPrice && Number.isFinite(targetMean) && targetMean > 0 ? Number(((targetMean / currentPrice - 1) * 100).toFixed(2)) : null,
+    medianTargetUpsidePct: currentPrice && Number.isFinite(targetMedian) && targetMedian > 0 ? Number(((targetMedian / currentPrice - 1) * 100).toFixed(2)) : null,
+  };
   const data = {
-    ok: true, symbol: cacheKey, requestedAt: new Date().toISOString(), analyst,
+    ok: true, symbol: cacheKey, requestedAt: new Date().toISOString(), analyst, priceContext,
     institutionalHoldings: {
       status: cacheKey === 'META' ? 'available' : 'unsupported_symbol',
       message: cacheKey === 'META' ? null : 'Institutional 13F matching is currently configured only for META; no other ticker is inferred from META filings.',
