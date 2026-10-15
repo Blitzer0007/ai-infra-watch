@@ -275,6 +275,7 @@ async function fetchReentryResearch(symbol) {
     currentPrice,
     quoteSource: currentPrice ? 'Yahoo Finance chart endpoint' : null,
     quoteRetrievedAt: quote?.retrievedAt || null,
+    quoteMarketTime: quote?.marketTime || null,
     meanTargetUpsidePct: currentPrice && Number.isFinite(targetMean) && targetMean > 0 ? Number(((targetMean / currentPrice - 1) * 100).toFixed(2)) : null,
     medianTargetUpsidePct: currentPrice && Number.isFinite(targetMedian) && targetMedian > 0 ? Number(((targetMedian / currentPrice - 1) * 100).toFixed(2)) : null,
   };
@@ -302,7 +303,7 @@ function assess(row,q) {
   const trendConfirmed=q.price>=q.sma20 && q.sma20>=q.sma50;
   if (ownershipStatus === 'holding') {
     if (plannedExitPrice > 0 && q.price >= plannedExitPrice) {
-      return {status:'EXIT_REVIEW',reasons:['Price reached your planned exit-review level of $'+plannedExitPrice.toFixed(2)+'. This is a review alert, not an automatic sell.','Check position size, valuation, taxes, earnings timing and the updated business thesis before deciding.']};
+      return {status:'EXIT_REVIEW',reasons:['Price reached your planned exit-review level of $'+plannedExitPrice.toFixed(2)+'. This is a review alert, not an automatic sell.','Consolidate fresh company evidence, current analyst consensus and dated institutional filings alongside valuation, position size, taxes and earnings timing before deciding. This is still a manual review, not an automatic sell.']};
     }
     return {status:'HOLDING',reasons:[plannedExitPrice > 0 ? 'Still holding. Planned exit review starts at $'+plannedExitPrice.toFixed(2)+'.' : 'Still holding. Set a planned exit-review price if you want a price-triggered reminder.']};
   }
