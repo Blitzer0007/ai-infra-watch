@@ -418,10 +418,34 @@ export function buildDeliveryKey(row) {
  * Failure after send retains the returned message ID in evidence. A claimed key
  * is never auto-reclaimed; ambiguous cases require reconciliation to avoid duplicates.
  */
-export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, recordFailure }) {
+export async function sendOnceWithDurableClaim({ claim, inspectExistingClaim, send, recordAccepted, recordFailure }) {
   const claimed = await claim();
   if (claimed !== true) {
-    return { status: 'existing_claim_suppressed', messageId: null, attempted: false, deliveryRecordPersisted: null };
+    let existing = null;
+    if (typeof inspectExistingClaim === 'function') {
+      try { existing = await inspectExistingClaim(); } catch { existing = null; }
+    }
+    const previousMessageId = Number(existing?.telegram_message_id);
+    if (existing?.status === 'accepted' && Number.isInteger(previousMessageId) && previousMessageId > 0) {
+      // Telegram accepted this episode earlier. Reconcile the watchlist state without resending.
+      return {
+        status: 'already_accepted',
+        messageId: previousMessageId,
+        attempted: false,
+        deliveryRecordPersisted: true,
+        priorStatus: 'accepted',
+        reconciliationRequired: false,
+      };
+    }
+    return {
+      status: 'existing_claim_suppressed',
+      messageId: Number.isInteger(previousMessageId) && previousMessageId > 0 ? previousMessageId : null,
+      attempted: false,
+      deliveryRecordPersisted: Boolean(existing),
+      priorStatus: existing?.status || 'unknown',
+      reconciliationRequired: true,
+      error: 'An existing delivery claim prevents a new send; inspect the persisted delivery state before retrying.',
+    };
   }
 
   let messageId = null;
@@ -435,7 +459,7 @@ export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, re
       if (recorded !== true) throw new Error('Delivery failure state update was not confirmed');
       deliveryRecordPersisted = true;
     } catch {
-      // The original durable claim remains in "sending", suppressing automatic retries.
+      // The durable claim remains "sending"; do not infer rejection if persistence failed.
     }
     return {
       status,
@@ -450,7 +474,7 @@ export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, re
   try {
     const recorded = await recordAccepted(messageId);
     if (recorded !== true) throw new Error('Telegram acceptance state update was not confirmed');
-    return { status: 'accepted', messageId, attempted: true, deliveryRecordPersisted: true };
+    return { status: 'accepted', messageId, attempted: true, deliveryRecordPersisted: true, reconciliationRequired: false };
   } catch (error) {
     const message = String(error?.message || error);
     let deliveryRecordPersisted = false;
@@ -473,10 +497,10 @@ export async function sendOnceWithDurableClaim({ claim, send, recordAccepted, re
   }
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, telegramSent, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
-  if (notifyEligibleCandidates > 0 && telegramSent > 0) return 'telegram_delivery_confirmed';
+  if (notifyEligibleCandidates > 0 && (telegramSent > 0 || telegramPreviouslyAccepted > 0)) return 'telegram_delivery_confirmed';
   if (notifyEligibleCandidates > 0) return 'candidate_not_delivered';
   if (evaluatedRows === activeRows && qualifyingCandidates === 0) return 'evaluated_no_qualifying_candidate';
   if (evaluatedRows === activeRows) return 'evaluated_existing_candidate_no_new_alert';
@@ -503,7 +527,7 @@ async function sendTelegram(row,q,signal=assess(row,q)) {
 }
 async function runScan() {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
@@ -519,6 +543,10 @@ async function runScan() {
         const deliveryKey=buildDeliveryKey(row);
         const delivery=await sendOnceWithDurableClaim({
           claim: async () => db('rpc/claim_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_symbol:row.symbol,p_chat_id:chatId})}),
+          inspectExistingClaim: async () => {
+            const existingRows=await db('reentry_telegram_deliveries?delivery_key=eq.'+encodeURIComponent(deliveryKey)+'&select=status,telegram_message_id,last_error&limit=1');
+            return Array.isArray(existingRows) ? (existingRows[0] || null) : null;
+          },
           send: async () => sendTelegram(row,q,signal),
           recordAccepted: async (messageId) => db('rpc/finish_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_status:'accepted',p_message_id:messageId,p_error:null})}),
           recordFailure: async (status,messageId,error) => db('rpc/finish_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_status:status,p_message_id:messageId,p_error:error})}),
@@ -527,12 +555,17 @@ async function runScan() {
         if(delivery.status==='accepted') {
           acceptedMessageId=delivery.messageId;
           sent++;
+        } else if(delivery.status==='already_accepted') {
+          acceptedMessageId=delivery.messageId;
+          previouslyAccepted++;
         } else if(delivery.status==='accepted_state_persistence_failed') {
           acceptedMessageId=delivery.messageId;
           sent++;
           throw new Error('Telegram accepted message ID '+delivery.messageId+', but delivery-state persistence is unconfirmed; automatic duplicate sends are suppressed pending reconciliation.');
         } else if(delivery.status==='rejected' || delivery.status==='uncertain') {
           throw new Error('Telegram delivery '+delivery.status+': '+delivery.error);
+        } else if(delivery.status==='existing_claim_suppressed') {
+          throw new Error('Telegram delivery claim is '+delivery.priorStatus+'; no resend occurred. Reconciliation is required before another attempt.');
         }
       }
       const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:signal.status,updated_at:new Date().toISOString()};
@@ -553,7 +586,7 @@ async function runScan() {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, telegramSent: sent, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
