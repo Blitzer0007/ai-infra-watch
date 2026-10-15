@@ -104,6 +104,7 @@ test('failure injection: accepted Telegram message ID survives delivery-state pe
     recordAccepted: async () => { throw new Error('simulated database timeout after Telegram acceptance'); },
     recordFailure: async (status, messageId, error) => {
       failureRecords.push({ status, messageId, error });
+      return true;
     },
   });
 
@@ -134,7 +135,7 @@ test('failure injection: ambiguous Telegram timeout records uncertain and suppre
     claim: async () => true,
     send: async () => { throw new Error('simulated timeout with unknown Telegram outcome'); },
     recordAccepted: async () => {},
-    recordFailure: async (status, messageId, error) => { failureRecord = { status, messageId, error }; },
+    recordFailure: async (status, messageId, error) => { failureRecord = { status, messageId, error }; return true; },
   });
   assert.equal(result.status, 'uncertain');
   assert.equal(result.messageId, null);
@@ -154,7 +155,7 @@ test('Telegram rejection is recorded as rejected, not successful delivery', asyn
     claim: async () => true,
     send: async () => { throw error; },
     recordAccepted: async () => {},
-    recordFailure: async (status, messageId, message) => { failureRecord = { status, messageId, message }; },
+    recordFailure: async (status, messageId, message) => { failureRecord = { status, messageId, message }; return true; },
   });
   assert.equal(result.status, 'rejected');
   assert.equal(result.messageId, null);
@@ -165,7 +166,7 @@ test('accepted Telegram delivery is confirmed only after delivery record persist
   const result = await sendOnceWithDurableClaim({
     claim: async () => true,
     send: async () => 42,
-    recordAccepted: async (messageId) => { assert.equal(messageId, 42); },
+    recordAccepted: async (messageId) => { assert.equal(messageId, 42); return true; },
     recordFailure: async () => assert.fail('failure finalizer should not be called'),
   });
   assert.equal(result.status, 'accepted');
