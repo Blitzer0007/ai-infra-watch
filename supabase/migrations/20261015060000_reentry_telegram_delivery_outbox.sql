@@ -45,7 +45,18 @@ begin
   insert into public.reentry_telegram_deliveries
     (delivery_key, symbol, status, chat_id)
   values (p_delivery_key, upper(p_symbol), 'sending', p_chat_id)
-  on conflict (delivery_key) do nothing;
+  on conflict (delivery_key) do update
+    set symbol = excluded.symbol,
+        status = 'sending',
+        telegram_message_id = null,
+        chat_id = excluded.chat_id,
+        claimed_at = now(),
+        completed_at = null,
+        last_error = null,
+        updated_at = now()
+    -- A confirmed Telegram rejection means no message was accepted, so it is safe to retry.
+    -- Accepted, sending, and uncertain states are never automatically reclaimed.
+    where public.reentry_telegram_deliveries.status = 'rejected';
 
   get diagnostics inserted_count = row_count;
   return inserted_count = 1;
