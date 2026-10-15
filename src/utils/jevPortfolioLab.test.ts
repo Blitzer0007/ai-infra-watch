@@ -215,7 +215,7 @@ test('backtest reaches evidence-ready only with source-backed complete universe 
   const result = runHistoricalPaperBacktest({
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
-    universeId: 'TEST-US-EQUITIES', universeEvidence: membershipSnapshots(dates),
+    universeId: 'TEST-US-EQUITIES', universeMembershipEvidence: membershipSnapshots(dates),
   });
   assert.equal(result.pointInTimeVerified, true);
   assert.equal(result.availabilityStatus, 'verified');
@@ -231,7 +231,7 @@ test('backtest remains insufficient when a complete historical universe snapshot
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
     universeId: 'TEST-US-EQUITIES',
-    universeEvidence: membershipSnapshots(dates.slice(0, 2)),
+    universeMembershipEvidence: membershipSnapshots(dates.slice(0, 2)),
   });
   assert.equal(result.pointInTimeVerified, true);
   assert.equal(result.universeMembershipStatus, 'unknown');
@@ -271,7 +271,7 @@ test('assumed universe snapshots can never make the backtest evidence-ready', ()
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
     universeId: 'TEST-US-EQUITIES',
-    universeEvidence: membershipSnapshots(dates, 'assumed'),
+    universeMembershipEvidence: membershipSnapshots(dates, 'assumed'),
   });
   assert.equal(result.universeMembershipStatus, 'assumed');
   assert.equal(result.evidenceStatus, 'insufficient');
@@ -297,7 +297,7 @@ test('a verified availability label without source proof cannot make a backtest 
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
     startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
     universeId: 'TEST-US-EQUITIES',
-    universeEvidence: membershipSnapshots(dates),
+    universeMembershipEvidence: membershipSnapshots(dates),
   });
   assert.equal(result.pointInTimeVerified, true);
   assert.equal(result.availabilityStatus, 'unknown');
