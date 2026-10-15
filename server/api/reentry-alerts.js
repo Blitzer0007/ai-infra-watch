@@ -1,4 +1,4 @@
-import { createPublicKey, createVerify } from 'node:crypto';
+import { createHash, createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,8 +88,16 @@ async function sendTelegram(row,q) {
   const message=['🟢 AI Infra Watch · Re-entry Candidate','',row.symbol+' · '+assess(row,q).status,'Latest price: $'+q.price.toFixed(2),'Your target: $'+Number(row.target_price).toFixed(2),'20-day average: $'+q.sma20.toFixed(2),'50-day average: $'+q.sma50.toFixed(2),'52-week high drawdown: '+(q.drawdownFrom52WeekHighPct==null?'unavailable':q.drawdownFrom52WeekHighPct.toFixed(1)+'%'),'Saved thesis: '+String(row.thesis||'not recorded'),'','Why now: target reached and trend confirmation met.','Before acting, re-check current valuation, earnings, fresh company evidence, and portfolio concentration.','Review alert only — no automatic buy/sell instruction.'].join('\n');
   const response=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chat,text:message}),signal:AbortSignal.timeout(10000)});
   const payload=await response.json().catch(()=>null);
-  if(!response.ok) throw new Error('Telegram delivery failed: HTTP '+response.status);
-  if(!telegramAccepted(response.ok,payload)) throw new Error('Telegram API did not confirm message acceptance');
+  if(!response.ok) {
+    const error = new Error('Telegram delivery rejected: HTTP '+response.status);
+    error.deliveryStatus = 'rejected';
+    throw error;
+  }
+  if(!telegramAccepted(response.ok,payload)) {
+    const error = new Error('Telegram API did not confirm message acceptance');
+    error.deliveryStatus = 'rejected';
+    throw error;
+  }
   return payload.result.message_id;
 }
 async function runScan() {
@@ -104,9 +112,31 @@ async function runScan() {
       const notifyEligible = shouldNotifyCandidate(row.last_alert_signature, candidate);
       if (notifyEligible) notifyEligibleCandidates++;
       if(notifyEligible) {
-        acceptedMessageId = await sendTelegram(row,q);
-        sent++;
-        deliveryEvidence.push({symbol:row.symbol,messageId:acceptedMessageId,statePersisted:false});
+        const chatId=String(process.env.TELEGRAM_CHAT_ID||'').trim();
+        if(!chatId) throw new Error('Telegram chat ID is not configured');
+        // One notification per configured thesis/target episode. Changing the thesis,
+        // sale date, or target creates a new key. Existing claims are never auto-retried.
+        const keyMaterial=[String(row.symbol).toUpperCase(),String(row.target_price),String(row.sale_date||''),String(row.thesis||'')].join('|');
+        const deliveryKey=createHash('sha256').update(keyMaterial).digest('hex');
+        const claimed=await db('rpc/claim_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_symbol:row.symbol,p_chat_id:chatId})});
+        if(claimed!==true) {
+          deliveryEvidence.push({symbol:row.symbol,status:'existing_claim_suppressed',messageId:null,statePersisted:false});
+        } else {
+          try {
+            acceptedMessageId = await sendTelegram(row,q);
+            sent++;
+            // Record Telegram acceptance before changing the watchlist signature.
+            await db('rpc/finish_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_status:'accepted',p_message_id:acceptedMessageId,p_error:null})});
+            deliveryEvidence.push({symbol:row.symbol,status:'accepted',messageId:acceptedMessageId,statePersisted:false});
+          } catch(deliveryError) {
+            const deliveryStatus=deliveryError?.deliveryStatus==='rejected'?'rejected':'uncertain';
+            try {
+              await db('rpc/finish_reentry_telegram_delivery',{method:'POST',body:JSON.stringify({p_delivery_key:deliveryKey,p_status:deliveryStatus,p_message_id:null,p_error:String(deliveryError?.message||deliveryError)})});
+            } catch { /* Keep the durable claim in "sending"; this suppresses duplicates pending reconciliation. */ }
+            deliveryEvidence.push({symbol:row.symbol,status:deliveryStatus,messageId:null,statePersisted:false});
+            throw deliveryError;
+          }
+        }
       }
       const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:candidate?'REENTRY_CANDIDATE':'NOT_CANDIDATE',updated_at:new Date().toISOString()};
       await db('reentry_watchlist?symbol=eq.'+encodeURIComponent(row.symbol),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(patch)});
