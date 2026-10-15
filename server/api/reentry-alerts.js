@@ -162,7 +162,7 @@ export function parseMeta13fPosition(xml) {
   const hasCommon = totals.common.count > 0;
   const optionSummary = kind => ({
     reported: totals[kind].count > 0,
-    contractsOrShares: totals[kind].count > 0 ? totals[kind].quantity : null,
+    reportedQuantity: totals[kind].count > 0 ? totals[kind].quantity : null,
     marketValueUsd: totals[kind].count > 0 ? totals[kind].valueUsd : null,
   });
   return {
