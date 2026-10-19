@@ -7,30 +7,39 @@
 - JEV remains paper-only with manual approval; this test suite does not execute trades.
 
 ## Local interactive production smoke test (recommended)
-Use this when you do not have a separate QA account. It opens a fresh local Chromium context so you can sign in manually to the production app. It does not import or save cookies/storage state, and it does not upload browser data.
+Use this when you do not have a separate QA account. It opens a fresh local Chromium context so you can sign in manually to production. It does not import or save cookies/storage state, and it does not upload browser data.
 
 From the repository root, with the virtual environment active:
 ```powershell
 python -m tests.production_validation.interactive_production_smoke
 ```
 
-The runner checks the homepage, pauses for manual sign-in, verifies the authenticated dashboard shell, and then checks all 14 routes listed in `VIEW_PATHS` by default. To run a smaller subset that you have confirmed exists:
+The runner checks the homepage, pauses for manual sign-in, and then:
+- verifies that the dashboard navigation shell is visible;
+- sends a **read-only GET** to `/api/portfolio?includeLots=true` from the page using the token already held in browser `sessionStorage`;
+- checks only response status, source/persistence flags, non-empty holdings collection, and a basic row-shape predicate; it never prints or exports portfolio rows, symbols, quantities, prices, or thesis data;
+- checks all 14 routes listed in `VIEW_PATHS` by default. To run a smaller subset of confirmed routes:
 ```powershell
 $env:PROD_READ_ONLY_ROUTES = "/overview,/watchlist"
 python -m tests.production_validation.interactive_production_smoke
 ```
-The default route list is sourced from `VIEW_PATHS` in `src/App.tsx`: `/overview`, `/contracts`, `/tracker`, `/congress`, `/macro`, `/portfolio`, `/watchlist`, `/research`, `/jev-lab`, `/quality`, `/outlook`, `/health`, `/guide`, and `/settings`. The runner checks that the dashboard navigation shell remains visible and each route renders a non-empty body. It does not click buttons or trigger scans, alerts, proposals, database writes, or trading actions. It validates navigation/rendering only, not data correctness.
+
+The routes are sourced from `VIEW_PATHS` in `src/App.tsx`: `/overview`, `/contracts`, `/tracker`, `/congress`, `/macro`, `/portfolio`, `/watchlist`, `/research`, `/jev-lab`, `/quality`, `/outlook`, `/health`, `/guide`, and `/settings`. Only `GET`, `HEAD`, and `OPTIONS` requests are allowed, plus the app's manual login endpoint `POST /api/auth`; other mutating HTTP requests are intercepted and aborted before reaching the server. This blocks startup effects such as alert config sync, scorecard writes, and Telegram notification relays. It never clicks dashboard buttons or submits application forms.
+
+The check proves current protected-read access and response shape, not correctness of every displayed figure, source freshness, or historical point-in-time backtest validity. Do not paste access tokens into PowerShell or chat.
 
 ## Production Playwright in GitHub Actions
-The separate workflow can optionally use repository secrets:
+The manual workflow can run anonymous route/navigation smoke checks. It optionally accepts:
 - `PROD_STORAGE_STATE_B64`: base64-encoded Playwright storage-state JSON from an approved session.
-- `PROD_AUTHENTICATED_MARKER`: a stable CSS selector visible only after authenticated app load.
+- `PROD_AUTHENTICATED_MARKER`: a CSS selector visible after dashboard load.
 
-Prefer the local interactive runner above when possible. Never paste production credentials, cookies, or session tokens into chat or commit them. The workflow intentionally does not upload browser storage state, screenshots, traces, or cookies as artifacts. If secure session secrets are missing, authenticated tests are reported as skipped/blocked rather than passed.
+**Important limitation:** the dashboard's bearer token is stored in `sessionStorage`, which standard Playwright `storage_state` does not restore. The authenticated CI test therefore additionally probes the protected portfolio GET and fails closed when the token is absent. Do not mark the authenticated production gate complete based on mocked CI, a navigation marker alone, or a run where authenticated tests are skipped. Use the local interactive runner above to verify the live protected read unless a separately reviewed, safe QA authentication mechanism is introduced.
+
+Never paste production credentials, cookies, or session tokens into chat or commit them. The workflow does not upload browser storage state, screenshots, traces, or cookies as artifacts. If the relevant secrets are missing, authenticated validation must remain blocked—not passed.
 
 Optional repository variables:
 - `PROD_BASE_URL`: defaults to the production dashboard URL.
-- `PROD_SMOKE_PATHS`: comma-separated same-origin routes to check; defaults to `/`. Confirm actual route paths before expanding this list.
+- `PROD_SMOKE_PATHS`: comma-separated routes to check; defaults to `/`. Confirm actual route paths before expanding this list.
 
 ## Historical evidence
 The pure validators enforce:
