@@ -1,9 +1,8 @@
 name: Re-entry Telegram Alerts
 run-name: Re-entry scan • ${{ github.event.schedule || 'manual' }}
 on:
-  schedule:
-    - cron: '15 1 * * 1-5'
-    - cron: '15 14 * * 1-5'
+  # Scheduled runs are paused until the durable Telegram outbox is deployed and delivery is verified.
+  # Manual dispatch remains available for an explicitly approved operator-initiated run.
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,6 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
+    # Hard release gate: keep all re-entry scans disabled until the durable outbox is deployed and verified.
+    if: ${{ false }}
     runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
@@ -32,15 +33,13 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://ai-infra-watch-theta.vercel.app/api/reentry-alerts?run=true"
-          # This endpoint can send Telegram messages. Never automatically retry a
-          # request with an ambiguous outcome: the first request may have sent an
-          # alert even if its HTTP response was lost or a later DB write failed.
+          # This endpoint can send Telegram messages. Do not automatically retry after an
+          # ambiguous network/5xx outcome: the first request may already have sent.
           CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
-          # A 401/403 means auth was rejected before the scan handler runs, so a
-          # single legacy-auth fallback is safe. Never fallback on 5xx/network errors.
+          # Fall back only when the request was rejected by authentication before scan.
           if { [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; } && [ -n "${FALLBACK_TOKEN:-}" ]; then
             CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
           fi
           cat response.json
           test "$CODE" = "200"
-          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.scanned===0||d.scanStatus==='empty_watchlist'){console.error('Empty active re-entry watchlist: no entries were evaluated; this is not a successful no-candidate scan.');process.exit(1)}if(d.scanStatus==='incomplete_scan'||d.scanStatus==='completed_with_errors'||d.errors?.length){console.error((d.errors||[]).join('\\n')||('Scan status: '+d.scanStatus));process.exit(1)}"
+          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.scanned===0||d.scanStatus==='empty_watchlist'){console.error('Empty active re-entry watchlist: no entries were evaluated; this is not a completed evaluation.');process.exit(1)}if(d.scanStatus==='incomplete_scan'||d.scanStatus==='completed_with_errors'||d.errors?.length){console.error((d.errors||[]).join('\\n')||('Scan status: '+d.scanStatus));process.exit(1)}"
