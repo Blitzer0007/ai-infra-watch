@@ -26,5 +26,7 @@ jobs:
           cache-dependency-path: tests/production_validation/requirements.txt
       - name: Install test dependencies
         run: python -m pip install -r tests/production_validation/requirements.txt
+      - name: Compile production validation scripts
+        run: python -m compileall -q tests/production_validation
       - name: Test historical evidence and session coverage rules
         run: python -m pytest -q tests/production_validation/test_historical_evidence.py tests/production_validation/test_historical_collector.py
