@@ -69,6 +69,22 @@ function history(): HistoricalPrice[] {
   return rows;
 }
 
+function verifiedHistory(): HistoricalPrice[] {
+  return history().map(row => ({
+    ...row,
+    adjusted: true,
+    availabilityStatus: 'verified' as const,
+    availabilityEvidence: {
+      source: 'Unit-test provider snapshot',
+      sourceUrl: `https://example.test/market-history/${row.symbol}/${row.date}`,
+      recordId: `${row.symbol}:${row.date}`,
+      symbol: row.symbol,
+      observationDate: row.date,
+      availableAt: row.availableAt,
+    },
+  }));
+}
+
 test('historical backtest compares strategy with both benchmarks and applies costs', () => {
   const result = runHistoricalPaperBacktest({
     prices: history(), target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
@@ -161,4 +177,170 @@ test('historical backtest rejects explicitly unadjusted prices', () => {
   assert.throws(() => runHistoricalPaperBacktest({
     prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }], startCapital: 10000,
   }), /Adjusted closes are required/);
+});
+
+
+test('backtest cannot claim ready evidence without explicit point-in-time decision cutoffs', () => {
+  const prices = verifiedHistory();
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  assert.equal(result.pointInTimeVerified, false);
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+function membershipSnapshots(
+  dates: string[],
+  status: 'verified' | 'assumed' | 'unknown' = 'verified',
+  complete = true,
+  sourceUrl = 'https://example.test/universe/snapshots',
+) {
+  return dates.map(asOf => ({
+    universeId: 'TEST-US-EQUITIES',
+    asOf,
+    complete,
+    members: ['MSFT', 'SPY', 'QQQ', 'AAPL'],
+    status,
+    source: 'Unit-test complete universe snapshot',
+    sourceUrl,
+    recordId: `TEST-US-EQUITIES:${asOf}`,
+  }));
+}
+
+test('backtest reaches evidence-ready only with source-backed complete universe snapshots for every decision date', () => {
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  const prices = verifiedHistory();
+  const decisionCutoffByDate = Object.fromEntries(dates.map(date => [date, date + 'T23:00:00Z']));
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES', universeMembershipEvidence: membershipSnapshots(dates),
+  });
+  assert.equal(result.pointInTimeVerified, true);
+  assert.equal(result.availabilityStatus, 'verified');
+  assert.equal(result.universeMembershipStatus, 'verified');
+  assert.equal(result.evidenceStatus, 'ready');
+});
+
+test('backtest remains insufficient when a complete historical universe snapshot is missing', () => {
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  const prices = verifiedHistory();
+  const decisionCutoffByDate = Object.fromEntries(dates.map(date => [date, date + 'T23:00:00Z']));
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES',
+    universeMembershipEvidence: membershipSnapshots(dates.slice(0, 2)),
+  });
+  assert.equal(result.pointInTimeVerified, true);
+  assert.equal(result.universeMembershipStatus, 'unknown');
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('a selected-ticker-only or partial constituent list cannot be marked verified', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  const dates = ['2026-01-01', '2026-01-08'];
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates,
+    decisionCutoffByDate: Object.fromEntries(dates.map(date => [date, date + 'T23:00:00Z'])),
+    universeId: 'TEST-US-EQUITIES',
+    evidence: membershipSnapshots(dates, 'verified', false),
+  }), 'unknown');
+});
+
+test('universe snapshot missing a target ticker is insufficient even if the snapshot claims completeness', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  const dates = ['2026-01-01'];
+  const snapshots = membershipSnapshots(dates).map(snapshot => ({ ...snapshot, members: ['SPY', 'QQQ', 'AAPL'] }));
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates,
+    decisionCutoffByDate: { '2026-01-01': '2026-01-01T23:00:00Z' },
+    universeId: 'TEST-US-EQUITIES',
+    evidence: snapshots,
+  }), 'unknown');
+});
+
+test('assumed universe snapshots can never make the backtest evidence-ready', () => {
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  const prices = verifiedHistory();
+  const decisionCutoffByDate = Object.fromEntries(dates.map(date => [date, date + 'T23:00:00Z']));
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES',
+    universeMembershipEvidence: membershipSnapshots(dates, 'assumed'),
+  });
+  assert.equal(result.universeMembershipStatus, 'assumed');
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('universe snapshots without an HTTPS source URL are not verified', async () => {
+  const { resolveHistoricalUniverseMembershipStatus } = await import('./jevPortfolioLab');
+  const dates = ['2026-01-01'];
+  assert.equal(resolveHistoricalUniverseMembershipStatus({
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    dates,
+    decisionCutoffByDate: { '2026-01-01': '2026-01-01T23:00:00Z' },
+    universeId: 'TEST-US-EQUITIES',
+    evidence: membershipSnapshots(dates, 'verified', true, 'http://example.test/universe'),
+  }), 'unknown');
+});
+
+test('a verified availability label without source proof cannot make a backtest evidence-ready', () => {
+  const dates = ['2026-01-01', '2026-01-08', '2026-01-15'];
+  const prices = history().map(row => ({ ...row, adjusted: true, availabilityStatus: 'verified' as const }));
+  const decisionCutoffByDate = Object.fromEntries(dates.map(date => [date, date + 'T23:00:00Z']));
+  const result = runHistoricalPaperBacktest({
+    prices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2, decisionCutoffByDate,
+    universeId: 'TEST-US-EQUITIES',
+    universeMembershipEvidence: membershipSnapshots(dates),
+  });
+  assert.equal(result.pointInTimeVerified, true);
+  assert.equal(result.availabilityStatus, 'unknown');
+  assert.equal(result.universeMembershipStatus, 'verified');
+  assert.equal(result.evidenceStatus, 'insufficient');
+});
+
+test('historical backtest rejects future-dated price rows and future decision cutoffs', () => {
+  const futurePrices = history().map(row => ({
+    ...row,
+    date: '2099-01-01',
+    availableAt: '2099-01-01T22:00:00Z',
+  }));
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: futurePrices, target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+  }), /Future-dated prices/);
+
+  assert.throws(() => runHistoricalPaperBacktest({
+    prices: history(),
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000,
+    decisionCutoffByDate: Object.fromEntries(
+      ['2026-01-01', '2026-01-08', '2026-01-15'].map(date => [date, '2099-01-01T23:00:00Z']),
+    ),
+  }), /Look-ahead data rejected/);
+});
+
+test('historical backtest normalizes ticker symbols before aligning all benchmark dates', () => {
+  const uppercase = runHistoricalPaperBacktest({
+    prices: history(),
+    target: [{ symbol: 'MSFT', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  const lowercasePrices = history().map(row => ({ ...row, symbol: row.symbol.toLowerCase() }));
+  const lowercase = runHistoricalPaperBacktest({
+    prices: lowercasePrices,
+    target: [{ symbol: 'msft', weight: 0.15, sector: 'software' }],
+    startCapital: 10000, minimumObservations: 2,
+  });
+  assert.equal(lowercase.startDate, uppercase.startDate);
+  assert.equal(lowercase.endDate, uppercase.endDate);
+  assert.equal(lowercase.strategyNetReturnPct, uppercase.strategyNetReturnPct);
+  assert.equal(lowercase.spyReturnPct, uppercase.spyReturnPct);
+  assert.equal(lowercase.qqqReturnPct, uppercase.qqqReturnPct);
 });
