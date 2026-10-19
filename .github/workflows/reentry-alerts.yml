@@ -1,9 +1,8 @@
 name: Re-entry Telegram Alerts
 run-name: Re-entry scan • ${{ github.event.schedule || 'manual' }}
 on:
-  schedule:
-    - cron: '15 1 * * 1-5'
-    - cron: '15 14 * * 1-5'
+  # Scheduled runs are paused until the durable Telegram outbox is deployed and delivery is verified.
+  # Manual dispatch remains available for an explicitly approved operator-initiated run.
   workflow_dispatch:
 permissions:
   contents: read
