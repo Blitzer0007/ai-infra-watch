@@ -33,10 +33,13 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://ai-infra-watch-theta.vercel.app/api/reentry-alerts?run=true"
-          CODE=$(curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
-          if [ "$CODE" != "200" ] && [ -n "${FALLBACK_TOKEN:-}" ]; then
-            CODE=$(curl --silent --show-error --retry 2 --retry-all-errors --retry-delay 3 --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
+          # This endpoint can send Telegram messages. Do not automatically retry after an
+          # ambiguous network/5xx outcome: the first request may already have sent.
+          CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $OIDC_TOKEN" "$URL")
+          # Fall back only when the request was rejected by authentication before scan.
+          if { [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; } && [ -n "${FALLBACK_TOKEN:-}" ]; then
+            CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
           fi
           cat response.json
           test "$CODE" = "200"
-          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.errors?.length){console.error(d.errors.join('\\n'));process.exit(1)}"
+          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.scanned===0||d.scanStatus==='empty_watchlist'){console.error('Empty active re-entry watchlist: no entries were evaluated; this is not a completed evaluation.');process.exit(1)}if(d.scanStatus==='incomplete_scan'||d.scanStatus==='completed_with_errors'||d.errors?.length){console.error((d.errors||[]).join('\\n')||('Scan status: '+d.scanStatus));process.exit(1)}"
