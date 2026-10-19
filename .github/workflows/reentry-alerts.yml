@@ -12,6 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
+    # Hard release gate: keep all re-entry scans disabled until the durable outbox is deployed and verified.
+    if: ${{ false }}
     runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
