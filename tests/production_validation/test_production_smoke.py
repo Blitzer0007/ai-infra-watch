@@ -106,7 +106,7 @@ def test_authenticated_production_session(page: Page):
         """async () => {
           const token = window.sessionStorage.getItem("aiw_access_token_v1") || "";
           if (!token) return { tokenPresent: false };
-          const response = await fetch("/api/portfolio?includeLots=true", {
+          const response = await fetch("/api/portfolio", {
             method: "GET",
             headers: { "Authorization": "Bearer " + token, "Accept": "application/json" },
             cache: "no-store"
