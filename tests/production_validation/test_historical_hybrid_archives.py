@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.historical_evidence import archive_ohlc_asof
 from scripts.historical_evidence.archive_ohlc_asof import (
     EARLIEST_SUPPORTED_AS_OF,
     FREE_SYMBOLS,
@@ -14,6 +15,8 @@ from scripts.historical_evidence.archive_ohlc_asof import (
 )
 from scripts.historical_evidence.archive_marketparquet import validate_parquet
 from scripts.historical_evidence.build_sp500_membership_evidence import (
+    _publication_upper_bound,
+    _title_overlap,
     build_bundle,
     publication_date_from_page,
 )
@@ -247,3 +250,63 @@ def test_ohlc_payload_rejects_malformed_cursor():
             "2026-10-20",
             "2026-10-20",
         )
+
+
+
+def test_ohlc_archive_follows_all_cursor_pages_and_archives_manifest(monkeypatch):
+    calls = []
+    uploaded = []
+    metadata = []
+
+    def make_page(trading_date, next_cursor):
+        return json.dumps({
+            "data": [{
+                "date": trading_date,
+                "symbol": "XNAS:NVDA",
+                "instrument_id": "security-123",
+                "open": "100.0",
+                "high": "102.0",
+                "low": "99.0",
+                "close": "101.5",
+                "volume": "1000000",
+            }],
+            "meta": {"as_of": "2026-10-20T23:59:59.999999Z", "next_cursor": next_cursor},
+        }).encode("utf-8")
+
+    pages = {
+        None: make_page("2025-10-01", "cursor-page-2"),
+        "cursor-page-2": make_page("2025-10-02", None),
+    }
+
+    def fake_fetch(symbol, date_from, date_to, as_of, cursor=None):
+        calls.append(cursor)
+        return pages[cursor], {
+            "request_id": f"request-{len(calls)}",
+            "credits_cost": "5",
+            "credits_remaining": "12400",
+        }
+
+    monkeypatch.setattr(archive_ohlc_asof, "fetch_response", fake_fetch)
+    monkeypatch.setattr(archive_ohlc_asof, "upload_object", lambda path, body, mime: uploaded.append((path, body, mime)) or True)
+    monkeypatch.setattr(archive_ohlc_asof, "upsert_metadata", lambda row: metadata.append(row))
+    monkeypatch.setattr(archive_ohlc_asof, "utc_now", lambda: "2026-10-20T23:45:00Z")
+
+    result = archive_ohlc_asof.archive_symbol("NVDA", date(2026, 10, 20))
+
+    assert calls == [None, "cursor-page-2"]
+    assert result["rows"] == 2
+    assert result["pages"] == 2
+    assert result["first_date"] == "2025-10-01"
+    assert result["last_date"] == "2025-10-02"
+    assert result["result"] == "archived_candidate"
+    assert len(uploaded) == 3  # two exact response pages plus the page-hash manifest
+    assert len(metadata) == 3
+    assert all(row["evidence_status"] == "candidate" for row in metadata)
+
+
+def test_membership_publication_upper_bound_and_source_title_match_are_conservative():
+    assert _publication_upper_bound("2024-05-20") == "2024-05-21T23:59:59.999999Z"
+    relevant_page = b"<html><title>Acme Quantum Labs Set to Join S&amp;P 500</title></html>"
+    unrelated_page = b"<html><title>Quarterly Market Update</title></html>"
+    assert _title_overlap("Acme Quantum Labs Set to Join S&P 500", relevant_page) >= 0.60
+    assert _title_overlap("Acme Quantum Labs Set to Join S&P 500", unrelated_page) < 0.60
