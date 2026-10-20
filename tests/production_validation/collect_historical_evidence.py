@@ -73,6 +73,7 @@ def extract_price_rows(symbol: str, payload: dict[str, Any], source_url: str, re
             "availability_evidence_type": None,
             "availability_evidence_url": None,
             "availability_evidence_published_at": None,
+            "availability_evidence_artifact_path": None,
             "availability_evidence_sha256": None,
             "decision_cutoff": None,
             "provider_timestamp": observed_at,
@@ -219,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_dir = Path(args.raw_dir) if args.raw_dir else output.with_name(output.stem + "_raw")
     raw_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema_version": 3,
+        "schema_version": 4,
         "generated_at": utc_now(),
         "collector": "tests.production_validation.collect_historical_evidence",
         "period": {"start_utc": args.start, "end_utc_exclusive": args.end},
@@ -272,7 +273,11 @@ def main(argv: list[str] | None = None) -> int:
             "error": f"Exchange session calendar unavailable: {type(exc).__name__}: {exc}",
             "note": "Do not treat missing calendar calculation as a coverage pass.",
         }
-    membership_validation = validate_universe_membership(read_json(args.membership_json))
+    membership_path = Path(args.membership_json).resolve() if args.membership_json else None
+    membership_validation = validate_universe_membership(
+        read_json(args.membership_json),
+        artifact_root=membership_path.parent if membership_path else None,
+    )
     report["validation"] = {
         "price_evidence": {
             "status": "BLOCKED",
@@ -283,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
                 "availability_evidence_type",
                 "availability_evidence_url",
                 "availability_evidence_published_at",
+                "availability_evidence_artifact_path",
                 "availability_evidence_sha256",
                 "available_at",
                 "decision_cutoff",
