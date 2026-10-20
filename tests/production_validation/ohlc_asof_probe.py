@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 SYMBOL = "XNAS:NVDA"
-AS_OF = "2025-10-03"
+AS_OF = "2026-10-03"
 DATE_FROM = "2025-10-01"
 DATE_TO = "2025-10-03"
 
