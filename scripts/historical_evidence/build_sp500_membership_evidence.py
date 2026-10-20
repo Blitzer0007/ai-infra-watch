@@ -19,7 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -201,6 +201,12 @@ def build_bundle(
         raise ValueError("No sp500-ticker-changes-YYYY.yaml files found in source root")
     source_notes_path = source_root / "source_notes.json"
     notes = json.loads(source_notes_path.read_text(encoding="utf-8")) if source_notes_path.exists() else {}
+    coverage_text = str(notes.get("data_freeze_date") or notes.get("date_downloaded") or "").strip()
+    try:
+        coverage_through = date.fromisoformat(coverage_text).isoformat()
+    except ValueError:
+        coverage_through = None
+    events_after_coverage: list[str] = []
 
     # Preserve byte-exact upstream inputs in the private evidence bundle.
     upstream_dir = output_root / "source-artifacts" / "upstream"
@@ -227,9 +233,15 @@ def build_bundle(
         for raw_day, raw_event in changes.items():
             day = str(raw_day)[:10]
             try:
-                date.fromisoformat(day)
+                parsed_day = date.fromisoformat(day)
             except ValueError:
                 raise ValueError(f"Invalid event date {day} in {path.name}")
+            if coverage_through and day > coverage_through:
+                # This repository snapshot may contain events announced after its stated
+                # data freeze (including formerly pending future changes). Do not apply
+                # them to the reconstructed universe until the source freeze catches up.
+                events_after_coverage.append(day)
+                continue
             event = raw_event if isinstance(raw_event, dict) else {}
             url = str(event.get("source_url") or event.get("evidence_url") or "").strip()
             announcement_date = str(event.get("announcement_date") or "").strip() or None
@@ -293,12 +305,6 @@ def build_bundle(
                 ),
             }
 
-    coverage_text = str(notes.get("data_freeze_date") or notes.get("date_downloaded") or "").strip()
-    try:
-        coverage_through = date.fromisoformat(coverage_text).isoformat()
-    except ValueError:
-        coverage_through = None
-
     intervals: list[dict[str, Any]] = []
     continuity_errors: list[str] = []
     active: dict[str, dict[str, Any]] = {}
@@ -306,6 +312,9 @@ def build_bundle(
     for key, event in event_inputs.items():
         all_events.append((date.fromisoformat(event["day"]), key, event))
     event_lookup = {key: event for key, event in event_inputs.items()}
+
+    def previous_day(day_text: str) -> str:
+        return (date.fromisoformat(day_text) - timedelta(days=1)).isoformat()
 
     def open_interval(symbol: str, starts: str, entry_proof: dict[str, Any], *, baseline: bool = False) -> None:
         active[symbol] = {
@@ -390,7 +399,7 @@ def build_bundle(
         else:
             active_symbols = set(active)
             for symbol in sorted(active_symbols - baseline):
-                close_interval(symbol, year_start, baseline_proof, baseline_end=True)
+                close_interval(symbol, previous_day(year_start), baseline_proof, baseline_end=True)
             for symbol in sorted(baseline - active_symbols):
                 open_interval(symbol, year_start, baseline_proof, baseline=True)
             if active_symbols != baseline:
@@ -406,25 +415,31 @@ def build_bundle(
             day_text = event_day.isoformat()
             proof = proof_by_event[event_key]
             for symbol in event["removed"]:
-                close_interval(symbol, day_text, proof, baseline_end=not proof.get("verified"))
+                close_interval(symbol, previous_day(day_text), proof, baseline_end=not proof.get("verified"))
             for symbol in event["added"]:
                 if symbol in active:
                     continuity_errors.append(f"{day_text}: attempted duplicate addition for {symbol}")
                     continue
                 open_interval(symbol, day_text, proof, baseline=not proof.get("verified"))
 
+    # Active intervals are right-censored at the dataset's actual coverage date.
+    # Never emit open-ended membership from a stale/frozen source snapshot.
     for symbol, current in sorted(active.items()):
         entry = current["entry_proof"]
         starts = current["effective_from"]
+        if coverage_through and starts > coverage_through:
+            continuity_errors.append(f"{starts}: active ticker {symbol} begins after dataset coverage")
+            continue
         entry_time_ok = False
         try:
             entry_time_ok = datetime.fromisoformat(entry["published_at"].replace("Z", "+00:00")) <= datetime.fromisoformat(iso_midnight(starts).replace("Z", "+00:00"))
         except (KeyError, ValueError, TypeError):
             pass
-        verified = bool(entry.get("verified")) and entry_time_ok
+        # No explicit exit source means interval boundaries after the freeze cannot
+        # be assumed. The bounded interval is intentionally insufficient rather than PASS.
         intervals.append(make_interval(
-            symbol=symbol, starts=starts, ends=None, entry_proof=entry,
-            exit_proof=None, verified=verified, baseline_start=current["baseline_start"],
+            symbol=symbol, starts=starts, ends=coverage_through, entry_proof=entry,
+            exit_proof=None, verified=False, baseline_start=current["baseline_start"],
         ))
 
     intervals.sort(key=lambda row: (row["symbol"], row["effective_from"], row["effective_to"] or "9999"))
@@ -459,6 +474,8 @@ def build_bundle(
         "insufficient_intervals": len(blocked),
         "unique_symbols": len({row["symbol"] for row in intervals}),
         "official_source_urls": len(unique_urls),
+        "events_excluded_after_source_freeze": len(events_after_coverage),
+        "latest_excluded_event_date": max(events_after_coverage) if events_after_coverage else None,
         "official_source_pages_archived": sum(1 for item in fetched_sources.values() if item.get("verified")),
         "official_source_failures": len(source_fetch_errors),
         "continuity_errors": continuity_errors[:100],
@@ -468,7 +485,7 @@ def build_bundle(
         "strict_validator_error_count": len(validator.get("errors", [])),
         "strict_validator_errors_sample": validator.get("errors", [])[:50],
         "historical_membership_gate": overall,
-        "gate_reason": "The community dataset has legacy entries without per-event publication evidence and a source freeze before the current date; dated public sources only qualify the specific intervals they support.",
+        "gate_reason": "The community dataset has legacy entries without per-event publication evidence. Events after the declared source freeze are excluded, surviving intervals are right-censored at the freeze, and dated public sources only qualify the specific intervals they support.",
     }
     (output_root / "membership_rows.json").write_text(json.dumps({"membership_rows": intervals}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (output_root / "candidate_verified_membership_rows.json").write_text(json.dumps({"membership_rows": candidates}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
