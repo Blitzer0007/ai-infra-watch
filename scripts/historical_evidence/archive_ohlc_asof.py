@@ -55,8 +55,10 @@ def validate_request(symbol: str, date_from: str, date_to: str, as_of: str) -> t
         raise ValueError("Dates must use YYYY-MM-DD format") from exc
     if cutoff < EARLIEST_SUPPORTED_AS_OF:
         raise ValueError("OHLC has not exposed point-in-time history before 2026-09-22")
-    if cutoff > datetime.now(timezone.utc).date():
-        raise ValueError("as_of cannot be in the future")
+    # A same-day as_of cutoff is still in progress: its end-of-day knowledge set
+    # includes a portion of the UTC day that has not elapsed yet.
+    if cutoff >= datetime.now(timezone.utc).date():
+        raise ValueError("as_of must be a completed UTC calendar day; use yesterday or earlier")
     if end < start:
         raise ValueError("to date must not precede from date")
     if end > cutoff:
@@ -347,7 +349,11 @@ def archive_symbol(symbol: str, as_of: date) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--as-of", default=datetime.now(timezone.utc).date().isoformat())
+    parser.add_argument(
+        "--as-of",
+        default=(datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat(),
+        help="Completed UTC knowledge-cutoff date; defaults to yesterday",
+    )
     parser.add_argument("--symbols", default=",".join(FREE_SYMBOLS), help="Subset of the OHLC Free-plan allowlist")
     args = parser.parse_args(argv)
     try:
