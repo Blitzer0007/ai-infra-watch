@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2, Database, Fingerprint } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { authFetch } from '../utils/apiAuth';
 import FreshnessBadge from './FreshnessBadge';
@@ -73,6 +73,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const [forecastValidationError, setForecastValidationError] = useState('');
   const [jobHealth, setJobHealth] = useState<any[]>([]);
   const [jobHealthError, setJobHealthError] = useState('');
+  const [historicalArchive, setHistoricalArchive] = useState<any>(null);
+  const [historicalArchiveError, setHistoricalArchiveError] = useState('');
+  const [archiveReload, setArchiveReload] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +98,28 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch('/api/historical-evidence-health', { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || 'Historical archive inventory unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        setHistoricalArchive(body);
+        setHistoricalArchiveError('');
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setHistoricalArchive(null);
+          setHistoricalArchiveError(error instanceof Error ? error.message : 'Historical archive inventory unavailable');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [archiveReload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,6 +209,87 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           })}
           {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">Loading scheduled job health…</div> : null}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="historical-evidence-archives">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-cyan-300">
+              <Database className="w-3.5 h-3.5" /> Private evidence archive
+            </div>
+            <div className="text-sm font-black mt-1">Historical Evidence Archives</div>
+            <div className="text-[9px] text-white/35 mt-1">Private Supabase inventory, capture dates, row counts and indexed SHA-256 values. Raw files remain private.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + (historicalArchive?.historicalGate?.status === 'BLOCKED' ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : 'text-white/45 border-white/10')}>
+              Historical gate: {historicalArchive?.historicalGate?.status || 'UNKNOWN'}
+            </span>
+            <button type="button" onClick={() => setArchiveReload(value => value + 1)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[9px] font-mono uppercase text-white/55 hover:text-white">
+              <RefreshCw className="w-3 h-3" /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {historicalArchiveError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/80">{historicalArchiveError}</div>}
+        {historicalArchive?.historicalGate?.reason && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.025] px-3 py-2 text-[9px] leading-4 text-amber-100/60">{historicalArchive.historicalGate.reason}</div>}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-4">
+          {(historicalArchive?.providers || []).map((provider: any) => {
+            const latest = provider.latest;
+            const status = latest?.evidenceStatus || 'NO ARTIFACTS';
+            const statusTone = status === 'verified'
+              ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5'
+              : status === 'insufficient'
+                ? 'text-rose-300 border-rose-400/20 bg-rose-400/5'
+                : status === 'candidate' || status === 'archive_only'
+                  ? 'text-amber-300 border-amber-400/20 bg-amber-400/5'
+                  : 'text-white/40 border-white/10 bg-white/[.02]';
+            return <div key={provider.provider} className="rounded-xl border border-white/10 bg-black/10 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[10px] font-bold">{provider.label}</div>
+                <span className={'shrink-0 px-2 py-1 rounded-full border text-[7px] font-mono uppercase ' + statusTone}>{status}</span>
+              </div>
+              <div className="mt-2 text-[9px] leading-4 text-white/35">{provider.description}</div>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="rounded-lg border border-white/5 p-2">
+                  <div className="text-[8px] text-white/30 uppercase">Indexed rows*</div>
+                  <div className="text-lg font-black mt-1">{provider.artifactCountInWindow ?? 0}</div>
+                </div>
+                <div className="rounded-lg border border-white/5 p-2">
+                  <div className="text-[8px] text-white/30 uppercase">Latest market date</div>
+                  <div className="text-[10px] font-bold mt-2">{latest?.marketDate || '—'}</div>
+                </div>
+              </div>
+              <div className="mt-3 space-y-1 text-[8px] font-mono text-white/30 break-words">
+                <div>Last stored: {latest?.retrievedAt ? new Date(latest.retrievedAt).toLocaleString() : 'no artifact indexed yet'}</div>
+                <div>Source as-of: {latest?.sourceAsOf ? new Date(latest.sourceAsOf).toLocaleString() : 'not provided'}</div>
+                <div>Rows / symbols: {latest?.rowCount ?? '—'} / {latest?.symbolCount ?? '—'}</div>
+                <div className="flex items-center gap-1.5"><Fingerprint className="w-3 h-3" /> SHA-256 recorded: {latest?.sha256 ? latest.sha256.slice(0, 16) + '…' : 'no hash indexed'}</div>
+              </div>
+            </div>;
+          })}
+          {!historicalArchive && !historicalArchiveError ? <div className="lg:col-span-3 text-[9px] font-mono text-white/30">Loading private archive inventory…</div> : null}
+        </div>
+
+        {Array.isArray(historicalArchive?.recentArtifacts) && historicalArchive.recentArtifacts.length > 0 ? <div className="mt-4 rounded-xl border border-white/5 overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/10 text-[8px] font-mono uppercase tracking-widest text-white/30">
+            Recent artifacts · {historicalArchive.recentArtifacts.length} shown from {historicalArchive.inventoryWindow?.returnedRows ?? 0} loaded metadata rows
+            {historicalArchive.inventoryWindow?.capped ? ' · inventory capped at ' + historicalArchive.inventoryWindow.limit : ''}
+          </div>
+          <div className="divide-y divide-white/5">
+            {historicalArchive.recentArtifacts.map((artifact: any) => <div key={artifact.id + ':' + artifact.sha256} className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-[9px] font-bold break-words">{artifact.provider} · {artifact.artifactType}</div>
+                <div className="mt-1 text-[8px] font-mono text-white/30 break-all">{artifact.marketDate || (artifact.sourceAsOf ? new Date(artifact.sourceAsOf).toLocaleDateString() : 'date not supplied')} · {artifact.sha256?.slice(0, 16)}…</div>
+              </div>
+              <div className="flex md:flex-col md:items-end items-center gap-2 text-[8px] font-mono text-white/30">
+                <span>{artifact.evidenceStatus}</span>
+                <span>{artifact.retrievedAt ? new Date(artifact.retrievedAt).toLocaleString() : 'time unknown'}</span>
+              </div>
+            </div>)}
+          </div>
+        </div> : null}
+        <div className="mt-3 text-[8px] leading-4 text-white/25">* Counts refer to indexed metadata rows in the loaded inventory window, not guaranteed unique logical archives. SHA-256 is recorded metadata; this view does not independently download and re-hash the private objects. Stored or candidate archives do not clear the historical evidence gate.</div>
       </section>
 
       <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4" data-testid="forecast-validation-health">

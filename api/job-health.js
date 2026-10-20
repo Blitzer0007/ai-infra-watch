@@ -23,10 +23,30 @@ const JOBS = [
   { id:'server-smart-alerts', name:'Server Smart Alerts', path:'server-smart-alerts.yml', cadence:'every 10 minutes UTC' },
   { id:'earnings-alerts', name:'Earnings alerts', path:'earnings-alerts.yml', cadence:'08:30 Asia/Kolkata' },
   { id:'production-smoke', name:'Production Smoke', path:'production-smoke.yml', cadence:'every 6 hours at :23 UTC' },
+  { id:'private-ohlc-asof-archive', name:'Private OHLC as-of archive', path:'private-ohlc-asof-archive.yml', cadence:'Weekdays at 23:30 UTC (05:00 IST next day)' },
+  { id:'private-marketparquet-archive', name:'Private MarketParquet archive', path:'private-marketparquet-archive.yml', cadence:'Weekdays at 23:40 UTC (05:10 IST next day)' },
+  { id:'private-sp500-membership-audit', name:'Private S&P 500 membership audit', path:'private-sp500-membership-audit.yml', cadence:'Monthly, day 1 at 04:17 UTC (09:47 IST)' },
 ];
 
-function nextScheduledRun(id, now = new Date()) {
+export function nextScheduledRun(id, now = new Date()) {
   const next = new Date(now);
+
+  if (id === 'private-ohlc-asof-archive' || id === 'private-marketparquet-archive') {
+    const minute = id === 'private-ohlc-asof-archive' ? 30 : 40;
+    const candidate = new Date(now);
+    candidate.setUTCHours(23, minute, 0, 0);
+    if (candidate <= now) candidate.setUTCDate(candidate.getUTCDate() + 1);
+    while (candidate.getUTCDay() === 0 || candidate.getUTCDay() === 6) {
+      candidate.setUTCDate(candidate.getUTCDate() + 1);
+    }
+    return candidate.toISOString();
+  }
+
+  if (id === 'private-sp500-membership-audit') {
+    let candidate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 4, 17, 0, 0));
+    if (candidate <= now) candidate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 4, 17, 0, 0));
+    return candidate.toISOString();
+  }
 
   if (id === 'server-smart-alerts') {
     next.setUTCSeconds(0, 0);
