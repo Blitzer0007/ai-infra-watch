@@ -77,7 +77,7 @@ def _finite_number(value: Any, *, positive: bool = False) -> bool:
 
 
 def validate_payload(payload: Any, symbol: str, date_from: str, date_to: str, as_of: str) -> dict[str, Any]:
-    """Check the provider response's shape and the requested point-in-time contract."""
+    """Check one provider page's schema and point-in-time cutoff."""
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list) or not isinstance(payload.get("meta"), dict):
         raise ValueError("Provider response did not match the expected data/meta JSON schema")
     rows = payload["data"]
@@ -85,6 +85,8 @@ def validate_payload(payload: Any, symbol: str, date_from: str, date_to: str, as
     response_as_of = meta.get("as_of")
     if not isinstance(response_as_of, str) or response_as_of[:10] != as_of:
         raise ValueError("Provider response as_of did not match the requested cutoff date")
+    if "next_cursor" not in meta:
+        raise ValueError("Provider response is missing pagination metadata; refuse a potentially truncated archive")
     if not rows:
         raise ValueError("Provider returned no rows for this symbol/window")
     dates: list[str] = []
@@ -114,36 +116,49 @@ def validate_payload(payload: Any, symbol: str, date_from: str, date_to: str, as
         if row.get("volume") is not None and not _finite_number(row.get("volume")):
             raise ValueError("Provider bar volume is not a finite non-negative number")
     if len(dates) != len(set(dates)):
-        raise ValueError("Provider returned duplicate trading dates")
+        raise ValueError("Provider returned duplicate trading dates within a page")
+    cursor = meta.get("next_cursor")
+    if cursor is not None and (not isinstance(cursor, str) or not cursor.strip()):
+        raise ValueError("Provider returned malformed pagination cursor")
     return {
         "row_count": len(rows),
         "first_date": min(dates),
         "last_date": max(dates),
+        "dates": dates,
         "response_as_of": response_as_of,
         "unique_instrument_ids": len(instrument_ids),
+        "next_cursor": cursor,
     }
 
 
-def fetch_response(qualified_symbol: str, date_from: date, date_to: date, as_of: date) -> tuple[bytes, dict[str, str]]:
-    query = urllib.parse.urlencode({
+def fetch_response(
+    qualified_symbol: str, date_from: date, date_to: date, as_of: date,
+    cursor: str | None = None,
+) -> tuple[bytes, dict[str, str]]:
+    params = {
         "symbols": qualified_symbol,
         "from": date_from.isoformat(),
         "to": date_to.isoformat(),
         "as_of": as_of.isoformat(),
         "order": "asc",
-        "limit": "10000",
-    })
+        # The provider paginates at up to 500 rows; every cursor page is retained.
+        "limit": "500",
+    }
+    if cursor is not None:
+        params["cursor"] = cursor
+    query = urllib.parse.urlencode(params)
+    api_key = os.environ.get("OHLC_API_KEY", "").strip()
+    if not api_key:
+        raise ArchiveError("OHLC_API_KEY is not configured")
     request = urllib.request.Request(
         f"{API_URL}?{query}",
         headers={
-            "Authorization": "Bearer " + os.environ.get("OHLC_API_KEY", "").strip(),
+            "Authorization": "Bearer " + api_key,
             "Accept": "application/json",
             "User-Agent": USER_AGENT,
         },
         method="GET",
     )
-    if not os.environ.get("OHLC_API_KEY", "").strip():
-        raise ArchiveError("OHLC_API_KEY is not configured")
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             body = response.read(25 * 1024 * 1024 + 1)
@@ -156,7 +171,6 @@ def fetch_response(qualified_symbol: str, date_from: date, date_to: date, as_of:
                 raise ArchiveError("OHLC response exceeds the 25 MiB safety limit")
             return body, headers
     except urllib.error.HTTPError as exc:
-        # Do not print provider error bodies; they are not needed for safe triage.
         raise ArchiveError(f"OHLC request for {qualified_symbol} failed with HTTP {exc.code}") from None
     except (urllib.error.URLError, TimeoutError) as exc:
         raise ArchiveError(f"OHLC request failed ({type(exc).__name__})") from None
@@ -166,31 +180,139 @@ def archive_symbol(symbol: str, as_of: date) -> dict[str, Any]:
     qualified_symbol, start, end, cutoff = validate_request(
         symbol, five_year_start(as_of).isoformat(), as_of.isoformat(), as_of.isoformat()
     )
-    raw, headers = fetch_response(qualified_symbol, start, end, cutoff)
-    try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ArchiveError("OHLC returned invalid JSON") from None
-    try:
-        validated = validate_payload(payload, qualified_symbol, start.isoformat(), end.isoformat(), cutoff.isoformat())
-    except ValueError as exc:
-        raise ArchiveError(f"OHLC response rejected for {symbol}: {exc}") from None
+    pages: list[dict[str, Any]] = []
+    all_dates: list[str] = []
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
 
-    digest = hashlib.sha256(raw).hexdigest()
-    object_path = f"ohlc/eod_asof/{cutoff.isoformat()}/{symbol}/{digest}.json"
+    for page_index in range(10):
+        raw, headers = fetch_response(qualified_symbol, start, end, cutoff, cursor)
+        try:
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ArchiveError("OHLC returned invalid JSON") from None
+        try:
+            validated = validate_payload(
+                payload, qualified_symbol, start.isoformat(), end.isoformat(), cutoff.isoformat()
+            )
+        except ValueError as exc:
+            raise ArchiveError(f"OHLC response rejected for {symbol}: {exc}") from None
+
+        all_dates.extend(validated["dates"])
+        pages.append({
+            "page_index": page_index + 1,
+            "raw": raw,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "headers": headers,
+            "validated": validated,
+        })
+        next_cursor = validated["next_cursor"]
+        if next_cursor is None:
+            break
+        if next_cursor in seen_cursors:
+            raise ArchiveError("OHLC returned a repeated pagination cursor")
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+    else:
+        raise ArchiveError("OHLC exceeded the 10-page safety cap; refusing a truncated archive")
+
+    if not pages or len(all_dates) != len(set(all_dates)):
+        raise ArchiveError("OHLC pages produced an empty or duplicate-date history")
+    ordered_dates = sorted(all_dates)
     retrieved_at = utc_now()
-    upload_object(object_path, raw, "application/json")
-    metadata = {
+    page_manifest: list[dict[str, Any]] = []
+
+    # Fetch and validate every page before writing any artifact for this symbol.
+    for page in pages:
+        validated = page["validated"]
+        digest = page["sha256"]
+        page_index = page["page_index"]
+        object_path = (
+            f"ohlc/eod_asof/{cutoff.isoformat()}/{symbol}/"
+            f"page-{page_index:02d}/{digest}.json"
+        )
+        upload_object(object_path, page["raw"], "application/json")
+        headers = page["headers"]
+        upsert_metadata({
+            "provider": "ohlc",
+            "artifact_type": "eod_asof_response_page",
+            "sha256": digest,
+            "bucket_name": BUCKET,
+            "object_path": object_path,
+            "source_endpoint": API_URL,
+            "retrieved_at": retrieved_at,
+            "source_as_of": validated["response_as_of"],
+            "market_date": cutoff.isoformat(),
+            "row_count": validated["row_count"],
+            "symbol_count": 1,
+            "evidence_status": "candidate",
+            "details": {
+                "symbol": symbol,
+                "qualified_symbol": qualified_symbol,
+                "range_start": start.isoformat(),
+                "range_end": end.isoformat(),
+                "page_index": page_index,
+                "page_count": len(pages),
+                "first_bar_date": validated["first_date"],
+                "last_bar_date": validated["last_date"],
+                "stable_instrument_ids": validated["unique_instrument_ids"],
+                "request_id": headers["request_id"] or None,
+                "credits_cost": headers["credits_cost"] or None,
+                "credits_remaining": headers["credits_remaining"] or None,
+                "adjustment": "raw",
+                "point_in_time_note": "Provider as_of view preserved verbatim; review semantics before using as release evidence.",
+                "data_license_note": "Personal-use workflow. Do not redistribute source rows or expose the raw archive publicly.",
+            },
+        })
+        page_manifest.append({
+            "page_index": page_index,
+            "object_path": object_path,
+            "sha256": digest,
+            "row_count": validated["row_count"],
+            "first_date": validated["first_date"],
+            "last_date": validated["last_date"],
+            "request_id": headers["request_id"] or None,
+            "credits_cost": headers["credits_cost"] or None,
+        })
+
+    manifest = {
+        "schema_version": 1,
         "provider": "ohlc",
-        "artifact_type": "eod_asof_full_history",
-        "sha256": digest,
+        "artifact_type": "eod_asof_full_history_manifest",
+        "symbol": symbol,
+        "qualified_symbol": qualified_symbol,
+        "as_of": cutoff.isoformat(),
+        "provider_as_of": pages[0]["validated"]["response_as_of"],
+        "range_start": start.isoformat(),
+        "range_end": end.isoformat(),
+        "retrieved_at": retrieved_at,
+        "row_count": len(all_dates),
+        "unique_date_count": len(set(all_dates)),
+        "first_date": ordered_dates[0],
+        "last_date": ordered_dates[-1],
+        "page_count": len(pages),
+        "pages": page_manifest,
+        "validation": "structural_pass",
+        "release_gate": "not_evaluated",
+        "note": "This manifest proves which provider responses were archived; it does not independently authenticate provider as_of semantics or clear universe membership evidence.",
+    }
+    manifest_bytes = json.dumps(manifest, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    manifest_path = (
+        f"ohlc/eod_asof/{cutoff.isoformat()}/{symbol}/manifest/{manifest_sha}.json"
+    )
+    upload_object(manifest_path, manifest_bytes, "application/json")
+    upsert_metadata({
+        "provider": "ohlc",
+        "artifact_type": "eod_asof_full_history_manifest",
+        "sha256": manifest_sha,
         "bucket_name": BUCKET,
-        "object_path": object_path,
+        "object_path": manifest_path,
         "source_endpoint": API_URL,
         "retrieved_at": retrieved_at,
-        "source_as_of": validated["response_as_of"],
+        "source_as_of": pages[0]["validated"]["response_as_of"],
         "market_date": cutoff.isoformat(),
-        "row_count": validated["row_count"],
+        "row_count": len(all_dates),
         "symbol_count": 1,
         "evidence_status": "candidate",
         "details": {
@@ -198,34 +320,30 @@ def archive_symbol(symbol: str, as_of: date) -> dict[str, Any]:
             "qualified_symbol": qualified_symbol,
             "range_start": start.isoformat(),
             "range_end": end.isoformat(),
-            "first_bar_date": validated["first_date"],
-            "last_bar_date": validated["last_date"],
-            "stable_instrument_ids": validated["unique_instrument_ids"],
-            "request_id": headers["request_id"] or None,
-            "credits_cost": headers["credits_cost"] or None,
-            "credits_remaining": headers["credits_remaining"] or None,
+            "page_count": len(pages),
+            "first_bar_date": ordered_dates[0],
+            "last_bar_date": ordered_dates[-1],
+            "unique_date_count": len(set(all_dates)),
+            "page_hashes": [page["sha256"] for page in page_manifest],
             "adjustment": "raw",
             "point_in_time_note": "Provider as_of view preserved verbatim; review semantics before using as release evidence.",
             "data_license_note": "Personal-use workflow. Do not redistribute source rows or expose the raw archive publicly.",
         },
-    }
-    upsert_metadata(metadata)
+    })
     return {
         "symbol": symbol,
         "as_of": cutoff.isoformat(),
         "range_start": start.isoformat(),
         "range_end": end.isoformat(),
-        "rows": validated["row_count"],
-        "first_date": validated["first_date"],
-        "last_date": validated["last_date"],
-        "sha256": digest,
-        "object_path": object_path,
-        "request_id": headers["request_id"] or None,
-        "credits_cost": headers["credits_cost"] or None,
-        "credits_remaining": headers["credits_remaining"] or None,
+        "rows": len(all_dates),
+        "pages": len(pages),
+        "first_date": ordered_dates[0],
+        "last_date": ordered_dates[-1],
+        "manifest_sha256": manifest_sha,
+        "manifest_path": manifest_path,
+        "credit_costs": [page["headers"]["credits_cost"] or None for page in pages],
         "result": "archived_candidate",
     }
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
