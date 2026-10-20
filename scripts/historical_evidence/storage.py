@@ -68,7 +68,7 @@ def upload_object(object_path: str, content: bytes, content_type: str) -> bool:
     try:
         status, _ = _request(
             url, key, method="POST", body=content, content_type=content_type,
-            extra_headers={"x-upsert": "false", "cache-control": "no-store"},
+            extra_headers={"x-upsert": "false", "cache-control": "0"},
         )
     except ArchiveError:
         raise
