@@ -7,7 +7,7 @@ import pytest
 TABLES = {
     "portfolio_holdings": "symbol,quantity,average_cost,purchase_date",
     "forecast_snapshots": "ticker,horizon,status,median,actual_return",
-    "forecast_model_config": "ticker,horizon,model_version",
+    "forecast_model_config": "ticker,horizon,active_model",
     "ai_quality_runs": "suite,target,status,quality_score,case_count,failures",
 }
 
