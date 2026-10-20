@@ -7,7 +7,9 @@ that supports historical availability, not merely a current data endpoint or URL
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
 import math
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Iterable
 from urllib.parse import parse_qsl, urlparse
@@ -73,7 +75,49 @@ def _is_positive_finite_number(value: Any) -> bool:
     )
 
 
-def validate_price_evidence(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def _verify_artifact(
+    row: dict[str, Any],
+    path_field: str,
+    hash_field: str,
+    prefix: str,
+    errors: list[str],
+    artifact_root: str | Path | None,
+) -> None:
+    """Resolve a safe relative artifact path and verify its exact SHA-256."""
+    value = row.get(path_field)
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"{prefix}: missing {path_field}")
+        return
+    relative = PurePosixPath(value.strip())
+    if relative.is_absolute() or ".." in relative.parts or "\\" in value or ":" in value:
+        errors.append(f"{prefix}: {path_field} must be a safe relative path inside the evidence bundle")
+        return
+    expected = row.get(hash_field)
+    if not isinstance(expected, str) or not _SHA256_RE.fullmatch(expected.strip()):
+        # The field-format error is reported by _require_sha256 too.
+        return
+    if artifact_root is None:
+        errors.append(f"{prefix}: artifact_root is required to verify {path_field}")
+        return
+
+    root = Path(artifact_root).resolve()
+    target = (root / Path(*relative.parts)).resolve()
+    if not target.is_relative_to(root):
+        errors.append(f"{prefix}: {path_field} escapes the evidence bundle")
+        return
+    if not target.is_file():
+        errors.append(f"{prefix}: evidence artifact file not found for {path_field}")
+        return
+
+    digest = hashlib.sha256()
+    with target.open("rb") as artifact:
+        for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest().lower() != expected.strip().lower():
+        errors.append(f"{prefix}: {hash_field} does not match the referenced evidence artifact")
+
+
+def validate_price_evidence(rows: Iterable[dict[str, Any]], artifact_root: str | Path | None = None) -> dict[str, Any]:
     """Require price rows plus hashed, timestamped source evidence available by cutoff."""
     materialized = list(rows)
     if not materialized:
@@ -100,6 +144,7 @@ def validate_price_evidence(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
         for field in ("availability_evidence_id", "availability_evidence_type"):
             _required_text(row, field, prefix, errors)
         _require_sha256(row, "availability_evidence_sha256", prefix, errors)
+        _verify_artifact(row, "availability_evidence_artifact_path", "availability_evidence_sha256", prefix, errors, artifact_root)
         if row.get("availability_evidence_type") not in _PRICE_EVIDENCE_TYPES:
             errors.append(
                 f"{prefix}: availability_evidence_type must identify a provider snapshot, "
@@ -132,7 +177,7 @@ def validate_price_evidence(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def validate_universe_membership(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def validate_universe_membership(rows: Iterable[dict[str, Any]], artifact_root: str | Path | None = None) -> dict[str, Any]:
     """Require source-record and hashed evidence for effective-dated membership rows."""
     materialized = list(rows)
     if not materialized:
@@ -150,6 +195,7 @@ def validate_universe_membership(rows: Iterable[dict[str, Any]]) -> dict[str, An
                 errors.append(f"{prefix}: {message}")
 
         _require_sha256(row, "membership_evidence_sha256", prefix, errors)
+        _verify_artifact(row, "membership_evidence_artifact_path", "membership_evidence_sha256", prefix, errors, artifact_root)
         if row.get("membership_evidence_type") not in _MEMBERSHIP_EVIDENCE_TYPES:
             errors.append(
                 f"{prefix}: membership_evidence_type must identify an effective-dated "
