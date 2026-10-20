@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -17,6 +18,16 @@ SYMBOL = "XNAS:NVDA"
 AS_OF = "2025-10-03"
 DATE_FROM = "2025-10-01"
 DATE_TO = "2025-10-03"
+
+
+def safe_text(value: object, api_key: str, limit: int = 160) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.replace(api_key, "[redacted]") if api_key else value
+    value = re.sub(r"(?i)bearer\s+\S+", "Bearer [redacted]", value)
+    value = re.sub(r"https?://\S+", "[url redacted]", value)
+    value = re.sub(r"[A-Za-z0-9_-]{32,}", "[token redacted]", value)
+    return value[:limit]
 
 
 def main() -> int:
@@ -51,11 +62,36 @@ def main() -> int:
             headers = response.headers
             body = response.read()
     except urllib.error.HTTPError as exc:
-        # Do not print provider error bodies: no credentials or payloads go to logs.
+        # Only emit a whitelisted, sanitized problem summary; never the response body.
+        body = exc.read()
+        try:
+            problem = json.loads(body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            problem = {}
+        code = problem.get("code") if isinstance(problem, dict) else None
+        title = problem.get("title") if isinstance(problem, dict) else None
+        detail = problem.get("detail") if isinstance(problem, dict) else None
+        combined = " ".join(str(v) for v in (code, title, detail) if v is not None).lower()
+        if "point-in-time-unavailable" in combined:
+            code = "point-in-time-unavailable"
+        elif not code:
+            code = "provider_http_error"
+        earliest = re.search(r"(?:earliest|available from|history begins).*?(20\\d{2}-\\d{2}-\\d{2})", combined)
+        earliest_date = earliest.group(1) if earliest else None
         print(
             "OHLC_PROBE "
-            f"status=error http_status={exc.code} "
-            f"request_id={exc.headers.get('X-Request-ID', 'unavailable')}"
+            + json.dumps(
+                {
+                    "result": "FAIL",
+                    "http_status": exc.code,
+                    "error_code": safe_text(code, api_key),
+                    "error_title": safe_text(title, api_key),
+                    "error_detail": safe_text(detail, api_key),
+                    "earliest_as_of_hint": earliest_date,
+                    "request_id": exc.headers.get("X-Request-ID") if exc.headers else None,
+                },
+                sort_keys=True,
+            )
         )
         return 1
     except (urllib.error.URLError, TimeoutError) as exc:
