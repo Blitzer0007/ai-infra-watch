@@ -61,11 +61,14 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
     def read_only_guard(route):
         request = route.request
         method = request.method.upper()
-        if method not in {"GET", "HEAD", "OPTIONS"}:
+        # The access-token verification endpoint is read-only with respect to
+        # portfolio/paper-ledger state. Allow the UI's normal unlock POST so the
+        # browser can establish its sessionStorage token; continue blocking all
+        # other non-read requests before they can reach production.
+        is_auth_verification = request.url.split("?", 1)[0].rstrip("/").endswith("/api/auth")
+        if method not in {"GET", "HEAD", "OPTIONS"} and not (method == "POST" and is_auth_verification):
             if "/api/jev-lab" in request.url or "/api/jev-lab-history" in request.url:
                 mutating_requests.append(method + " " + request.url)
-            # Block every non-read request before it can reach production. This
-            # protects against unrelated startup effects as well as JEV writes.
             route.abort("blockedbyclient")
             return
         route.continue_()
