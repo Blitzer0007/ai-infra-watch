@@ -77,6 +77,19 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
     page.on("response", capture_response)
     page.route("**/*", read_only_guard)
     response = page.goto("/jev-lab", wait_until="domcontentloaded", timeout=60000)
+    # The server-side bearer header authenticates direct API tests, but the SPA's
+    # private-dashboard gate requires its normal browser unlock flow. Reuse the
+    # token in memory and submit it through the UI; never print or persist it.
+    body_text = page.locator("body").inner_text(timeout=10000)
+    if "Enter your private access token" in body_text:
+        headers = _headers()
+        authorization = next((value for key, value in headers.items() if key.lower() == "authorization"), "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        assert token, "QA_HEADERS_JSON must include Authorization: Bearer <token> for browser unlock"
+        token_input = page.locator('input[type="password"], input[autocomplete="current-password"], input').first
+        token_input.fill(token)
+        unlock = page.get_by_role("button", name="UNLOCK DASHBOARD", exact=False)
+        unlock.click()
     try:
         page.get_by_text("JEV Autonomous Portfolio Lab", exact=False).first.wait_for(state="visible", timeout=30000)
     except Exception:
