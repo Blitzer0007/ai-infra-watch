@@ -64,6 +64,17 @@ def test_price_evidence_fails_when_availability_artifact_was_published_after_cut
     assert any("availability evidence was published after the decision cutoff" in e for e in result["errors"])
 
 
+
+def test_price_evidence_rejects_publication_record_created_after_claimed_availability():
+    result = validate_price_evidence([
+        price_row(
+            availability_evidence_published_at="2025-01-02T21:06:00Z",
+            available_at="2025-01-02T21:05:00Z",
+        )
+    ])
+    assert result["status"] == "FAIL"
+    assert any("published after the claimed available_at time" in e for e in result["errors"])
+
 def test_price_evidence_rejects_missing_evidence_record_id_and_hash():
     result = validate_price_evidence([
         price_row(availability_evidence_id="", availability_evidence_sha256="")
