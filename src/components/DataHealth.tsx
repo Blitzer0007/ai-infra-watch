@@ -89,33 +89,16 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         if (cancelled) return;
         setJobHealth(Array.isArray(body?.jobs) ? body.jobs : []);
         setJobHealthError('');
+        setHistoricalArchive(body?.historicalArchive || null);
+        setHistoricalArchiveError(body?.historicalArchiveError || '');
       })
       .catch(error => {
         if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'Scheduled job health unavailable';
           setJobHealth([]);
-          setJobHealthError(error instanceof Error ? error.message : 'Scheduled job health unavailable');
-        }
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    authFetch('/api/historical-evidence-health', { cache: 'no-store' })
-      .then(async response => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body?.error || 'Historical archive inventory unavailable');
-        return body;
-      })
-      .then(body => {
-        if (cancelled) return;
-        setHistoricalArchive(body);
-        setHistoricalArchiveError('');
-      })
-      .catch(error => {
-        if (!cancelled) {
+          setJobHealthError(message);
           setHistoricalArchive(null);
-          setHistoricalArchiveError(error instanceof Error ? error.message : 'Historical archive inventory unavailable');
+          setHistoricalArchiveError(message);
         }
       });
     return () => { cancelled = true; };

@@ -4,10 +4,122 @@ const REPO = 'Blitzer0007/ai-infra-watch';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
+
+const ARCHIVE_BUCKET = 'aiw-private-historical-evidence';
+const ARCHIVE_INDEX_LIMIT = 1000;
+const ARCHIVE_PROVIDERS = [
+  {
+    provider: 'ohlc',
+    label: 'OHLC as-of snapshots',
+    description: 'Daily end-of-day snapshots; retained as candidate evidence pending separate point-in-time review.',
+  },
+  {
+    provider: 'marketparquet',
+    label: 'MarketParquet daily archive',
+    description: 'Private daily full-market file; retrieval-time archive, not proof of original publication time.',
+  },
+  {
+    provider: 'sp500-membership',
+    label: 'S&P 500 membership evidence',
+    description: 'Dated membership source bundle; legacy event provenance and coverage remain under review.',
+  },
+];
+
+function parseArchiveTotalCount(contentRange, fallback) {
+  const match = String(contentRange || '').match(/\/(\d+)$/);
+  return match ? Number(match[1]) : fallback;
+}
+
+function safeArchiveArtifact(row) {
+  return {
+    id: row.id,
+    provider: row.provider,
+    artifactType: row.artifact_type,
+    sha256: row.sha256,
+    objectPath: row.object_path,
+    retrievedAt: row.retrieved_at,
+    sourceAsOf: row.source_as_of,
+    marketDate: row.market_date,
+    rowCount: row.row_count,
+    symbolCount: row.symbol_count,
+    evidenceStatus: row.evidence_status,
+  };
+}
+
+export function summarizeArtifacts(rows, totalIndexedRows = Array.isArray(rows) ? rows.length : 0) {
+  const validRows = Array.isArray(rows) ? rows.filter(row =>
+    row && ARCHIVE_PROVIDERS.some(provider => provider.provider === row.provider)
+  ) : [];
+  const providers = ARCHIVE_PROVIDERS.map(provider => {
+    const ownRows = validRows
+      .filter(row => row.provider === provider.provider)
+      .sort((a, b) => String(b.retrieved_at || '').localeCompare(String(a.retrieved_at || '')));
+    const statusCounts = {};
+    for (const row of ownRows) {
+      const status = String(row.evidence_status || 'unknown');
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    }
+    return {
+      ...provider,
+      artifactCountInWindow: ownRows.length,
+      statusCounts,
+      latest: ownRows.length ? safeArchiveArtifact(ownRows[0]) : null,
+    };
+  });
+  return {
+    providers,
+    recentArtifacts: validRows
+      .slice()
+      .sort((a, b) => String(b.retrieved_at || '').localeCompare(String(a.retrieved_at || '')))
+      .slice(0, 20)
+      .map(safeArchiveArtifact),
+    inventoryWindow: {
+      returnedRows: validRows.length,
+      totalIndexedRows: Number.isFinite(totalIndexedRows) ? totalIndexedRows : validRows.length,
+      capped: Number.isFinite(totalIndexedRows) && totalIndexedRows > validRows.length,
+      limit: ARCHIVE_INDEX_LIMIT,
+    },
+    historicalGate: {
+      status: 'BLOCKED',
+      reason: 'Archive presence and recorded hashes do not establish historical publication timing or complete event-level membership provenance.',
+    },
+  };
+}
+
+async function loadHistoricalArchiveInventory() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Private archive metadata is not configured');
+  const query = 'select=id,provider,artifact_type,sha256,object_path,retrieved_at,source_as_of,market_date,row_count,symbol_count,evidence_status&order=retrieved_at.desc&limit=' + ARCHIVE_INDEX_LIMIT;
+  const response = await fetch(SUPABASE_URL + '/rest/v1/historical_data_artifacts?' + query, {
+    headers: {
+      ...supabaseHeaders(SUPABASE_SERVICE_ROLE_KEY),
+      Accept: 'application/json',
+      Prefer: 'count=exact',
+    },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error('Supabase archive metadata HTTP ' + response.status);
+  const contentRange = response.headers.get('content-range');
+  const rows = await response.json();
+  return {
+    ok: true,
+    retrievedAt: new Date().toISOString(),
+    source: 'Supabase private metadata index',
+    bucket: ARCHIVE_BUCKET,
+    ...summarizeArtifacts(rows, parseArchiveTotalCount(contentRange, Array.isArray(rows) ? rows.length : 0)),
+  };
+}
+
+export function supabaseHeaders(key) {
+  const headers = { apikey: key };
+  // Opaque sb_secret_* keys belong in apikey only; legacy service_role JWTs also use Bearer.
+  if (!String(key).startsWith('sb_secret_')) headers.Authorization = 'Bearer ' + key;
+  return headers;
+}
+
 async function supabase(path) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase scheduler health configuration missing');
   const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
-    headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY },
+    headers: supabaseHeaders(SUPABASE_SERVICE_ROLE_KEY),
     signal: AbortSignal.timeout(6000),
   });
   const text = await response.text();
@@ -185,11 +297,21 @@ export default async function handler(req, res) {
       forecastJob = { id:'forecast-auto-tracker', name:'Forecast Auto Tracker', cadence:'06:45 + 07:15 + 07:45 IST weekdays', scheduler:'Supabase Cron', status:'unavailable', conclusion:null, nextRunAt:null, error:error instanceof Error ? error.message : 'Forecast scheduler health unavailable' };
     }
 
+    let historicalArchive = null;
+    let historicalArchiveError = '';
+    try {
+      historicalArchive = await loadHistoricalArchiveInventory();
+    } catch (archiveError) {
+      historicalArchiveError = archiveError instanceof Error ? archiveError.message : 'Private archive inventory unavailable';
+    }
+
     return res.status(200).json({
       ok:true,
       retrievedAt:new Date().toISOString(),
       source:'GitHub Actions + Supabase Cron',
       jobs:[...jobs, forecastJob],
+      historicalArchive,
+      historicalArchiveError,
     });
   } catch (error) {
     return res.status(502).json({
