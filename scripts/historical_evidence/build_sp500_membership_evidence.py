@@ -136,7 +136,7 @@ def fetch_announcement(
     artifacts_root: Path,
     expected_title: str | None = None,
 ) -> dict[str, Any]:
-    """Fetch and hash one allowlisted official page without following untrusted URLs."""
+    """Archive one official response, then separately evaluate date/title corroboration."""
     if not is_official_url(url):
         return {"verified": False, "reason": "source host is not on the official allowlist", "source_url": url}
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
@@ -153,41 +153,52 @@ def fetch_announcement(
         return {"verified": False, "reason": "official source redirected outside the allowlist", "source_url": url}
     if status != 200 or not content or len(content) > MAX_SOURCE_BYTES:
         return {"verified": False, "reason": "official source response was empty or exceeded the size limit", "source_url": url}
-    published_date = publication_date_from_page(url, content, expected_date)
-    if not published_date:
-        return {"verified": False, "reason": "official page did not independently confirm its expected publication date", "source_url": url}
-    title_overlap = _title_overlap(expected_title or "", content)
-    if not expected_title or title_overlap < 0.60:
-        return {
-            "verified": False,
-            "reason": (
-                "dataset event title is missing"
-                if not expected_title else
-                "official page title/content did not sufficiently match the dataset's event title"
-            ),
-            "source_url": url,
-            "title_overlap": round(title_overlap, 3),
-        }
+
+    # Preserve the exact allowlisted response even when it fails semantic/date checks,
+    # so a reviewer can audit why it did not qualify as membership evidence.
     digest = sha256_bytes(content)
     relative_path = f"source-artifacts/official-announcements/{digest}.html"
     artifact_path = artifacts_root / relative_path
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     if not artifact_path.exists():
         artifact_path.write_bytes(content)
-    return {
-        "verified": True,
-        "reason": None,
+
+    base = {
+        "verified": False,
         "source_url": url,
-        "published_date": published_date,
-        "published_at": _publication_upper_bound(published_date),
-        "publication_time_precision": "date-only conservative UTC upper bound (+1 day)",
-        "title_overlap": round(title_overlap, 3),
         "artifact_path": relative_path,
         "sha256": digest,
         "bytes": len(content),
         "http_status": status,
+        "final_url": final_url,
     }
-
+    published_date = publication_date_from_page(url, content, expected_date)
+    if not published_date:
+        return {
+            **base,
+            "reason": "official page did not independently confirm its expected publication date",
+        }
+    title_overlap = _title_overlap(expected_title or "", content)
+    if not expected_title or title_overlap < 0.60:
+        return {
+            **base,
+            "reason": (
+                "dataset event title is missing"
+                if not expected_title else
+                "official page title/content did not sufficiently match the dataset's event title"
+            ),
+            "published_date": published_date,
+            "title_overlap": round(title_overlap, 3),
+        }
+    return {
+        **base,
+        "verified": True,
+        "reason": None,
+        "published_date": published_date,
+        "published_at": _publication_upper_bound(published_date),
+        "publication_time_precision": "date-only conservative UTC upper bound (+1 day)",
+        "title_overlap": round(title_overlap, 3),
+    }
 
 def dataset_file_proof(
     relative_path: str, file_bytes: bytes, source_sha: str, commit_time: str
