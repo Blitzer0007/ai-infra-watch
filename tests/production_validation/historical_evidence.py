@@ -120,6 +120,8 @@ def validate_price_evidence(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
                 errors.append(f"{prefix}: observation timestamp is after the decision cutoff")
             if evidence_published_at > cutoff:
                 errors.append(f"{prefix}: availability evidence was published after the decision cutoff")
+            if evidence_published_at > available_at:
+                errors.append(f"{prefix}: availability evidence was published after the claimed available_at time")
         except ValueError as exc:
             errors.append(str(exc))
 
