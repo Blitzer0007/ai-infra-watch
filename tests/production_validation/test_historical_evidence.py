@@ -222,3 +222,24 @@ def test_universe_membership_rejects_missing_artifact_or_bad_hash(tmp_path):
 
 def test_universe_membership_blocks_empty_input():
     assert validate_universe_membership([])["status"] == "BLOCKED"
+
+
+from .validate_historical_evidence import validate_bundle
+
+
+def test_bundle_passes_only_when_both_validators_and_artifact_hashes_pass(tmp_path):
+    report = validate_bundle(
+        [price_row(tmp_path)],
+        [membership_row(tmp_path)],
+        tmp_path,
+    )
+    assert report["price_evidence"]["status"] == "PASS"
+    assert report["universe_membership"]["status"] == "PASS"
+    assert report["historical_evidence_gate"] == "PASS"
+
+
+def test_bundle_keeps_historical_gate_blocked_when_membership_is_missing(tmp_path):
+    report = validate_bundle([price_row(tmp_path)], [], tmp_path)
+    assert report["price_evidence"]["status"] == "PASS"
+    assert report["universe_membership"]["status"] == "BLOCKED"
+    assert report["historical_evidence_gate"] == "BLOCKED"
