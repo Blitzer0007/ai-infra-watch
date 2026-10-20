@@ -339,7 +339,20 @@ def build_bundle(
                 chronologically_valid = False
         except (KeyError, ValueError, TypeError):
             chronologically_valid = False
-        verified = bool(entry.get("verified")) and chronologically_valid and bool(exit_proof.get("verified")) and not baseline_end
+        exit_chronologically_valid = False
+        try:
+            exit_time = datetime.fromisoformat(str(exit_proof["published_at"]).replace("Z", "+00:00"))
+            end_time = datetime.combine(date.fromisoformat(ends), time.max, timezone.utc)
+            exit_chronologically_valid = exit_time <= end_time
+        except (KeyError, ValueError, TypeError):
+            exit_chronologically_valid = False
+        verified = (
+            bool(entry.get("verified"))
+            and chronologically_valid
+            and bool(exit_proof.get("verified"))
+            and exit_chronologically_valid
+            and not baseline_end
+        )
         intervals.append(make_interval(
             symbol=symbol,
             starts=start,
@@ -391,6 +404,9 @@ def build_bundle(
     for path, doc, relative_path, raw in loaded:
         year = int(doc["year"])
         year_start = f"{year:04d}-01-01"
+        if coverage_through and year_start > coverage_through:
+            # The declared freeze does not establish the next year's January baseline.
+            continue
         baseline = {_normal_ticker(s) for s in doc["tickers_on_Jan_1"]}
         baseline_proof = source_file_proofs[year]
         if not active:
