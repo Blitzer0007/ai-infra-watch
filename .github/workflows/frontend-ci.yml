@@ -15,6 +15,7 @@ on:
       - "tsconfig*.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/production-validation.yml"
   pull_request:
     paths:
       - "server/**"
@@ -27,6 +28,7 @@ on:
       - "tsconfig*.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/production-validation.yml"
 
 concurrency:
   group: frontend-ci-${{ github.ref }}

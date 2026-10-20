@@ -4,10 +4,17 @@ const REPO = 'Blitzer0007/ai-infra-watch';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
+export function supabaseHeaders(key) {
+  const headers = { apikey: key };
+  // Opaque sb_secret_* keys belong in apikey only; legacy service_role JWTs also use Bearer.
+  if (!String(key).startsWith('sb_secret_')) headers.Authorization = 'Bearer ' + key;
+  return headers;
+}
+
 async function supabase(path) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase scheduler health configuration missing');
   const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
-    headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY },
+    headers: supabaseHeaders(SUPABASE_SERVICE_ROLE_KEY),
     signal: AbortSignal.timeout(6000),
   });
   const text = await response.text();

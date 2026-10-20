@@ -60,14 +60,15 @@ jobs:
     if: ${{ github.event.inputs.run_authenticated_checks == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Report whether secure QA configuration exists
+      - name: Require approved secure QA configuration
         env:
           QA_STATE: ${{ secrets.PROD_STORAGE_STATE_B64 }}
           QA_MARKER: ${{ secrets.PROD_AUTHENTICATED_MARKER }}
         run: |
-          if [ -z "$QA_STATE" ] || [ -z "$QA_MARKER" ]; then
-            echo "::warning::Authenticated production checks are BLOCKED: configure PROD_STORAGE_STATE_B64 and PROD_AUTHENTICATED_MARKER secrets."
-            echo "No credentials were supplied and no authenticated pass is claimed."
-          else
-            echo "Secure QA configuration is present; inspect the Playwright job for the actual authenticated test result."
+          set -euo pipefail
+          if [ -z "${QA_STATE:-}" ] || [ -z "${QA_MARKER:-}" ]; then
+            echo "::error::Authenticated production checks are BLOCKED: configure PROD_STORAGE_STATE_B64 and PROD_AUTHENTICATED_MARKER secrets before requesting authenticated validation."
+            echo "No credentials were supplied and no authenticated pass can be claimed."
+            exit 1
           fi
+          echo "Secure QA configuration is present; the Playwright job must still pass authenticated tests."
