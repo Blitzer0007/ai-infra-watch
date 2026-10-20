@@ -62,9 +62,18 @@ def extract_price_rows(symbol: str, payload: dict[str, Any], source_url: str, re
             "adjusted": True,
             "source": "Yahoo Finance chart API",
             "source_url": source_url,
+            # Yahoo's chart response does not expose a separately versioned row or an
+            # immutable historical publication record; do not synthesize these values.
+            "source_record_id": None,
             "retrieved_at": retrieved_at,
+            "retrieved_response_sha256": payload.get("raw_sha256"),
             "available_at": None,
             "availability_status": "unknown_vendor_publication_time",
+            "availability_evidence_id": None,
+            "availability_evidence_type": None,
+            "availability_evidence_url": None,
+            "availability_evidence_published_at": None,
+            "availability_evidence_sha256": None,
             "decision_cutoff": None,
             "provider_timestamp": observed_at,
             "provider_timezone": "UTC",
@@ -210,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_dir = Path(args.raw_dir) if args.raw_dir else output.with_name(output.stem + "_raw")
     raw_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": utc_now(),
         "collector": "tests.production_validation.collect_historical_evidence",
         "period": {"start_utc": args.start, "end_utc_exclusive": args.end},
@@ -268,9 +277,20 @@ def main(argv: list[str] | None = None) -> int:
         "price_evidence": {
             "status": "BLOCKED",
             "checked": len(report["price_rows"]),
+            "required_fields": [
+                "source_record_id",
+                "availability_evidence_id",
+                "availability_evidence_type",
+                "availability_evidence_url",
+                "availability_evidence_published_at",
+                "availability_evidence_sha256",
+                "available_at",
+                "decision_cutoff",
+            ],
             "errors": [
                 "Yahoo chart data alone does not prove when each historical observation was first available.",
-                "No strategy-specific decision_cutoff/available_at evidence was inferred from retrieval time.",
+                "The collector intentionally leaves source_record_id and availability-evidence fields empty because Yahoo's current chart response is not a versioned historical publication record.",
+                "Retrieval timestamps and a hash of today's response do not establish historical publication/availability time.",
                 "Adjusted-close values can incorporate later corporate-action adjustments and require point-in-time semantics review.",
             ],
         },
