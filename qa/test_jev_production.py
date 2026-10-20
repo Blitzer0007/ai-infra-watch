@@ -58,15 +58,20 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
         if "/api/jev-lab" in response.url or "/api/jev-lab-history" in response.url:
             api_responses.append((response.url, response.status))
 
-    def capture_request(request):
-        if (
-            ("/api/jev-lab" in request.url or "/api/jev-lab-history" in request.url)
-            and request.method not in {"GET", "HEAD"}
-        ):
-            mutating_requests.append(request.method + " " + request.url)
+    def read_only_guard(route):
+        request = route.request
+        method = request.method.upper()
+        if method not in {"GET", "HEAD", "OPTIONS"}:
+            if "/api/jev-lab" in request.url or "/api/jev-lab-history" in request.url:
+                mutating_requests.append(method + " " + request.url)
+            # Block every non-read request before it can reach production. This
+            # protects against unrelated startup effects as well as JEV writes.
+            route.abort("blockedbyclient")
+            return
+        route.continue_()
 
     page.on("response", capture_response)
-    page.on("request", capture_request)
+    page.route("**/*", read_only_guard)
     page.goto("/jev-lab", wait_until="domcontentloaded", timeout=60000)
     page.get_by_text("JEV Autonomous Portfolio Lab", exact=False).first.wait_for(state="visible", timeout=30000)
     page.get_by_text("PAPER ONLY", exact=True).wait_for(state="visible", timeout=30000)
