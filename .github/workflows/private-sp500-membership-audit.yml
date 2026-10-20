@@ -1,0 +1,50 @@
+name: Private S&P 500 membership evidence audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 1 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-historical-evidence-archive
+  cancel-in-progress: false
+
+jobs:
+  audit-and-archive:
+    name: Build dated membership evidence bundle
+    if: ${{ vars.HISTORICAL_EVIDENCE_ARCHIVE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout controlled archive code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/production_validation/requirements.txt
+
+      - name: Install membership audit dependencies
+        run: python -m pip install -r tests/production_validation/requirements.txt
+
+      - name: Fetch an exact upstream S&P 500 dataset revision
+        id: upstream
+        shell: bash
+        run: |
+          git clone --filter=blob:none --depth=1 https://github.com/shardul0701/SP500-Survivorship-bias-data-2004-2026.git /tmp/sp500-upstream
+          echo "sha=$(git -C /tmp/sp500-upstream rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit_time=$(git -C /tmp/sp500-upstream show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build, source-check, hash, and privately archive membership evidence
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+          UPSTREAM_COMMIT_TIME: ${{ steps.upstream.outputs.commit_time }}
+        run: |
+          python -m scripts.historical_evidence.build_sp500_membership_evidence             --source-root /tmp/sp500-upstream             --upstream-sha "$UPSTREAM_SHA"             --upstream-commit-time "$UPSTREAM_COMMIT_TIME"             --output-bundle /tmp/sp500-membership-evidence.zip
