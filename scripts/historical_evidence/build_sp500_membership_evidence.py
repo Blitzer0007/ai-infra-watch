@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import hashlib
+import importlib.util
 import json
 import re
 import shutil
@@ -430,8 +431,13 @@ def build_bundle(
     candidates = [row for row in intervals if row["status"] == "verified"]
     blocked = [row for row in intervals if row["status"] != "verified"]
     try:
-        from tests.production_validation.historical_evidence import validate_universe_membership
-        validator = validate_universe_membership(intervals, artifact_root=output_root)
+        validator_path = Path(__file__).resolve().parents[2] / "tests" / "production_validation" / "historical_evidence.py"
+        spec = importlib.util.spec_from_file_location("aiw_historical_evidence_validator", validator_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("historical evidence validator module could not be loaded")
+        validator_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(validator_module)
+        validator = validator_module.validate_universe_membership(intervals, artifact_root=output_root)
     except Exception as exc:
         validator = {"status": "ERROR", "checked": len(intervals), "errors": [f"Validator invocation failed ({type(exc).__name__})"]}
 
