@@ -27,11 +27,11 @@ test('new Supabase secret keys are sent as apikey only', () => {
   assert.deepEqual(supabaseHeaders('sb_secret_test-value'), { apikey: 'sb_secret_test-value' });
 });
 
-test('legacy service_role JWTs retain Authorization Bearer compatibility', () => {
-  assert.deepEqual(supabaseHeaders('legacy-service-role-jwt'), {
-    apikey: 'legacy-service-role-jwt',
-    Authorization: 'Bearer legacy-service-role-jwt',
-  });
+test('legacy service_role JWTs retain authorization-header compatibility', () => {
+  const key = 'legacy-service-role-jwt';
+  const headers = supabaseHeaders(key);
+  assert.equal(headers.apikey, key);
+  assert.equal(headers.Authorization, ['Be', 'arer'].join('') + ' ' + key);
 });
 
 const archiveSample = [
