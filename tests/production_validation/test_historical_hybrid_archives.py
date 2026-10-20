@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.historical_evidence import archive_ohlc_asof
+from scripts.historical_evidence.storage import _auth_headers
 from scripts.historical_evidence.archive_ohlc_asof import (
     EARLIEST_SUPPORTED_AS_OF,
     FREE_SYMBOLS,
@@ -316,3 +317,11 @@ def test_membership_publication_upper_bound_and_source_title_match_are_conservat
     unrelated_page = b"<html><title>Quarterly Market Update</title></html>"
     assert _title_overlap("Acme Quantum Labs Set to Join S&P 500", relevant_page) >= 0.60
     assert _title_overlap("Acme Quantum Labs Set to Join S&P 500", unrelated_page) < 0.60
+
+
+def test_supabase_auth_headers_support_secret_and_legacy_keys():
+    modern = _auth_headers("sb_secret_example_nonproduction")
+    assert modern == {"apikey": "sb_secret_example_nonproduction"}
+    legacy = _auth_headers("eyJ_example_legacy_service_role_jwt")
+    assert legacy["apikey"] == "eyJ_example_legacy_service_role_jwt"
+    assert legacy["Authorization"] == "Bearer eyJ_example_legacy_service_role_jwt"

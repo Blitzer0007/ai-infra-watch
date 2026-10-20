@@ -29,12 +29,21 @@ def _config() -> tuple[str, str]:
     return base, service_key
 
 
+def _auth_headers(key: str) -> dict[str, str]:
+    """Build compatible auth headers for legacy service_role JWTs and new secret keys."""
+    headers = {"apikey": key}
+    if not key.startswith("sb_secret_"):
+        # Legacy service_role values are JWTs accepted in Authorization.
+        # New sb_secret_* API keys are opaque; Supabase expects them via apikey.
+        headers["Authorization"] = "Bearer " + key
+    return headers
+
+
 def _request(url: str, key: str, *, method: str, body: bytes | None,
              content_type: str, extra_headers: dict[str, str] | None = None,
              timeout: int = 60) -> tuple[int, bytes]:
     headers = {
-        "apikey": key,
-        "Authorization": "Bearer " + key,
+        **_auth_headers(key),
         "Content-Type": content_type,
         "User-Agent": "AI-Infra-Watch-private-evidence-archive/1.0",
     }
