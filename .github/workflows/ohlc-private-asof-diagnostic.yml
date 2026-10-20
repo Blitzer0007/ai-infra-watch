@@ -1,0 +1,36 @@
+name: OHLC private as-of diagnostic
+
+on:
+  push:
+    branches:
+      - feat/ohlc-private-asof-diagnostic
+    paths:
+      - "tests/production_validation/ohlc_asof_probe.py"
+      - ".github/workflows/ohlc-private-asof-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ohlc-private-asof-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: One-symbol historical as-of capability probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out isolated diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Query a single historical NVDA window
+        env:
+          OHLC_API_KEY: ${{ secrets.OHLC_API_KEY }}
+        run: python tests/production_validation/ohlc_asof_probe.py
