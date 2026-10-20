@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import hashlib
+import html
 import importlib.util
 import json
 import re
@@ -92,14 +93,46 @@ def publication_date_from_page(url: str, html: bytes, expected_date: str | None)
         expected = date.fromisoformat(expected_date).isoformat()
     except ValueError:
         return None
-    # Reject a dated official URL whose date conflicts with the dataset's announced date.
-    if path_dates and expected not in path_dates:
-        return None
-    if expected in metadata_dates or expected in path_dates:
+    # Do not accept conflicting metadata simply because a URL slug carries the expected date.
+    if metadata_dates:
+        if expected not in metadata_dates:
+            return None
+        return expected
+    if path_dates and expected in path_dates:
         return expected
     return None
 
-def fetch_announcement(url: str, expected_date: str | None, artifacts_root: Path) -> dict[str, Any]:
+
+def _title_overlap(expected_title: str, html_bytes: bytes) -> float:
+    """Measure whether the official page includes the event title supplied by the source dataset."""
+    stop = {
+        "the", "and", "for", "with", "from", "that", "this", "others", "join",
+        "set", "to", "of", "in", "on", "at", "by", "a", "an", "s", "p",
+        "500", "midcap", "smallcap", "index",
+    }
+    expected = {
+        token for token in re.findall(r"[a-z0-9]+", expected_title.lower())
+        if len(token) > 2 and token not in stop
+    }
+    if len(expected) < 2:
+        return 1.0
+    page_text = html.unescape(re.sub(r"(?is)<[^>]+>", " ", html_bytes.decode("utf-8", errors="replace"))).lower()
+    actual = set(re.findall(r"[a-z0-9]+", page_text))
+    return len(expected & actual) / len(expected)
+
+
+def _publication_upper_bound(published_date: str) -> str:
+    """Conservatively bound a date-only publication record in UTC, allowing local timezones."""
+    upper_day = date.fromisoformat(published_date) + timedelta(days=1)
+    return datetime.combine(upper_day, time.max, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def fetch_announcement(
+    url: str,
+    expected_date: str | None,
+    artifacts_root: Path,
+    expected_title: str | None = None,
+) -> dict[str, Any]:
     """Fetch and hash one allowlisted official page without following untrusted URLs."""
     if not is_official_url(url):
         return {"verified": False, "reason": "source host is not on the official allowlist", "source_url": url}
@@ -120,6 +153,14 @@ def fetch_announcement(url: str, expected_date: str | None, artifacts_root: Path
     published_date = publication_date_from_page(url, content, expected_date)
     if not published_date:
         return {"verified": False, "reason": "official page did not independently confirm its expected publication date", "source_url": url}
+    title_overlap = _title_overlap(expected_title or "", content)
+    if expected_title and title_overlap < 0.60:
+        return {
+            "verified": False,
+            "reason": "official page title/content did not sufficiently match the dataset's event title",
+            "source_url": url,
+            "title_overlap": round(title_overlap, 3),
+        }
     digest = sha256_bytes(content)
     relative_path = f"source-artifacts/official-announcements/{digest}.html"
     artifact_path = artifacts_root / relative_path
@@ -131,7 +172,9 @@ def fetch_announcement(url: str, expected_date: str | None, artifacts_root: Path
         "reason": None,
         "source_url": url,
         "published_date": published_date,
-        "published_at": iso_midnight(published_date),
+        "published_at": _publication_upper_bound(published_date),
+        "publication_time_precision": "date-only conservative UTC upper bound (+1 day)",
+        "title_overlap": round(title_overlap, 3),
         "artifact_path": relative_path,
         "sha256": digest,
         "bytes": len(content),
@@ -259,16 +302,26 @@ def build_bundle(
             }
 
     # Fetch official releases in parallel; each distinct URL is captured once by content hash.
-    unique_urls: dict[str, str | None] = {}
+    unique_urls: dict[str, dict[str, str | None]] = {}
     for event in event_inputs.values():
         if event["url"]:
-            unique_urls[event["url"]] = event["announcement_date"]
+            previous = unique_urls.get(event["url"])
+            title = event["titles"][0] if event["titles"] else ""
+            if previous and previous.get("title") and title and previous["title"] != title:
+                previous["title"] = ""  # conflicting labels for one URL: skip title-claim verification
+            else:
+                unique_urls[event["url"]] = {
+                    "date": event["announcement_date"],
+                    "title": title or None,
+                }
     fetched_sources: dict[str, dict[str, Any]] = {}
     source_fetch_errors: list[dict[str, str]] = []
     if fetch_sources:
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             futures = {
-                pool.submit(fetch_announcement, url, expected, output_root): url
+                pool.submit(
+                    fetch_announcement, url, expected["date"], output_root, expected.get("title")
+                ): url
                 for url, expected in unique_urls.items()
             }
             for future in concurrent.futures.as_completed(futures):
@@ -289,6 +342,7 @@ def build_bundle(
                 "verified": True,
                 "source_url": event["url"],
                 "published_at": result["published_at"],
+                "publication_time_precision": result.get("publication_time_precision"),
                 "artifact_path": result["artifact_path"],
                 "sha256": result["sha256"],
                 "evidence_type": "archived_constituent_release",
@@ -387,6 +441,7 @@ def build_bundle(
             "membership_evidence_type": str(entry_proof.get("evidence_type") or "effective_dated_constituent_file"),
             "membership_evidence_url": ev_url,
             "membership_evidence_published_at": published_at,
+            "membership_evidence_published_at_precision": entry_proof.get("publication_time_precision", "upstream commit timestamp; source row remains insufficient"),
             "membership_evidence_artifact_path": ev_path,
             "membership_evidence_sha256": ev_hash,
             "entry_evidence_verified": bool(entry_proof.get("verified")),
