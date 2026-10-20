@@ -169,6 +169,18 @@ def write_membership_fixture(root: Path):
         "    union: [D]\n",
         encoding="utf-8",
     )
+    (source / "sp500-ticker-changes-2026.yaml").write_text(
+        "year: 2026\\n"
+        "tickers_on_Jan_1: [A, D]\\n"
+        "changes:\\n"
+        "  '2026-06-22':\\n"
+        "    difference: [D]\\n"
+        "    union: [E]\\n"
+        "    source_url: https://press.spglobal.com/2026-06-05-e-test\\n"
+        "    announcement_date: '2026-06-05'\\n",
+        encoding="utf-8",
+    )
+
 
 
 def test_membership_builder_preserves_source_artifacts_and_fails_closed(tmp_path):
@@ -189,6 +201,15 @@ def test_membership_builder_preserves_source_artifacts_and_fails_closed(tmp_path
     assert all((output / row["membership_evidence_artifact_path"]).is_file() for row in rows)
     assert all(len(row["membership_evidence_sha256"]) == 64 for row in rows)
     assert report["coverage_through"] == "2025-12-31"
+    assert report["events_excluded_after_source_freeze"] == 1
+    assert report["latest_excluded_event_date"] == "2026-06-22"
+    by_symbol_and_start = {(row["symbol"], row["effective_from"][:10]): row for row in rows}
+    # A member removed on June 1 is not represented as a member on that effective date.
+    assert by_symbol_and_start[("B", "2024-01-01")]["effective_to"] == "2024-05-31T00:00:00Z"
+    assert by_symbol_and_start[("C", "2024-06-01")]["effective_to"] == "2025-02-02T00:00:00Z"
+    # No row sourced from this frozen dataset may imply indefinite current membership.
+    assert all(row["effective_to"] is not None for row in rows)
+    assert all(row["status"] == "insufficient" for row in rows if row["effective_to"] == "2025-12-31T00:00:00Z")
 
 
 
