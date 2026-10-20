@@ -93,6 +93,9 @@ def publication_date_from_page(url: str, html: bytes, expected_date: str | None)
         expected = date.fromisoformat(expected_date).isoformat()
     except ValueError:
         return None
+    # Require URL slug and page metadata to agree when both expose dates.
+    if path_dates and expected not in path_dates:
+        return None
     # Do not accept conflicting metadata simply because a URL slug carries the expected date.
     if metadata_dates:
         if expected not in metadata_dates:
@@ -154,10 +157,14 @@ def fetch_announcement(
     if not published_date:
         return {"verified": False, "reason": "official page did not independently confirm its expected publication date", "source_url": url}
     title_overlap = _title_overlap(expected_title or "", content)
-    if expected_title and title_overlap < 0.60:
+    if not expected_title or title_overlap < 0.60:
         return {
             "verified": False,
-            "reason": "official page title/content did not sufficiently match the dataset's event title",
+            "reason": (
+                "dataset event title is missing"
+                if not expected_title else
+                "official page title/content did not sufficiently match the dataset's event title"
+            ),
             "source_url": url,
             "title_overlap": round(title_overlap, 3),
         }
