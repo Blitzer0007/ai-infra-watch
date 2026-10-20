@@ -26,7 +26,7 @@ const ARCHIVE_PROVIDERS = [
 ];
 
 function parseArchiveTotalCount(contentRange, fallback) {
-  const match = String(contentRange || '').match(/\\/(\\d+)$/);
+  const match = String(contentRange || '').match(/\/(\d+)$/);
   return match ? Number(match[1]) : fallback;
 }
 
