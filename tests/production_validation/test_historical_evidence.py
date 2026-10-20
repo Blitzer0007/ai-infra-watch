@@ -19,7 +19,7 @@ def price_row(**overrides):
         "availability_evidence_id": "fixture-release-2025-01-02",
         "availability_evidence_type": "provider_snapshot",
         "availability_evidence_url": "https://data.nasdaq.com/databases/SEP/documentation?anchor=sample-data",
-        "availability_evidence_published_at": "2025-01-02T22:00:00Z",
+        "availability_evidence_published_at": "2025-01-02T21:04:00Z",
         "availability_evidence_sha256": "a" * 64,
     }
     return {**row, **overrides}
