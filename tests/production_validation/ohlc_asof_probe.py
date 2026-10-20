@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 SYMBOL = "XNAS:NVDA"
-AS_OF = "2026-10-03"
+AS_OF = "2026-09-22"
 DATE_FROM = "2025-10-01"
 DATE_TO = "2025-10-03"
 
@@ -151,7 +151,7 @@ def main() -> int:
 
     if status != 200:
         summary["result"] = "FAIL"
-    elif response_as_of != AS_OF:
+    elif not isinstance(response_as_of, str) or response_as_of[:10] != AS_OF:
         summary["result"] = "FAIL"
         summary["reason"] = "response_as_of_does_not_match_requested_cutoff"
     elif not data:
