@@ -70,10 +70,26 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
             return
         route.continue_()
 
+    console_errors: list[str] = []
+    page_errors: list[str] = []
+    page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.on("response", capture_response)
     page.route("**/*", read_only_guard)
-    page.goto("/jev-lab", wait_until="domcontentloaded", timeout=60000)
-    page.get_by_text("JEV Autonomous Portfolio Lab", exact=False).first.wait_for(state="visible", timeout=30000)
+    response = page.goto("/jev-lab", wait_until="domcontentloaded", timeout=60000)
+    try:
+        page.get_by_text("JEV Autonomous Portfolio Lab", exact=False).first.wait_for(state="visible", timeout=30000)
+    except Exception:
+        # Diagnostic output is intentionally limited to page metadata and visible text;
+        # never print request headers, cookies, storage state, or environment variables.
+        print(f"JEV smoke diagnostic: final_url={page.url!r}")
+        print(f"JEV smoke diagnostic: response_status={response.status if response else None}")
+        print(f"JEV smoke diagnostic: title={page.title()!r}")
+        print(f"JEV smoke diagnostic: visible_body_text={page.locator('body').inner_text(timeout=5000)[:3000]!r}")
+        print(f"JEV smoke diagnostic: jev_api_responses={api_responses!r}")
+        print(f"JEV smoke diagnostic: console_errors={console_errors[-20:]!r}")
+        print(f"JEV smoke diagnostic: page_errors={page_errors[-20:]!r}")
+        raise
     page.get_by_text("PAPER ONLY", exact=True).wait_for(state="visible", timeout=30000)
     page.get_by_text("MANUAL APPROVAL", exact=True).wait_for(state="visible", timeout=30000)
 
