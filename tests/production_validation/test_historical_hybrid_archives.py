@@ -170,14 +170,14 @@ def write_membership_fixture(root: Path):
         encoding="utf-8",
     )
     (source / "sp500-ticker-changes-2026.yaml").write_text(
-        "year: 2026\\n"
-        "tickers_on_Jan_1: [A, D]\\n"
-        "changes:\\n"
-        "  '2026-06-22':\\n"
-        "    difference: [D]\\n"
-        "    union: [E]\\n"
-        "    source_url: https://press.spglobal.com/2026-06-05-e-test\\n"
-        "    announcement_date: '2026-06-05'\\n",
+        "year: 2026\n"
+        "tickers_on_Jan_1: [A, D]\n"
+        "changes:\n"
+        "  '2026-06-22':\n"
+        "    difference: [D]\n"
+        "    union: [E]\n"
+        "    source_url: https://press.spglobal.com/2026-06-05-e-test\n"
+        "    announcement_date: '2026-06-05'\n",
         encoding="utf-8",
     )
 
