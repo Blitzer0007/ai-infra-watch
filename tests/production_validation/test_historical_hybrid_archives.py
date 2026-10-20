@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -53,6 +53,10 @@ def ohlc_payload(symbol: str = "XNAS:NVDA", as_of: str = "2026-10-20"):
 def test_ohlc_free_allowlist_is_exact_and_cutoff_is_fail_closed():
     assert set(FREE_SYMBOLS) == {"AAPL", "NVDA", "JNJ", "PEP", "MSFT", "SPY", "QQQ"}
     assert EARLIEST_SUPPORTED_AS_OF.isoformat() == "2026-09-22"
+    today = datetime.now(timezone.utc).date()
+    yesterday = today - timedelta(days=1)
+    with pytest.raises(ValueError, match="completed UTC calendar day"):
+        validate_ohlc_request("NVDA", yesterday.isoformat(), yesterday.isoformat(), today.isoformat())
     with pytest.raises(ValueError, match="outside"):
         validate_ohlc_request("MU", "2026-10-01", "2026-10-20", "2026-10-20")
     with pytest.raises(ValueError, match="before"):
@@ -258,6 +262,8 @@ def test_ohlc_archive_follows_all_cursor_pages_and_archives_manifest(monkeypatch
     uploaded = []
     metadata = []
 
+    as_of = datetime.now(timezone.utc).date() - timedelta(days=1)
+
     def make_page(trading_date, next_cursor):
         return json.dumps({
             "data": [{
@@ -270,7 +276,7 @@ def test_ohlc_archive_follows_all_cursor_pages_and_archives_manifest(monkeypatch
                 "close": "101.5",
                 "volume": "1000000",
             }],
-            "meta": {"as_of": "2026-10-20T23:59:59.999999Z", "next_cursor": next_cursor},
+            "meta": {"as_of": f"{as_of.isoformat()}T23:59:59.999999Z", "next_cursor": next_cursor},
         }).encode("utf-8")
 
     pages = {
@@ -291,7 +297,7 @@ def test_ohlc_archive_follows_all_cursor_pages_and_archives_manifest(monkeypatch
     monkeypatch.setattr(archive_ohlc_asof, "upsert_metadata", lambda row: metadata.append(row))
     monkeypatch.setattr(archive_ohlc_asof, "utc_now", lambda: "2026-10-20T23:45:00Z")
 
-    result = archive_ohlc_asof.archive_symbol("NVDA", date(2026, 10, 20))
+    result = archive_ohlc_asof.archive_symbol("NVDA", as_of)
 
     assert calls == [None, "cursor-page-2"]
     assert result["rows"] == 2
