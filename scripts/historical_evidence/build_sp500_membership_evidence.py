@@ -46,37 +46,57 @@ def is_official_url(url: str) -> bool:
 
 
 def publication_date_from_page(url: str, html: bytes, expected_date: str | None) -> str | None:
-    """Verify an announcement date from metadata or the official press URL's date slug."""
+    """Verify an announcement date from page metadata or the official press URL's date slug."""
     text = html.decode("utf-8", errors="replace")
-    candidates: list[str] = []
-    patterns = [
-        r'(?i)(?:article:published_time|og:published_time|datePublished|dateCreated|publishdate|publication_date)[^>]{0,160}?(?:content|value)?\s*[=:]\s*["\']([^"\']{10,35})["\']',
-        r'(?i)["\'](?:datePublished|dateCreated|published_time)["\']\s*:\s*["\']([^"\']{10,35})["\']',
-    ]
-    for pattern in patterns:
-        for match in re.finditer(pattern, text):
-            candidate = match.group(1)[:10]
-            try:
-                candidates.append(date.fromisoformat(candidate).isoformat())
-            except ValueError:
-                continue
-    path_dates = re.findall(r"(?<!\d)(20\d{2}-\d{2}-\d{2})(?!\d)", urlparse(url).path)
-    for candidate in path_dates:
+    metadata_dates: list[str] = []
+    for tag_match in re.finditer(r"(?is)<meta\b[^>]*>", text):
+        tag = tag_match.group(0)
+        attrs = {
+            match.group(1).lower(): match.group(3)
+            for match in re.finditer(r"""([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(["'])(.*?)\2""", tag, re.S)
+        }
+        name = str(attrs.get("property") or attrs.get("name") or "").lower()
+        if name not in {
+            "article:published_time", "og:published_time", "datepublished",
+            "datecreated", "publication_date", "publishdate",
+        }:
+            continue
+        candidate = str(attrs.get("content") or "")[:10]
         try:
-            candidates.append(date.fromisoformat(candidate).isoformat())
+            metadata_dates.append(date.fromisoformat(candidate).isoformat())
         except ValueError:
             continue
+
+    # JSON-LD is used by many publication systems; only inspect the known publication fields.
+    for pattern in (
+        r"""(?i)["'](?:datePublished|dateCreated|published_time)["']\s*:\s*["']([^"']{10,35})["']""",
+    ):
+        for match in re.finditer(pattern, text):
+            try:
+                metadata_dates.append(date.fromisoformat(match.group(1)[:10]).isoformat())
+            except ValueError:
+                continue
+
+    path_dates: list[str] = []
+    for candidate in re.findall(r"(?<!\d)(20\d{2}-\d{2}-\d{2})(?!\d)", urlparse(url).path):
+        try:
+            path_dates.append(date.fromisoformat(candidate).isoformat())
+        except ValueError:
+            continue
+
     if expected_date is None:
-        unique = sorted(set(candidates))
+        unique = sorted(set(metadata_dates or path_dates))
         return unique[0] if len(unique) == 1 else None
     try:
         expected = date.fromisoformat(expected_date).isoformat()
     except ValueError:
         return None
-    if expected in candidates:
+    # Reject a dated official URL whose date conflicts with the dataset's announced date.
+    if path_dates and expected not in path_dates:
+        return None
+    if expected in metadata_dates or expected in path_dates:
         return expected
     return None
-
 
 def fetch_announcement(url: str, expected_date: str | None, artifacts_root: Path) -> dict[str, Any]:
     """Fetch and hash one allowlisted official page without following untrusted URLs."""
