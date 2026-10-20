@@ -189,3 +189,40 @@ def test_membership_builder_preserves_source_artifacts_and_fails_closed(tmp_path
     assert all((output / row["membership_evidence_artifact_path"]).is_file() for row in rows)
     assert all(len(row["membership_evidence_sha256"]) == 64 for row in rows)
     assert report["coverage_through"] == "2025-12-31"
+
+
+
+def test_ohlc_payload_requires_pagination_metadata_and_exposes_cursor():
+    payload = ohlc_payload()
+    payload["meta"]["next_cursor"] = "next-page-token"
+    info = validate_ohlc_payload(
+        payload,
+        "XNAS:NVDA",
+        "2025-10-01",
+        "2026-10-20",
+        "2026-10-20",
+    )
+    assert info["next_cursor"] == "next-page-token"
+
+    del payload["meta"]["next_cursor"]
+    with pytest.raises(ValueError, match="pagination metadata"):
+        validate_ohlc_payload(
+            payload,
+            "XNAS:NVDA",
+            "2025-10-01",
+            "2026-10-20",
+            "2026-10-20",
+        )
+
+
+def test_ohlc_payload_rejects_malformed_cursor():
+    payload = ohlc_payload()
+    payload["meta"]["next_cursor"] = 42
+    with pytest.raises(ValueError, match="malformed pagination cursor"):
+        validate_ohlc_payload(
+            payload,
+            "XNAS:NVDA",
+            "2025-10-01",
+            "2026-10-20",
+            "2026-10-20",
+        )
