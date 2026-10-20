@@ -545,6 +545,29 @@ def build_bundle(
     except Exception as exc:
         validator = {"status": "ERROR", "checked": len(intervals), "errors": [f"Validator invocation failed ({type(exc).__name__})"]}
 
+    # Persist a machine-readable index of both accepted and rejected official-page evidence.
+    official_fetch_rows = [
+        {
+            "source_url": item.get("source_url") or url,
+            "final_url": item.get("final_url"),
+            "verified": bool(item.get("verified")),
+            "reason": item.get("reason"),
+            "published_date": item.get("published_date"),
+            "published_at": item.get("published_at"),
+            "publication_time_precision": item.get("publication_time_precision"),
+            "title_overlap": item.get("title_overlap"),
+            "artifact_path": item.get("artifact_path"),
+            "sha256": item.get("sha256"),
+            "bytes": item.get("bytes"),
+            "http_status": item.get("http_status"),
+        }
+        for url, item in sorted(fetched_sources.items())
+    ]
+    (output_root / "official_source_fetches.json").write_text(
+        json.dumps({"sources": official_fetch_rows}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
     # The open dataset itself reports a June 2026 freeze and outstanding conflicts.
     # Preserve the uncertainty instead of claiming that the universe is verified to today.
     caveats = notes.get("caveats") if isinstance(notes.get("caveats"), list) else []
@@ -563,6 +586,8 @@ def build_bundle(
         "insufficient_intervals": len(blocked),
         "unique_symbols": len({row["symbol"] for row in intervals}),
         "official_source_urls": len(unique_urls),
+        "official_source_fetches_path": "official_source_fetches.json",
+        "official_source_fetches": official_fetch_rows,
         "events_excluded_after_source_freeze": len(events_after_coverage),
         "latest_excluded_event_date": max(events_after_coverage) if events_after_coverage else None,
         "official_source_pages_archived": sum(1 for item in fetched_sources.values() if item.get("verified")),
