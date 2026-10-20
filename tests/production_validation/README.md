@@ -50,6 +50,10 @@ This makes read-only requests to the Yahoo Finance chart endpoint, records the e
 
 **The collector intentionally leaves the price gate BLOCKED.** A provider's current retrieval time does not prove when each historical price was first available to a strategy. Do not substitute the download timestamp for `available_at` or a decision cutoff. The universe-membership gate also remains BLOCKED when no independently sourced effective-dated membership file is provided. The report is auditable source evidence, not approval to run a point-in-time backtest.
 
+**Evidence schema hardening:** the release validator now requires more than a timestamp and a source URL. Each price row must include a vendor/source row identifier, an availability-evidence record ID/type, an HTTPS evidence URL, the evidence's original publication timestamp, and a SHA-256 digest of the exact evidence artifact. The evidence publication timestamp must be no later than both the claimed `available_at` and the strategy decision cutoff. Universe-membership rows similarly require a membership record ID, evidence record/type/URL/publication timestamp, and SHA-256 of the exact evidence artifact; reversed effective intervals and evidence published after the as-of date are rejected. HTTPS links with placeholder hosts or credentials embedded in URL query parameters are rejected.
+
+The validator checks that the submitted artifact references and chronology are structurally plausible; it cannot independently authenticate a vendor's statement. Review the raw artifact, hash, record identifier, licensed source, and timestamp provenance before accepting a real-world PASS. The Yahoo collector intentionally emits blank availability-evidence fields because the current chart response is not a versioned publication record; its structural collection result must not be mistaken for point-in-time evidence.
+
 ## Telegram natural-run evidence
 This suite deliberately does not trigger the scan. Capture evidence from the naturally scheduled workflow:
 - scheduled workflow run ID and timestamp;
