@@ -1,4 +1,5 @@
 import { requireAccess } from '../../api/_access-auth.js';
+import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -139,13 +140,9 @@ async function sendTelegram(events) {
           signal: AbortSignal.timeout(10000),
         },
       );
-      if (!response.ok) {
-        let detail = '';
-        try {
-          const payload = await response.json();
-          detail = payload?.description ? ' ' + payload.description : '';
-        } catch {}
-        throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail);
+      const payload = await response.json().catch(() => null);
+      if (!isTelegramMessageAccepted(response.ok, payload)) {
+        throw new Error(telegramDeliveryFailure(response.status, payload));
       }
       sent += 1;
     } catch (error) {
