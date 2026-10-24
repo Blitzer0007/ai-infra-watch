@@ -58,3 +58,35 @@ jobs:
           }
           console.log('npm audit exit status:', auditStatus);
           NODE
+
+      - name: Build a lockfile-only remediation candidate
+        continue-on-error: true
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund --no-progress
+
+      - name: Summarize remaining advisories after candidate fix
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > "$RUNNER_TEMP/npm-audit-after.json"
+          audit_status=$?
+          set -e
+          node --input-type=module - "$RUNNER_TEMP/npm-audit-after.json" "$audit_status" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const [file, status] = process.argv.slice(2);
+          const report = JSON.parse(readFileSync(file, 'utf8'));
+          console.log('Post-fix dependency audit:', JSON.stringify(report.metadata?.vulnerabilities || {}));
+          for (const [name, item] of Object.entries(report.vulnerabilities || {})) {
+            console.log(JSON.stringify({ package: name, severity: item.severity, fixAvailable: item.fixAvailable }));
+          }
+          console.log('Post-fix npm audit exit status:', status);
+          NODE
+
+      - name: Upload non-committing package-lock candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-remediation-candidate
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
