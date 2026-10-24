@@ -20,6 +20,7 @@ on:
       - "api/**"
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
+      - ".github/workflows/vercel-production-deploy.yml"
   schedule:
     - cron: "30 2 * * *"
 
