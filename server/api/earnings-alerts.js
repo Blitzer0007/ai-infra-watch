@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createPublicKey, createVerify } from 'node:crypto';
+import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 import { history as loadMarketHistory, providerSymbol } from '../../api/_market-data.js';
 
 const DEFAULT_LEAD_DAYS = 1;
@@ -310,12 +311,7 @@ export function isFinnhubCalendarPayload(payload) {
     && Array.isArray(payload.earningsCalendar));
 }
 
-export function telegramAccepted(responseOk, payload) {
-  return responseOk === true
-    && payload?.ok === true
-    && Number.isSafeInteger(payload?.result?.message_id)
-    && payload.result.message_id > 0;
-}
+export const telegramAccepted = isTelegramMessageAccepted;
 
 async function fetchFinnhubCalendar(fromDate, toDate) {
   const apiKey = String(process.env.FINNHUB_API_KEY || '').trim();
@@ -449,12 +445,8 @@ async function sendTelegram(alerts) {
         },
       );
       const payload = await response.json().catch(() => null);
-      if (!telegramAccepted(response.ok, payload)) {
-        const detail = payload?.description ? ' ' + String(payload.description).slice(0, 240) : '';
-        const statusText = response.ok
-          ? 'Telegram did not confirm an accepted message ID.'
-          : 'Telegram API returned HTTP ' + response.status + '.';
-        throw new Error(statusText + detail);
+      if (!isTelegramMessageAccepted(response.ok, payload)) {
+        throw new Error(telegramDeliveryFailure(response.status, payload));
       }
       sent += 1;
     } catch (error) {
