@@ -583,12 +583,13 @@ export async function sendOnceWithDurableClaim({ claim, inspectExistingClaim, se
   }
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, notificationsDeferredStaleQuote = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
   if (notifyEligibleCandidates > 0 && notificationsDeferred >= notifyEligibleCandidates) {
     if (notificationsDeferredNonScheduled >= notifyEligibleCandidates) return 'notifications_deferred_non_scheduled_scan';
     if (notificationsDeferredOutsideSession >= notifyEligibleCandidates) return 'notifications_deferred_outside_market_session';
+    if (notificationsDeferredStaleQuote >= notifyEligibleCandidates) return 'notifications_deferred_stale_quote';
     return 'notifications_deferred_by_safety_gate';
   }
   if (notificationsDeferred > 0) return 'completed_with_deferred_notifications';
@@ -619,7 +620,7 @@ async function sendTelegram(row,q,signal=assess(row,q)) {
 }
 async function runScan({ allowNotifications = false } = {}) {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; let notificationsDeferredStaleQuote=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
@@ -628,13 +629,15 @@ async function runScan({ allowNotifications = false } = {}) {
       if (candidate) qualifyingCandidates++;
       const notifyEligible = shouldNotifySignal(row.last_alert_signature, signal.status);
       const now = new Date();
-      const sessionAndQuoteValid = isRegularUsEquitySession(now) && isSameNewYorkMarketDate(q.marketTime, now);
+      const regularSessionOpen = isRegularUsEquitySession(now);
+      const quoteMarketDateValid = isSameNewYorkMarketDate(q.marketTime, now);
       const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications);
       if (notifyEligible) notifyEligibleCandidates++;
       if (notifyEligible && !notificationWindowOpen) {
         notificationsDeferred++;
         if (!allowNotifications) notificationsDeferredNonScheduled++;
-        else if (!sessionAndQuoteValid) notificationsDeferredOutsideSession++;
+        else if (!regularSessionOpen) notificationsDeferredOutsideSession++;
+        else if (!quoteMarketDateValid) notificationsDeferredStaleQuote++;
       }
       if(notifyEligible && notificationWindowOpen) {
         const chatId=String(process.env.TELEGRAM_CHAT_ID||'').trim();
@@ -686,7 +689,7 @@ async function runScan({ allowNotifications = false } = {}) {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, notificationsDeferredStaleQuote, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
