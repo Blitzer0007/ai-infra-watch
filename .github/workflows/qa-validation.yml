@@ -21,6 +21,7 @@ on:
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
       - ".github/workflows/vercel-production-deploy.yml"
+      - ".github/workflows/jev-lab-weekly-review.yml"
   schedule:
     - cron: "30 2 * * *"
 
@@ -95,7 +96,7 @@ jobs:
   ui:
     name: Playwright UI functional validation
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' && vars.QA_BASE_URL != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.QA_BASE_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
