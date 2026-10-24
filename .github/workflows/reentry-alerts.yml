@@ -2,7 +2,7 @@ name: Re-entry Telegram Alerts
 run-name: Re-entry scan • ${{ github.event.schedule || 'scheduled' }}
 on:
   # The 15-minute poll spans US regular-session hours year-round; the New York-time preflight below is authoritative.
-  # The opt-in variable must remain unset/false until the guarded API code is deployed and the release is approved.
+  # Both independent opt-ins must remain unset/false until matching API code is deployed and explicit release approval is recorded.
   schedule:
     - cron: "*/15 13-20 * * 1-5"
 permissions:
@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
-    # Hard release gate: repository variable is intentionally not set by this PR.
-    if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' }}
+    # Dual hard release gate: neither opt-in variable is set by this PR.
+    if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' && vars.REENTRY_ALERTS_RELEASE_APPROVED == 'true' }}
     runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
