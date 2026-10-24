@@ -460,10 +460,13 @@ test('same-market-date guard rejects missing, invalid, and stale holiday/weekend
   assert.equal(isSameNewYorkMarketDate('not-a-date', now), false);
 });
 
-test('re-entry notification requires both regular-session time and a quote from the same New York date', () => {
-  assert.equal(canSendReentryNotification('2026-10-26T13:35:00Z', new Date('2026-10-26T14:00:00Z')), true);
-  assert.equal(canSendReentryNotification('2026-10-26T13:35:00Z', new Date('2026-10-26T20:00:00Z')), false);
-  assert.equal(canSendReentryNotification('2026-10-23T19:55:00Z', new Date('2026-10-26T14:00:00Z')), false);
+test('re-entry notification requires an approved scheduled run, regular-session time, and same-date quote', () => {
+  const marketTime = '2026-10-26T13:35:00Z';
+  const now = new Date('2026-10-26T14:00:00Z');
+  assert.equal(canSendReentryNotification(marketTime, now), false); // interactive/UI refreshes are not allowed to send
+  assert.equal(canSendReentryNotification(marketTime, now, true), true);
+  assert.equal(canSendReentryNotification(marketTime, new Date('2026-10-26T20:00:00Z'), true), false);
+  assert.equal(canSendReentryNotification('2026-10-23T19:55:00Z', now, true), false);
 });
 
 test('deferred off-hours notification preserves the prior alert signature for the next live session', () => {
@@ -473,6 +476,7 @@ test('deferred off-hours notification preserves the prior alert signature for th
 });
 
 test('scan status explicitly distinguishes fully deferred notifications from failed delivery', () => {
-  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_outside_market_session');
-  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredOutsideSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_outside_market_session');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_non_scheduled_scan');
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
