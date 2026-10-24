@@ -93,9 +93,10 @@ jobs:
         run: python -m pytest -q qa/test_db.py
 
   ui:
-    name: Playwright UI functional validation
+    name: Authenticated production JEV smoke (read-only)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' && vars.QA_BASE_URL != '' }}
+    timeout-minutes: 8
+    if: ${{ vars.QA_BASE_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -105,12 +106,14 @@ jobs:
         run: python -m pip install -r qa/requirements.txt
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
-      - name: Run Playwright UI tests
+      - name: Run isolated authenticated JEV smoke tests
         env:
+          PYTHONUNBUFFERED: "1"
+          PYTHONFAULTHANDLER: "1"
           QA_BASE_URL: ${{ vars.QA_BASE_URL }}
           QA_HEADERS_JSON: ${{ secrets.QA_HEADERS_JSON }}
           QA_STORAGE_STATE_B64: ${{ secrets.QA_STORAGE_STATE_B64 }}
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py
+        run: python -u -m pytest -vv -s -o faulthandler_timeout=120 qa/test_jev_production.py
 
 
   telegram-outbox-migration-test:
