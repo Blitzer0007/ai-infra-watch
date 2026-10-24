@@ -297,6 +297,7 @@ def test_decision_journal_mounts(page):
     goto_app(page)
     journal = page.get_by_test_id("decision-journal")
     journal.wait_for(state="visible", timeout=30000)
+    journal.get_by_text("Decision journal + 20-day review", exact=False).wait_for(state="visible", timeout=30000)
     assert "Decision journal + 20-day review" in journal.inner_text()
     journal.get_by_test_id("decision-weekly-review").wait_for(state="visible", timeout=30000)
 
