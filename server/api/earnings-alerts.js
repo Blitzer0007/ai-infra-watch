@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createPublicKey, createVerify } from 'node:crypto';
+import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 import { history as loadMarketHistory, providerSymbol } from '../../api/_market-data.js';
 
 const DEFAULT_LEAD_DAYS = 1;
@@ -305,6 +306,13 @@ function buildAlert(event, profile, profiles, today) {
   };
 }
 
+export function isFinnhubCalendarPayload(payload) {
+  return Boolean(payload && typeof payload === 'object' && !Array.isArray(payload)
+    && Array.isArray(payload.earningsCalendar));
+}
+
+export const telegramAccepted = isTelegramMessageAccepted;
+
 async function fetchFinnhubCalendar(fromDate, toDate) {
   const apiKey = String(process.env.FINNHUB_API_KEY || '').trim();
   if (!apiKey) {
@@ -334,9 +342,16 @@ async function fetchFinnhubCalendar(fromDate, toDate) {
       };
     }
     const payload = await response.json();
+    if (!isFinnhubCalendarPayload(payload)) {
+      return {
+        ok: false,
+        error: 'Finnhub earnings calendar returned an unexpected response schema.',
+        events: [],
+      };
+    }
     return {
       ok: true,
-      events: Array.isArray(payload?.earningsCalendar) ? payload.earningsCalendar : [],
+      events: payload.earningsCalendar,
     };
   } catch (error) {
     return {
@@ -429,13 +444,9 @@ async function sendTelegram(alerts) {
           signal: AbortSignal.timeout(10000),
         },
       );
-      if (!response.ok) {
-        let detail = '';
-        try {
-          const payload = await response.json();
-          detail = payload?.description ? ' ' + payload.description : '';
-        } catch {}
-        throw new Error('Telegram API returned HTTP ' + response.status + '.' + detail);
+      const payload = await response.json().catch(() => null);
+      if (!isTelegramMessageAccepted(response.ok, payload)) {
+        throw new Error(telegramDeliveryFailure(response.status, payload));
       }
       sent += 1;
     } catch (error) {
@@ -640,12 +651,11 @@ async function githubOidcVerified(req) {
     return false;
   }
 }
-async function authorizedForNotify(req) {
+export async function authorizedForNotify(req) {
   const secret = String(process.env.CRON_SECRET || '').trim();
-  if (secret && req.headers.authorization === 'Bearer ' + secret) return true;
-  if (await githubOidcVerified(req)) return true;
-  const userAgent = String(req.headers['user-agent'] || '');
-  return userAgent.includes('vercel-cron/1.0');
+  if (secret && req.headers?.authorization === 'Bearer ' + secret) return true;
+  // User-Agent is caller-controlled and must never be treated as authentication.
+  return githubOidcVerified(req);
 }
 
 export default async function handler(req, res) {
@@ -662,6 +672,14 @@ export default async function handler(req, res) {
   const toDate = new Date(today.getTime() + lookaheadDays * 86400000);
   const to = toDate.toISOString().slice(0, 10);
 
+  const isVercelCron = String(req.headers['user-agent'] || '').includes('vercel-cron/1.0');
+  const notify = String(req.query?.notify || '') === '1' || isVercelCron;
+  if (notify && !(await authorizedForNotify(req))) {
+    // Reject before contacting Finnhub or any notification provider.
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(401).json({ ok: false, error: 'Unauthorized earnings notification trigger.' });
+  }
+
   const calendar = await fetchFinnhubCalendar(from, to);
 
   const upcoming = calendar.events
@@ -674,8 +692,6 @@ export default async function handler(req, res) {
     .filter(event => event.days_until >= 0 && event.days_until <= lookaheadDays)
     .sort((a, b) => a.date.localeCompare(b.date) || a.symbol.localeCompare(b.symbol));
 
-  const isVercelCron = String(req.headers['user-agent'] || '').includes('vercel-cron/1.0');
-  const notify = String(req.query?.notify || '') === '1' || isVercelCron;
   let delivered = {
     configured: Boolean(String(process.env.NOTIFY_WEBHOOK_URL || '').trim())
       || Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim() && String(process.env.TELEGRAM_CHAT_ID || '').trim()),
@@ -689,10 +705,6 @@ export default async function handler(req, res) {
   };
 
   if (notify) {
-    if (!(await authorizedForNotify(req))) {
-      return res.status(401).json({ ok: false, error: 'Unauthorized earnings notification trigger.' });
-    }
-
     const due = upcoming.filter(event => event.days_until === leadDays);
     const [webhookDelivery, telegramDelivery] = await Promise.all([
       sendWebhook(due),
