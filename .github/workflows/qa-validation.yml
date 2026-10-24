@@ -21,6 +21,7 @@ on:
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
       - ".github/workflows/vercel-production-deploy.yml"
+      - ".github/workflows/jev-lab-weekly-review.yml"
   schedule:
     - cron: "30 2 * * *"
 
