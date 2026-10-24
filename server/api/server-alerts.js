@@ -2,6 +2,7 @@ import { createPublicKey, createVerify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireAccess } from '../../api/_access-auth.js';
+import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 import { getTickerValidationContext } from '../utils/forecastValidation.js';
 import { getMarketSessionInfo, shouldEmitLargeMoveSummary, shouldEvaluateLargeMove } from '../utils/serverAlertSession.js';
 
@@ -239,9 +240,9 @@ async function sendTelegram(events) {
           signal: AbortSignal.timeout(10000),
         }
       );
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(String(payload?.description || 'Telegram HTTP ' + response.status));
+      const payload = await response.json().catch(() => null);
+      if (!isTelegramMessageAccepted(response.ok, payload)) {
+        throw new Error(telegramDeliveryFailure(response.status, payload));
       }
       sent += 1;
       sentEventKeys.push(event.stateKey);
