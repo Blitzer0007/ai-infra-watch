@@ -42,7 +42,7 @@ if (files.includes(deploymentWorkflowPath)) {
   if (stepScopedTokenCount < 5) {
     findings.push(deploymentWorkflowPath + ': expected step-scoped VERCEL_TOKEN for auth/deploy CLI steps');
   }
-  if (/cat\\s+\\/tmp\\/production-(?:auth|portfolio)\\.json/.test(workflow)) {
+  if (/cat\s+\/tmp\/production-(?:auth|portfolio)\.json/.test(workflow)) {
     findings.push(deploymentWorkflowPath + ': do not print raw access-control response bodies into CI logs');
   }
 }
