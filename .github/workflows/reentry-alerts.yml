@@ -54,6 +54,46 @@ jobs:
           if { [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; } && [ -n "${FALLBACK_TOKEN:-}" ]; then
             CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' --header "Authorization: Bearer $FALLBACK_TOKEN" "$URL")
           fi
-          cat response.json
-          test "$CODE" = "200"
-          node -e "const d=require('./response.json');if(!d.ok)process.exit(1);if(d.scanned===0||d.scanStatus==='empty_watchlist'){console.error('Empty active re-entry watchlist: no entries were evaluated; this is not a completed evaluation.');process.exit(1)}if(d.scanStatus==='incomplete_scan'||d.scanStatus==='completed_with_errors'||d.errors?.length){console.error((d.errors||[]).join('\\n')||('Scan status: '+d.scanStatus));process.exit(1)}"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Re-entry endpoint returned HTTP $CODE; response body is suppressed."
+            exit 1
+          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          let data;
+          try {
+            data = JSON.parse(fs.readFileSync('response.json', 'utf8'));
+          } catch {
+            console.error('Re-entry endpoint returned invalid JSON; response body is suppressed.');
+            process.exit(1);
+          }
+          if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            console.error('Re-entry endpoint returned an unexpected response shape; body suppressed.');
+            process.exit(1);
+          }
+          const summary = {
+            ok: data.ok === true,
+            scanStatus: typeof data.scanStatus === 'string' ? data.scanStatus : 'unknown',
+            activeRows: Number.isInteger(data.activeRows) ? data.activeRows : null,
+            evaluatedRows: Number.isInteger(data.evaluatedRows) ? data.evaluatedRows : null,
+            qualifyingCandidates: Number.isInteger(data.qualifyingCandidates) ? data.qualifyingCandidates : null,
+            notifyEligibleCandidates: Number.isInteger(data.notifyEligibleCandidates) ? data.notifyEligibleCandidates : null,
+            notificationsDeferred: Number.isInteger(data.notificationsDeferred) ? data.notificationsDeferred : null,
+            telegramSent: Number.isInteger(data.telegramSent) ? data.telegramSent : null,
+            telegramPreviouslyAccepted: Number.isInteger(data.telegramPreviouslyAccepted) ? data.telegramPreviouslyAccepted : null,
+            errorCount: Array.isArray(data.errors) ? data.errors.length : null,
+          };
+          console.log('Re-entry scan summary (watchlist rows, theses, message IDs and error details omitted): ' + JSON.stringify(summary));
+          if (data.ok !== true) {
+            console.error('Re-entry scan reported failure; private response details are suppressed.');
+            process.exit(1);
+          }
+          if (data.activeRows === 0 || data.scanStatus === 'empty_watchlist') {
+            console.error('Empty active re-entry watchlist: no entries were evaluated.');
+            process.exit(1);
+          }
+          if (data.scanStatus === 'incomplete_scan' || data.scanStatus === 'completed_with_errors' || (Array.isArray(data.errors) && data.errors.length > 0)) {
+            console.error('Re-entry scan was incomplete or had errors; private details are suppressed.');
+            process.exit(1);
+          }
+          NODE
