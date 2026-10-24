@@ -20,3 +20,13 @@ def test_jev_smoke_workflow_uses_configured_auth_without_exposing_it():
     assert "QA_HEADERS_JSON: ${{ secrets.QA_HEADERS_JSON }}" in smoke_job
     assert "qa/test_jev_production.py" in smoke_job
     assert "echo ${{ secrets.QA_HEADERS_JSON }}" not in smoke_job
+
+
+def test_jev_smoke_fails_closed_when_authenticated_config_is_missing():
+    workflow = (ROOT / ".github" / "workflows" / "qa-validation.yml").read_text()
+    smoke_job = workflow.split("  jev-production-smoke:\\n", 1)[1].split("\\n\\n  telegram-outbox-migration-test:", 1)[0]
+    assert "if: ${{ vars.QA_BASE_URL != '' }}" not in smoke_job
+    assert "Require authenticated production QA configuration" in smoke_job
+    assert 'echo "::error::QA_BASE_URL is required' in smoke_job
+    assert 'echo "::error::QA_HEADERS_JSON is required' in smoke_job
+    assert "skipped authenticated smoke tests are not release evidence" in smoke_job
