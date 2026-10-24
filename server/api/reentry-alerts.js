@@ -53,7 +53,69 @@ async function quoteHistory(symbol) {
   if(!(price>0) || valid.length<50) throw new Error('Insufficient history for '+symbol);
   const avg=n=>valid.slice(-n).reduce((a,b)=>a+b,0)/n;
   const high=Math.max(...valid);
-  return {price,sma20:avg(20),sma50:avg(50),drawdownFrom52WeekHighPct:high>0?(high-price)/high*100:null,retrievedAt:new Date().toISOString()};
+  const regularMarketTime = meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
+  const marketTime = Number.isFinite(regularMarketTime) && regularMarketTime > 0
+    ? new Date(regularMarketTime * 1000).toISOString()
+    : null;
+  const regularPeriod = meta.currentTradingPeriod?.regular;
+  const sessionStart = regularPeriod?.start == null ? NaN : Number(regularPeriod.start);
+  const sessionEnd = regularPeriod?.end == null ? NaN : Number(regularPeriod.end);
+  const regularSession = Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart > 0 && sessionEnd > sessionStart
+    ? { start: sessionStart, end: sessionEnd }
+    : null;
+  return {price,sma20:avg(20),sma50:avg(50),drawdownFrom52WeekHighPct:high>0?(high-price)/high*100:null,retrievedAt:new Date().toISOString(),marketTime,regularSession};
+}
+
+function newYorkClockParts(value) {
+  const instant = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(instant.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(instant);
+  return Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+}
+
+/** True only during the regular US equity session; the quote-date check separately rejects holidays/stale prices. */
+export function isRegularUsEquitySession(now = new Date()) {
+  const parts = newYorkClockParts(now);
+  if (!parts || parts.weekday === 'Sat' || parts.weekday === 'Sun') return false;
+  const minuteOfDay = Number(parts.hour) * 60 + Number(parts.minute);
+  return Number.isFinite(minuteOfDay) && minuteOfDay >= 9 * 60 + 30 && minuteOfDay < 16 * 60;
+}
+
+export function isSameNewYorkMarketDate(marketTime, now = new Date()) {
+  if (!marketTime) return false;
+  const quote = newYorkClockParts(marketTime);
+  const current = newYorkClockParts(now);
+  return Boolean(quote && current && quote.year === current.year && quote.month === current.month && quote.day === current.day);
+}
+
+/** Prevent off-hours/manual refreshes or stale holiday quotes from sending notifications. */
+export function hasValidRegularSessionBounds(regularSession) {
+  const start = regularSession?.start == null ? NaN : Number(regularSession.start);
+  const end = regularSession?.end == null ? NaN : Number(regularSession.end);
+  return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > start;
+}
+
+export function isWithinRegularSessionBounds(regularSession, now = new Date()) {
+  if (!hasValidRegularSessionBounds(regularSession)) return false;
+  const start = Number(regularSession.start);
+  const end = Number(regularSession.end);
+  const instant = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  return Number.isFinite(instant) && instant >= start * 1000 && instant < end * 1000;
+}
+
+export function canSendReentryNotification(marketTime, now = new Date(), allowScheduledRun = false, regularSession = null) {
+  return allowScheduledRun === true
+    && isRegularUsEquitySession(now)
+    && isSameNewYorkMarketDate(marketTime, now)
+    && isWithinRegularSessionBounds(regularSession, now);
+}
+
+/** A deferred notification must retain the previous signature so the next eligible session can send it once. */
+export function resolveLastAlertSignature(previousSignature, nextStatus, notificationDeferred = false) {
+  return notificationDeferred ? (previousSignature ?? null) : nextStatus;
 }
 
 const RESEARCH_CACHE = new Map();
@@ -544,9 +606,17 @@ export async function sendOnceWithDurableClaim({ claim, inspectExistingClaim, se
   }
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, notificationsDeferredStaleQuote = 0, notificationsDeferredMissingSession = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
+  if (notifyEligibleCandidates > 0 && notificationsDeferred >= notifyEligibleCandidates) {
+    if (notificationsDeferredNonScheduled >= notifyEligibleCandidates) return 'notifications_deferred_non_scheduled_scan';
+    if (notificationsDeferredOutsideSession >= notifyEligibleCandidates) return 'notifications_deferred_outside_market_session';
+    if (notificationsDeferredStaleQuote >= notifyEligibleCandidates) return 'notifications_deferred_stale_quote';
+    if (notificationsDeferredMissingSession >= notifyEligibleCandidates) return 'notifications_deferred_missing_session_metadata';
+    return 'notifications_deferred_by_safety_gate';
+  }
+  if (notificationsDeferred > 0) return 'completed_with_deferred_notifications';
   if (notifyEligibleCandidates > 0 && (telegramSent > 0 || telegramPreviouslyAccepted > 0)) return 'telegram_delivery_confirmed';
   if (notifyEligibleCandidates > 0) return 'candidate_not_delivered';
   if (evaluatedRows === activeRows && qualifyingCandidates === 0) return 'evaluated_no_qualifying_candidate';
@@ -572,9 +642,9 @@ async function sendTelegram(row,q,signal=assess(row,q)) {
   }
   return payload.result.message_id;
 }
-async function runScan() {
+async function runScan({ allowNotifications = false } = {}) {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; let notificationsDeferredStaleQuote=0; let notificationsDeferredMissingSession=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
@@ -582,8 +652,21 @@ async function runScan() {
       const candidate=signal.status==='REENTRY_CANDIDATE';
       if (candidate) qualifyingCandidates++;
       const notifyEligible = shouldNotifySignal(row.last_alert_signature, signal.status);
+      const now = new Date();
+      const regularSessionOpen = isRegularUsEquitySession(now);
+      const quoteMarketDateValid = isSameNewYorkMarketDate(q.marketTime, now);
+      const sessionBoundsPresent = hasValidRegularSessionBounds(q.regularSession);
+      const actualSessionOpen = isWithinRegularSessionBounds(q.regularSession, now);
+      const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications, q.regularSession);
       if (notifyEligible) notifyEligibleCandidates++;
-      if(notifyEligible) {
+      if (notifyEligible && !notificationWindowOpen) {
+        notificationsDeferred++;
+        if (!allowNotifications) notificationsDeferredNonScheduled++;
+        else if (!regularSessionOpen || (sessionBoundsPresent && !actualSessionOpen)) notificationsDeferredOutsideSession++;
+        else if (!quoteMarketDateValid) notificationsDeferredStaleQuote++;
+        else if (!sessionBoundsPresent) notificationsDeferredMissingSession++;
+      }
+      if(notifyEligible && notificationWindowOpen) {
         const chatId=String(process.env.TELEGRAM_CHAT_ID||'').trim();
         if(!chatId) throw new Error('Telegram chat ID is not configured');
         // One notification per configured thesis/target episode. Existing claims are never auto-retried.
@@ -615,7 +698,7 @@ async function runScan() {
           throw new Error('Telegram delivery claim is '+delivery.priorStatus+'; no resend occurred. Reconciliation is required before another attempt.');
         }
       }
-      const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:signal.status,updated_at:new Date().toISOString()};
+      const patch={last_price:q.price,sma20:q.sma20,sma50:q.sma50,drawdown_from_52_week_high_pct:q.drawdownFrom52WeekHighPct,retrieved_at:q.retrievedAt,last_alert_signature:resolveLastAlertSignature(row.last_alert_signature,signal.status,notifyEligible && !notificationWindowOpen),updated_at:new Date().toISOString()};
       await db('reentry_watchlist?symbol=eq.'+encodeURIComponent(row.symbol),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(patch)});
       if (acceptedMessageId) {
         const evidence = deliveryEvidence.find(item => item.symbol === row.symbol && item.messageId === acceptedMessageId);
@@ -633,7 +716,7 @@ async function runScan() {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, notificationsDeferredStaleQuote, notificationsDeferredMissingSession, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
@@ -643,7 +726,7 @@ export default async function handler(req,res) {
   res.setHeader('Cache-Control','no-store');
   const cron=await isCron(req);
   if(cron && req.method==='GET' && String(req.query?.run||'')==='true') {
-    try { return res.status(200).json(await runScan()); }
+    try { return res.status(200).json(await runScan({ allowNotifications: true })); }
     catch(e) { return res.status(500).json({ok:false,error:String(e?.message||e)}); }
   }
   if(!requireAccess(req,res)) return;

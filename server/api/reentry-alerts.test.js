@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { telegramAccepted } from './reentry-alerts.js';
+import { telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
 
 test('Telegram delivery counts only a successful API response with a message id', () => {
   assert.equal(telegramAccepted(true, { ok: true, result: { message_id: 42 } }), true);
@@ -36,7 +36,6 @@ test('a failed delivery leaves the previous non-candidate signature eligible for
 });
 
 
-import { classifyScan } from './reentry-alerts.js';
 
 test('empty watchlist is not reported as a successful no-candidate evaluation', () => {
   assert.equal(classifyScan({ activeRows: 0, evaluatedRows: 0, qualifyingCandidates: 0, notifyEligibleCandidates: 0, telegramSent: 0, errors: 0 }), 'empty_watchlist');
@@ -442,4 +441,53 @@ test('missing fund ownership fields remain unavailable instead of becoming zeros
   assert.equal(result.billionaireAssociatedFunds[0].shares, null);
   assert.equal(result.billionaireAssociatedFunds[0].shareChange, null);
   assert.equal(result.billionaireAssociatedFunds[0].portfolioPercent, null);
+});
+
+
+test('regular-session gate observes New York time across daylight-saving changes', () => {
+  assert.equal(isRegularUsEquitySession(new Date('2026-10-26T13:30:00Z')), true); // 09:30 EDT
+  assert.equal(isRegularUsEquitySession(new Date('2026-10-26T13:29:00Z')), false);
+  assert.equal(isRegularUsEquitySession(new Date('2026-10-26T20:00:00Z')), false); // 16:00 EDT, close is exclusive
+  assert.equal(isRegularUsEquitySession(new Date('2026-11-02T14:30:00Z')), true); // 09:30 EST
+  assert.equal(isRegularUsEquitySession(new Date('2026-10-24T14:00:00Z')), false); // Saturday
+});
+
+test('same-market-date guard rejects missing, invalid, and stale holiday/weekend quotes', () => {
+  const now = new Date('2026-10-26T14:00:00Z');
+  assert.equal(isSameNewYorkMarketDate('2026-10-26T13:35:00Z', now), true);
+  assert.equal(isSameNewYorkMarketDate('2026-10-23T19:55:00Z', now), false);
+  assert.equal(isSameNewYorkMarketDate(null, now), false);
+  assert.equal(isSameNewYorkMarketDate('not-a-date', now), false);
+});
+
+test('re-entry notification requires an approved scheduled run, same-date quote, and valid provider session bounds', () => {
+  const marketTime = '2026-10-26T13:35:00Z';
+  const now = new Date('2026-10-26T14:00:00Z');
+  const regularSession = { start: Date.parse('2026-10-26T13:30:00Z') / 1000, end: Date.parse('2026-10-26T20:00:00Z') / 1000 };
+  assert.equal(canSendReentryNotification(marketTime, now), false); // interactive/UI refreshes are not allowed to send
+  assert.equal(canSendReentryNotification(marketTime, now, true, regularSession), true);
+  assert.equal(canSendReentryNotification(marketTime, new Date('2026-10-26T20:00:00Z'), true, regularSession), false);
+  assert.equal(canSendReentryNotification('2026-10-23T19:55:00Z', now, true, regularSession), false);
+  assert.equal(canSendReentryNotification(marketTime, now, true, null), false); // fail closed if the source omits session metadata
+});
+
+test('provider session bounds enforce early closes even when ordinary weekday hours are open', () => {
+  const earlyClose = { start: Date.parse('2026-11-27T14:30:00Z') / 1000, end: Date.parse('2026-11-27T18:00:00Z') / 1000 }; // 09:30–13:00 EST
+  assert.equal(isWithinRegularSessionBounds(earlyClose, new Date('2026-11-27T17:55:00Z')), true);
+  assert.equal(isWithinRegularSessionBounds(earlyClose, new Date('2026-11-27T18:01:00Z')), false);
+  assert.equal(isWithinRegularSessionBounds(null, new Date('2026-11-27T17:55:00Z')), false);
+});
+
+test('deferred off-hours notification preserves the prior alert signature for the next live session', () => {
+  assert.equal(resolveLastAlertSignature('NOT_READY', 'WATCH_ENTRY', true), 'NOT_READY');
+  assert.equal(resolveLastAlertSignature(null, 'REENTRY_CANDIDATE', true), null);
+  assert.equal(resolveLastAlertSignature('NOT_READY', 'WATCH_ENTRY', false), 'WATCH_ENTRY');
+});
+
+test('scan status explicitly distinguishes fully deferred notifications from failed delivery', () => {
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredOutsideSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_outside_market_session');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_non_scheduled_scan');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredStaleQuote: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_stale_quote');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredMissingSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_missing_session_metadata');
+  assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
