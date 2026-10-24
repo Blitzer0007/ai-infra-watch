@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlsplit
 
 import httpx
 import pytest
-from urllib.parse import urlsplit
 
 
 def _has_auth_headers() -> bool:
@@ -31,7 +31,7 @@ def test_jev_read_only_api_contracts():
     base_url = (os.getenv("QA_BASE_URL") or "https://ai-infra-watch-theta.vercel.app").rstrip("/")
     with httpx.Client(base_url=base_url, headers=_headers(), follow_redirects=True, timeout=30.0) as client:
         proposals = client.get("/api/jev-lab", params={"limit": 5})
-        assert proposals.status_code == 200, proposals.text[:500]
+        assert proposals.status_code == 200, f"/api/jev-lab returned HTTP {proposals.status_code}"
         proposal_body = proposals.json()
         assert proposal_body.get("ok") is True
         assert isinstance(proposal_body.get("proposals"), list)
@@ -40,7 +40,7 @@ def test_jev_read_only_api_contracts():
             "/api/jev-lab-history",
             params={"range": "1y", "symbols": "MSFT,SPY,QQQ"},
         )
-        assert history.status_code == 200, history.text[:500]
+        assert history.status_code == 200, f"/api/jev-lab-history returned HTTP {history.status_code}"
         history_body = history.json()
         assert isinstance(history_body.get("results"), list)
         assert {row.get("symbol") for row in history_body["results"]} == {"MSFT", "SPY", "QQQ"}
