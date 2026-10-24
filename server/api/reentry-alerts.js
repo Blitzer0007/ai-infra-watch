@@ -86,8 +86,8 @@ export function isSameNewYorkMarketDate(marketTime, now = new Date()) {
 }
 
 /** Prevent off-hours/manual refreshes or stale holiday quotes from sending notifications. */
-export function canSendReentryNotification(marketTime, now = new Date()) {
-  return isRegularUsEquitySession(now) && isSameNewYorkMarketDate(marketTime, now);
+export function canSendReentryNotification(marketTime, now = new Date(), allowScheduledRun = false) {
+  return allowScheduledRun === true && isRegularUsEquitySession(now) && isSameNewYorkMarketDate(marketTime, now);
 }
 
 /** A deferred notification must retain the previous signature so the next eligible session can send it once. */
@@ -583,10 +583,14 @@ export async function sendOnceWithDurableClaim({ claim, inspectExistingClaim, se
   }
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
-  if (notifyEligibleCandidates > 0 && notificationsDeferred >= notifyEligibleCandidates) return 'notifications_deferred_outside_market_session';
+  if (notifyEligibleCandidates > 0 && notificationsDeferred >= notifyEligibleCandidates) {
+    if (notificationsDeferredNonScheduled >= notifyEligibleCandidates) return 'notifications_deferred_non_scheduled_scan';
+    if (notificationsDeferredOutsideSession >= notifyEligibleCandidates) return 'notifications_deferred_outside_market_session';
+    return 'notifications_deferred_by_safety_gate';
+  }
   if (notificationsDeferred > 0) return 'completed_with_deferred_notifications';
   if (notifyEligibleCandidates > 0 && (telegramSent > 0 || telegramPreviouslyAccepted > 0)) return 'telegram_delivery_confirmed';
   if (notifyEligibleCandidates > 0) return 'candidate_not_delivered';
@@ -613,9 +617,9 @@ async function sendTelegram(row,q,signal=assess(row,q)) {
   }
   return payload.result.message_id;
 }
-async function runScan() {
+async function runScan({ allowNotifications = false } = {}) {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
@@ -623,9 +627,15 @@ async function runScan() {
       const candidate=signal.status==='REENTRY_CANDIDATE';
       if (candidate) qualifyingCandidates++;
       const notifyEligible = shouldNotifySignal(row.last_alert_signature, signal.status);
-      const notificationWindowOpen = canSendReentryNotification(q.marketTime);
+      const now = new Date();
+      const sessionAndQuoteValid = isRegularUsEquitySession(now) && isSameNewYorkMarketDate(q.marketTime, now);
+      const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications);
       if (notifyEligible) notifyEligibleCandidates++;
-      if (notifyEligible && !notificationWindowOpen) notificationsDeferred++;
+      if (notifyEligible && !notificationWindowOpen) {
+        notificationsDeferred++;
+        if (!allowNotifications) notificationsDeferredNonScheduled++;
+        else if (!sessionAndQuoteValid) notificationsDeferredOutsideSession++;
+      }
       if(notifyEligible && notificationWindowOpen) {
         const chatId=String(process.env.TELEGRAM_CHAT_ID||'').trim();
         if(!chatId) throw new Error('Telegram chat ID is not configured');
@@ -676,7 +686,7 @@ async function runScan() {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
@@ -686,7 +696,7 @@ export default async function handler(req,res) {
   res.setHeader('Cache-Control','no-store');
   const cron=await isCron(req);
   if(cron && req.method==='GET' && String(req.query?.run||'')==='true') {
-    try { return res.status(200).json(await runScan()); }
+    try { return res.status(200).json(await runScan({ allowNotifications: true })); }
     catch(e) { return res.status(500).json({ok:false,error:String(e?.message||e)}); }
   }
   if(!requireAccess(req,res)) return;
