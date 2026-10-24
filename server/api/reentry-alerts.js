@@ -57,7 +57,13 @@ async function quoteHistory(symbol) {
   const marketTime = Number.isFinite(regularMarketTime) && regularMarketTime > 0
     ? new Date(regularMarketTime * 1000).toISOString()
     : null;
-  return {price,sma20:avg(20),sma50:avg(50),drawdownFrom52WeekHighPct:high>0?(high-price)/high*100:null,retrievedAt:new Date().toISOString(),marketTime};
+  const regularPeriod = meta.currentTradingPeriod?.regular;
+  const sessionStart = regularPeriod?.start == null ? NaN : Number(regularPeriod.start);
+  const sessionEnd = regularPeriod?.end == null ? NaN : Number(regularPeriod.end);
+  const regularSession = Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart > 0 && sessionEnd > sessionStart
+    ? { start: sessionStart, end: sessionEnd }
+    : null;
+  return {price,sma20:avg(20),sma50:avg(50),drawdownFrom52WeekHighPct:high>0?(high-price)/high*100:null,retrievedAt:new Date().toISOString(),marketTime,regularSession};
 }
 
 function newYorkClockParts(value) {
@@ -86,8 +92,19 @@ export function isSameNewYorkMarketDate(marketTime, now = new Date()) {
 }
 
 /** Prevent off-hours/manual refreshes or stale holiday quotes from sending notifications. */
-export function canSendReentryNotification(marketTime, now = new Date(), allowScheduledRun = false) {
-  return allowScheduledRun === true && isRegularUsEquitySession(now) && isSameNewYorkMarketDate(marketTime, now);
+export function isWithinRegularSessionBounds(regularSession, now = new Date()) {
+  const start = regularSession?.start == null ? NaN : Number(regularSession.start);
+  const end = regularSession?.end == null ? NaN : Number(regularSession.end);
+  const instant = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > start
+    && Number.isFinite(instant) && instant >= start * 1000 && instant < end * 1000;
+}
+
+export function canSendReentryNotification(marketTime, now = new Date(), allowScheduledRun = false, regularSession = null) {
+  return allowScheduledRun === true
+    && isRegularUsEquitySession(now)
+    && isSameNewYorkMarketDate(marketTime, now)
+    && isWithinRegularSessionBounds(regularSession, now);
 }
 
 /** A deferred notification must retain the previous signature so the next eligible session can send it once. */
@@ -583,13 +600,14 @@ export async function sendOnceWithDurableClaim({ claim, inspectExistingClaim, se
   }
 }
 
-export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, notificationsDeferredStaleQuote = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
+export function classifyScan({ activeRows, evaluatedRows, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred = 0, notificationsDeferredOutsideSession = 0, notificationsDeferredNonScheduled = 0, notificationsDeferredStaleQuote = 0, notificationsDeferredMissingSession = 0, telegramSent, telegramPreviouslyAccepted = 0, errors }) {
   if (activeRows === 0) return 'empty_watchlist';
   if (errors > 0) return 'completed_with_errors';
   if (notifyEligibleCandidates > 0 && notificationsDeferred >= notifyEligibleCandidates) {
     if (notificationsDeferredNonScheduled >= notifyEligibleCandidates) return 'notifications_deferred_non_scheduled_scan';
     if (notificationsDeferredOutsideSession >= notifyEligibleCandidates) return 'notifications_deferred_outside_market_session';
     if (notificationsDeferredStaleQuote >= notifyEligibleCandidates) return 'notifications_deferred_stale_quote';
+    if (notificationsDeferredMissingSession >= notifyEligibleCandidates) return 'notifications_deferred_missing_session_metadata';
     return 'notifications_deferred_by_safety_gate';
   }
   if (notificationsDeferred > 0) return 'completed_with_deferred_notifications';
@@ -620,7 +638,7 @@ async function sendTelegram(row,q,signal=assess(row,q)) {
 }
 async function runScan({ allowNotifications = false } = {}) {
   const rows=await db('reentry_watchlist?active=eq.true&select=*');
-  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; let notificationsDeferredStaleQuote=0; const errors=[]; const deliveryEvidence=[];
+  const results=[]; let sent=0; let previouslyAccepted=0; let qualifyingCandidates=0; let notifyEligibleCandidates=0; let notificationsDeferred=0; let notificationsDeferredOutsideSession=0; let notificationsDeferredNonScheduled=0; let notificationsDeferredStaleQuote=0; let notificationsDeferredMissingSession=0; const errors=[]; const deliveryEvidence=[];
   for(const row of Array.isArray(rows)?rows:[]) {
     let acceptedMessageId = null;
     try {
@@ -631,13 +649,16 @@ async function runScan({ allowNotifications = false } = {}) {
       const now = new Date();
       const regularSessionOpen = isRegularUsEquitySession(now);
       const quoteMarketDateValid = isSameNewYorkMarketDate(q.marketTime, now);
-      const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications);
+      const sessionBoundsPresent = Boolean(q.regularSession && isWithinRegularSessionBounds(q.regularSession, new Date(q.regularSession.start * 1000)));
+      const actualSessionOpen = isWithinRegularSessionBounds(q.regularSession, now);
+      const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications, q.regularSession);
       if (notifyEligible) notifyEligibleCandidates++;
       if (notifyEligible && !notificationWindowOpen) {
         notificationsDeferred++;
         if (!allowNotifications) notificationsDeferredNonScheduled++;
-        else if (!regularSessionOpen) notificationsDeferredOutsideSession++;
+        else if (!regularSessionOpen || (sessionBoundsPresent && !actualSessionOpen)) notificationsDeferredOutsideSession++;
         else if (!quoteMarketDateValid) notificationsDeferredStaleQuote++;
+        else if (!sessionBoundsPresent) notificationsDeferredMissingSession++;
       }
       if(notifyEligible && notificationWindowOpen) {
         const chatId=String(process.env.TELEGRAM_CHAT_ID||'').trim();
@@ -689,7 +710,7 @@ async function runScan({ allowNotifications = false } = {}) {
         : 'Could not refresh quote/history or persist the scan; alert delivery was not confirmed.']});
     }
   }
-  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, notificationsDeferredStaleQuote, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
+  const summary = { activeRows: Array.isArray(rows) ? rows.length : 0, evaluatedRows: results.length, qualifyingCandidates, notifyEligibleCandidates, notificationsDeferred, notificationsDeferredOutsideSession, notificationsDeferredNonScheduled, notificationsDeferredStaleQuote, notificationsDeferredMissingSession, telegramSent: sent, telegramPreviouslyAccepted: previouslyAccepted, errors: errors.length };
   return {ok:errors.length===0,scanStatus:classifyScan(summary),...summary,errors,deliveryEvidence,items:results};
 }
 function publicRow(row) {
