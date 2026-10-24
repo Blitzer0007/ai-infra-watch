@@ -47,6 +47,17 @@ if (files.includes(deploymentWorkflowPath)) {
   }
 }
 
+const reentryApiPath = 'server/api/reentry-alerts.js';
+if (files.includes(reentryApiPath)) {
+  const api = readFileSync(reentryApiPath, 'utf8');
+  if (!api.includes('async function runScan({ allowNotifications = false } = {})') ||
+      !api.includes('runScan({ allowNotifications: true })') ||
+      !api.includes('canSendReentryNotification(q.marketTime, now, allowNotifications)') ||
+      !api.includes('resolveLastAlertSignature(row.last_alert_signature,signal.status,notifyEligible && !notificationWindowOpen)')) {
+    findings.push(reentryApiPath + ': preserve scheduled-only Telegram sends, market-session gating, and deferred alert signatures');
+  }
+}
+
 const reentryWorkflowPath = '.github/workflows/reentry-alerts.yml';
 if (files.includes(reentryWorkflowPath)) {
   const workflow = readFileSync(reentryWorkflowPath, 'utf8');
