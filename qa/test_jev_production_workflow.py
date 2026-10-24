@@ -41,3 +41,11 @@ def test_jev_smoke_diagnostics_do_not_print_dashboard_data():
     assert "urlsplit(response.url).path" in smoke_test
     assert "console_error_count=" in smoke_test
     assert "page_error_count=" in smoke_test
+
+
+def test_jev_smoke_contract_failures_do_not_print_response_bodies():
+    smoke_test = (ROOT / "qa" / "test_jev_production.py").read_text()
+    assert "proposals.text" not in smoke_test
+    assert "history.text" not in smoke_test
+    assert "returned HTTP {proposals.status_code}" in smoke_test
+    assert "returned HTTP {history.status_code}" in smoke_test
