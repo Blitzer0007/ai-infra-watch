@@ -95,7 +95,7 @@ jobs:
   ui:
     name: Playwright UI functional validation
     runs-on: ubuntu-latest
-    if: ${{ vars.QA_BASE_URL != '' }}
+    if: ${{ github.event_name != 'pull_request' && vars.QA_BASE_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
