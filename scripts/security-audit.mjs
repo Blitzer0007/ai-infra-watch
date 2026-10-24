@@ -47,6 +47,24 @@ if (files.includes(deploymentWorkflowPath)) {
   }
 }
 
+const reentryWorkflowPath = '.github/workflows/reentry-alerts.yml';
+if (files.includes(reentryWorkflowPath)) {
+  const workflow = readFileSync(reentryWorkflowPath, 'utf8');
+  if (!workflow.includes("if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' }}")) {
+    findings.push(reentryWorkflowPath + ': live scanning must remain behind REENTRY_ALERTS_ENABLED=true');
+  }
+  if (!workflow.includes('cron: "*/15 13-20 * * 1-5"')) {
+    findings.push(reentryWorkflowPath + ': expected the bounded weekday polling schedule');
+  }
+  if (/^\s*workflow_dispatch:\s*$/m.test(workflow)) {
+    findings.push(reentryWorkflowPath + ': manual re-entry scans are not permitted by the release gate');
+  }
+  if (!/timeZone:\s*["']America\/New_York["']/.test(workflow) ||
+      (workflow.match(/if: steps\.session\.outputs\.open == 'true'/g) || []).length < 2) {
+    findings.push(reentryWorkflowPath + ': OIDC and scanning must both require the New York regular-session preflight');
+  }
+}
+
 if (findings.length) {
   console.error('Potential security issues found:');
   findings.forEach((item) => console.error(' - ' + item));
