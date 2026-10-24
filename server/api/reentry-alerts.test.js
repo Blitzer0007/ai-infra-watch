@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
+import { telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
 
 test('Telegram delivery counts only a successful API response with a message id', () => {
   assert.equal(telegramAccepted(true, { ok: true, result: { message_id: 42 } }), true);
@@ -460,13 +460,22 @@ test('same-market-date guard rejects missing, invalid, and stale holiday/weekend
   assert.equal(isSameNewYorkMarketDate('not-a-date', now), false);
 });
 
-test('re-entry notification requires an approved scheduled run, regular-session time, and same-date quote', () => {
+test('re-entry notification requires an approved scheduled run, same-date quote, and valid provider session bounds', () => {
   const marketTime = '2026-10-26T13:35:00Z';
   const now = new Date('2026-10-26T14:00:00Z');
+  const regularSession = { start: Date.parse('2026-10-26T13:30:00Z') / 1000, end: Date.parse('2026-10-26T20:00:00Z') / 1000 };
   assert.equal(canSendReentryNotification(marketTime, now), false); // interactive/UI refreshes are not allowed to send
-  assert.equal(canSendReentryNotification(marketTime, now, true), true);
-  assert.equal(canSendReentryNotification(marketTime, new Date('2026-10-26T20:00:00Z'), true), false);
-  assert.equal(canSendReentryNotification('2026-10-23T19:55:00Z', now, true), false);
+  assert.equal(canSendReentryNotification(marketTime, now, true, regularSession), true);
+  assert.equal(canSendReentryNotification(marketTime, new Date('2026-10-26T20:00:00Z'), true, regularSession), false);
+  assert.equal(canSendReentryNotification('2026-10-23T19:55:00Z', now, true, regularSession), false);
+  assert.equal(canSendReentryNotification(marketTime, now, true, null), false); // fail closed if the source omits session metadata
+});
+
+test('provider session bounds enforce early closes even when ordinary weekday hours are open', () => {
+  const earlyClose = { start: Date.parse('2026-11-27T14:30:00Z') / 1000, end: Date.parse('2026-11-27T18:00:00Z') / 1000 }; // 09:30–13:00 EST
+  assert.equal(isWithinRegularSessionBounds(earlyClose, new Date('2026-11-27T17:55:00Z')), true);
+  assert.equal(isWithinRegularSessionBounds(earlyClose, new Date('2026-11-27T18:01:00Z')), false);
+  assert.equal(isWithinRegularSessionBounds(null, new Date('2026-11-27T17:55:00Z')), false);
 });
 
 test('deferred off-hours notification preserves the prior alert signature for the next live session', () => {
@@ -479,5 +488,6 @@ test('scan status explicitly distinguishes fully deferred notifications from fai
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredOutsideSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_outside_market_session');
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_non_scheduled_scan');
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredStaleQuote: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_stale_quote');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredMissingSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_missing_session_metadata');
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
