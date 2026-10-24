@@ -88,7 +88,6 @@ jobs:
             -H "Content-Type: application/json" -X POST "$BASE_URL/api/auth" --data '{"token":""}')"
           if [ "$auth_status" != "401" ]; then
             echo "::error::Expected anonymous auth check to return 401, got $auth_status"
-            cat /tmp/production-auth.json
             exit 1
           fi
 
@@ -96,7 +95,6 @@ jobs:
             "$BASE_URL/api/portfolio")"
           if [ "$portfolio_status" != "401" ]; then
             echo "::error::Expected protected portfolio API to return 401, got $portfolio_status"
-            cat /tmp/production-portfolio.json
             exit 1
           fi
 
