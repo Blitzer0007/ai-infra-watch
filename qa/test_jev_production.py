@@ -5,6 +5,7 @@ import os
 
 import httpx
 import pytest
+from urllib.parse import urlsplit
 
 
 def _has_auth_headers() -> bool:
@@ -56,7 +57,7 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
 
     def capture_response(response):
         if "/api/jev-lab" in response.url or "/api/jev-lab-history" in response.url:
-            api_responses.append((response.url, response.status))
+            api_responses.append((urlsplit(response.url).path, response.status))
 
     def read_only_guard(route):
         request = route.request
@@ -68,7 +69,7 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
         is_auth_verification = request.url.split("?", 1)[0].rstrip("/").endswith("/api/auth")
         if method not in {"GET", "HEAD", "OPTIONS"} and not (method == "POST" and is_auth_verification):
             if "/api/jev-lab" in request.url or "/api/jev-lab-history" in request.url:
-                mutating_requests.append(method + " " + request.url)
+                mutating_requests.append(method + " " + urlsplit(request.url).path)
             route.abort("blockedbyclient")
             return
         route.continue_()
@@ -96,22 +97,20 @@ def test_jev_production_ui_loads_without_mutating_paper_ledger(page):
     try:
         page.get_by_text("JEV Autonomous Portfolio Lab", exact=False).first.wait_for(state="visible", timeout=30000)
     except Exception:
-        # Diagnostic output is intentionally limited to page metadata and visible text;
-        # never print request headers, cookies, storage state, or environment variables.
-        print(f"JEV smoke diagnostic: final_url={page.url!r}")
+        # CI logs may be publicly visible: emit status/counts only, never dashboard text,
+        # complete URLs, console messages, or page-error messages.
+        print(f"JEV smoke diagnostic: final_path={urlsplit(page.url).path!r}")
         print(f"JEV smoke diagnostic: response_status={response.status if response else None}")
-        print(f"JEV smoke diagnostic: title={page.title()!r}")
-        print(f"JEV smoke diagnostic: visible_body_text={page.locator('body').inner_text(timeout=5000)[:3000]!r}")
-        print(f"JEV smoke diagnostic: jev_api_responses={api_responses!r}")
-        print(f"JEV smoke diagnostic: console_errors={console_errors[-20:]!r}")
-        print(f"JEV smoke diagnostic: page_errors={page_errors[-20:]!r}")
+        print(f"JEV smoke diagnostic: jev_api_statuses={[status for _, status in api_responses]!r}")
+        print(f"JEV smoke diagnostic: console_error_count={len(console_errors)}")
+        print(f"JEV smoke diagnostic: page_error_count={len(page_errors)}")
         raise
     page.get_by_text("PAPER ONLY", exact=True).wait_for(state="visible", timeout=30000)
     page.get_by_text("MANUAL APPROVAL", exact=True).wait_for(state="visible", timeout=30000)
 
-    assert not mutating_requests, f"Read-only smoke unexpectedly attempted a write: {mutating_requests}"
+    assert not mutating_requests, f"Read-only smoke unexpectedly attempted writes to these API paths: {[request for request in mutating_requests]!r}"
     # The direct API test above verifies the authenticated proposal/history contracts.
     # The UI can render its read-only shell without eagerly issuing those requests in
     # every deployment; do not fail solely because this build deferred the fetch.
-    failures = [(url, status) for url, status in api_responses if status >= 400]
-    assert not failures, f"JEV read endpoints returned errors: {failures}"
+    failures = [(path, status) for path, status in api_responses if status >= 400]
+    assert not failures, f"JEV read endpoints returned errors by path/status: {failures}"
