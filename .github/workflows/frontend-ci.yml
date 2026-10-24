@@ -50,6 +50,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Fail on known npm advisories
+        run: npm audit --audit-level=low
+
       - name: Security audit
         run: npm run security:audit
 
