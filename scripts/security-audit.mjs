@@ -59,6 +59,9 @@ if (files.includes(reentryWorkflowPath)) {
   if (/^\s*workflow_dispatch:\s*$/m.test(workflow)) {
     findings.push(reentryWorkflowPath + ': manual re-entry scans are not permitted by the release gate');
   }
+  if (/\bcat\s+response\.json\b/.test(workflow)) {
+    findings.push(reentryWorkflowPath + ': do not print private scan response bodies into CI logs');
+  }
   if (!/timeZone:\s*["']America\/New_York["']/.test(workflow) ||
       (workflow.match(/if: steps\.session\.outputs\.open == 'true'/g) || []).length < 2) {
     findings.push(reentryWorkflowPath + ': OIDC and scanning must both require the New York regular-session preflight');
