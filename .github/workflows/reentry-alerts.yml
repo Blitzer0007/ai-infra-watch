@@ -1,9 +1,10 @@
 name: Re-entry Telegram Alerts
-run-name: Re-entry scan • ${{ github.event.schedule || 'manual' }}
+run-name: Re-entry scan • ${{ github.event.schedule || 'scheduled' }}
 on:
-  # Scheduled runs are paused until the durable Telegram outbox is deployed and delivery is verified.
-  # Manual dispatch remains available for an explicitly approved operator-initiated run.
-  workflow_dispatch:
+  # The 15-minute poll spans US regular-session hours year-round; the New York-time preflight below is authoritative.
+  # The opt-in variable must remain unset/false until the guarded API code is deployed and the release is approved.
+  schedule:
+    - cron: "*/15 13-20 * * 1-5"
 permissions:
   contents: read
   id-token: write
@@ -12,12 +13,24 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
-    # Hard release gate: keep all re-entry scans disabled until the durable outbox is deployed and verified.
-    if: ${{ false }}
+    # Hard release gate: repository variable is intentionally not set by this PR.
+    if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' }}
     runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
+      - name: Confirm New York regular-session window
+        id: session
+        shell: bash
+        run: |
+          set -euo pipefail
+          SESSION_OPEN="$(node -e 'const p=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));const n=Number(p.hour)*60+Number(p.minute);console.log(!["Sat","Sun"].includes(p.weekday)&&n>=570&&n<960?"true":"false")')"
+          echo "open=$SESSION_OPEN" >> "$GITHUB_OUTPUT"
+          if [ "$SESSION_OPEN" != "true" ]; then
+            echo "::notice::New York regular equity session is closed; skipping this re-entry scan."
+          fi
+
       - name: Request GitHub OIDC token
+        if: steps.session.outputs.open == 'true'
         id: oidc
         run: |
           set -euo pipefail
@@ -27,6 +40,7 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
       - name: Scan sold-stock re-entry watchlist and send Telegram alerts
+        if: steps.session.outputs.open == 'true'
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
           FALLBACK_TOKEN: ${{ secrets.AIW_CRON_SECRET }}
