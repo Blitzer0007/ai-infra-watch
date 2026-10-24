@@ -30,3 +30,14 @@ def test_jev_smoke_fails_closed_when_authenticated_config_is_missing():
     assert 'echo "::error::QA_BASE_URL is required' in smoke_job
     assert 'echo "::error::QA_HEADERS_JSON is required' in smoke_job
     assert "skipped authenticated smoke tests are not release evidence" in smoke_job
+
+
+def test_jev_smoke_diagnostics_do_not_print_dashboard_data():
+    smoke_test = (ROOT / "qa" / "test_jev_production.py").read_text()
+    assert "visible_body_text=" not in smoke_test
+    assert "console_errors[-20:]" not in smoke_test
+    assert "page_errors[-20:]" not in smoke_test
+    assert "api_responses!r" not in smoke_test
+    assert "urlsplit(response.url).path" in smoke_test
+    assert "console_error_count=" in smoke_test
+    assert "page_error_count=" in smoke_test
