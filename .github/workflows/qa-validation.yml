@@ -20,6 +20,7 @@ on:
       - "api/**"
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
+      - ".github/workflows/vercel-production-deploy.yml"
   schedule:
     - cron: "30 2 * * *"
 
@@ -113,6 +114,7 @@ jobs:
           QA_HEADERS_JSON: ${{ secrets.QA_HEADERS_JSON }}
           QA_STORAGE_STATE_B64: ${{ secrets.QA_STORAGE_STATE_B64 }}
         run: python -u -m pytest -vv -s -o faulthandler_timeout=120 qa/test_jev_production.py
+
 
   telegram-outbox-migration-test:
     name: Telegram outbox migration integration test (disposable PostgreSQL)
