@@ -17,7 +17,6 @@ jobs:
     env:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
     steps:
       - name: Checkout
@@ -25,8 +24,10 @@ jobs:
         with:
           ref: main
 
-      - name: Verify Vercel token
+      - name: Verify Vercel token is configured
         shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           if [ -z "${VERCEL_TOKEN}" ]; then
             echo "::error::VERCEL_TOKEN is not available to this workflow."
@@ -56,16 +57,24 @@ jobs:
         run: python -m pip install --upgrade pip uv
 
       - name: Verify Vercel authentication
-        run: vercel whoami --token="${VERCEL_TOKEN}" --debug
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel whoami
 
       - name: Pull Vercel production configuration
-        run: vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production
 
       - name: Build Vercel deployment
-        run: vercel build --prod --token="${VERCEL_TOKEN}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod
 
       - name: Deploy to Vercel production
-        run: vercel deploy --prebuilt --archive=tgz --prod --token="${VERCEL_TOKEN}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --archive=tgz --prod
 
       - name: Smoke-test production release
         shell: bash
@@ -79,7 +88,6 @@ jobs:
             -H "Content-Type: application/json" -X POST "$BASE_URL/api/auth" --data '{"token":""}')"
           if [ "$auth_status" != "401" ]; then
             echo "::error::Expected anonymous auth check to return 401, got $auth_status"
-            cat /tmp/production-auth.json
             exit 1
           fi
 
@@ -87,7 +95,6 @@ jobs:
             "$BASE_URL/api/portfolio")"
           if [ "$portfolio_status" != "401" ]; then
             echo "::error::Expected protected portfolio API to return 401, got $portfolio_status"
-            cat /tmp/production-portfolio.json
             exit 1
           fi
 

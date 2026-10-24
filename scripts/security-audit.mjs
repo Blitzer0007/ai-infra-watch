@@ -24,9 +24,32 @@ for (const file of files) {
   }
 }
 
+const deploymentWorkflowPath = '.github/workflows/vercel-production-deploy.yml';
+if (files.includes(deploymentWorkflowPath)) {
+  const workflow = readFileSync(deploymentWorkflowPath, 'utf8');
+  const expectedTokenLine = "VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}";
+  const stepScopedTokenCount = workflow
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith('          VERCEL_TOKEN:') && line.trim() === expectedTokenLine)
+    .length;
+
+  if (/^ {6}VERCEL_TOKEN:/m.test(workflow)) {
+    findings.push(deploymentWorkflowPath + ': VERCEL_TOKEN must not be exposed at job scope');
+  }
+  if (/^\s*run:\s*vercel\s+(?:whoami|pull|build|deploy)\b[^\n]*(?:--token\b|--debug\b)/m.test(workflow)) {
+    findings.push(deploymentWorkflowPath + ': avoid Vercel token CLI flags and verbose debug output');
+  }
+  if (stepScopedTokenCount < 5) {
+    findings.push(deploymentWorkflowPath + ': expected step-scoped VERCEL_TOKEN for auth/deploy CLI steps');
+  }
+  if (/cat\s+\/tmp\/production-(?:auth|portfolio)\.json/.test(workflow)) {
+    findings.push(deploymentWorkflowPath + ': do not print raw access-control response bodies into CI logs');
+  }
+}
+
 if (findings.length) {
-  console.error('Potential committed secret material found:');
+  console.error('Potential security issues found:');
   findings.forEach((item) => console.error(' - ' + item));
   process.exit(1);
 }
-console.log('Security audit passed: no known secret signatures found in tracked source.');
+console.log('Security audit passed: no known secret signatures or deploy-workflow diagnostic violations found.');
