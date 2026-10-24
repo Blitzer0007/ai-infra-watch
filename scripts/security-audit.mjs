@@ -42,6 +42,9 @@ if (files.includes(deploymentWorkflowPath)) {
   if (stepScopedTokenCount < 5) {
     findings.push(deploymentWorkflowPath + ': expected step-scoped VERCEL_TOKEN for auth/deploy CLI steps');
   }
+  if (/cat\\s+\\/tmp\\/production-(?:auth|portfolio)\\.json/.test(workflow)) {
+    findings.push(deploymentWorkflowPath + ': do not print raw access-control response bodies into CI logs');
+  }
 }
 
 if (findings.length) {
@@ -49,4 +52,4 @@ if (findings.length) {
   findings.forEach((item) => console.error(' - ' + item));
   process.exit(1);
 }
-console.log('Security audit passed: no known secret signatures or deploy-token scope violations found.');
+console.log('Security audit passed: no known secret signatures or deploy-workflow diagnostic violations found.');
