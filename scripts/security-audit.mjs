@@ -61,8 +61,8 @@ if (files.includes(reentryApiPath)) {
 const reentryWorkflowPath = '.github/workflows/reentry-alerts.yml';
 if (files.includes(reentryWorkflowPath)) {
   const workflow = readFileSync(reentryWorkflowPath, 'utf8');
-  if (!workflow.includes("if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' }}")) {
-    findings.push(reentryWorkflowPath + ': live scanning must remain behind REENTRY_ALERTS_ENABLED=true');
+  if (!workflow.includes("if: ${{ vars.REENTRY_ALERTS_ENABLED == 'true' && vars.REENTRY_ALERTS_RELEASE_APPROVED == 'true' }}")) {
+    findings.push(reentryWorkflowPath + ': live scanning must require both REENTRY_ALERTS_ENABLED and explicit REENTRY_ALERTS_RELEASE_APPROVED opt-ins');
   }
   if (!workflow.includes('cron: "*/15 13-20 * * 1-5"')) {
     findings.push(reentryWorkflowPath + ': expected the bounded weekday polling schedule');
