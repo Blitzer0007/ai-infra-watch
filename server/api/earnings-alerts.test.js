@@ -40,10 +40,10 @@ test('a spoofed Vercel cron User-Agent cannot authorize notification delivery', 
 
 test('a valid configured cron bearer secret authorizes notification delivery', async () => {
   const previousSecret = process.env.CRON_SECRET;
-  process.env.CRON_SECRET = 'unit-test-cron-secret';
+  process.env.CRON_SECRET = 'unit-test';
   try {
     assert.equal(await authorizedForNotify({
-      headers: { authorization: 'Bearer unit-test-cron-secret' },
+      headers: { authorization: 'Bearer unit-test' },
     }), true);
   } finally {
     if (previousSecret === undefined) delete process.env.CRON_SECRET;
