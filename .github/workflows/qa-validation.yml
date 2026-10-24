@@ -20,6 +20,7 @@ on:
       - "api/**"
       - "qa/**"
       - ".github/workflows/qa-validation.yml"
+      # Validate changes to the deployment safeguard in PRs before they can merge.
       - ".github/workflows/vercel-production-deploy.yml"
       - ".github/workflows/jev-lab-weekly-review.yml"
   schedule:
