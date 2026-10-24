@@ -92,12 +92,18 @@ export function isSameNewYorkMarketDate(marketTime, now = new Date()) {
 }
 
 /** Prevent off-hours/manual refreshes or stale holiday quotes from sending notifications. */
-export function isWithinRegularSessionBounds(regularSession, now = new Date()) {
+export function hasValidRegularSessionBounds(regularSession) {
   const start = regularSession?.start == null ? NaN : Number(regularSession.start);
   const end = regularSession?.end == null ? NaN : Number(regularSession.end);
+  return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > start;
+}
+
+export function isWithinRegularSessionBounds(regularSession, now = new Date()) {
+  if (!hasValidRegularSessionBounds(regularSession)) return false;
+  const start = Number(regularSession.start);
+  const end = Number(regularSession.end);
   const instant = now instanceof Date ? now.getTime() : new Date(now).getTime();
-  return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > start
-    && Number.isFinite(instant) && instant >= start * 1000 && instant < end * 1000;
+  return Number.isFinite(instant) && instant >= start * 1000 && instant < end * 1000;
 }
 
 export function canSendReentryNotification(marketTime, now = new Date(), allowScheduledRun = false, regularSession = null) {
@@ -649,7 +655,7 @@ async function runScan({ allowNotifications = false } = {}) {
       const now = new Date();
       const regularSessionOpen = isRegularUsEquitySession(now);
       const quoteMarketDateValid = isSameNewYorkMarketDate(q.marketTime, now);
-      const sessionBoundsPresent = Boolean(q.regularSession && isWithinRegularSessionBounds(q.regularSession, new Date(q.regularSession.start * 1000)));
+      const sessionBoundsPresent = hasValidRegularSessionBounds(q.regularSession);
       const actualSessionOpen = isWithinRegularSessionBounds(q.regularSession, now);
       const notificationWindowOpen = canSendReentryNotification(q.marketTime, now, allowNotifications, q.regularSession);
       if (notifyEligible) notifyEligibleCandidates++;
