@@ -478,5 +478,6 @@ test('deferred off-hours notification preserves the prior alert signature for th
 test('scan status explicitly distinguishes fully deferred notifications from failed delivery', () => {
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredOutsideSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_outside_market_session');
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_non_scheduled_scan');
+  assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredStaleQuote: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_stale_quote');
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
