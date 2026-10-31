@@ -18,6 +18,13 @@ const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const expectedFiles = new Set(manifest.migrations.map(item => path.basename(item.file)));
 const actualFiles = (await readdir(migrationDir)).filter(name => name.endsWith('.sql')).sort();
 const failures = [];
+const versions = manifest.migrations.map(item => String(item.version));
+const uniqueVersions = new Set(versions);
+if (uniqueVersions.size !== versions.length) failures.push('Duplicate migration version found in manifest');
+if (versions.some((version, index) => index > 0 && versions[index - 1] >= version)) {
+  failures.push('Manifest migration versions must be strictly increasing');
+}
+
 
 for (const migration of manifest.migrations) {
   try {
