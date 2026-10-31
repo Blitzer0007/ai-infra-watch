@@ -42,48 +42,70 @@ async function db(path, options={}) {
   const text=await response.text(); return text ? JSON.parse(text) : null;
 }
 
-export function calculateReentryIndicators({ price, closes, adjustedCloses }) {
+export function calculateReentryIndicators({ price, closes, adjustedCloses, timestamps, regularMarketTime }) {
   const livePrice = Number(price);
   const raw = Array.isArray(closes) ? closes.map(Number) : [];
   const adjusted = Array.isArray(adjustedCloses) ? adjustedCloses.map(Number) : [];
-  const validIndexes = raw.map((value, index) => ({ value, index }))
-    .filter(item => Number.isFinite(item.value) && item.value > 0)
-    .map(item => item.index);
-
-  if (!(livePrice > 0) || validIndexes.length < 50) {
-    throw new Error('Insufficient historical data for re-entry indicators');
+  const dates = Array.isArray(timestamps) ? timestamps.map(Number) : [];
+  if (!(livePrice > 0)) throw new Error('Invalid live quote for re-entry indicators');
+  if (!raw.length || raw.length !== adjusted.length || raw.length !== dates.length) {
+    throw new Error('Aligned raw and adjusted daily history is required for re-entry indicators');
   }
 
-  const missingAdjusted = validIndexes.find(index =>
-    !Number.isFinite(adjusted[index]) || !(adjusted[index] > 0)
-  );
-  if (missingAdjusted !== undefined) {
-    throw new Error('Complete split/dividend-adjusted history is required for re-entry indicators');
-  }
+  const regularMarketEpoch = Number(regularMarketTime);
+  const quoteEpochMs = Number.isFinite(regularMarketEpoch) && regularMarketEpoch > 0
+    ? regularMarketEpoch * 1000
+    : NaN;
+  const complete = raw.map((rawClose, index) => ({
+    timestamp: dates[index],
+    rawClose,
+    adjustedClose: adjusted[index],
+  })).filter(point =>
+    Number.isFinite(point.timestamp) &&
+    Number.isFinite(point.rawClose) && point.rawClose > 0 &&
+    Number.isFinite(point.adjustedClose) && point.adjustedClose > 0
+  ).sort((a, b) => a.timestamp - b.timestamp);
 
-  const adjustedSeries = validIndexes.map(index => adjusted[index]);
-  const latestIndex = validIndexes.at(-1);
-  const latestRawClose = raw[latestIndex];
-  const latestAdjustedClose = adjusted[latestIndex];
-  const adjustmentFactor = latestAdjustedClose / latestRawClose;
+  const unique = [];
+  for (const point of complete) {
+    if (unique.length && unique[unique.length - 1].timestamp === point.timestamp) {
+      unique[unique.length - 1] = point;
+    } else {
+      unique.push(point);
+    }
+  }
+  if (unique.length < 50) throw new Error('At least 50 complete aligned adjusted daily bars are required');
+
+  // Use the last completed daily bar, not an in-progress bar, when deriving the
+  // latest Yahoo adjclose/raw-close factor. The same factor converts the live
+  // quote to the current adjusted-price basis for the high-water comparison.
+  const lastCompleted = Number.isFinite(quoteEpochMs)
+    ? unique.filter(point => point.timestamp * 1000 <= quoteEpochMs).at(-1)
+    : unique.at(-1);
+  if (!lastCompleted) throw new Error('No completed daily bar aligns with the live quote session');
+
+  const adjustmentFactor = lastCompleted.adjustedClose / lastCompleted.rawClose;
   if (!(adjustmentFactor > 0) || !Number.isFinite(adjustmentFactor)) {
     throw new Error('Invalid adjusted-close factor for re-entry indicators');
   }
-
-  const adjustedLivePrice = livePrice * adjustmentFactor;
+  const adjustedSeries = unique.map(point => point.adjustedClose);
   const average = count => {
     const sample = adjustedSeries.slice(-count);
-    return sample.reduce((sum, value) => sum + value, 0) / sample.length;
+    if (sample.length !== count) throw new Error('Insufficient adjusted bars for re-entry indicators');
+    return sample.reduce((sum, value) => sum + value, 0) / count;
   };
   const high = Math.max(...adjustedSeries);
+  const adjustedLivePrice = livePrice * adjustmentFactor;
   return {
     price: livePrice,
     sma20: average(20),
     sma50: average(50),
     drawdownFrom52WeekHighPct: high > 0 ? (high - adjustedLivePrice) / high * 100 : null,
     priceBasis: 'split_dividend_adjusted_close',
-    adjustedPointCount: adjustedSeries.length,
-    rawPointCount: validIndexes.length,
+    adjustmentReferenceDate: new Date(lastCompleted.timestamp * 1000).toISOString().slice(0, 10),
+    adjustmentFactor,
+    adjustedPointCount: unique.length,
+    rawPointCount: unique.length,
   };
 }
 
@@ -92,13 +114,23 @@ async function quoteHistory(symbol) {
   const response=await fetch(url,{headers:{'User-Agent':'ai-infra-watch/1.0'},signal:AbortSignal.timeout(10000)});
   if(!response.ok) throw new Error('Market quote unavailable for '+symbol);
   const body=await response.json(), result=body?.chart?.result?.[0];
-  const meta=result?.meta, closes=result?.indicators?.quote?.[0]?.close;
+  const meta=result?.meta;
+  const timestamps=result?.timestamp;
+  const closes=result?.indicators?.quote?.[0]?.close;
   const adjustedCloses=result?.indicators?.adjclose?.[0]?.adjclose;
-  if(!meta || !Array.isArray(closes) || !Array.isArray(adjustedCloses)) throw new Error('Adjusted history unavailable for '+symbol);
+  if(!meta || !Array.isArray(timestamps) || !Array.isArray(closes) || !Array.isArray(adjustedCloses)) {
+    throw new Error('Adjusted history unavailable for '+symbol);
+  }
   const lastValidRaw=closes.map(Number).filter(v=>Number.isFinite(v)&&v>0).at(-1);
   const price=Number(meta.regularMarketPrice || lastValidRaw);
-  const indicators=calculateReentryIndicators({price,closes,adjustedCloses});
-  const regularMarketTime = meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
+  const regularMarketTime=meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
+  const indicators=calculateReentryIndicators({
+    price,
+    closes,
+    adjustedCloses,
+    timestamps,
+    regularMarketTime,
+  });
   const marketTime = Number.isFinite(regularMarketTime) && regularMarketTime > 0
     ? new Date(regularMarketTime * 1000).toISOString()
     : null;
