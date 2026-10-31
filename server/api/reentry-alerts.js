@@ -854,11 +854,22 @@ export default async function handler(req,res) {
     }
     if(req.method==='GET') {
       let rows=await db('reentry_watchlist?select=*&order=symbol.asc');
+      let refreshResult=null;
       if(String(req.query?.refresh||'')==='true') {
-        const refreshed=await runScan();
-        rows=refreshed.items;
+        // Manual refresh evaluates and persists current market data, but never sends Telegram.
+        refreshResult=await runScan({allowNotifications:false});
+        rows=refreshResult.items;
       }
-      return res.status(200).json({ok:true,items:(Array.isArray(rows)?rows:[]).map(publicRow)});
+      return res.status(200).json({
+        ok:refreshResult ? refreshResult.ok : true,
+        items:(Array.isArray(rows)?rows:[]).map(publicRow),
+        ...(refreshResult ? {refresh:{
+          scanStatus:refreshResult.scanStatus,
+          activeRows:refreshResult.activeRows,
+          evaluatedRows:refreshResult.evaluatedRows,
+          errors:refreshResult.errors,
+        }} : {}),
+      });
     }
     if(req.method==='POST') {
       const symbol=String(req.body?.symbol||'').trim().toUpperCase(), target=Number(req.body?.targetPrice);
