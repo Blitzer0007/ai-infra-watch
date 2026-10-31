@@ -2,6 +2,7 @@ import { createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
 import { evaluatePortfolioReturnAlerts } from './portfolio-return-alerts.js';
 import { evaluatePortfolioHoldingReturnAlerts } from './portfolio-holding-return-alerts.js';
+import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -611,6 +612,7 @@ async function buildDigest(decisionJournal) {
 async function deliver(digest, channels) {
   const delivered = [];
   const errors = [];
+  const telegram = { attempted: false, accepted: false, message_id: null };
 
   const webhookUrl = process.env.PORTFOLIO_DIGEST_WEBHOOK_URL;
   if ((channels.includes('webhook') || (!channels.length && webhookUrl)) && webhookUrl) {
@@ -640,13 +642,19 @@ async function deliver(digest, channels) {
         { text: 'Open Decision Center', url: dashboardBase + '/overview' },
         { text: 'Open Watchlist', url: dashboardBase + '/watchlist' },
       ]);
+      telegram.attempted = true;
       const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         chat_id: chatId,
         text: digest.text,
         reply_markup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
         disable_web_page_preview: true,
-      }) });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+      }), signal: AbortSignal.timeout(10000) });
+      const payload = await response.json().catch(() => null);
+      if (!isTelegramMessageAccepted(response.ok, payload)) {
+        throw new Error(telegramDeliveryFailure(response.status, payload));
+      }
+      telegram.accepted = true;
+      telegram.message_id = payload.result.message_id;
       delivered.push('telegram');
     } catch (error) { errors.push('telegram: ' + (error instanceof Error ? error.message : 'delivery failed')); }
   }
@@ -665,7 +673,7 @@ async function deliver(digest, channels) {
     } catch (error) { errors.push('email: ' + (error instanceof Error ? error.message : 'delivery failed')); }
   }
 
-  return { delivered, errors };
+  return { delivered, errors, telegram };
 }
 
 export default async function handler(req, res) {
