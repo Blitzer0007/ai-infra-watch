@@ -1,5 +1,5 @@
 import { createPublicKey, createVerify } from 'node:crypto';
-import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
+import { history as routedHistory, quote as routedQuote, requireAdjustedHistory } from '../../api/_market-data.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -192,9 +192,20 @@ async function buildAutoForecast(holding, horizon = 20) {
   ]);
   if (quoteData.stale) return { skipped: true, ticker, reason: 'quote is stale' };
 
-  const points = marketData.points || [];
+  let adjustedMarketData;
+  try {
+    adjustedMarketData = requireAdjustedHistory(marketData);
+  } catch (error) {
+    return {
+      skipped: true,
+      ticker,
+      reason: error instanceof Error ? error.message : 'split/dividend-adjusted history unavailable',
+    };
+  }
+  const points = adjustedMarketData.points;
+  const entryPoint = points.at(-1);
   const forecast = distribution(points, horizon);
-  if (!forecast) return { skipped: true, ticker, reason: 'insufficient historical data' };
+  if (!forecast || !entryPoint) return { skipped: true, ticker, reason: 'insufficient adjusted historical data' };
 
   const capturedAt = new Date().toISOString();
   const row = {
@@ -228,7 +239,13 @@ async function buildAutoForecast(holding, horizon = 20) {
         changePct: Number(quoteData.changePct || 0),
         provider: quoteData.provider || quoteData.source || 'market-router',
       },
-      historyThrough: points.at(-1)?.date || null,
+      priceBasis: 'split_dividend_adjusted_close',
+      entryReference: {
+        date: entryPoint.date,
+        rawClose: Number(entryPoint.rawPrice),
+        adjustedClose: Number(entryPoint.price),
+      },
+      historyThrough: entryPoint.date,
       modelVersion,
       counts: { analyst: 0, news: 0, contracts: 0, political: 0, macro: 0 },
     },

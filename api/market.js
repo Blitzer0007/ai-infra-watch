@@ -1,4 +1,5 @@
 import quoteHandler from '../server/api/quote.js';
+import marketDataHealthHandler from '../server/api/market-data-health.js';
 import companyScaleHandler from '../server/api/company-scale.js';
 import contractDetailHandler from '../server/api/contract-detail.js';
 import earningsAlertsHandler from '../server/api/earnings-alerts.js';
@@ -14,6 +15,7 @@ import jevLabHandler from '../server/api/jev-lab.js';
 
 const routes = {
   quote: quoteHandler,
+  'market-data-health': marketDataHealthHandler,
   'company-scale': companyScaleHandler,
   'contract-detail': contractDetailHandler,
   'earnings-alerts': earningsAlertsHandler,

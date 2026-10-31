@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextScheduledRun, supabaseHeaders, summarizeArtifacts } from '../../api/job-health.js';
+import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess, summarizeReentryDeliveryHealth } from '../../api/job-health.js';
 
 test('private OHLC archive next run uses the weekday 23:30 UTC slot', () => {
   assert.equal(nextScheduledRun('private-ohlc-asof-archive', new Date('2026-10-20T03:00:00Z')), '2026-10-20T23:30:00.000Z');
@@ -62,4 +62,122 @@ test('unknown providers are ignored and recorded hashes do not clear the histori
   assert.equal(summary.recentArtifacts.length, 3);
   assert.equal(summary.providers.some(row => row.provider === 'unknown'), false);
   assert.equal(summary.historicalGate.status, 'BLOCKED');
+});
+
+test('completed scheduler runs expose elapsed duration and current age', () => {
+  const now = Date.parse('2026-10-31T12:00:30.000Z');
+  const timing = summarizeRunTiming({
+    status: 'completed',
+    created_at: '2026-10-31T12:00:00.000Z',
+    finished_at: '2026-10-31T12:00:20.000Z',
+  }, now);
+  assert.equal(timing.durationMs, 20000);
+  assert.equal(timing.ageMs, 30000);
+  assert.equal(timing.unfinished, false);
+  assert.equal(timing.isStuck, false);
+});
+
+test('a recent started scheduler run is unfinished but not yet stuck', () => {
+  const now = Date.parse('2026-10-31T12:04:00.000Z');
+  const timing = summarizeRunTiming({
+    status: 'started',
+    created_at: '2026-10-31T12:00:00.000Z',
+  }, now, 5 * 60 * 1000);
+  assert.equal(timing.unfinished, true);
+  assert.equal(timing.isStuck, false);
+  assert.equal(timing.durationMs, 240000);
+});
+
+test('a scheduler run with no completion after threshold is flagged stuck', () => {
+  const now = Date.parse('2026-10-31T12:08:00.000Z');
+  const timing = summarizeRunTiming({
+    status: 'started',
+    created_at: '2026-10-31T12:00:00.000Z',
+  }, now, 5 * 60 * 1000);
+  assert.equal(timing.unfinished, true);
+  assert.equal(timing.isStuck, true);
+  assert.equal(timing.durationMs, 480000);
+});
+
+test('GitHub Actions completion time is measured from updated_at', () => {
+  const timing = summarizeRunTiming({
+    status: 'completed',
+    created_at: '2026-10-31T12:00:00.000Z',
+    updated_at: '2026-10-31T12:02:00.000Z',
+  }, Date.parse('2026-10-31T12:05:00.000Z'));
+  assert.equal(timing.durationMs, 120000);
+  assert.equal(timing.unfinished, false);
+});
+
+test('queued and in-progress GitHub runs remain unfinished until completed', () => {
+  const now = Date.parse('2026-10-31T12:08:00.000Z');
+  for (const status of ['queued', 'in_progress']) {
+    const timing = summarizeRunTiming({
+      status,
+      created_at: '2026-10-31T12:00:00.000Z',
+      updated_at: '2026-10-31T12:07:00.000Z',
+    }, now, 5 * 60 * 1000);
+    assert.equal(timing.unfinished, true);
+    assert.equal(timing.isStuck, true);
+    assert.equal(timing.durationMs, 480000);
+  }
+});
+
+test('runs without a valid creation timestamp do not invent ages or stuck status', () => {
+  const timing = summarizeRunTiming({ status: 'queued', created_at: 'not-a-date' }, Date.now());
+  assert.equal(timing.ageMs, null);
+  assert.equal(timing.durationMs, null);
+  assert.equal(timing.unfinished, false);
+  assert.equal(timing.isStuck, false);
+});
+
+test('Re-entry next run skips UTC polls before the New York session opens in EDT', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T12:59:00Z')), '2026-10-26T13:30:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T13:00:00Z')), '2026-10-26T13:30:00.000Z');
+});
+
+test('Re-entry next run skips UTC polls before the New York session opens in EST', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-12-01T13:00:00Z')), '2026-12-01T14:30:00.000Z');
+});
+
+test('Re-entry next run rolls over weekends using the next local-session poll', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T14:30:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-12-04T20:50:00Z')), '2026-12-07T14:30:00.000Z');
+});
+
+test('skipped workflow runs remain a visible release-gate signal until a later success', () => {
+  const history = [
+    { conclusion: 'skipped', created_at: '2026-10-31T10:00:00Z' },
+    { conclusion: 'failure', created_at: '2026-10-31T09:45:00Z' },
+    { conclusion: 'success', created_at: '2026-10-31T09:30:00Z' },
+    { conclusion: 'skipped', created_at: '2026-10-31T09:15:00Z' },
+  ];
+  assert.equal(skippedRunsSinceLastSuccess(history, Date.parse('2026-10-31T09:30:00Z')), 1);
+  assert.equal(skippedRunsSinceLastSuccess(history, NaN), 2);
+});
+
+test('re-entry delivery health distinguishes an active watchlist from confirmed Telegram deliveries', () => {
+  const summary = summarizeReentryDeliveryHealth(
+    [],
+    [{ active: true, ownership_status: 'sold' }, { active: false, ownership_status: 'holding' }],
+  );
+  assert.equal(summary.activeWatchlistRows, 1);
+  assert.equal(summary.activeSoldRows, 1);
+  assert.equal(summary.activeHoldingRows, 0);
+  assert.equal(summary.deliveryLedgerRowsInWindow, 0);
+  assert.deepEqual(summary.statusCounts, { sending: 0, accepted: 0, rejected: 0, uncertain: 0 });
+  assert.equal(summary.lastAcceptedAt, null);
+});
+
+test('re-entry delivery health counts accepted, rejected, and uncertain ledger rows without exposing row details', () => {
+  const summary = summarizeReentryDeliveryHealth([
+    { status: 'uncertain', created_at: '2026-10-31T12:03:00Z', completed_at: '2026-10-31T12:03:05Z', symbol: 'MU', delivery_key: 'private' },
+    { status: 'accepted', created_at: '2026-10-31T12:00:00Z', completed_at: '2026-10-31T12:00:02Z', symbol: 'NVDA', telegram_message_id: 1234 },
+    { status: 'rejected', created_at: '2026-10-31T11:55:00Z', completed_at: '2026-10-31T11:55:01Z' },
+  ], [{ active: true, ownership_status: 'sold' }, { active: true, ownership_status: 'holding' }]);
+  assert.deepEqual(summary.statusCounts, { sending: 0, accepted: 1, rejected: 1, uncertain: 1 });
+  assert.equal(summary.lastAcceptedAt, '2026-10-31T12:00:02Z');
+  assert.equal(summary.activeWatchlistRows, 2);
+  assert.equal(Object.hasOwn(summary, 'telegram_message_id'), false);
+  assert.equal(Object.hasOwn(summary, 'symbol'), false);
 });
