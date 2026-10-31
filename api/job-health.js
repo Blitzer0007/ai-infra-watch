@@ -140,6 +140,26 @@ const JOBS = [
   { id:'private-sp500-membership-audit', name:'Private S&P 500 membership audit', path:'private-sp500-membership-audit.yml', cadence:'Monthly, day 1 at 04:17 UTC (09:47 IST)' },
 ];
 
+
+export function summarizeRunTiming(run, now = Date.now(), stuckAfterMs = 5 * 60 * 1000) {
+  const startedAt = Date.parse(run?.created_at || '');
+  const finishedAt = Date.parse(run?.finished_at || run?.updated_at || '');
+  const status = String(run?.status || '').toLowerCase();
+  const terminal = ['completed', 'failed', 'failure', 'cancelled', 'timed_out', 'success'].includes(status);
+  const hasFinished = Boolean(run?.finished_at) || terminal;
+  const ageMs = Number.isFinite(startedAt) ? Math.max(0, Number(now) - startedAt) : null;
+  const durationMs = Number.isFinite(startedAt)
+    ? (hasFinished && Number.isFinite(finishedAt) ? Math.max(0, finishedAt - startedAt) : ageMs)
+    : null;
+  const unfinished = Number.isFinite(startedAt) && !hasFinished;
+  return {
+    ageMs,
+    durationMs,
+    unfinished,
+    isStuck: unfinished && ageMs > stuckAfterMs,
+  };
+}
+
 export function nextScheduledRun(id, now = new Date()) {
   const next = new Date(now);
 
@@ -233,23 +253,39 @@ export default async function handler(req, res) {
         const failureTime = Date.parse(run.created_at || run.updated_at || '');
         return !Number.isFinite(lastSuccessTime) || failureTime > lastSuccessTime;
       });
+      const observedAt = Date.now();
+      const lastTiming = summarizeRunTiming(last, observedAt, 15 * 60 * 1000);
+      const unfinishedRunCount = history.filter(run => summarizeRunTiming(run, observedAt, 15 * 60 * 1000).unfinished).length;
+      const stuckRunCount = history.filter(run => summarizeRunTiming(run, observedAt, 15 * 60 * 1000).isStuck).length;
       return {
         id: job.id,
         name: job.name,
         cadence: job.cadence,
-        status: last?.status || 'no_runs',
-        conclusion: last?.conclusion || null,
+        status: lastTiming.isStuck ? 'stuck' : last?.status || 'no_runs',
+        conclusion: lastTiming.isStuck ? 'failure' : last?.conclusion || null,
         lastRunAt: last?.created_at || null,
+        lastRunDurationMs: lastTiming.durationMs,
+        lastRunAgeMs: lastTiming.ageMs,
+        isStuck: lastTiming.isStuck,
+        unfinishedRunCount,
+        stuckRunCount,
         lastSuccessAt: lastSuccess?.updated_at || lastSuccess?.created_at || null,
         lastFailureAt: lastFailure?.updated_at || lastFailure?.created_at || null,
         recentFailureCount: failuresSinceLastSuccess.length,
         nextRunAt: nextScheduledRun(job.id),
-        recentRuns: history.slice(0, 5).map(run => ({
-          number: run.run_number,
-          conclusion: run.conclusion,
-          createdAt: run.created_at,
-          updatedAt: run.updated_at,
-        })),
+        recentRuns: history.slice(0, 5).map(run => {
+          const timing = summarizeRunTiming(run, observedAt, 15 * 60 * 1000);
+          return {
+            number: run.run_number,
+            status: run.status,
+            conclusion: run.conclusion,
+            createdAt: run.created_at,
+            updatedAt: run.updated_at,
+            durationMs: timing.durationMs,
+            ageMs: timing.ageMs,
+            isStuck: timing.isStuck,
+          };
+        }),
       };
     });
 
@@ -261,6 +297,10 @@ export default async function handler(req, res) {
       const latest = history[0] || null;
       const lastSuccess = successes[0] || null;
       const lastFailure = failures[0] || null;
+      const observedAt = Date.now();
+      const lastTiming = summarizeRunTiming(latest, observedAt, 5 * 60 * 1000);
+      const unfinishedRunCount = history.filter(run => summarizeRunTiming(run, observedAt, 5 * 60 * 1000).unfinished).length;
+      const stuckRunCount = history.filter(run => summarizeRunTiming(run, observedAt, 5 * 60 * 1000).isStuck).length;
       const nextRun = (now = new Date()) => {
         const next = new Date(now);
         next.setUTCSeconds(0,0);
@@ -283,15 +323,23 @@ export default async function handler(req, res) {
         name:'Forecast Auto Tracker',
         cadence:'06:45 + 07:15 + 07:45 IST weekdays',
         scheduler:'Supabase Cron',
-        status: latest?.status || 'no_runs',
-        conclusion: latest?.status === 'completed' ? 'success' : latest?.status === 'failed' ? 'failure' : latest?.status || null,
+        status: lastTiming.isStuck ? 'stuck' : latest?.status || 'no_runs',
+        conclusion: lastTiming.isStuck ? 'failure' : latest?.status === 'completed' ? 'success' : latest?.status === 'failed' ? 'failure' : latest?.status || null,
         lastRunAt: latest?.created_at || null,
+        lastRunDurationMs: lastTiming.durationMs,
+        lastRunAgeMs: lastTiming.ageMs,
+        isStuck: lastTiming.isStuck,
+        unfinishedRunCount,
+        stuckRunCount,
         lastSuccessAt: lastSuccess?.finished_at || lastSuccess?.created_at || null,
         lastFailureAt: lastFailure?.finished_at || lastFailure?.created_at || null,
         recentFailureCount: failures.length,
         nextRunAt: nextRun(),
-        lastRun: latest ? { source:latest.source, slot:latest.slot, status:latest.status, httpStatus:latest.http_status, holdings:latest.holdings, created:latest.created_count, skipped:latest.skipped_count, error:latest.error } : null,
-        recentRuns: history.slice(0,5).map(run => ({ source:run.source, slot:run.slot, status:run.status, httpStatus:run.http_status, createdAt:run.created_at, finishedAt:run.finished_at, created:run.created_count, skipped:run.skipped_count, error:run.error })),
+        lastRun: latest ? { source:latest.source, slot:latest.slot, status:latest.status, httpStatus:latest.http_status, holdings:latest.holdings, created:latest.created_count, skipped:latest.skipped_count, error:latest.error, durationMs:lastTiming.durationMs, ageMs:lastTiming.ageMs, isStuck:lastTiming.isStuck } : null,
+        recentRuns: history.slice(0,5).map(run => {
+          const timing = summarizeRunTiming(run, observedAt, 5 * 60 * 1000);
+          return { source:run.source, slot:run.slot, status:run.status, httpStatus:run.http_status, createdAt:run.created_at, finishedAt:run.finished_at, created:run.created_count, skipped:run.skipped_count, error:run.error, durationMs:timing.durationMs, ageMs:timing.ageMs, isStuck:timing.isStuck };
+        }),
       };
     } catch (error) {
       forecastJob = { id:'forecast-auto-tracker', name:'Forecast Auto Tracker', cadence:'06:45 + 07:15 + 07:45 IST weekdays', scheduler:'Supabase Cron', status:'unavailable', conclusion:null, nextRunAt:null, error:error instanceof Error ? error.message : 'Forecast scheduler health unavailable' };

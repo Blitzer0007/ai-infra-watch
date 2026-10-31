@@ -29,6 +29,17 @@ function statusClass(status: string, stale?: boolean) {
   return 'text-white/45 border-white/10 bg-white/[.02]';
 }
 
+
+function formatDuration(ms: unknown) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value < 0) return '—';
+  if (value < 1000) return Math.round(value) + 'ms';
+  if (value < 60000) return (value / 1000).toFixed(1) + 's';
+  const minutes = Math.floor(value / 60000);
+  const seconds = Math.round((value % 60000) / 1000);
+  return minutes + 'm ' + seconds + 's';
+}
+
 export default function DataHealth({ evidenceAvailability, timestamp, isLoading, error, onRefresh }: Props) {
   const entries = Object.entries(evidenceAvailability || {});
 
@@ -167,25 +178,32 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         {jobHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{jobHealthError}</div>}
         <div className="mt-3 space-y-2">
           {jobHealth.map(job => {
-            const healthy = job.conclusion === 'success';
-            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.recentFailureCount > 0;
+            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0;
+            const healthy = job.conclusion === 'success' && !degraded;
             return <div key={job.id} className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[10px] font-bold">{job.name}</span>
-                <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + (healthy ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : degraded ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : 'text-white/45 border-white/10')}>{job.conclusion || job.status || 'NO RUNS'}</span>
+                <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + (healthy ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : degraded ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : 'text-white/45 border-white/10')}>{job.isStuck ? 'STUCK' : job.conclusion || job.status || 'NO RUNS'}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-[8px] font-mono text-white/30">
                 <span>Last success: {job.lastSuccessAt ? new Date(job.lastSuccessAt).toLocaleString() : 'none recorded'}</span>
                 <span>Failures since last success: {job.recentFailureCount ?? 0}</span>
                 <span>Next expected: {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'not calculated'}</span>
               </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[8px] font-mono text-white/30">
+                <span>Last run duration: {formatDuration(job.lastRunDurationMs)}</span>
+                <span>Last run age: {formatDuration(job.lastRunAgeMs)}</span>
+                <span>Unfinished: {job.unfinishedRunCount ?? 0}</span>
+                <span>Stuck: {job.stuckRunCount ?? 0}</span>
+              </div>
               <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}</div>
               {job.id === 'forecast-auto-tracker' && job.lastRun ? (
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
                   <span className="text-white/35">Holdings processed <b className="text-white/70">{job.lastRun.holdings ?? '—'}</b></span>
                   <span className="text-white/35">Forecasts created <b className="text-cyan-200">{job.lastRun.created ?? '—'}</b></span>
                   <span className="text-white/35">Skipped safely <b className="text-white/70">{job.lastRun.skipped ?? '—'}</b></span>
-                  <span className="text-white/35">Run result <b className={job.lastRun.status === 'completed' ? 'text-emerald-300' : 'text-amber-300'}>{job.lastRun.status || '—'}</b></span>
+                  <span className="text-white/35">Run result <b className={job.lastRun.status === 'completed' && !job.lastRun.isStuck ? 'text-emerald-300' : 'text-amber-300'}>{job.lastRun.isStuck ? 'stuck' : job.lastRun.status || '—'}</b></span>
+                  <span className="text-white/35">Duration <b className="text-white/70">{formatDuration(job.lastRun.durationMs)}</b></span>
                 </div>
               ) : null}
             </div>;

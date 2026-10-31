@@ -63,3 +63,52 @@ test('unknown providers are ignored and recorded hashes do not clear the histori
   assert.equal(summary.providers.some(row => row.provider === 'unknown'), false);
   assert.equal(summary.historicalGate.status, 'BLOCKED');
 });
+
+test('completed scheduler runs expose elapsed duration and current age', () => {
+  const { summarizeRunTiming } = require('../../api/job-health.js');
+  const now = Date.parse('2026-10-31T12:00:30.000Z');
+  const timing = summarizeRunTiming({
+    status: 'completed',
+    created_at: '2026-10-31T12:00:00.000Z',
+    finished_at: '2026-10-31T12:00:20.000Z',
+  }, now);
+  assert.equal(timing.durationMs, 20000);
+  assert.equal(timing.ageMs, 30000);
+  assert.equal(timing.unfinished, false);
+  assert.equal(timing.isStuck, false);
+});
+
+test('a recent started scheduler run is unfinished but not yet stuck', () => {
+  const { summarizeRunTiming } = require('../../api/job-health.js');
+  const now = Date.parse('2026-10-31T12:04:00.000Z');
+  const timing = summarizeRunTiming({
+    status: 'started',
+    created_at: '2026-10-31T12:00:00.000Z',
+  }, now, 5 * 60 * 1000);
+  assert.equal(timing.unfinished, true);
+  assert.equal(timing.isStuck, false);
+  assert.equal(timing.durationMs, 240000);
+});
+
+test('a scheduler run with no completion after threshold is flagged stuck', () => {
+  const { summarizeRunTiming } = require('../../api/job-health.js');
+  const now = Date.parse('2026-10-31T12:08:00.000Z');
+  const timing = summarizeRunTiming({
+    status: 'started',
+    created_at: '2026-10-31T12:00:00.000Z',
+  }, now, 5 * 60 * 1000);
+  assert.equal(timing.unfinished, true);
+  assert.equal(timing.isStuck, true);
+  assert.equal(timing.durationMs, 480000);
+});
+
+test('GitHub Actions completion time is measured from updated_at', () => {
+  const { summarizeRunTiming } = require('../../api/job-health.js');
+  const timing = summarizeRunTiming({
+    status: 'completed',
+    created_at: '2026-10-31T12:00:00.000Z',
+    updated_at: '2026-10-31T12:02:00.000Z',
+  }, Date.parse('2026-10-31T12:05:00.000Z'));
+  assert.equal(timing.durationMs, 120000);
+  assert.equal(timing.unfinished, false);
+});
