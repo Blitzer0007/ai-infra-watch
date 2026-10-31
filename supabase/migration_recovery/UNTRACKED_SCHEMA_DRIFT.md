@@ -65,3 +65,26 @@ production migration was run as part of this recovery.
 The live data checks found no invalid currency values, null risk-group/beta
 values, invalid risk-leverage values, or legacy broker-alert rows needing
 conversion. All production inspection for this report was read-only.
+
+## Ordered replay validation
+
+The consolidated release candidate adds
+`supabase/tests/schema_full_migration_replay.sql`. It applies all 30 migration
+files in the manifest's exact version order to an ephemeral PostgreSQL 17
+database with fixture objects for the pre-existing Supabase baseline
+(`forecast_snapshots`, `forecast_model_config`, `ai_quality_runs`,
+Storage buckets and the pg_cron job interface). The test injects the
+`portfolio_digest_runs` predecessor before the recorded RLS-only migration,
+then applies the forward schema-drift candidate twice and checks table/RPC
+privileges, the smart-alert cadence, private Storage bucket, currency checks,
+and the reward flow type.
+
+**CI result:** the ordered replay job passed on consolidated PR #160 head
+`72a4c0c` on October 31, 2026. This is a repeatable PostgreSQL fixture test,
+not a full Supabase local-stack test or a linked-project CLI dry run. The
+production baseline includes Supabase-managed extensions and platform schemas
+such as `pg_cron`, `pg_net`, Vault and Storage; the disposable test models
+only the required migration interfaces. The final pre-release gate remains
+to generate the active timestamped reconciliation migration with the
+Supabase CLI and review `supabase db push --dry-run --remote` against an
+authorized disposable/linked validation project. No production DDL was run.
