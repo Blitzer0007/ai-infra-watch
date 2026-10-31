@@ -361,7 +361,7 @@ jobs:
           output="$(supabase db push --linked --include-all --dry-run 2>&1)"
           printf '%s\n' "$output"
           expected="20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql"
-          planned="$(printf '%s\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+\\.sql' | sort -u || true)"
+          planned="$(printf '%s\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+[.]sql' | sort -u || true)"
           if [ "$planned" != "$expected" ]; then
             echo "::error::Expected exactly one pending migration ($expected), received: ${planned:-none}."
             exit 1
