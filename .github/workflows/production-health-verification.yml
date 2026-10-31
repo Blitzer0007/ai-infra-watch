@@ -1,0 +1,29 @@
+name: Production Health Verification
+run-name: Production Health Verification • ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Data Health, scheduler, and Re-entry ledger
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify authenticated production health
+        env:
+          QA_HEADERS_JSON: ${{ secrets.QA_HEADERS_JSON }}
+        run: python scripts/verify-production-health.py
