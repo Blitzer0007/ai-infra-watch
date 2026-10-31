@@ -181,10 +181,10 @@ begin
     if has_table_privilege('anon', format('public.%I', v_table_name), 'select,insert,update,delete') then
       raise exception 'anon has DML on public.%', v_table_name;
     end if;
-    if has_table_privilege('authenticated', format('public.%I', table_name), 'select,insert,update,delete') then
+    if has_table_privilege('authenticated', format('public.%I', v_table_name), 'select,insert,update,delete') then
       raise exception 'authenticated has DML on public.%', v_table_name;
     end if;
-    if not has_table_privilege('service_role', format('public.%I', table_name), 'select,insert,update,delete') then
+    if not has_table_privilege('service_role', format('public.%I', v_table_name), 'select,insert,update,delete') then
       raise exception 'service_role lost DML on public.%', v_table_name;
     end if;
   end loop;
