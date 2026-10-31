@@ -301,7 +301,7 @@ jobs:
         with:
           version: 2.122.0
           github-token: ${{ github.token }}
-      - name: Generate an ordered reconciliation migration name in a disposable workspace
+      - name: Generate migration with Supabase CLI and apply reviewed backfill timestamp
         shell: bash
         run: |
           set -euo pipefail
@@ -311,13 +311,19 @@ jobs:
           supabase migration new create_portfolio_digest_runs_and_reconcile_schema_drift
           generated="$(find supabase/migrations -maxdepth 1 -type f -name '*_create_portfolio_digest_runs_and_reconcile_schema_drift.sql' -print)"
           test -n "$generated"
-          filename="$(basename "$generated")"
-          if ! [[ "$filename" =~ ^[0-9]{14}_create_portfolio_digest_runs_and_reconcile_schema_drift\.sql$ ]]; then
-            echo "::error::Supabase CLI generated an unexpected migration filename: $filename"
+          cli_filename="$(basename "$generated")"
+          if ! [[ "$cli_filename" =~ ^[0-9]{14}_create_portfolio_digest_runs_and_reconcile_schema_drift[.]sql$ ]]; then
+            echo "::error::Supabase CLI generated an unexpected migration filename: $cli_filename"
             exit 1
           fi
-          echo "Supabase CLI generated migration path: $generated"
-          echo "Supabase CLI migration filename generation: PASS"
+          # Supabase migration new creates the blank file. The reviewed migration
+          # must be backfilled before historical 20261013233140, so rename that
+          # CLI-created file to the selected insertion timestamp.
+          backfilled="supabase/migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql"
+          mv "$generated" "$backfilled"
+          test -f "$backfilled"
+          echo "Supabase CLI created $cli_filename; reviewed backfill path: $backfilled"
+          echo "Supabase CLI migration creation and reviewed backfill rename: PASS"
 
   supabase-linked-migration-dry-run:
     name: Linked Supabase migration dry run (read-only)
