@@ -40,8 +40,8 @@ export function coverageInterval(rows = [], lowerKey, upperKey) {
 export function calibrationVerdict(p25p75Coverage, p10p90Coverage, count) {
   const validCoverage = interval =>
     Number(interval?.count) >= 50 &&
-    Number.isFinite(Number(interval?.lowerPct)) &&
-    Number.isFinite(Number(interval?.upperPct));
+    isPresentFiniteNumber(interval?.lowerPct) &&
+    isPresentFiniteNumber(interval?.upperPct);
   if (
     Number(count) < 50 ||
     !validCoverage(p25p75Coverage) ||
