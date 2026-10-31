@@ -492,44 +492,60 @@ test('scan status explicitly distinguishes fully deferred notifications from fai
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
 
-test('Re-entry technical indicators use split/dividend-adjusted closes while keeping the live price raw', async () => {
+test('Re-entry indicators align live quote adjustment factor to the completed bar timestamp', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
-  const closes = Array(50).fill(100);
-  const adjustedCloses = Array(50).fill(50);
-  const result = calculateReentryIndicators({ price: 100, closes, adjustedCloses });
+  const timestamps = Array.from({ length: 51 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
+  const closes = Array(51).fill(100);
+  const adjustedCloses = Array(51).fill(50);
+  // Last point is newer than the provider's regularMarketTime and may be an in-progress bar.
+  adjustedCloses[50] = 25;
+  const result = calculateReentryIndicators({
+    price: 100,
+    closes,
+    adjustedCloses,
+    timestamps,
+    regularMarketTime: timestamps[49],
+  });
   assert.equal(result.price, 100);
-  assert.equal(result.sma20, 50);
-  assert.equal(result.sma50, 50);
+  assert.equal(result.sma20, 48.75);
+  assert.equal(result.sma50, 48.5);
+  assert.equal(result.adjustmentReferenceDate, '2026-02-19');
+  assert.equal(result.adjustmentFactor, 0.5);
   assert.equal(result.drawdownFrom52WeekHighPct, 0);
   assert.equal(result.priceBasis, 'split_dividend_adjusted_close');
-  assert.equal(result.adjustedPointCount, 50);
+  assert.equal(result.adjustedPointCount, 51);
 });
 
-test('Re-entry indicators fail closed when adjusted-close history is missing', async () => {
+test('Re-entry indicators fail closed when adjusted-close history is missing or misaligned', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
   assert.throws(() => calculateReentryIndicators({
-    price: 100,
-    closes: Array(60).fill(100),
-    adjustedCloses: [],
-  }), /Complete split\/dividend-adjusted history/);
+    price: 100, closes: Array(60).fill(100), adjustedCloses: [], timestamps,
+  }), /Aligned raw and adjusted daily history/);
+  assert.throws(() => calculateReentryIndicators({
+    price: 100, closes: Array(60).fill(100), adjustedCloses: Array(60).fill(100),
+    timestamps: timestamps.slice(1),
+  }), /Aligned raw and adjusted daily history/);
 });
 
 test('Re-entry indicators fail closed on partial adjusted-close coverage', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
   const adjustedCloses = Array(60).fill(100);
   adjustedCloses[20] = null;
   assert.throws(() => calculateReentryIndicators({
-    price: 100,
-    closes: Array(60).fill(100),
-    adjustedCloses,
-  }), /Complete split\/dividend-adjusted history/);
+    price: 100, closes: Array(60).fill(100), adjustedCloses, timestamps,
+  }), /At least 50 complete aligned adjusted daily bars/);
 });
 
-test('Re-entry adjusted indicators require at least 50 complete daily points', async () => {
+test('Re-entry adjusted indicators require at least 50 complete aligned daily points', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 49 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
   assert.throws(() => calculateReentryIndicators({
     price: 100,
     closes: Array(49).fill(100),
     adjustedCloses: Array(49).fill(100),
-  }), /Insufficient historical data/);
+    timestamps,
+  }), /At least 50 complete aligned adjusted daily bars/);
 });
+
