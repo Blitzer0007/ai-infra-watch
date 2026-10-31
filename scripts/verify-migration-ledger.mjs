@@ -44,5 +44,5 @@ if (failures.length) {
   for (const failure of failures) console.error('MIGRATION LEDGER CHECK FAILED: ' + failure);
   process.exitCode = 1;
 } else {
-  console.log('Supabase migration ledger integrity passed (' + manifest.migrations.length + ' exact SQL files).');
+  console.log('Supabase migration manifest integrity passed (' + manifest.migrations.length + ' local SQL files, including pending reconciliation).');
 }
