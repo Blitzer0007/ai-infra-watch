@@ -56,7 +56,7 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
   const quoteEpochMs = Number.isFinite(regularMarketEpoch) && regularMarketEpoch > 0
     ? regularMarketEpoch * 1000
     : NaN;
-  const complete = raw.map((rawClose, index) => ({
+  const aligned = raw.map((rawClose, index) => ({
     timestamp: dates[index],
     rawClose,
     adjustedClose: adjusted[index],
@@ -67,28 +67,29 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
   ).sort((a, b) => a.timestamp - b.timestamp);
 
   const unique = [];
-  for (const point of complete) {
+  for (const point of aligned) {
     if (unique.length && unique[unique.length - 1].timestamp === point.timestamp) {
       unique[unique.length - 1] = point;
     } else {
       unique.push(point);
     }
   }
-  if (unique.length < 50) throw new Error('At least 50 complete aligned adjusted daily bars are required');
 
-  // Use the last completed daily bar, not an in-progress bar, when deriving the
-  // latest Yahoo adjclose/raw-close factor. The same factor converts the live
-  // quote to the current adjusted-price basis for the high-water comparison.
-  const lastCompleted = Number.isFinite(quoteEpochMs)
-    ? unique.filter(point => point.timestamp * 1000 <= quoteEpochMs).at(-1)
-    : unique.at(-1);
-  if (!lastCompleted) throw new Error('No completed daily bar aligns with the live quote session');
-
+  // Keep every indicator on the same completed-bar basis. A partially formed
+  // daily bar must not influence either the moving averages or the high-water mark.
+  const completed = Number.isFinite(quoteEpochMs)
+    ? unique.filter(point => point.timestamp * 1000 <= quoteEpochMs)
+    : unique;
+  if (completed.length < 50) {
+    throw new Error('At least 50 complete aligned adjusted daily bars are required');
+  }
+  const lastCompleted = completed.at(-1);
   const adjustmentFactor = lastCompleted.adjustedClose / lastCompleted.rawClose;
   if (!(adjustmentFactor > 0) || !Number.isFinite(adjustmentFactor)) {
     throw new Error('Invalid adjusted-close factor for re-entry indicators');
   }
-  const adjustedSeries = unique.map(point => point.adjustedClose);
+
+  const adjustedSeries = completed.map(point => point.adjustedClose);
   const average = count => {
     const sample = adjustedSeries.slice(-count);
     if (sample.length !== count) throw new Error('Insufficient adjusted bars for re-entry indicators');
@@ -104,8 +105,8 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
     priceBasis: 'split_dividend_adjusted_close',
     adjustmentReferenceDate: new Date(lastCompleted.timestamp * 1000).toISOString().slice(0, 10),
     adjustmentFactor,
-    adjustedPointCount: unique.length,
-    rawPointCount: unique.length,
+    adjustedPointCount: completed.length,
+    rawPointCount: completed.length,
   };
 }
 
