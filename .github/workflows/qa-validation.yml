@@ -281,7 +281,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
-      - name: Replay all 30 recorded migrations with baseline and drift prerequisites
+      - name: Replay 30 recorded migrations plus pending ordered reconciliation migration
         run: |
           psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
             -f supabase/tests/schema_full_migration_replay.sql
@@ -295,15 +295,15 @@ jobs:
         with:
           version: 2.122.0
           github-token: ${{ github.token }}
-      - name: Generate a migration in a disposable workspace
+      - name: Generate an ordered reconciliation migration name in a disposable workspace
         shell: bash
         run: |
           set -euo pipefail
           workdir="$(mktemp -d)"
           cd "$workdir"
           supabase init
-          supabase migration new reconcile_untracked_schema_drift
-          generated="$(find supabase/migrations -maxdepth 1 -type f -name '*_reconcile_untracked_schema_drift.sql' -print)"
+          supabase migration new create_portfolio_digest_runs_and_reconcile_schema_drift
+          generated="$(find supabase/migrations -maxdepth 1 -type f -name '*_create_portfolio_digest_runs_and_reconcile_schema_drift.sql' -print)"
           test -n "$generated"
           filename="$(basename "$generated")"
           if ! [[ "$filename" =~ ^[0-9]{14}_reconcile_untracked_schema_drift\.sql$ ]]; then
