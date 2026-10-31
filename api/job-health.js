@@ -161,18 +161,40 @@ export function summarizeRunTiming(run, now = Date.now(), stuckAfterMs = 5 * 60 
   };
 }
 
+function newYorkScheduleParts(value) {
+  const instant = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(instant.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant);
+  return Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+}
+
+function isReentrySessionPoll(candidate) {
+  const parts = newYorkScheduleParts(candidate);
+  if (!parts || parts.weekday === 'Sat' || parts.weekday === 'Sun') return false;
+  const minuteOfDay = Number(parts.hour) * 60 + Number(parts.minute);
+  return Number.isFinite(minuteOfDay) && minuteOfDay >= 9 * 60 + 30 && minuteOfDay < 16 * 60;
+}
+
 export function nextScheduledRun(id, now = new Date()) {
   const next = new Date(now);
 
   if (id === 'reentry-alerts') {
+    // The GitHub schedule polls 13:00–20:45 UTC. This local-session filter
+    // accounts for both EST and EDT and skips UTC poll slots that the workflow
+    // preflight will deliberately reject before requesting an OIDC token.
     for (let offset = 0; offset <= 7; offset += 1) {
       const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset));
-      const weekday = day.getUTCDay();
-      if (weekday === 0 || weekday === 6) continue;
+      if (day.getUTCDay() === 0 || day.getUTCDay() === 6) continue;
       for (let hour = 13; hour <= 20; hour += 1) {
         for (let minute = 0; minute < 60; minute += 15) {
           const candidate = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour, minute, 0, 0));
-          if (candidate > now) return candidate.toISOString();
+          if (candidate > now && isReentrySessionPoll(candidate)) return candidate.toISOString();
         }
       }
     }
@@ -230,8 +252,6 @@ export function nextScheduledRun(id, now = new Date()) {
   next.setUTCHours(hours[0], minute, 0, 0);
   return next.toISOString();
 }
-
-
 
 export function summarizeReentryDeliveryHealth(deliveries, watchlist) {
   const rows = Array.isArray(deliveries) ? deliveries : [];
