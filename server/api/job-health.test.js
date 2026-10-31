@@ -109,6 +109,28 @@ test('GitHub Actions completion time is measured from updated_at', () => {
   assert.equal(timing.unfinished, false);
 });
 
+test('queued and in-progress GitHub runs remain unfinished until completed', () => {
+  const now = Date.parse('2026-10-31T12:08:00.000Z');
+  for (const status of ['queued', 'in_progress']) {
+    const timing = summarizeRunTiming({
+      status,
+      created_at: '2026-10-31T12:00:00.000Z',
+      updated_at: '2026-10-31T12:07:00.000Z',
+    }, now, 5 * 60 * 1000);
+    assert.equal(timing.unfinished, true);
+    assert.equal(timing.isStuck, true);
+    assert.equal(timing.durationMs, 480000);
+  }
+});
+
+test('runs without a valid creation timestamp do not invent ages or stuck status', () => {
+  const timing = summarizeRunTiming({ status: 'queued', created_at: 'not-a-date' }, Date.now());
+  assert.equal(timing.ageMs, null);
+  assert.equal(timing.durationMs, null);
+  assert.equal(timing.unfinished, false);
+  assert.equal(timing.isStuck, false);
+});
+
 test('Re-entry next run skips UTC polls before the New York session opens in EDT', () => {
   assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T12:59:00Z')), '2026-10-26T13:30:00.000Z');
   assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T13:00:00Z')), '2026-10-26T13:30:00.000Z');
@@ -119,7 +141,7 @@ test('Re-entry next run skips UTC polls before the New York session opens in EST
 });
 
 test('Re-entry next run rolls over weekends using the next local-session poll', () => {
-  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T13:30:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T14:30:00.000Z');
   assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-12-04T20:50:00Z')), '2026-12-07T14:30:00.000Z');
 });
 
