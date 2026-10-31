@@ -41,18 +41,63 @@ async function db(path, options={}) {
   if (!response.ok) throw new Error('Re-entry storage failed: HTTP '+response.status);
   const text=await response.text(); return text ? JSON.parse(text) : null;
 }
+
+export function calculateReentryIndicators({ price, closes, adjustedCloses }) {
+  const livePrice = Number(price);
+  const raw = Array.isArray(closes) ? closes.map(Number) : [];
+  const adjusted = Array.isArray(adjustedCloses) ? adjustedCloses.map(Number) : [];
+  const validIndexes = raw.map((value, index) => ({ value, index }))
+    .filter(item => Number.isFinite(item.value) && item.value > 0)
+    .map(item => item.index);
+
+  if (!(livePrice > 0) || validIndexes.length < 50) {
+    throw new Error('Insufficient historical data for re-entry indicators');
+  }
+
+  const missingAdjusted = validIndexes.find(index =>
+    !Number.isFinite(adjusted[index]) || !(adjusted[index] > 0)
+  );
+  if (missingAdjusted !== undefined) {
+    throw new Error('Complete split/dividend-adjusted history is required for re-entry indicators');
+  }
+
+  const adjustedSeries = validIndexes.map(index => adjusted[index]);
+  const latestIndex = validIndexes.at(-1);
+  const latestRawClose = raw[latestIndex];
+  const latestAdjustedClose = adjusted[latestIndex];
+  const adjustmentFactor = latestAdjustedClose / latestRawClose;
+  if (!(adjustmentFactor > 0) || !Number.isFinite(adjustmentFactor)) {
+    throw new Error('Invalid adjusted-close factor for re-entry indicators');
+  }
+
+  const adjustedLivePrice = livePrice * adjustmentFactor;
+  const average = count => {
+    const sample = adjustedSeries.slice(-count);
+    return sample.reduce((sum, value) => sum + value, 0) / sample.length;
+  };
+  const high = Math.max(...adjustedSeries);
+  return {
+    price: livePrice,
+    sma20: average(20),
+    sma50: average(50),
+    drawdownFrom52WeekHighPct: high > 0 ? (high - adjustedLivePrice) / high * 100 : null,
+    priceBasis: 'split_dividend_adjusted_close',
+    adjustedPointCount: adjustedSeries.length,
+    rawPointCount: validIndexes.length,
+  };
+}
+
 async function quoteHistory(symbol) {
   const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?range=1y&interval=1d';
   const response=await fetch(url,{headers:{'User-Agent':'ai-infra-watch/1.0'},signal:AbortSignal.timeout(10000)});
   if(!response.ok) throw new Error('Market quote unavailable for '+symbol);
   const body=await response.json(), result=body?.chart?.result?.[0];
   const meta=result?.meta, closes=result?.indicators?.quote?.[0]?.close;
-  if(!meta || !Array.isArray(closes)) throw new Error('History unavailable for '+symbol);
-  const valid=closes.filter(v=>Number.isFinite(v));
-  const price=Number(meta.regularMarketPrice || valid.at(-1));
-  if(!(price>0) || valid.length<50) throw new Error('Insufficient history for '+symbol);
-  const avg=n=>valid.slice(-n).reduce((a,b)=>a+b,0)/n;
-  const high=Math.max(...valid);
+  const adjustedCloses=result?.indicators?.adjclose?.[0]?.adjclose;
+  if(!meta || !Array.isArray(closes) || !Array.isArray(adjustedCloses)) throw new Error('Adjusted history unavailable for '+symbol);
+  const lastValidRaw=closes.map(Number).filter(v=>Number.isFinite(v)&&v>0).at(-1);
+  const price=Number(meta.regularMarketPrice || lastValidRaw);
+  const indicators=calculateReentryIndicators({price,closes,adjustedCloses});
   const regularMarketTime = meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
   const marketTime = Number.isFinite(regularMarketTime) && regularMarketTime > 0
     ? new Date(regularMarketTime * 1000).toISOString()
@@ -63,7 +108,7 @@ async function quoteHistory(symbol) {
   const regularSession = Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart > 0 && sessionEnd > sessionStart
     ? { start: sessionStart, end: sessionEnd }
     : null;
-  return {price,sma20:avg(20),sma50:avg(50),drawdownFrom52WeekHighPct:high>0?(high-price)/high*100:null,retrievedAt:new Date().toISOString(),marketTime,regularSession};
+  return {...indicators,retrievedAt:new Date().toISOString(),marketTime,regularSession};
 }
 
 function newYorkClockParts(value) {
