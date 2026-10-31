@@ -84,7 +84,10 @@ export function buildJevPaperAllocator(input: JevAllocatorInput): JevAllocatorRe
   if (input.evidenceComplete !== true) blockedReasons.push('JEV evidence gate is incomplete.');
   if (input.evidenceFresh !== true) blockedReasons.push('Evidence freshness is not confirmed.');
   if (input.conflictCount > 0) blockedReasons.push('Resolve material evidence conflicts first.');
-  if (['insufficient', 'gather_more', 'stop'].includes(action)) blockedReasons.push('JEV gate action blocks allocation.');
+  // The autonomous backend uses "stop" to mean research is sufficient and
+  // the evidence-gathering loop may terminate. It is the positive terminal
+  // decision; all other/unknown actions remain blocked until explicitly ready.
+  if (!['complete', 'stop'].includes(action)) blockedReasons.push('JEV gate has not confirmed evidence sufficiency.');
   if (input.thesisBreaches?.length) blockedReasons.push('Review invalidated thesis or breached holding rules: ' + input.thesisBreaches.join(', '));
   for (const candidate of input.candidates) {
     const symbol = candidate.symbol.toUpperCase();
