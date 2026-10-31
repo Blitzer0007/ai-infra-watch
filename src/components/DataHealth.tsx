@@ -171,14 +171,14 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Automation reliability</div>
             <div className="text-sm font-black mt-1">Scheduled job health</div>
-            <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
+            <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures/skips, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
           </div>
           <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs checked' : 'unavailable'}</span>
         </div>
         {jobHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{jobHealthError}</div>}
         <div className="mt-3 space-y-2">
           {jobHealth.map(job => {
-            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0;
+            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.conclusion === 'skipped' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0 || Number(job.recentSkippedCount) > 0;
             const healthy = job.conclusion === 'success' && !degraded;
             return <div key={job.id} className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -195,8 +195,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Last run age: {formatDuration(job.lastRunAgeMs)}</span>
                 <span>Unfinished: {job.unfinishedRunCount ?? 0}</span>
                 <span>Stuck: {job.stuckRunCount ?? 0}</span>
+                <span>Skipped since success: {job.recentSkippedCount ?? 0}</span>
               </div>
-              <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}</div>
+              <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}{job.releaseGate ? ' · Release gate: ' + job.releaseGate : ''}</div>
               {job.id === 'forecast-auto-tracker' && job.lastRun ? (
                 <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
                   <span className="text-white/35">Holdings processed <b className="text-white/70">{job.lastRun.holdings ?? '—'}</b></span>

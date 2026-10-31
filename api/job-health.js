@@ -135,6 +135,7 @@ const JOBS = [
   { id:'server-smart-alerts', name:'Server Smart Alerts', path:'server-smart-alerts.yml', cadence:'every 10 minutes UTC' },
   { id:'earnings-alerts', name:'Earnings alerts', path:'earnings-alerts.yml', cadence:'08:30 Asia/Kolkata' },
   { id:'production-smoke', name:'Production Smoke', path:'production-smoke.yml', cadence:'every 6 hours at :23 UTC' },
+  { id:'reentry-alerts', name:'Re-entry Telegram Alerts', path:'reentry-alerts.yml', cadence:'Every 15 minutes during US regular-session window', releaseGate:'REENTRY_ALERTS_ENABLED + REENTRY_ALERTS_RELEASE_APPROVED' },
   { id:'private-ohlc-asof-archive', name:'Private OHLC as-of archive', path:'private-ohlc-asof-archive.yml', cadence:'Weekdays at 23:30 UTC (05:00 IST next day)' },
   { id:'private-marketparquet-archive', name:'Private MarketParquet archive', path:'private-marketparquet-archive.yml', cadence:'Weekdays at 23:40 UTC (05:10 IST next day)' },
   { id:'private-sp500-membership-audit', name:'Private S&P 500 membership audit', path:'private-sp500-membership-audit.yml', cadence:'Monthly, day 1 at 04:17 UTC (09:47 IST)' },
@@ -162,6 +163,21 @@ export function summarizeRunTiming(run, now = Date.now(), stuckAfterMs = 5 * 60 
 
 export function nextScheduledRun(id, now = new Date()) {
   const next = new Date(now);
+
+  if (id === 'reentry-alerts') {
+    for (let offset = 0; offset <= 7; offset += 1) {
+      const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset));
+      const weekday = day.getUTCDay();
+      if (weekday === 0 || weekday === 6) continue;
+      for (let hour = 13; hour <= 20; hour += 1) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          const candidate = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour, minute, 0, 0));
+          if (candidate > now) return candidate.toISOString();
+        }
+      }
+    }
+    return null;
+  }
 
   if (id === 'private-ohlc-asof-archive' || id === 'private-marketparquet-archive') {
     const minute = id === 'private-ohlc-asof-archive' ? 30 : 40;
@@ -215,6 +231,15 @@ export function nextScheduledRun(id, now = new Date()) {
   return next.toISOString();
 }
 
+
+export function skippedRunsSinceLastSuccess(history, lastSuccessTime) {
+  return (Array.isArray(history) ? history : []).filter(run => {
+    if (String(run?.conclusion || '').toLowerCase() !== 'skipped') return false;
+    const skippedAt = Date.parse(run.created_at || run.updated_at || '');
+    return !Number.isFinite(lastSuccessTime) || skippedAt > lastSuccessTime;
+  }).length;
+}
+
 function workflowMatches(run, fileName) {
   return String(run?.path || '').endsWith(fileName);
 }
@@ -253,6 +278,9 @@ export default async function handler(req, res) {
         const failureTime = Date.parse(run.created_at || run.updated_at || '');
         return !Number.isFinite(lastSuccessTime) || failureTime > lastSuccessTime;
       });
+      const skippedRuns = history.filter(run => String(run.conclusion || '').toLowerCase() === 'skipped');
+      const recentSkippedCount = skippedRunsSinceLastSuccess(history, lastSuccessTime);
+      const lastSkipped = skippedRuns[0] || null;
       const observedAt = Date.now();
       const lastTiming = summarizeRunTiming(last, observedAt, 15 * 60 * 1000);
       const unfinishedRunCount = history.filter(run => summarizeRunTiming(run, observedAt, 15 * 60 * 1000).unfinished).length;
@@ -261,6 +289,7 @@ export default async function handler(req, res) {
         id: job.id,
         name: job.name,
         cadence: job.cadence,
+        releaseGate: job.releaseGate || null,
         status: lastTiming.isStuck ? 'stuck' : last?.status || 'no_runs',
         conclusion: lastTiming.isStuck ? 'failure' : last?.conclusion || null,
         lastRunAt: last?.created_at || null,
@@ -272,6 +301,8 @@ export default async function handler(req, res) {
         lastSuccessAt: lastSuccess?.updated_at || lastSuccess?.created_at || null,
         lastFailureAt: lastFailure?.updated_at || lastFailure?.created_at || null,
         recentFailureCount: failuresSinceLastSuccess.length,
+        recentSkippedCount,
+        lastSkippedAt: lastSkipped?.created_at || lastSkipped?.updated_at || null,
         nextRunAt: nextScheduledRun(job.id),
         recentRuns: history.slice(0, 5).map(run => {
           const timing = summarizeRunTiming(run, observedAt, 15 * 60 * 1000);

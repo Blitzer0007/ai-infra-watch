@@ -108,3 +108,23 @@ test('GitHub Actions completion time is measured from updated_at', () => {
   assert.equal(timing.durationMs, 120000);
   assert.equal(timing.unfinished, false);
 });
+
+test('Re-entry alert next run follows its 15-minute UTC schedule on weekdays', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T13:00:00Z')), '2026-10-26T13:15:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T12:59:00Z')), '2026-10-26T13:00:00.000Z');
+});
+
+test('Re-entry alert next run rolls over weekends', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T13:00:00.000Z');
+});
+
+test('skipped workflow runs remain a visible release-gate signal until a later success', () => {
+  const history = [
+    { conclusion: 'skipped', created_at: '2026-10-31T10:00:00Z' },
+    { conclusion: 'failure', created_at: '2026-10-31T09:45:00Z' },
+    { conclusion: 'success', created_at: '2026-10-31T09:30:00Z' },
+    { conclusion: 'skipped', created_at: '2026-10-31T09:15:00Z' },
+  ];
+  assert.equal(skippedRunsSinceLastSuccess(history, Date.parse('2026-10-31T09:30:00Z')), 1);
+  assert.equal(skippedRunsSinceLastSuccess(history, NaN), 2);
+});
