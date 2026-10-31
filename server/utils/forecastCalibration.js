@@ -13,11 +13,15 @@ export function wilsonInterval(hits, total, z = 1.96) {
   };
 }
 
+function isPresentFiniteNumber(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+}
+
 export function coverageInterval(rows = [], lowerKey, upperKey) {
   const eligible = rows.filter(row =>
-    Number.isFinite(Number(row?.actual_return)) &&
-    Number.isFinite(Number(row?.[lowerKey])) &&
-    Number.isFinite(Number(row?.[upperKey])),
+    isPresentFiniteNumber(row?.actual_return) &&
+    isPresentFiniteNumber(row?.[lowerKey]) &&
+    isPresentFiniteNumber(row?.[upperKey]),
   );
   const hits = eligible.filter(row =>
     Number(row.actual_return) >= Number(row[lowerKey]) &&
