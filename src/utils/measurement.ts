@@ -209,14 +209,13 @@ export function calculatePortfolioAttribution(inputs: PortfolioMetricInput[]): P
     .sort((a, b) => Math.abs(b.pnlContribution) - Math.abs(a.pnlContribution));
 }
 
-function returnMap(history: HistoricalPricePoint[]) {
-  const map = new Map<string, number>();
-  for (let i = 1; i < history.length; i++) {
-    const previous = Number(history[i - 1]?.price);
-    const current = Number(history[i]?.price);
-    if (previous > 0 && current > 0) map.set(history[i].date, (current / previous - 1) * 100);
-  }
-  return map;
+function toPriceMap(history: HistoricalPricePoint[] = []) {
+  return new Map(
+    [...history]
+      .filter(point => point?.date && Number.isFinite(Number(point.price)) && Number(point.price) > 0)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(point => [point.date, Number(point.price)]),
+  );
 }
 export function buildPortfolioDailySeriesFromTransactions(
   histories: Record<string, HistoricalPricePoint[]>,
@@ -323,42 +322,38 @@ export function buildPortfolioDailySeries(
 ): PortfolioDailyPoint[] {
   const expected = Object.entries(weights)
     .filter(([, weight]) => Number.isFinite(weight) && weight > 0)
-    .map(([symbol, weight]) => ({ symbol, weight }));
-  const returnsBySymbol = Object.fromEntries(
-    Object.entries(histories).map(([symbol, history]) => [symbol, returnMap(history)]),
-  ) as Record<string, Map<string, number>>;
-  const dates = [...new Set(Object.values(returnsBySymbol).flatMap(map => [...map.keys()]))].sort();
-  const activeDates = dates.slice(-Math.max(1, days));
+    .map(([symbol, weight]) => ({ symbol: symbol.toUpperCase(), weight, prices: toPriceMap(histories[symbol] || []) }));
   const expectedWeight = expected.reduce((sum, row) => sum + row.weight, 0);
-  if (!expected.length || expectedWeight <= 0) return [];
-  return activeDates
-    .map(date => {
-      const rows = expected.map(({ symbol, weight }) => ({
-        symbol,
-        value: returnsBySymbol[symbol]?.get(date),
-        weight,
-      }));
-      // A missing positive-weight symbol makes this date incomplete. Do not
-      // re-normalize the remaining symbols into a false 100% portfolio.
-      if (rows.some(row => !Number.isFinite(row.value))) return null;
-      const returnPct = rows.reduce((sum, row) => sum + (row.value as number) * (row.weight / expectedWeight), 0);
-      const breadth = rows.reduce((sum, row) => sum + ((row.value as number) >= 0 ? row.weight / expectedWeight : 0), 0);
-      const stressScore = Math.round(clamp((1 - breadth) * 40 + clamp((-returnPct / 5) * 30, 0, 30), 0, 100));
-      return { date, returnPct, stressScore };
-    })
-    .filter((row): row is PortfolioDailyPoint => row != null);
+  if (!expected.length || expectedWeight <= 0 || expected.some(row => row.prices.size === 0)) return [];
+  const dates = [...new Set(expected.flatMap(row => [...row.prices.keys()]))].sort();
+  const activeDates = dates.slice(-Math.max(1, days + 1));
+  const result: PortfolioDailyPoint[] = [];
+  for (let i = 1; i < activeDates.length; i++) {
+    const previousDate = activeDates[i - 1];
+    const date = activeDates[i];
+    const rows = expected.map(row => {
+      const previousPrice = row.prices.get(previousDate);
+      const currentPrice = row.prices.get(date);
+      if (!(previousPrice && currentPrice)) return null;
+      const move = (currentPrice / previousPrice - 1) * 100;
+      return Number.isFinite(move) ? { move, weight: row.weight } : null;
+    });
+    // Each observation must cover every positive-weight holding over the same
+    // pair of market dates. Missing rows are withheld rather than reweighted.
+    if (rows.some(row => row == null)) continue;
+    const completeRows = rows.filter((row): row is { move: number; weight: number } => row != null);
+    const returnPct = completeRows.reduce((sum, row) => sum + row.move * (row.weight / expectedWeight), 0);
+    const breadth = completeRows.reduce((sum, row) => sum + (row.move >= 0 ? row.weight / expectedWeight : 0), 0);
+    const stressScore = Math.round(clamp((1 - breadth) * 40 + clamp((-returnPct / 5) * 30, 0, 30), 0, 100));
+    result.push({ date, returnPct, stressScore });
+  }
+  return result.slice(-Math.max(1, days));
 }
 
 export function comparePortfolioToBenchmarks(
   portfolioHistory: HistoricalPricePoint[],
   benchmarkHistories: Record<string, HistoricalPricePoint[]>,
 ): BenchmarkComparison[] {
-  const toPriceMap = (history: HistoricalPricePoint[]) => new Map(
-    [...history]
-      .filter(point => point?.date && Number.isFinite(Number(point.price)) && Number(point.price) > 0)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(point => [point.date, Number(point.price)]),
-  );
   const portfolioPrices = toPriceMap(portfolioHistory);
   const results: BenchmarkComparison[] = [];
   for (const [benchmark, history] of Object.entries(benchmarkHistories)) {
