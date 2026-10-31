@@ -29,6 +29,17 @@ function statusClass(status: string, stale?: boolean) {
   return 'text-white/45 border-white/10 bg-white/[.02]';
 }
 
+
+function formatDuration(ms: unknown) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value < 0) return '—';
+  if (value < 1000) return Math.round(value) + 'ms';
+  if (value < 60000) return (value / 1000).toFixed(1) + 's';
+  const minutes = Math.floor(value / 60000);
+  const seconds = Math.round((value % 60000) / 1000);
+  return minutes + 'm ' + seconds + 's';
+}
+
 export default function DataHealth({ evidenceAvailability, timestamp, isLoading, error, onRefresh }: Props) {
   const entries = Object.entries(evidenceAvailability || {});
 
@@ -69,6 +80,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
   const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT' || String(item?.conflictStatus || '') === 'CONFLICT').length;
   const fallback = entries.filter(([, item]) => Boolean(item?.fallback)).length;
+  const [marketDataHealth, setMarketDataHealth] = useState<any>(null);
+  const [marketDataHealthError, setMarketDataHealthError] = useState('');
+  const [marketDataHealthReload, setMarketDataHealthReload] = useState(0);
   const [forecastValidation, setForecastValidation] = useState<any>(null);
   const [forecastValidationError, setForecastValidationError] = useState('');
   const [jobHealth, setJobHealth] = useState<any[]>([]);
@@ -103,6 +117,28 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       });
     return () => { cancelled = true; };
   }, [archiveReload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch('/api/market?route=market-data-health' + (marketDataHealthReload > 0 ? '&refresh=true' : ''), { cache: 'no-store' })
+      .then(async response => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error || 'Market provider health unavailable');
+        return body;
+      })
+      .then(body => {
+        if (cancelled) return;
+        setMarketDataHealth(body);
+        setMarketDataHealthError('');
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setMarketDataHealth(null);
+          setMarketDataHealthError(error instanceof Error ? error.message : 'Market provider health unavailable');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [marketDataHealthReload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,37 +191,112 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       </div>
 
 
+      <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="market-provider-health">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Market data integrity</div>
+            <div className="text-sm font-black mt-1">Quote and historical-price providers</div>
+            <div className="text-[9px] text-white/30 mt-1">Samples SPY and the three largest holdings by cost basis. Raw-close history is distinguished from complete split/dividend-adjusted history.</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[8px] font-mono uppercase text-white/25">{marketDataHealth?.rows?.length ? marketDataHealth.rows.length + ' symbols sampled' : 'unavailable'}</span>
+            <button type="button" onClick={() => setMarketDataHealthReload(value => value + 1)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[8px] font-mono uppercase text-white/55 hover:text-white">
+              <RefreshCw className="w-3 h-3" /> Refresh
+            </button>
+          </div>
+        </div>
+        {marketDataHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{marketDataHealthError}</div>}
+        <div className="mt-3 space-y-2">
+          {(marketDataHealth?.rows || []).map((row: any) => {
+            const quote = row.quote || {};
+            const history = row.history || {};
+            const stale = quote.stale || history.stale;
+            const fallback = quote.fallbackUsed || history.fallbackUsed;
+            const adjustedHistoryComplete = history.adjustedCloseAvailable === true && !history.futureDateDetected && Number(history.invalidDateCount || 0) === 0;
+            const label = stale ? 'STALE' : fallback ? 'FALLBACK' : quote.available && history.available && adjustedHistoryComplete ? 'PRIMARY' : 'PARTIAL';
+            const tone = stale ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
+            return <div key={row.symbol} className="rounded-xl border border-white/5 bg-black/10 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-bold">{row.symbol}</span>
+                <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + tone}>{label}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-[8px] font-mono text-white/35">
+                <span>Quote: <b className="text-white/70">{quote.provider || 'unavailable'}</b> · {quote.providerStatus || quote.errorCode || 'unknown'}{quote.cached ? ' · cached' : ''}</span>
+                <span>Quote age: <b className="text-white/70">{quote.ageSeconds == null ? '—' : Math.round(quote.ageSeconds / 60) + 'm'}</b></span>
+                <span>History: <b className="text-white/70">{history.provider || 'unavailable'}</b> · {history.providerStatus || history.errorCode || 'unknown'}{history.cached ? ' · cached' : ''}</span>
+                <span>History range: <b className="text-white/70">{history.firstDate || '—'} to {history.lastDate || '—'}</b></span>
+                <span>Adjusted-close coverage: <b className={history.adjustedCloseAvailable ? 'text-emerald-300' : 'text-amber-200'}>{history.adjustedCoveragePct ?? 0}%</b> ({history.adjustedPointCount ?? 0}/{history.pointCount ?? 0})</span>
+                <span>Latest daily bar age: <b className="text-white/70">{history.ageDays == null ? '—' : history.ageDays + 'd'}</b></span>
+              </div>
+              {(quote.providerAttempts?.length > 1 || history.providerAttempts?.length > 1) ? (
+                <div className="mt-2 text-[7px] font-mono text-white/25">
+                  Attempts: {[...(quote.providerAttempts || []), ...(history.providerAttempts || [])].map((item: any) => item.provider + ':' + item.status + (item.errorCode ? '(' + item.errorCode + ')' : '')).join(' · ')}
+                </div>
+              ) : null}
+            </div>;
+          })}
+          {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">Loading market provider health…</div> : null}
+        </div>
+        {marketDataHealth?.retrievedAt && <div className="mt-2 text-[7px] font-mono text-white/20">Sample retrieved: {new Date(marketDataHealth.retrievedAt).toLocaleString()} · {marketDataHealth.cached ? 'cached summary' : 'live provider check'}</div>}
+      </section>
+
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="scheduled-job-health">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Automation reliability</div>
             <div className="text-sm font-black mt-1">Scheduled job health</div>
-            <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
+            <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures/skips, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
           </div>
           <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs checked' : 'unavailable'}</span>
         </div>
         {jobHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{jobHealthError}</div>}
         <div className="mt-3 space-y-2">
           {jobHealth.map(job => {
-            const healthy = job.conclusion === 'success';
-            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.recentFailureCount > 0;
+            const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.conclusion === 'skipped' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0 || Number(job.recentSkippedCount) > 0;
+            const healthy = job.conclusion === 'success' && !degraded;
             return <div key={job.id} className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[10px] font-bold">{job.name}</span>
-                <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + (healthy ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : degraded ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : 'text-white/45 border-white/10')}>{job.conclusion || job.status || 'NO RUNS'}</span>
+                <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + (healthy ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : degraded ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : 'text-white/45 border-white/10')}>{job.isStuck ? 'STUCK' : job.conclusion || job.status || 'NO RUNS'}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-[8px] font-mono text-white/30">
                 <span>Last success: {job.lastSuccessAt ? new Date(job.lastSuccessAt).toLocaleString() : 'none recorded'}</span>
                 <span>Failures since last success: {job.recentFailureCount ?? 0}</span>
                 <span>Next expected: {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'not calculated'}</span>
               </div>
-              <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}</div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[8px] font-mono text-white/30">
+                <span>Last run duration: {formatDuration(job.lastRunDurationMs)}</span>
+                <span>Last run age: {formatDuration(job.lastRunAgeMs)}</span>
+                <span>Unfinished: {job.unfinishedRunCount ?? 0}</span>
+                <span>Stuck: {job.stuckRunCount ?? 0}</span>
+                <span>Skipped since success: {job.recentSkippedCount ?? 0}</span>
+              </div>
+              <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}{job.releaseGate ? ' · Release gate: ' + job.releaseGate : ''}</div>
+              {job.id === 'reentry-alerts' && job.deliveryHealth ? (
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
+                  <span className="text-white/35">Active watchlist <b className="text-white/70">{job.deliveryHealth.activeWatchlistRows}</b></span>
+                  <span className="text-white/35">Active sold rows <b className="text-white/70">{job.deliveryHealth.activeSoldRows}</b></span>
+                  <span className="text-white/35">Accepted <b className="text-emerald-300">{job.deliveryHealth.statusCounts.accepted}</b></span>
+                  <span className="text-white/35">Rejected / uncertain <b className="text-amber-200">{job.deliveryHealth.statusCounts.rejected + job.deliveryHealth.statusCounts.uncertain}</b></span>
+                  <span className="text-white/35">Ledger rows <b className="text-white/70">{job.deliveryHealth.deliveryLedgerRowsInWindow}</b></span>
+                  <span className="text-white/35">Last accepted <b className="text-white/70">{job.deliveryHealth.lastAcceptedAt ? new Date(job.deliveryHealth.lastAcceptedAt).toLocaleString() : 'none recorded'}</b></span>
+                </div>
+              ) : null}
+              {job.id === 'reentry-alerts' && job.deliveryHealthError ? (
+                <div className="mt-2 text-[8px] font-mono text-amber-200/70">Telegram delivery ledger unavailable: {job.deliveryHealthError}</div>
+              ) : null}
+              {job.id === 'reentry-alerts' && job.conclusion === 'skipped' ? (
+                <div className="mt-2 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[8px] font-mono text-amber-200/70">
+                  Scheduled job skipped. Check the repository release-gate variables; a skipped workflow is not evidence of a completed scan or Telegram delivery.
+                </div>
+              ) : null}
               {job.id === 'forecast-auto-tracker' && job.lastRun ? (
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
                   <span className="text-white/35">Holdings processed <b className="text-white/70">{job.lastRun.holdings ?? '—'}</b></span>
                   <span className="text-white/35">Forecasts created <b className="text-cyan-200">{job.lastRun.created ?? '—'}</b></span>
                   <span className="text-white/35">Skipped safely <b className="text-white/70">{job.lastRun.skipped ?? '—'}</b></span>
-                  <span className="text-white/35">Run result <b className={job.lastRun.status === 'completed' ? 'text-emerald-300' : 'text-amber-300'}>{job.lastRun.status || '—'}</b></span>
+                  <span className="text-white/35">Run result <b className={job.lastRun.status === 'completed' && !job.lastRun.isStuck ? 'text-emerald-300' : 'text-amber-300'}>{job.lastRun.isStuck ? 'stuck' : job.lastRun.status || '—'}</b></span>
+                  <span className="text-white/35">Duration <b className="text-white/70">{formatDuration(job.lastRun.durationMs)}</b></span>
                 </div>
               ) : null}
             </div>;
