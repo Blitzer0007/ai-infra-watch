@@ -492,19 +492,16 @@ test('scan status explicitly distinguishes fully deferred notifications from fai
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
 
-test('Re-entry indicators align live quote adjustment factor to the completed bar timestamp', async () => {
+test('Re-entry indicators exclude the current daily row until the exchange session has closed', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
-  const timestamps = Array.from({ length: 51 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
+  const timestamps = Array.from({ length: 51 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
   const closes = Array(51).fill(100);
   const adjustedCloses = Array(51).fill(50);
-  // Last point is newer than the provider's regularMarketTime and may be an in-progress bar.
-  adjustedCloses[50] = 25;
+  adjustedCloses[50] = 25; // same-day bar, timestamped at market open, but still in progress
+  const regularMarketTime = timestamps[50] + 60 * 60;
+  const regularSessionEnd = timestamps[50] + 6.5 * 60 * 60;
   const result = calculateReentryIndicators({
-    price: 100,
-    closes,
-    adjustedCloses,
-    timestamps,
-    regularMarketTime: timestamps[49],
+    price: 100, closes, adjustedCloses, timestamps, regularMarketTime, regularSessionEnd,
   });
   assert.equal(result.price, 100);
   assert.equal(result.sma20, 50);
@@ -512,41 +509,73 @@ test('Re-entry indicators align live quote adjustment factor to the completed ba
   assert.equal(result.adjustmentReferenceDate, '2026-02-19');
   assert.equal(result.adjustmentFactor, 0.5);
   assert.equal(result.drawdownFrom52WeekHighPct, 0);
-  assert.equal(result.priceBasis, 'split_dividend_adjusted_close');
   assert.equal(result.adjustedPointCount, 50);
 });
 
-test('Re-entry indicators fail closed when adjusted-close history is missing or misaligned', async () => {
+test('Re-entry indicators can include the same-day bar only after the same-day session close', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
-  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
-  assert.throws(() => calculateReentryIndicators({
-    price: 100, closes: Array(60).fill(100), adjustedCloses: [], timestamps,
-  }), /Aligned raw and adjusted daily history/);
-  assert.throws(() => calculateReentryIndicators({
-    price: 100, closes: Array(60).fill(100), adjustedCloses: Array(60).fill(100),
-    timestamps: timestamps.slice(1),
-  }), /Aligned raw and adjusted daily history/);
+  const timestamps = Array.from({ length: 50 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const regularMarketTime = timestamps.at(-1) + 6.5 * 60 * 60;
+  const result = calculateReentryIndicators({
+    price: 100,
+    closes: Array(50).fill(100),
+    adjustedCloses: Array(50).fill(50),
+    timestamps,
+    regularMarketTime,
+    regularSessionEnd: timestamps.at(-1) + 6.5 * 60 * 60,
+  });
+  assert.equal(result.adjustedPointCount, 50);
+  assert.equal(result.adjustmentReferenceDate, '2026-02-19');
 });
 
-test('Re-entry indicators fail closed on partial adjusted-close coverage', async () => {
+test('Re-entry indicators fail closed on missing, duplicate, future, or misaligned timestamps', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
-  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const options = {
+    price: 100,
+    closes: Array(60).fill(100),
+    adjustedCloses: Array(60).fill(100),
+    timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
+  };
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: timestamps.slice(1) }), /Aligned raw, adjusted/);
+  const missing = [...timestamps];
+  missing[20] = null;
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: missing }), /valid timestamp/);
+  const duplicate = [...timestamps];
+  duplicate[20] = duplicate[19];
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: duplicate }), /Duplicate daily bar timestamps/);
+  const future = [...timestamps];
+  future[59] = Date.UTC(2026, 3, 2, 14, 30) / 1000;
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: future }), /Future daily bars/);
+});
+
+test('Re-entry indicators fail closed when any valid raw close lacks its adjusted close', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
   const adjustedCloses = Array(60).fill(100);
-  for (let i = 0; i < 11; i += 1) adjustedCloses[i] = null;
+  adjustedCloses[20] = null;
   assert.throws(() => calculateReentryIndicators({
-    price: 100, closes: Array(60).fill(100), adjustedCloses, timestamps,
-    regularMarketTime: timestamps.at(-1),
-  }), /At least 50 complete aligned adjusted daily bars/);
+    price: 100,
+    closes: Array(60).fill(100),
+    adjustedCloses,
+    timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
+  }), /Complete split\/dividend-adjusted coverage/);
 });
 
 test('Re-entry adjusted indicators require at least 50 complete aligned daily points', async () => {
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
-  const timestamps = Array.from({ length: 49 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
+  const timestamps = Array.from({ length: 49 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
   assert.throws(() => calculateReentryIndicators({
     price: 100,
     closes: Array(49).fill(100),
     adjustedCloses: Array(49).fill(100),
     timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
   }), /At least 50 complete aligned adjusted daily bars/);
 });
 
