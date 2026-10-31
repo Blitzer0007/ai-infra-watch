@@ -2,6 +2,7 @@ import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory } from '../../api/_market-data.js';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { coverageInterval, calibrationVerdict as getCalibrationVerdict } from '../utils/forecastCalibration.js';
+import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -88,6 +89,17 @@ async function verifyDueForecasts() {
   for (const forecast of due) {
     try {
       const marketData = await routedHistory(String(forecast.ticker).toUpperCase(), '5y');
+      if (!hasFreshMarketHistory(marketData)) {
+        deferred.push({
+          id: forecast.id,
+          ticker: forecast.ticker,
+          targetDate: forecast.target_date,
+          reason: marketData?.stale === true
+            ? 'historical market data is stale; verification deferred'
+            : 'usable historical market data is unavailable; verification deferred',
+        });
+        continue;
+      }
       const points = marketData.points || [];
       // Never verify against a point before the forecast target date.
       // If the market history has not reached the target yet, leave it pending.
@@ -244,7 +256,7 @@ function runModelBacktest(history,horizon,model) {
 }
 async function modelHistory(ticker) {
   const data = await routedHistory(ticker, '5y');
-  return data.points || [];
+  return hasFreshMarketHistory(data) ? data.points : [];
 }
 function chooseModel(v1,v2){
   if(!v1) return 'analogue-v2';
