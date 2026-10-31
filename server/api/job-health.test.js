@@ -109,13 +109,18 @@ test('GitHub Actions completion time is measured from updated_at', () => {
   assert.equal(timing.unfinished, false);
 });
 
-test('Re-entry alert next run follows its 15-minute UTC schedule on weekdays', () => {
-  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T13:00:00Z')), '2026-10-26T13:15:00.000Z');
-  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T12:59:00Z')), '2026-10-26T13:00:00.000Z');
+test('Re-entry next run skips UTC polls before the New York session opens in EDT', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T12:59:00Z')), '2026-10-26T13:30:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-26T13:00:00Z')), '2026-10-26T13:30:00.000Z');
 });
 
-test('Re-entry alert next run rolls over weekends', () => {
-  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T13:00:00.000Z');
+test('Re-entry next run skips UTC polls before the New York session opens in EST', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-12-01T13:00:00Z')), '2026-12-01T14:30:00.000Z');
+});
+
+test('Re-entry next run rolls over weekends using the next local-session poll', () => {
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-10-30T20:50:00Z')), '2026-11-02T13:30:00.000Z');
+  assert.equal(nextScheduledRun('reentry-alerts', new Date('2026-12-04T20:50:00Z')), '2026-12-07T14:30:00.000Z');
 });
 
 test('skipped workflow runs remain a visible release-gate signal until a later success', () => {
