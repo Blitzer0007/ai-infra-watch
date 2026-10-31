@@ -108,7 +108,14 @@ begin
   if (select currency from public.portfolio_holdings where symbol='TEST') <> 'USD' then
     raise exception 'holdings currency default/check failed';
   end if;
+  begin
+    insert into public.portfolio_holdings (id,symbol,quantity,currency) values
+      ('00000000-0000-0000-0000-000000000005','BAD',1,'US');
+    raise exception 'invalid currency unexpectedly passed the check constraint';
+  exception when check_violation then
+    null;
+  end;
 end;
-$$;
+$;
 
 rollback;
