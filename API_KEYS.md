@@ -152,14 +152,47 @@ AI_INFRA_AGENT_TOKEN=...
 
 ## 8. Scheduled earnings alerts
 
-The GitHub Actions scheduler calls `/api/earnings-alerts` daily at 08:30 IST. The Vercel route needs the server-side Finnhub key and a delivery webhook:
+The GitHub Actions workflow `.github/workflows/earnings-alerts.yml` calls `/api/earnings-alerts?days=14&notify=1` daily at 08:30 Asia/Kolkata. The route obtains its calendar from Finnhub and sends only events whose `days_until` matches the configured lead time.
+
+Required server-side Vercel setting:
 
 ```text
 FINNHUB_API_KEY=...
-NOTIFY_WEBHOOK_URL=...
-CRON_SECRET=...
-EARNINGS_ALERT_LEAD_DAYS=1
 ```
 
-`EARNINGS_ALERT_LEAD_DAYS=1` sends the alert one day before the scheduled report. Increase it up to 7 for an earlier warning. Also store matching `CRON_SECRET` in Vercel and `AIW_CRON_SECRET` in GitHub Actions secrets. The browser-stored Finnhub token in React Settings is not used by the scheduled job.
+At least one notification channel must be configured for an alert to be delivered:
+
+```text
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+```
+
+Optional webhook channel:
+
+```text
+NOTIFY_WEBHOOK_URL=...
+```
+
+`EARNINGS_ALERT_LEAD_DAYS` defaults to `1` and is bounded from 1 to 7 days. The scheduler authenticates with a GitHub Actions OIDC token scoped to this repository and workflow; it does not require a GitHub Actions `AIW_CRON_SECRET` for the normal scheduled path. `CRON_SECRET` remains an optional server-side bearer fallback for controlled direct cron callers. The browser-stored Finnhub token in React Settings is not used by this scheduled job.
+
+A successful scheduler run with zero alerts sent can be expected when no monitored company has an earnings event inside the configured T-1 window. Check the returned `upcoming` list, `notification.attempted`, `notification.sent`, and `notification.error` before interpreting zero sends as a failure.
+
+## 9. Portfolio digest and smart alerts
+
+The portfolio digest primary and fallback GitHub Actions workflows run four daily slots at approximately 06:05, 12:05, 18:05, and 22:05 Asia/Kolkata. Both call `/api/portfolio-digest`; slot-level idempotency prevents the fallback from sending a duplicate for a completed slot. The endpoint uses GitHub Actions OIDC and can fall back to the optional GitHub Actions secret `AIW_CRON_SECRET` if the OIDC request is rejected.
+
+The digest sends to Telegram when both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured. The delivery record stores the Telegram acceptance state and Bot API `message_id` when Telegram confirms acceptance. This is an API acceptance receipt, not proof that a person read the message.
+
+Server Smart Alerts are evaluated by `.github/workflows/server-smart-alerts.yml` every 10 minutes. This is a separate alert pipeline from the portfolio digest and the earnings calendar.
+
+## 10. Re-entry Telegram alerts — gated
+
+The re-entry workflow is intentionally disabled unless both GitHub repository variables are explicitly set to `true`:
+
+```text
+REENTRY_ALERTS_ENABLED=true
+REENTRY_ALERTS_RELEASE_APPROVED=true
+```
+
+Do not enable these variables until the release review confirms the API version, durable delivery persistence, natural production delivery evidence, and explicit release approval. The workflow also checks the New York regular-session window.
 
