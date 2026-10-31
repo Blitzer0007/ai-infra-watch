@@ -209,9 +209,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + tone}>{label}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-[8px] font-mono text-white/35">
-                <span>Quote: <b className="text-white/70">{quote.provider || 'unavailable'}</b> · {quote.providerStatus || quote.errorCode || 'unknown'}</span>
+                <span>Quote: <b className="text-white/70">{quote.provider || 'unavailable'}</b> · {quote.providerStatus || quote.errorCode || 'unknown'}{quote.cached ? ' · cached' : ''}</span>
                 <span>Quote age: <b className="text-white/70">{quote.ageSeconds == null ? '—' : Math.round(quote.ageSeconds / 60) + 'm'}</b></span>
-                <span>History: <b className="text-white/70">{history.provider || 'unavailable'}</b> · {history.providerStatus || history.errorCode || 'unknown'}</span>
+                <span>History: <b className="text-white/70">{history.provider || 'unavailable'}</b> · {history.providerStatus || history.errorCode || 'unknown'}{history.cached ? ' · cached' : ''}</span>
                 <span>History range: <b className="text-white/70">{history.firstDate || '—'} to {history.lastDate || '—'}</b></span>
                 <span>Adjusted-close coverage: <b className={history.adjustedCloseAvailable ? 'text-emerald-300' : 'text-amber-200'}>{history.adjustedCoveragePct ?? 0}%</b> ({history.adjustedPointCount ?? 0}/{history.pointCount ?? 0})</span>
                 <span>Latest daily bar age: <b className="text-white/70">{history.ageDays == null ? '—' : history.ageDays + 'd'}</b></span>
