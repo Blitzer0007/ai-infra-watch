@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming } from '../../api/job-health.js';
+import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess } from '../../api/job-health.js';
 
 test('private OHLC archive next run uses the weekday 23:30 UTC slot', () => {
   assert.equal(nextScheduledRun('private-ohlc-asof-archive', new Date('2026-10-20T03:00:00Z')), '2026-10-20T23:30:00.000Z');
