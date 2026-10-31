@@ -198,6 +198,24 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Skipped since success: {job.recentSkippedCount ?? 0}</span>
               </div>
               <div className="mt-1 text-[7px] font-mono text-white/20">Scheduler: {job.scheduler || 'GitHub Actions'} · Cadence: {job.cadence}{job.releaseGate ? ' · Release gate: ' + job.releaseGate : ''}</div>
+              {job.id === 'reentry-alerts' && job.deliveryHealth ? (
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
+                  <span className="text-white/35">Active watchlist <b className="text-white/70">{job.deliveryHealth.activeWatchlistRows}</b></span>
+                  <span className="text-white/35">Active sold rows <b className="text-white/70">{job.deliveryHealth.activeSoldRows}</b></span>
+                  <span className="text-white/35">Accepted <b className="text-emerald-300">{job.deliveryHealth.statusCounts.accepted}</b></span>
+                  <span className="text-white/35">Rejected / uncertain <b className="text-amber-200">{job.deliveryHealth.statusCounts.rejected + job.deliveryHealth.statusCounts.uncertain}</b></span>
+                  <span className="text-white/35">Ledger rows <b className="text-white/70">{job.deliveryHealth.deliveryLedgerRowsInWindow}</b></span>
+                  <span className="text-white/35">Last accepted <b className="text-white/70">{job.deliveryHealth.lastAcceptedAt ? new Date(job.deliveryHealth.lastAcceptedAt).toLocaleString() : 'none recorded'}</b></span>
+                </div>
+              ) : null}
+              {job.id === 'reentry-alerts' && job.deliveryHealthError ? (
+                <div className="mt-2 text-[8px] font-mono text-amber-200/70">Telegram delivery ledger unavailable: {job.deliveryHealthError}</div>
+              ) : null}
+              {job.id === 'reentry-alerts' && job.conclusion === 'skipped' ? (
+                <div className="mt-2 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[8px] font-mono text-amber-200/70">
+                  Scheduled job skipped. Check the repository release-gate variables; a skipped workflow is not evidence of a completed scan or Telegram delivery.
+                </div>
+              ) : null}
               {job.id === 'forecast-auto-tracker' && job.lastRun ? (
                 <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] p-2 text-[8px] font-mono">
                   <span className="text-white/35">Holdings processed <b className="text-white/70">{job.lastRun.holdings ?? '—'}</b></span>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess } from '../../api/job-health.js';
+import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess, summarizeReentryDeliveryHealth } from '../../api/job-health.js';
 
 test('private OHLC archive next run uses the weekday 23:30 UTC slot', () => {
   assert.equal(nextScheduledRun('private-ohlc-asof-archive', new Date('2026-10-20T03:00:00Z')), '2026-10-20T23:30:00.000Z');
@@ -127,4 +127,30 @@ test('skipped workflow runs remain a visible release-gate signal until a later s
   ];
   assert.equal(skippedRunsSinceLastSuccess(history, Date.parse('2026-10-31T09:30:00Z')), 1);
   assert.equal(skippedRunsSinceLastSuccess(history, NaN), 2);
+});
+
+test('re-entry delivery health distinguishes an active watchlist from confirmed Telegram deliveries', () => {
+  const summary = summarizeReentryDeliveryHealth(
+    [],
+    [{ active: true, ownership_status: 'sold' }, { active: false, ownership_status: 'holding' }],
+  );
+  assert.equal(summary.activeWatchlistRows, 1);
+  assert.equal(summary.activeSoldRows, 1);
+  assert.equal(summary.activeHoldingRows, 0);
+  assert.equal(summary.deliveryLedgerRowsInWindow, 0);
+  assert.deepEqual(summary.statusCounts, { sending: 0, accepted: 0, rejected: 0, uncertain: 0 });
+  assert.equal(summary.lastAcceptedAt, null);
+});
+
+test('re-entry delivery health counts accepted, rejected, and uncertain ledger rows without exposing row details', () => {
+  const summary = summarizeReentryDeliveryHealth([
+    { status: 'uncertain', created_at: '2026-10-31T12:03:00Z', completed_at: '2026-10-31T12:03:05Z', symbol: 'MU', delivery_key: 'private' },
+    { status: 'accepted', created_at: '2026-10-31T12:00:00Z', completed_at: '2026-10-31T12:00:02Z', symbol: 'NVDA', telegram_message_id: 1234 },
+    { status: 'rejected', created_at: '2026-10-31T11:55:00Z', completed_at: '2026-10-31T11:55:01Z' },
+  ], [{ active: true, ownership_status: 'sold' }, { active: true, ownership_status: 'holding' }]);
+  assert.deepEqual(summary.statusCounts, { sending: 0, accepted: 1, rejected: 1, uncertain: 1 });
+  assert.equal(summary.lastAcceptedAt, '2026-10-31T12:00:02Z');
+  assert.equal(summary.activeWatchlistRows, 2);
+  assert.equal(Object.hasOwn(summary, 'telegram_message_id'), false);
+  assert.equal(Object.hasOwn(summary, 'symbol'), false);
 });

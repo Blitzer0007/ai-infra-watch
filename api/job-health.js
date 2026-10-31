@@ -232,6 +232,28 @@ export function nextScheduledRun(id, now = new Date()) {
 }
 
 
+
+export function summarizeReentryDeliveryHealth(deliveries, watchlist) {
+  const rows = Array.isArray(deliveries) ? deliveries : [];
+  const watched = Array.isArray(watchlist) ? watchlist : [];
+  const statusCounts = { sending: 0, accepted: 0, rejected: 0, uncertain: 0 };
+  for (const row of rows) {
+    const status = String(row?.status || '').toLowerCase();
+    if (Object.hasOwn(statusCounts, status)) statusCounts[status] += 1;
+  }
+  const latestAccepted = rows.find(row => String(row?.status || '').toLowerCase() === 'accepted') || null;
+  return {
+    activeWatchlistRows: watched.filter(row => row?.active === true).length,
+    activeSoldRows: watched.filter(row => row?.active === true && String(row?.ownership_status || '').toLowerCase() === 'sold').length,
+    activeHoldingRows: watched.filter(row => row?.active === true && String(row?.ownership_status || '').toLowerCase() === 'holding').length,
+    deliveryLedgerRowsInWindow: rows.length,
+    ledgerWindowLimit: 100,
+    statusCounts,
+    lastAcceptedAt: latestAccepted?.completed_at || latestAccepted?.created_at || null,
+    latestDeliveryStatus: rows[0]?.status || null,
+  };
+}
+
 export function skippedRunsSinceLastSuccess(history, lastSuccessTime) {
   return (Array.isArray(history) ? history : []).filter(run => {
     if (String(run?.conclusion || '').toLowerCase() !== 'skipped') return false;
@@ -319,6 +341,19 @@ export default async function handler(req, res) {
         }),
       };
     });
+
+    const reentryJob = jobs.find(job => job.id === 'reentry-alerts');
+    if (reentryJob) {
+      try {
+        const [deliveries, watchlist] = await Promise.all([
+          supabase('reentry_telegram_deliveries?select=status,created_at,completed_at&order=created_at.desc&limit=100'),
+          supabase('reentry_watchlist?select=active,ownership_status&limit=100'),
+        ]);
+        reentryJob.deliveryHealth = summarizeReentryDeliveryHealth(deliveries, watchlist);
+      } catch (error) {
+        reentryJob.deliveryHealthError = error instanceof Error ? error.message : 'Re-entry delivery ledger unavailable';
+      }
+    }
 
     let forecastJob = null;
     try {
