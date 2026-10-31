@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextScheduledRun, supabaseHeaders, summarizeArtifacts } from '../../api/job-health.js';
+import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming } from '../../api/job-health.js';
 
 test('private OHLC archive next run uses the weekday 23:30 UTC slot', () => {
   assert.equal(nextScheduledRun('private-ohlc-asof-archive', new Date('2026-10-20T03:00:00Z')), '2026-10-20T23:30:00.000Z');
@@ -65,7 +65,6 @@ test('unknown providers are ignored and recorded hashes do not clear the histori
 });
 
 test('completed scheduler runs expose elapsed duration and current age', () => {
-  const { summarizeRunTiming } = require('../../api/job-health.js');
   const now = Date.parse('2026-10-31T12:00:30.000Z');
   const timing = summarizeRunTiming({
     status: 'completed',
@@ -79,7 +78,6 @@ test('completed scheduler runs expose elapsed duration and current age', () => {
 });
 
 test('a recent started scheduler run is unfinished but not yet stuck', () => {
-  const { summarizeRunTiming } = require('../../api/job-health.js');
   const now = Date.parse('2026-10-31T12:04:00.000Z');
   const timing = summarizeRunTiming({
     status: 'started',
@@ -91,7 +89,6 @@ test('a recent started scheduler run is unfinished but not yet stuck', () => {
 });
 
 test('a scheduler run with no completion after threshold is flagged stuck', () => {
-  const { summarizeRunTiming } = require('../../api/job-health.js');
   const now = Date.parse('2026-10-31T12:08:00.000Z');
   const timing = summarizeRunTiming({
     status: 'started',
@@ -103,7 +100,6 @@ test('a scheduler run with no completion after threshold is flagged stuck', () =
 });
 
 test('GitHub Actions completion time is measured from updated_at', () => {
-  const { summarizeRunTiming } = require('../../api/job-health.js');
   const timing = summarizeRunTiming({
     status: 'completed',
     created_at: '2026-10-31T12:00:00.000Z',
