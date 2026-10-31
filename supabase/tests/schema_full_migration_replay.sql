@@ -191,6 +191,20 @@ begin
     select 1 from information_schema.columns
     where table_schema='public' and table_name='forecast_snapshots' and column_name='evidence_snapshot'
   ) then raise exception 'forecast_snapshots.evidence_snapshot missing'; end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='portfolio_digest_runs' and column_name='slot_key'
+  ) or not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='portfolio_digest_runs' and column_name='delivery'
+  ) then raise exception 'portfolio_digest_runs prerequisite missing'; end if;
+
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname='public' and tablename='portfolio_digest_runs'
+      and indexname='portfolio_digest_runs_started_idx'
+  ) then raise exception 'portfolio_digest_runs started index missing'; end if;
+
 
   if not exists (
     select 1 from information_schema.columns
