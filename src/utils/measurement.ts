@@ -217,6 +217,20 @@ function toPriceMap(history: HistoricalPricePoint[] = []): Map<string, number> {
       .map(point => [point.date, Number(point.price)] as const),
   );
 }
+
+// Per-observation returns are retained for correlation analysis. Portfolio
+// return and stress series use aligned price-date intervals instead.
+function returnMap(history: HistoricalPricePoint[]) {
+  const prices = toPriceMap(history);
+  const dates = [...prices.keys()];
+  const returns = new Map<string, number>();
+  for (let i = 1; i < dates.length; i++) {
+    const previous = prices.get(dates[i - 1]) as number;
+    const current = prices.get(dates[i]) as number;
+    returns.set(dates[i], (current / previous - 1) * 100);
+  }
+  return returns;
+}
 export function buildPortfolioDailySeriesFromTransactions(
   histories: Record<string, HistoricalPricePoint[]>,
   transactions: Array<{ symbol: string; transactionType: 'BUY' | 'SELL'; quantity: number; tradeDate: string; sourceRow?: number }>,
