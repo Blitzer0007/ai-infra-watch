@@ -364,13 +364,13 @@ jobs:
           set -euo pipefail
           cd "$SUPABASE_DRYRUN_WORKDIR"
           list_output="$(supabase migration list --linked 2>&1)"
-          printf '%s\\n' "$list_output"
+          printf '%s\n' "$list_output"
           expected_count="$(jq '.migrations | length' "$GITHUB_WORKSPACE/supabase/migration-ledger.manifest.json")"
-          mismatch="$(printf '%s\\n' "$list_output" | awk -F'|' '
+          mismatch="$(printf '%s\n' "$list_output" | awk -F'|' '
             {
               local_version=$1
               remote_version=$2
-              gsub(/\x60/, "", local_version)
+              gsub(sprintf("%c", 96), "", local_version)
               gsub(/[[:space:]]/, "", local_version)
               gsub(/\x60/, "", remote_version)
               gsub(/[[:space:]]/, "", remote_version)
@@ -381,14 +381,14 @@ jobs:
           ')"
           if [ -n "$mismatch" ]; then
             echo "::error::Local and remote migration versions differ:"
-            printf '%s\\n' "$mismatch"
+            printf '%s\n' "$mismatch"
             exit 1
           fi
-          matched_count="$(printf '%s\\n' "$list_output" | awk -F'|' '
+          matched_count="$(printf '%s\n' "$list_output" | awk -F'|' '
             {
               local_version=$1
               remote_version=$2
-              gsub(/\x60/, "", local_version)
+              gsub(sprintf("%c", 96), "", local_version)
               gsub(/[[:space:]]/, "", local_version)
               gsub(/\x60/, "", remote_version)
               gsub(/[[:space:]]/, "", remote_version)
@@ -401,16 +401,16 @@ jobs:
             exit 1
           fi
           output="$(supabase db push --linked --include-all --dry-run 2>&1)"
-          printf '%s\\n' "$output"
-          if ! printf '%s\\n' "$output" | grep -qi 'dry run'; then
+          printf '%s\n' "$output"
+          if ! printf '%s\n' "$output" | grep -qi 'dry run'; then
             echo "::error::Supabase CLI did not confirm dry-run mode."
             exit 1
           fi
-          if ! printf '%s\\n' "$output" | grep -qi 'remote database is up to date'; then
+          if ! printf '%s\n' "$output" | grep -qi 'remote database is up to date'; then
             echo "::error::Remote database is not fully synchronized with the local migration inventory."
             exit 1
           fi
-          planned="$(printf '%s\\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+[.]sql' | sort -u || true)"
+          planned="$(printf '%s\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+[.]sql' | sort -u || true)"
           if [ -n "$planned" ]; then
             echo "::error::Unexpected pending migrations: $planned."
             exit 1
