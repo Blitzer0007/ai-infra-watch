@@ -1,7 +1,7 @@
 {
   "source": "public.supabase_migrations.schema_migrations",
   "sourceProject": "qjgnryjtrdwrbmlgdquk",
-  "note": "Git blob SHA-1 values verify exact restored SQL file contents; they are not cryptographic proof of database state.",
+  "note": "The first 30 entries match the live source migration ledger exactly. The additional entry is a pending idempotent reconciliation migration backfilled immediately before the recorded 20261013233140 RLS migration because that historical migration assumes portfolio_digest_runs already exists. Use supabase db push --linked --include-all --dry-run to review the pending out-of-order migration before any production apply. Git blob SHA-1 values verify repository file identity, not database state.",
   "migrations": [
     {
       "version": "20261002040357",
@@ -148,6 +148,12 @@
       "gitBlobSha1": "07f7efaf236861571425d3da01c74c53d5130075"
     },
     {
+      "version": "20261013233000",
+      "name": "create_portfolio_digest_runs_and_reconcile_schema_drift",
+      "file": "supabase/migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql",
+      "gitBlobSha1": "fb743e8410f8060918fa614a0625668c1e5bd598"
+    },
+    {
       "version": "20261013233140",
       "name": "portfolio_digest_runs_server_only_rls",
       "file": "supabase/migrations/20261013233140_portfolio_digest_runs_server_only_rls.sql",
@@ -182,12 +188,6 @@
       "name": "revoke_unused_direct_grants_private_tables_20261031",
       "file": "supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql",
       "gitBlobSha1": "9d5bdc28491deacfe6aff0ad82074e107e002f40"
-    },
-    {
-      "version": "20261031125203",
-      "name": "reconcile_untracked_schema_drift",
-      "file": "supabase/migrations/20261031125203_reconcile_untracked_schema_drift.sql",
-      "gitBlobSha1": "7986b059631bd0b1fb8a7510fd94e84f3e0b0658"
     }
   ]
 }
