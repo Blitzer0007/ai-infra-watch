@@ -189,5 +189,9 @@
       "file": "supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql",
       "gitBlobSha1": "9d5bdc28491deacfe6aff0ad82074e107e002f40"
     }
+  ],
+  "recordedMigrationCount": 30,
+  "pendingLocalMigrations": [
+    "20261013233000"
   ]
 }
