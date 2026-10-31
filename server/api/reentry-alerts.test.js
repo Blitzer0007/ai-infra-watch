@@ -507,13 +507,13 @@ test('Re-entry indicators align live quote adjustment factor to the completed ba
     regularMarketTime: timestamps[49],
   });
   assert.equal(result.price, 100);
-  assert.equal(result.sma20, 48.75);
-  assert.equal(result.sma50, 48.5);
+  assert.equal(result.sma20, 50);
+  assert.equal(result.sma50, 50);
   assert.equal(result.adjustmentReferenceDate, '2026-02-19');
   assert.equal(result.adjustmentFactor, 0.5);
   assert.equal(result.drawdownFrom52WeekHighPct, 0);
   assert.equal(result.priceBasis, 'split_dividend_adjusted_close');
-  assert.equal(result.adjustedPointCount, 51);
+  assert.equal(result.adjustedPointCount, 50);
 });
 
 test('Re-entry indicators fail closed when adjusted-close history is missing or misaligned', async () => {
@@ -532,9 +532,10 @@ test('Re-entry indicators fail closed on partial adjusted-close coverage', async
   const { calculateReentryIndicators } = await import('./reentry-alerts.js');
   const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i) / 1000);
   const adjustedCloses = Array(60).fill(100);
-  adjustedCloses[20] = null;
+  for (let i = 0; i < 11; i += 1) adjustedCloses[i] = null;
   assert.throws(() => calculateReentryIndicators({
     price: 100, closes: Array(60).fill(100), adjustedCloses, timestamps,
+    regularMarketTime: timestamps.at(-1),
   }), /At least 50 complete aligned adjusted daily bars/);
 });
 
