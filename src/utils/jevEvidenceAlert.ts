@@ -11,6 +11,8 @@ export type EvidenceGateDiagnostics = {
   minimum_independent_families?: number;
   missing_required_families?: string[];
   conflict_count?: number;
+  enabled?: boolean;
+  fallback?: boolean;
 };
 
 export function describeJevEvidenceGap(
@@ -47,6 +49,11 @@ export function describeJevEvidenceGap(
   else if (availability.complete !== true && !requiredMissing.length && usableCount >= minimum) {
     parts.push('backend did not identify the specific availability failure');
   }
+  if (gate.fallback === true || gate.enabled === false) {
+    parts.push('JEV assessment was unavailable or used fallback; allocator readiness is blocked');
+  } else if (gate.enabled !== true) {
+    parts.push('JEV enabled state was not confirmed; allocator readiness is blocked');
+  }
   if (action === 'stop' && availability.complete !== true) {
     parts.push('WARNING: JEV action was “stop”, but the separate availability check is incomplete; treat this as blocked pending diagnostics');
   } else if (action) {
@@ -58,6 +65,8 @@ export function describeJevEvidenceGap(
     'required=' + requiredMissing.join(','),
     'channels=' + unavailable.join(','),
     'action=' + action,
+    'enabled=' + String(gate.enabled === true),
+    'fallback=' + String(gate.fallback === true),
   ].join('|');
   return { message: parts.join('; ') + '.', dedupeSuffix: suffix.replace(/[^A-Za-z0-9:_|=,./-]/g, '_').slice(0, 240) };
 }
