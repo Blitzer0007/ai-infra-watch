@@ -1,5 +1,6 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory } from '../../api/_market-data.js';
+import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -76,6 +77,7 @@ export async function reviewDueDecisionJournal() {
         routedHistory(String(row.symbol).toUpperCase(), '1y'),
         routedHistory(benchmarkSymbol, '1y'),
       ]);
+      if (!hasFreshMarketHistory(series) || !hasFreshMarketHistory(benchmarkSeries)) continue;
       const target = twentiethSessionAfter(series.points || [], String(row.decision_date));
       if (!target || !(Number(row.decision_price) > 0) || !(Number(row.benchmark_entry_price) > 0)) continue;
       const benchmarkTarget = sameOrPreviousPoint(benchmarkSeries.points || [], target.date);
@@ -176,6 +178,9 @@ export default async function handler(req, res) {
       const symbol = String(holding.symbol).toUpperCase();
       const benchmarkSymbol = String(body.benchmarkSymbol || 'SPY').toUpperCase() === 'SOXX' ? 'SOXX' : 'SPY';
       const [series, benchmarkSeries, forecast] = await Promise.all([routedHistory(symbol, '1y'), routedHistory(benchmarkSymbol, '1y'), getLatestForecast(symbol)]);
+      if (!hasFreshMarketHistory(series) || !hasFreshMarketHistory(benchmarkSeries)) {
+        return res.status(503).json({ error: 'Fresh market and benchmark history are required to log this decision.' });
+      }
       const points = series.points || [];
       const latest = points.filter(p => Number(p.price) > 0).at(-1);
       const benchmarkEntry = sameOrPreviousPoint(benchmarkSeries.points || [], latest?.date || '');
