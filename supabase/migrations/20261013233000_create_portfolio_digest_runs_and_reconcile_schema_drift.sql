@@ -5,8 +5,7 @@
 --
 -- Production already has the table and columns; IF NOT EXISTS makes this
 -- migration safe for the current schema while allowing clean migration replay.
--- This migration was applied to production on 2026-10-31 and is recorded in
--- the linked Supabase migration ledger.
+-- This migration is pending in the repository and has not been applied to prod.
 
 create table if not exists public.portfolio_digest_runs (
   slot_key text primary key,
