@@ -52,7 +52,7 @@ function ageSeconds(value, nowMs = Date.now()) {
 
 function dateOnlyAgeDays(dateValue, nowMs = Date.now()) {
   const date = String(dateValue || '');
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T00:00:00.000Z'))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T00:00:00.000Z'))) {
     return null;
   }
   const today = new Date(nowMs).toISOString().slice(0, 10);
@@ -88,10 +88,10 @@ export function summarizeMarketHistory(data, nowMs = Date.now()) {
   const adjustedPoints = rawPoints.filter(point =>
     point?.adjusted === true && Number.isFinite(Number(point?.adjustedPrice)) && Number(point.adjustedPrice) > 0
   );
-  const invalidDateCount = rawPoints.filter(point => !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) ||
+  const invalidDateCount = rawPoints.filter(point => !/^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) ||
     !Number.isFinite(Date.parse(String(point?.date || '') + 'T00:00:00.000Z'))).length;
   const datedPoints = rawPoints
-    .filter(point => /^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) &&
+    .filter(point => /^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) &&
       Number.isFinite(Date.parse(String(point.date) + 'T00:00:00.000Z')))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const firstDate = datedPoints[0]?.date || null;
