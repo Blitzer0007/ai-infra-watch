@@ -154,8 +154,8 @@ $$;
 
 -- Reconcile production schema drift outside the historical ledger.
 -- Run twice to verify that the candidate SQL is idempotent.
-\ir ../migration_recovery/candidates/untracked_schema_drift_forward.sql
-\ir ../migration_recovery/candidates/untracked_schema_drift_forward.sql
+\ir ../migrations/20261031125203_reconcile_untracked_schema_drift.sql
+\ir ../migrations/20261031125203_reconcile_untracked_schema_drift.sql
 
 do $$
 declare
