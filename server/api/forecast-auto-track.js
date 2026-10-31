@@ -1,5 +1,6 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
+import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_OIDC_JWKS_URL = GITHUB_OIDC_ISSUER + '/.well-known/jwks';
@@ -191,6 +192,15 @@ async function buildAutoForecast(holding, horizon = 20) {
     routedHistory(ticker, '5y'),
   ]);
   if (quoteData.stale) return { skipped: true, ticker, reason: 'quote is stale' };
+  if (!hasFreshMarketHistory(marketData)) {
+    return {
+      skipped: true,
+      ticker,
+      reason: marketData?.stale === true
+        ? 'historical market data is stale; forecast was not created'
+        : 'usable historical market data is unavailable',
+    };
+  }
 
   const points = marketData.points || [];
   const forecast = distribution(points, horizon);
