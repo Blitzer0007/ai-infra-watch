@@ -27,6 +27,12 @@ supabase migration list
 supabase db push --linked --include-all --dry-run
 ```
 
+The opt-in GitHub Actions remote dry-run job uses the repository Actions
+secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. Configure those
+secrets under repository Settings → Secrets and variables → Actions before
+running that job. Do not commit them or paste them into chat. When either secret
+is absent, the job fails closed before connecting.
+
 The dry run must list only the pending
 `20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql`.
 Review it against remote schema and data first. Do not use `migration repair`
