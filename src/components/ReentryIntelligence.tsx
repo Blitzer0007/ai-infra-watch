@@ -56,6 +56,24 @@ export default function ReentryIntelligence() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Re-entry data unavailable. Sign in and retry.'); }
     finally { setLoading(false); }
   }, []);
+  const refreshMarketData = useCallback(async () => {
+    setLoading(true); setError(''); setMessage('');
+    try {
+      const response = await authFetch('/api/reentry-alerts?refresh=true', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'Market-data refresh failed.');
+      setItems(Array.isArray(data.items) ? data.items : []);
+      const scanErrors = Array.isArray(data.refresh?.errors) ? data.refresh.errors : [];
+      if (data.ok !== true || scanErrors.length) {
+        throw new Error(scanErrors.length ? scanErrors.join(' · ') : 'Refresh did not complete successfully. Check the ticker status below.');
+      }
+      setMessage('Market data refreshed successfully using the latest available completed market bars.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Market-data refresh failed. Retry after checking the connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   const save = async () => {
     const symbol = draft.symbol.trim().toUpperCase();
@@ -102,7 +120,7 @@ export default function ReentryIntelligence() {
   return <section className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.025] p-4 md:p-5">
     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
       <div><div className="flex items-center gap-2 text-cyan-100"><Activity className="w-4 h-4" /><h2 className="text-sm font-black">Re-entry Intelligence</h2></div><p className="mt-1 max-w-3xl text-[10px] leading-relaxed text-white/45">Track an existing holding’s planned exit-review level, then switch it to sold only after an actual sale. Lower-price and upper-price paths trigger evidence reviews—not automatic trades.</p></div>
-      <button type="button" onClick={() => void refresh()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase text-white/65 disabled:opacity-50"><RefreshCw className={'w-3 h-3 ' + (loading ? 'animate-spin' : '')}/> Refresh</button>
+      <button type="button" onClick={() => void refreshMarketData()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-bold uppercase text-white/65 disabled:opacity-50"><RefreshCw className={'w-3 h-3 ' + (loading ? 'animate-spin' : '')}/> Refresh</button>
     </div>
     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
       <label className="text-[9px] uppercase tracking-wide text-white/40">Ticker<input value={draft.symbol} onChange={e=>setDraft(v=>({...v,symbol:e.target.value.toUpperCase()}))} className="mt-1 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none focus:border-cyan-300/40" placeholder="MSFT"/></label>
