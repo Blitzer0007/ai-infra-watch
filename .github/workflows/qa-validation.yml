@@ -372,7 +372,7 @@ jobs:
               remote_version=$2
               gsub(sprintf("%c", 96), "", local_version)
               gsub(/[[:space:]]/, "", local_version)
-              gsub(/\x60/, "", remote_version)
+              gsub(sprintf("%c", 96), "", remote_version)
               gsub(/[[:space:]]/, "", remote_version)
               if (local_version ~ /^[0-9]+$/ || remote_version ~ /^[0-9]+$/) {
                 if (local_version != remote_version) print $0
@@ -390,7 +390,7 @@ jobs:
               remote_version=$2
               gsub(sprintf("%c", 96), "", local_version)
               gsub(/[[:space:]]/, "", local_version)
-              gsub(/\x60/, "", remote_version)
+              gsub(sprintf("%c", 96), "", remote_version)
               gsub(/[[:space:]]/, "", remote_version)
               if (local_version ~ /^[0-9]+$/ && local_version == remote_version) count++
             }
