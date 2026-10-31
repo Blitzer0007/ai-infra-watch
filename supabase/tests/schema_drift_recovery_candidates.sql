@@ -46,6 +46,7 @@ grant all privileges on table public.forecast_model_config, public.forecast_snap
 -- A clean replay runs this prerequisite before the exact restored 20261013233140
 -- migration, which immediately enables RLS and revokes client grants.
 \ir ../migration_recovery/candidates/portfolio_digest_runs_prerequisite.sql
+\ir ../migration_recovery/candidates/portfolio_digest_runs_prerequisite.sql
 \ir ../migrations/20261013233140_portfolio_digest_runs_server_only_rls.sql
 
 -- Run the forward reconciliation twice to prove additive/idempotent behavior.
@@ -116,6 +117,6 @@ begin
     null;
   end;
 end;
-$;
+$$;
 
 rollback;
