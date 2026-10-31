@@ -8,6 +8,7 @@ import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
 import { selectDynamicPeers } from '../utils/peerIntelligence';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import { buildJevPaperAllocator } from '../utils/jevPaperAllocator';
+import { hasFreshEvidence, isJevEvidenceGateReady } from '../utils/jevEvidenceReadiness';
 import { scorePeerStrength, type PeerFundamentalSnapshot } from '../utils/peerStrength';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
 
@@ -201,7 +202,8 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       const missing = Array.isArray(availability.missing) ? availability.missing : [];
       const conflicts = Number(gate?.conflict_detection?.count || gate?.conflict_count || 0);
       const action = String(gate.action || body?.jev?.action || '').toLowerCase();
-      if (body?.ok === false || availability.complete !== true || missing.length > 0 || conflicts > 0 || ['insufficient', 'gather_more'].includes(action)) {
+      const gateUnavailable = gate.enabled !== true || gate.fallback !== false;
+      if (body?.ok !== true || availability.complete !== true || missing.length > 0 || conflicts > 0 || gateUnavailable || action !== 'stop') {
         const diagnostic = describeJevEvidenceGap(availability, gate, action);
         const dedupeKey = 'jev-evidence-review:' + [...selected].sort().join('-') + ':' + (action || 'insufficient') + ':' + diagnostic.dedupeSuffix;
         void authFetch('/api/alert-notify', {
@@ -237,14 +239,18 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
     || candidateResearch?.jev?.evidence_gate?.evidence_availability || {};
   const evidenceGate = candidateResearch?.jev?.evidence_gate || {};
   const freshnessRaw = candidateResearch?.jev?.evidence_freshness || evidenceGate?.evidence_freshness || [];
-  const freshnessItems: any[] = Array.isArray(freshnessRaw) ? freshnessRaw
-    : freshnessRaw && typeof freshnessRaw === 'object' ? Object.values(freshnessRaw) : [];
-  const evidenceFresh = freshnessItems.length > 0 && freshnessItems.every((item: any) => {
-    const status = String(typeof item === 'string' ? item : item?.status || item?.state || item?.freshness || '').toLowerCase();
-    return ['fresh', 'current', 'verified'].includes(status);
-  });
+  const evidenceFresh = hasFreshEvidence(freshnessRaw);
   const evidenceConflicts = Number(evidenceGate?.conflict_detection?.count || evidenceGate?.conflict_count || 0);
   const evidenceAction = String(evidenceGate?.action || candidateResearch?.jev?.action || '').toLowerCase();
+  const evidenceComplete = isJevEvidenceGateReady({
+    availabilityComplete: evidenceAvailability.complete,
+    researchOk: candidateResearch?.ok,
+    gate: {
+      enabled: evidenceGate?.enabled,
+      fallback: evidenceGate?.fallback,
+      action: evidenceAction,
+    },
+  });
   const thesisBreaches = [
     ...(Array.isArray(candidateResearch?.jev?.thesis_invalidations) ? candidateResearch.jev.thesis_invalidations : []),
     ...(Array.isArray(candidateResearch?.jev?.thesis_rule_breaches) ? candidateResearch.jev.thesis_rule_breaches : []),
@@ -274,11 +280,11 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       };
     }),
     capital,
-    evidenceComplete: evidenceAvailability.complete === true && candidateResearch?.ok !== false,
+    evidenceComplete,
     evidenceFresh, conflictCount: evidenceConflicts, gateAction: evidenceAction, thesisBreaches,
     savedRulesLoaded: holdingRulesLoaded,
     maxPositionWeight: 0.15, maxSectorWeight: 0.35, minCashWeight: 0.05,
-  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, peerStrengthResults, holdingRulesLoaded, storedHoldings, livePrices]);
+  }), [selectedKey, capital, candidateResearch, evidenceAvailability.complete, evidenceFresh, evidenceComplete, evidenceConflicts, evidenceAction, thesisBreaches.join('|'), peerContexts, peerStrengthResults, holdingRulesLoaded, storedHoldings, livePrices]);
 
   const target: PaperHolding[] = useMemo(() => {
     if (useSuggestedAllocation && allocator.allocationAllowed) return allocator.suggestedWeights.map(item => ({
