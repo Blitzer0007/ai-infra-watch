@@ -321,7 +321,7 @@ jobs:
 
   supabase-linked-migration-dry-run:
     name: Linked Supabase migration dry run (read-only)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_linked_supabase_dry_run == true }}
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release/aiw-2026-10-31') || (github.event_name == 'workflow_dispatch' && inputs.run_linked_supabase_dry_run == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
