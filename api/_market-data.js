@@ -39,7 +39,7 @@ function remember(key, data) {
 
 export function classifyProviderError(error) {
   const message = String(error?.message || error || '').toLowerCase();
-  const http = message.match(/http\\s+(\\d{3})/);
+  const http = message.match(/http\s+(\d{3})/);
   if (http) {
     const status = Number(http[1]);
     if (status === 429) return 'rate_limited';

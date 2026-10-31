@@ -1,7 +1,7 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote, classifyProviderError } from '../../api/_market-data.js';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\\/$/, '');
+const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const CACHE_MS = 120000;
 let cache = { expiresAt: 0, data: null };
@@ -29,6 +29,20 @@ async function loadRepresentativeSymbols() {
     .filter(row => /^[A-Z0-9.^=-]{1,20}$/.test(row.symbol) && Number.isFinite(row.costBasis) && row.costBasis >= 0)
     .sort((a, b) => b.costBasis - a.costBasis);
   return [...new Set(['SPY', ...ranked.slice(0, 3).map(row => row.symbol)])];
+}
+
+
+function summarizeProviderFailure(error) {
+  const attempts = Array.isArray(error?.providers) ? error.providers.map(item => ({
+    provider: String(item?.provider || 'unknown'),
+    status: 'failed',
+    errorCode: item?.errorCode || classifyProviderError(new Error(String(item?.error || 'provider_error'))),
+  })) : [];
+  return {
+    available: false,
+    errorCode: classifyProviderError(error),
+    providerAttempts: attempts,
+  };
 }
 
 function ageSeconds(value, nowMs = Date.now()) {
@@ -115,10 +129,10 @@ export default async function handler(req, res) {
         symbol,
         quote: quoteData
           ? summarizeMarketQuote(quoteData)
-          : { available: false, errorCode: classifyProviderError(quoteResult.reason) },
+          : summarizeProviderFailure(quoteResult.reason),
         history: historyData
           ? summarizeMarketHistory(historyData)
-          : { available: false, errorCode: classifyProviderError(historyResult.reason) },
+          : summarizeProviderFailure(historyResult.reason),
       };
     }));
     const data = {
