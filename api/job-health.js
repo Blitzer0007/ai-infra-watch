@@ -132,7 +132,7 @@ async function supabase(path) {
 const JOBS = [
   { id:'portfolio-digest-primary', name:'Portfolio digest · primary', path:'portfolio-digest-scheduler.yml', cadence:'35 0,6,12,16 UTC' },
   { id:'portfolio-digest-fallback', name:'Portfolio digest · fallback', path:'portfolio-digest-fallback-scheduler.yml', cadence:'45 0,6,12,16 UTC' },
-  { id:'server-smart-alerts', name:'Server Smart Alerts', path:'server-smart-alerts.yml', cadence:'every 10 minutes UTC' },
+  { id:'server-smart-alerts', name:'Server Smart Alerts', scheduler:'Supabase Cron', path:'server-smart-alerts.yml', cadence:'every 10 minutes UTC' },
   { id:'earnings-alerts', name:'Earnings alerts', path:'earnings-alerts.yml', cadence:'08:30 Asia/Kolkata' },
   { id:'production-smoke', name:'Production Smoke', path:'production-smoke.yml', cadence:'every 6 hours at :23 UTC' },
   { id:'reentry-alerts', name:'Re-entry Telegram Alerts', path:'reentry-alerts.yml', cadence:'Every 15 minutes during US regular-session window', releaseGate:'REENTRY_ALERTS_ENABLED + REENTRY_ALERTS_RELEASE_APPROVED' },
@@ -158,6 +158,91 @@ export function summarizeRunTiming(run, now = Date.now(), stuckAfterMs = 5 * 60 
     durationMs,
     unfinished,
     isStuck: unfinished && ageMs > stuckAfterMs,
+  };
+}
+
+
+export function summarizeSupabaseSmartAlertHealth(row, now = Date.now(), staleAfterMs = 45 * 60 * 1000) {
+  const configured = row?.job_configured === true;
+  const active = row?.job_active === true;
+  const successTime = Date.parse(row?.last_http_success_at || '');
+  const latestHttpTime = Date.parse(row?.latest_http_at || '');
+  const cronRunTime = Date.parse(row?.last_cron_run_at || '');
+  const ageMs = Number.isFinite(successTime) ? Number(now) - successTime : null;
+  const latestHttpFailedAfterSuccess =
+    Number.isFinite(latestHttpTime) &&
+    row?.latest_http_ok !== true &&
+    (!Number.isFinite(successTime) || latestHttpTime >= successTime);
+
+  let status = 'completed';
+  if (!configured) status = 'missing';
+  else if (!active) status = 'disabled';
+  else if (latestHttpFailedAfterSuccess) status = 'failure';
+  else if (!Number.isFinite(successTime)) status = 'no_runs';
+  else if (ageMs < -60_000 || ageMs > staleAfterMs) status = 'stale';
+
+  const toCount = value => {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : 0;
+  };
+  const rawRuns = Array.isArray(row?.recent_runs) ? row.recent_runs : [];
+  const recentRuns = rawRuns.slice(0, 12).map(run => {
+    const createdAt = run?.createdAt || null;
+    const updatedAt = run?.updatedAt || null;
+    const started = Date.parse(createdAt || '');
+    const finished = Date.parse(updatedAt || '');
+    return {
+      createdAt,
+      updatedAt,
+      status: run?.status || 'unknown',
+      conclusion: run?.conclusion || null,
+      durationMs: Number.isFinite(started) && Number.isFinite(finished) ? Math.max(0, finished - started) : null,
+      ageMs: Number.isFinite(started) ? Math.max(0, Number(now) - started) : null,
+      isStuck: false,
+    };
+  });
+
+  const health = {
+    jobConfigured: configured,
+    jobActive: active,
+    schedule: row?.job_schedule || null,
+    cronRuns24h: toCount(row?.cron_runs_24h),
+    cronFailures24h: toCount(row?.cron_failures_24h),
+    latestHttpAt: row?.latest_http_at || null,
+    latestHttpStatus: row?.latest_http_status ?? null,
+    latestHttpOk: row?.latest_http_ok === true,
+    latestHttpError: row?.latest_http_error || null,
+    httpEvaluations6h: toCount(row?.http_evaluations_6h),
+    httpFailures6h: toCount(row?.http_failures_6h),
+    lastEvaluation: Number.isFinite(successTime) ? {
+      checkedAt: row?.last_http_checked_at || null,
+      evaluatedSymbols: toCount(row?.last_http_evaluated_symbols),
+      freshQuotes: toCount(row?.last_http_fresh_quotes),
+      sent: toCount(row?.last_http_sent),
+    } : null,
+  };
+
+  return {
+    scheduler: 'Supabase Cron',
+    status,
+    conclusion: status === 'completed' ? 'success' : 'failure',
+    lastRunAt: Number.isFinite(cronRunTime) ? new Date(cronRunTime).toISOString() : null,
+    lastRunDurationMs: recentRuns[0]?.durationMs ?? null,
+    lastRunAgeMs: Number.isFinite(cronRunTime) ? Math.max(0, Number(now) - cronRunTime) : null,
+    isStuck: false,
+    unfinishedRunCount: 0,
+    stuckRunCount: 0,
+    lastSuccessAt: Number.isFinite(successTime) ? new Date(successTime).toISOString() : null,
+    lastFailureAt: latestHttpFailedAfterSuccess && Number.isFinite(latestHttpTime)
+      ? new Date(latestHttpTime).toISOString()
+      : null,
+    recentFailureCount: toCount(row?.cron_failures_24h) + toCount(row?.http_failures_6h),
+    recentSkippedCount: 0,
+    lastSkippedAt: null,
+    nextRunAt: nextScheduledRun('server-smart-alerts', new Date(now)),
+    recentRuns,
+    schedulerHealth: health,
+    ...(latestHttpFailedAfterSuccess ? { schedulerHealthError: health.latestHttpError || 'Latest Smart Alerts HTTP evaluation failed.' } : {}),
   };
 }
 
@@ -361,6 +446,26 @@ export default async function handler(req, res) {
         }),
       };
     });
+
+    const smartAlertsJob = jobs.find(job => job.id === 'server-smart-alerts');
+    if (smartAlertsJob) {
+      try {
+        const cronRows = await supabase('rpc/server_smart_alerts_cron_health');
+        const cronHealth = Array.isArray(cronRows) ? cronRows[0] : cronRows;
+        if (!cronHealth || typeof cronHealth !== 'object') {
+          throw new Error('Supabase Cron health RPC returned no scheduler record');
+        }
+        Object.assign(smartAlertsJob, summarizeSupabaseSmartAlertHealth(cronHealth));
+      } catch (error) {
+        smartAlertsJob.scheduler = 'Supabase Cron';
+        smartAlertsJob.status = 'unavailable';
+        smartAlertsJob.conclusion = 'failure';
+        smartAlertsJob.lastSuccessAt = null;
+        smartAlertsJob.schedulerHealthError = error instanceof Error
+          ? error.message
+          : 'Supabase Smart Alerts scheduler health unavailable';
+      }
+    }
 
     const reentryJob = jobs.find(job => job.id === 'reentry-alerts');
     if (reentryJob) {
