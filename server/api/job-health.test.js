@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess, summarizeReentryDeliveryHealth } from '../../api/job-health.js';
+import { nextScheduledRun, supabaseHeaders, summarizeArtifacts, summarizeRunTiming, skippedRunsSinceLastSuccess, summarizeReentryDeliveryHealth, summarizeSupabaseSmartAlertHealth } from '../../api/job-health.js';
 
 test('private OHLC archive next run uses the weekday 23:30 UTC slot', () => {
   assert.equal(nextScheduledRun('private-ohlc-asof-archive', new Date('2026-10-20T03:00:00Z')), '2026-10-20T23:30:00.000Z');
@@ -180,4 +180,82 @@ test('re-entry delivery health counts accepted, rejected, and uncertain ledger r
   assert.equal(summary.activeWatchlistRows, 2);
   assert.equal(Object.hasOwn(summary, 'telegram_message_id'), false);
   assert.equal(Object.hasOwn(summary, 'symbol'), false);
+});
+
+
+const supabaseCronHealthSample = {
+  job_configured: true,
+  job_active: true,
+  job_schedule: '*/10 * * * *',
+  last_cron_run_at: '2026-10-31T17:50:00.086528Z',
+  cron_runs_24h: 144,
+  cron_failures_24h: 0,
+  latest_http_at: '2026-10-31T17:50:00.117816Z',
+  latest_http_status: 200,
+  latest_http_ok: true,
+  latest_http_error: null,
+  last_http_success_at: '2026-10-31T17:50:00.117816Z',
+  last_http_evaluated_symbols: 38,
+  last_http_fresh_quotes: 38,
+  last_http_sent: 0,
+  last_http_checked_at: '2026-10-31T17:50:03.153Z',
+  http_evaluations_6h: 36,
+  http_failures_6h: 0,
+  recent_runs: [{
+    createdAt: '2026-10-31T17:50:00.086528+00:00',
+    updatedAt: '2026-10-31T17:50:00.116968+00:00',
+    status: 'succeeded',
+    conclusion: 'success',
+  }],
+};
+
+test('Smart Alerts health uses successful Supabase Cron HTTP evaluations, not GitHub schedule age', () => {
+  const now = Date.parse('2026-10-31T17:52:00.000Z');
+  const health = summarizeSupabaseSmartAlertHealth(supabaseCronHealthSample, now);
+  assert.equal(health.scheduler, 'Supabase Cron');
+  assert.equal(health.status, 'completed');
+  assert.equal(health.conclusion, 'success');
+  assert.equal(health.lastSuccessAt, '2026-10-31T17:50:00.117Z');
+  assert.equal(health.schedulerHealth.cronRuns24h, 144);
+  assert.equal(health.schedulerHealth.httpFailures6h, 0);
+  assert.equal(health.schedulerHealth.lastEvaluation.evaluatedSymbols, 38);
+  assert.equal(health.schedulerHealth.lastEvaluation.freshQuotes, 38);
+});
+
+test('Smart Alerts health remains stale when Supabase HTTP evaluation is too old', () => {
+  const old = {
+    ...supabaseCronHealthSample,
+    latest_http_at: '2026-10-31T16:00:00.000Z',
+    last_http_success_at: '2026-10-31T16:00:00.000Z',
+    last_http_checked_at: '2026-10-31T16:00:03.000Z',
+  };
+  const health = summarizeSupabaseSmartAlertHealth(old, Date.parse('2026-10-31T17:00:00.000Z'));
+  assert.equal(health.status, 'stale');
+  assert.equal(health.conclusion, 'failure');
+});
+
+test('Smart Alerts health fails when the latest HTTP evaluation fails after a previous success', () => {
+  const failed = {
+    ...supabaseCronHealthSample,
+    latest_http_at: '2026-10-31T17:51:00.000Z',
+    latest_http_status: 500,
+    latest_http_ok: false,
+    latest_http_error: 'HTTP status 500',
+    http_failures_6h: 1,
+  };
+  const health = summarizeSupabaseSmartAlertHealth(failed, Date.parse('2026-10-31T17:52:00.000Z'));
+  assert.equal(health.status, 'failure');
+  assert.equal(health.lastFailureAt, '2026-10-31T17:51:00.000Z');
+  assert.equal(health.schedulerHealthError, 'HTTP status 500');
+});
+
+test('Smart Alerts health does not pass when the Supabase cron job is inactive or missing', () => {
+  assert.equal(
+    summarizeSupabaseSmartAlertHealth({ ...supabaseCronHealthSample, job_active: false }).status,
+    'disabled',
+  );
+  assert.equal(
+    summarizeSupabaseSmartAlertHealth({ ...supabaseCronHealthSample, job_configured: false }).status,
+    'missing',
+  );
 });
