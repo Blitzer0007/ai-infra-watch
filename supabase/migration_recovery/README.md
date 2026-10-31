@@ -17,8 +17,10 @@ database. Former repository files are preserved under
 The folder `candidates/` contains review-only SQL fragments for the missing
 `portfolio_digest_runs` prerequisite and confirmed schema/security drift.
 They are deliberately excluded from `supabase/migrations/` and the 30-entry
-manifest. The disposable PostgreSQL integration test validates the SQL logic
-and privilege boundaries, but it is not a substitute for generating the active
-timestamped migration files with Supabase CLI and running a full local replay.
+manifest. The disposable PostgreSQL integration tests validate the recovery candidates,
+and the full-replay test applies all 30 recorded migrations in order against a
+fixture for the pre-existing Supabase baseline. This is not a full Supabase
+local-stack run. It is not a substitute for generating the active timestamped
+reconciliation migration with Supabase CLI and running a linked-project dry run.
 
 No production database migration was run as part of this recovery.
