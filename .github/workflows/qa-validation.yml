@@ -190,11 +190,11 @@ jobs:
       - name: Apply re-entry schema and outbox migrations to disposable PostgreSQL
         run: |
           psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
-            -f supabase/migrations/20261014_reentry_watchlist.sql
+            -f supabase/migrations/20261013182018_reentry_watchlist.sql
           psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
-            -f supabase/migrations/20261015070000_reentry_dual_path_research_fields.sql
+            -f supabase/migrations/20261019160530_reentry_dual_path_research_fields_20261015.sql
           psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
-            -f supabase/migrations/20261015060000_reentry_telegram_delivery_outbox.sql
+            -f supabase/migrations/20261019160523_reentry_telegram_delivery_outbox_20261015.sql
       - name: Verify grants, claims, acceptance, and uncertain message IDs
         run: |
           psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
