@@ -1,4 +1,4 @@
-import { createPublicKey, createVerify } from 'node:crypto';
+import { createHash, createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
 import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 
@@ -156,6 +156,28 @@ function createId() {
   return 'auto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+export function createAutoForecastId(ticker, horizon, scenarioId, modelVersion, forecastDate) {
+  const key = [
+    'aiw-auto-forecast-v1',
+    String(ticker || '').trim().toUpperCase(),
+    String(horizon),
+    String(scenarioId || 'base'),
+    String(modelVersion || 'analogue-v1'),
+    String(forecastDate || '').slice(0, 10),
+  ].join('|');
+  const bytes = createHash('sha256').update(key).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32),
+  ].join('-');
+}
+
 async function getActiveModel(ticker, horizon) {
   const rows = await supabase(
     'forecast_model_config?select=active_model&ticker=eq.' + encodeURIComponent(ticker) +
@@ -208,7 +230,9 @@ async function buildAutoForecast(holding, horizon = 20) {
 
   const capturedAt = new Date().toISOString();
   const row = {
-    id: createId(),
+    // Primary-key idempotency protects simultaneous Supabase Cron and GitHub
+    // recovery invocations for the same ticker/horizon on the same UTC date.
+    id: createAutoForecastId(ticker, horizon, scenarioId, modelVersion, capturedAt),
     ticker,
     created_at: capturedAt,
     target_date: addBusinessDays(capturedAt, horizon),
@@ -244,10 +268,19 @@ async function buildAutoForecast(holding, horizon = 20) {
     },
   };
 
-  const saved = await supabase('forecast_snapshots', {
-    method: 'POST',
-    body: JSON.stringify(row),
-  });
+  let saved;
+  try {
+    saved = await supabase('forecast_snapshots', {
+      method: 'POST',
+      body: JSON.stringify(row),
+    });
+  } catch (error) {
+    const message = String(error?.message || error);
+    if (/23505|duplicate key|unique constraint|HTTP 409/i.test(message)) {
+      return { skipped: true, ticker, reason: 'forecast already created by another scheduler invocation for this date' };
+    }
+    throw error;
+  }
   return { created: true, ticker, id: saved?.[0]?.id || row.id, targetDate: row.target_date };
 }
 
