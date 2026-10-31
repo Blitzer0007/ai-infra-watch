@@ -358,22 +358,61 @@ jobs:
           supabase init
           cp -R "$GITHUB_WORKSPACE/supabase/migrations" "$workdir/supabase/"
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-      - name: Inspect migration history and dry-run the pending migration
+      - name: Verify linked migration inventory and dry-run production sync
         shell: bash
         run: |
           set -euo pipefail
           cd "$SUPABASE_DRYRUN_WORKDIR"
-          supabase migration list
-          output="$(supabase db push --linked --include-all --dry-run 2>&1)"
-          printf '%s\n' "$output"
-          expected="20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql"
-          planned="$(printf '%s\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+[.]sql' | sort -u || true)"
-          if [ "$planned" != "$expected" ]; then
-            echo "::error::Expected exactly one pending migration ($expected), received: ${planned:-none}."
+          list_output="$(supabase migration list --linked 2>&1)"
+          printf '%s\\n' "$list_output"
+          expected_count="$(jq '.migrations | length' "$GITHUB_WORKSPACE/supabase/migration-ledger.manifest.json")"
+          mismatch="$(printf '%s\\n' "$list_output" | awk -F'|' '
+            {
+              local_version=$1
+              remote_version=$2
+              gsub(/\x60/, "", local_version)
+              gsub(/[[:space:]]/, "", local_version)
+              gsub(/\x60/, "", remote_version)
+              gsub(/[[:space:]]/, "", remote_version)
+              if (local_version ~ /^[0-9]+$/ || remote_version ~ /^[0-9]+$/) {
+                if (local_version != remote_version) print $0
+              }
+            }
+          ')"
+          if [ -n "$mismatch" ]; then
+            echo "::error::Local and remote migration versions differ:"
+            printf '%s\\n' "$mismatch"
             exit 1
           fi
-          if ! printf '%s\n' "$output" | grep -qi 'dry run'; then
+          matched_count="$(printf '%s\\n' "$list_output" | awk -F'|' '
+            {
+              local_version=$1
+              remote_version=$2
+              gsub(/\x60/, "", local_version)
+              gsub(/[[:space:]]/, "", local_version)
+              gsub(/\x60/, "", remote_version)
+              gsub(/[[:space:]]/, "", remote_version)
+              if (local_version ~ /^[0-9]+$/ && local_version == remote_version) count++
+            }
+            END { print count+0 }
+          ')"
+          if [ "$matched_count" -ne "$expected_count" ]; then
+            echo "::error::Expected $expected_count matching local/remote migration versions; found $matched_count."
+            exit 1
+          fi
+          output="$(supabase db push --linked --include-all --dry-run 2>&1)"
+          printf '%s\\n' "$output"
+          if ! printf '%s\\n' "$output" | grep -qi 'dry run'; then
             echo "::error::Supabase CLI did not confirm dry-run mode."
             exit 1
           fi
-          echo "Read-only linked migration dry run passed: exactly one pending migration; no SQL was applied."
+          if ! printf '%s\\n' "$output" | grep -qi 'remote database is up to date'; then
+            echo "::error::Remote database is not fully synchronized with the local migration inventory."
+            exit 1
+          fi
+          planned="$(printf '%s\\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+[.]sql' | sort -u || true)"
+          if [ -n "$planned" ]; then
+            echo "::error::Unexpected pending migrations: $planned."
+            exit 1
+          fi
+          echo "Read-only linked migration check passed: $matched_count local/remote versions match; no SQL is pending or applied."

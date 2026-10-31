@@ -114,7 +114,7 @@ begin
 end;
 $$;
 
--- Exact 30-entry recorded migration ledger plus one pending, ordered reconciliation migration.
+-- Exact 30-entry historical migration ledger plus one recorded, ordered reconciliation migration.
 \ir ../migrations/20261002040357_create_portfolio_holdings.sql
 \ir ../migrations/20261002085841_portfolio_purchase_lots.sql
 \ir ../migrations/20261002085858_portfolio_purchase_lot_rpc.sql
@@ -140,7 +140,7 @@ $$;
 \ir ../migrations/20261013182018_reentry_watchlist.sql
 \ir ../migrations/20261013231950_jev_autonomous_portfolio_lab.sql
 
--- This pending migration is timestamped before the historical RLS migration.
+-- This recorded reconciliation migration is timestamped before the historical RLS migration.
 -- It creates portfolio_digest_runs on a clean database and reconciles the
 -- untracked schema deltas while remaining idempotent on current production.
 \ir ../migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql
@@ -152,7 +152,7 @@ $$;
 \ir ../migrations/20261020021802_private_historical_evidence_archive.sql
 \ir ../migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql
 
--- Re-run the pending migration at the end to verify idempotence.
+-- Re-run the recorded reconciliation migration at the end to verify idempotence.
 \ir ../migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql
 
 do $$
@@ -257,5 +257,5 @@ begin
 end;
 $$;
 
-select 'All 30 recorded migrations plus the pending ordered reconciliation migration: PASS' as result;
+select 'All 30 historical migrations plus the recorded ordered reconciliation migration: PASS' as result;
 rollback;
