@@ -25,14 +25,16 @@ function backendUrl(req) {
   return host ? `${proto}://${host}` : '';
 }
 
+export function agentBackendToken(env = process.env) {
+  // Keep this precedence in sync with app.config.settings.AGENT_API_TOKEN.
+  return String(
+    env.AI_INFRA_AGENT_TOKEN || env.AIW_ACCESS_TOKEN || env.AGENT_API_TOKEN || env.CRON_SECRET || ''
+  ).trim();
+}
+
 function backendHeaders() {
   const headers = { 'Content-Type': 'application/json' };
-  // Native Vercel deployments authenticate the Python agent with AGENT_API_TOKEN.
-  // Keep AI_INFRA_AGENT_TOKEN for separate-backend deployments, but fall back to
-  // the native token so /api/agent-ask -> /api/agent-python does not self-401.
-  const token = String(
-    process.env.AGENT_API_TOKEN || process.env.AIW_ACCESS_TOKEN || process.env.AI_INFRA_AGENT_TOKEN || ''
-  ).trim();
+  const token = agentBackendToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
