@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { independentForecastRows } from '../../server/utils/forecastIndependence.js';
-import { calibrationVerdict } from '../../server/utils/forecastCalibration.js';
+import { calibrationVerdict, coverageInterval } from '../../server/utils/forecastCalibration.js';
 
 function row(overrides = {}) {
   return {
@@ -42,6 +42,19 @@ describe('forecast independence and calibration', () => {
       calibrationVerdict({ lowerPct: 45, upperPct: 55 }, { lowerPct: 75, upperPct: 85 }, 49),
       'insufficient',
     );
+  });
+
+  it('excludes missing prediction bounds instead of coercing null to zero', () => {
+    const result = coverageInterval([
+      { actual_return: 3, p25: 1, p75: 5 },
+      { actual_return: 2, p25: null, p75: 4 },
+      { actual_return: 1, p25: 0, p75: undefined },
+      { actual_return: '', p25: 0, p75: 2 },
+    ], 'p25', 'p75');
+
+    assert.equal(result.count, 1);
+    assert.equal(result.hits, 1);
+    assert.equal(result.coveragePct, 100);
   });
 
   it('only labels clearly narrow or wide calibration when the confidence interval excludes the target', () => {
