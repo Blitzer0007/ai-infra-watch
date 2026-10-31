@@ -36,6 +36,23 @@ function remember(key, data) {
   return data;
 }
 
+
+export function classifyProviderError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  const http = message.match(/http\s+(\d{3})/);
+  if (http) {
+    const status = Number(http[1]);
+    if (status === 429) return 'rate_limited';
+    if (status >= 500) return 'provider_server_error';
+    if (status >= 400) return 'provider_http_error';
+  }
+  if (/not configured/.test(message)) return 'not_configured';
+  if (/no price|no .*history|no .*points|history unavailable|returned no price/.test(message)) return 'no_data';
+  if (/rate limit|too many requests|quota/.test(message)) return 'rate_limited';
+  if (/timeout|timed out|abort/.test(message)) return 'timeout';
+  return 'provider_error';
+}
+
 async function fetchJson(url, options = {}, timeout = 8000) {
   const response = await fetch(url, {
     ...options,
@@ -108,8 +125,10 @@ async function alphaQuote(symbol) {
 
 export async function quote(symbol) {
   const key = cacheKey('quote', symbol);
-  const cached = cachedValue(key);
-  if (cached) return { ...cached, cached: true };
+  const cacheEntry = memoryCache.get(key);
+  if (cacheEntry && Date.now() - cacheEntry.at < CACHE_MS) {
+    return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
+  }
 
   const providers = [
     ['yahoo', yahooQuote],
@@ -119,15 +138,30 @@ export async function quote(symbol) {
   const errors = [];
   for (const [name, fn] of providers) {
     try {
-      return remember(key, await fn(symbol));
+      const data = await fn(symbol);
+      const providerAttempts = [...errors, { provider: name, status: 'ok' }];
+      return remember(key, {
+        ...data,
+        providerStatus: errors.length ? 'FALLBACK' : 'PRIMARY',
+        fallbackUsed: errors.length > 0,
+        providerAttempts,
+      });
     } catch (error) {
-      errors.push({ provider: name, error: error?.message || String(error) });
+      errors.push({ provider: name, status: 'failed', errorCode: classifyProviderError(error) });
     }
   }
 
-  const last = memoryCache.get(key)?.data;
+  const last = memoryCache.get(key);
   if (last) {
-    return { ...last, stale: true, cached: true, providerStatus: 'STALE_FALLBACK', errors };
+    return {
+      ...last.data,
+      stale: true,
+      cached: true,
+      cacheAgeMs: Date.now() - last.at,
+      providerStatus: 'STALE_FALLBACK',
+      fallbackUsed: true,
+      providerAttempts: errors,
+    };
   }
   const error = new Error('All market quote providers failed for ' + normalizedSymbol(symbol));
   error.providers = errors;
@@ -198,10 +232,54 @@ async function alphaHistory(symbol, range) {
   return { points, currency: 'USD', exchange: null };
 }
 
+/**
+ * Return a complete split- and dividend-adjusted close series.
+ *
+ * Raw-close providers remain useful for valuation and recent-price checks, but
+ * must not silently substitute for adjusted closes in long-horizon returns.
+ */
+export function requireAdjustedHistory(data) {
+  if (!data || data.stale || data.providerStatus === 'STALE_FALLBACK') {
+    throw new Error('Adjusted history unavailable: market history is stale.');
+  }
+  const points = Array.isArray(data.points) ? data.points : [];
+  if (!points.length) {
+    throw new Error('Adjusted history unavailable: no historical points were returned.');
+  }
+  const invalid = points.find(point =>
+    !/^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) ||
+    !(Number(point?.price) > 0) ||
+    !(Number(point?.adjusted === true ? point?.adjustedPrice : NaN) > 0)
+  );
+  if (invalid) {
+    throw new Error('Adjusted history unavailable: provider did not supply a complete split/dividend-adjusted close series.');
+  }
+  const ordered = [...points].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index - 1].date === ordered[index].date) {
+      throw new Error('Adjusted history unavailable: duplicate market dates were returned.');
+    }
+  }
+  return {
+    ...data,
+    priceBasis: 'split_dividend_adjusted_close',
+    adjusted: true,
+    points: ordered.map(point => ({
+      ...point,
+      rawPrice: Number(point.price),
+      price: Number(point.adjustedPrice),
+      adjustedPrice: Number(point.adjustedPrice),
+      priceBasis: 'split_dividend_adjusted_close',
+    })),
+  };
+}
+
 export async function history(symbol, range = '2y') {
   const key = cacheKey('history', symbol, range);
-  const cached = cachedValue(key, 300000);
-  if (cached) return { ...cached, cached: true };
+  const cacheEntry = memoryCache.get(key);
+  if (cacheEntry && Date.now() - cacheEntry.at < 300000) {
+    return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
+  }
 
   const providers = [
     ['yahoo', yahooHistory],
@@ -212,14 +290,33 @@ export async function history(symbol, range = '2y') {
   for (const [name, fn] of providers) {
     try {
       const data = await fn(symbol, range);
-      return remember(key, { ...data, source: name === 'yahoo' ? 'Yahoo Finance' : name === 'finnhub' ? 'Finnhub' : 'Alpha Vantage', provider: name, stale: false });
+      const providerAttempts = [...errors, { provider: name, status: 'ok' }];
+      return remember(key, {
+        ...data,
+        source: name === 'yahoo' ? 'Yahoo Finance' : name === 'finnhub' ? 'Finnhub' : 'Alpha Vantage',
+        provider: name,
+        stale: false,
+        providerStatus: errors.length ? 'FALLBACK' : 'PRIMARY',
+        fallbackUsed: errors.length > 0,
+        providerAttempts,
+      });
     } catch (error) {
-      errors.push({ provider: name, error: error?.message || String(error) });
+      errors.push({ provider: name, status: 'failed', errorCode: classifyProviderError(error) });
     }
   }
 
-  const last = memoryCache.get(key)?.data;
-  if (last) return { ...last, stale: true, cached: true, providerStatus: 'STALE_FALLBACK', errors };
+  const last = memoryCache.get(key);
+  if (last) {
+    return {
+      ...last.data,
+      stale: true,
+      cached: true,
+      cacheAgeMs: Date.now() - last.at,
+      providerStatus: 'STALE_FALLBACK',
+      fallbackUsed: true,
+      providerAttempts: errors,
+    };
+  }
   const error = new Error('All market history providers failed for ' + normalizedSymbol(symbol));
   error.providers = errors;
   throw error;
