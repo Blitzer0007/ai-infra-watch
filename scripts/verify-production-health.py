@@ -15,6 +15,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 BASE_URL = "https://ai-infra-watch-theta.vercel.app"
+MAX_SCHEDULER_AGE_MINUTES = 45
 
 
 def fail(message: str) -> None:
@@ -24,7 +25,7 @@ def fail(message: str) -> None:
 def get_json(path: str, headers: dict[str, str]) -> dict:
     request_headers = {
         "Accept": "application/json",
-        "User-Agent": "aiw-production-health-verification/1.0",
+        "User-Agent": "aiw-production-health-verification/1.1",
         **headers,
     }
     request = Request(BASE_URL + path, headers=request_headers, method="GET")
@@ -91,7 +92,8 @@ def verify_data_health(headers: dict[str, str]) -> None:
         )
 
 
-def verify_scheduler_and_reentry(headers: dict[str, str]) -> None:
+def verify_scheduler_and_reentry(headers: dict[str, str]) -> list[str]:
+    failures: list[str] = []
     health = get_json("/api/job-health", headers)
     jobs_value = health.get("jobs")
     if health.get("ok") is not True or not isinstance(jobs_value, list):
@@ -99,62 +101,113 @@ def verify_scheduler_and_reentry(headers: dict[str, str]) -> None:
 
     jobs = {job.get("id"): job for job in jobs_value if isinstance(job, dict)}
     scheduler = jobs.get("server-smart-alerts")
+
     if not scheduler:
-        fail("Scheduler health did not include server-smart-alerts.")
+        failures.append("Scheduler health did not include server-smart-alerts.")
+        print("FAIL — Server Smart Alerts job is missing from the scheduler inventory.")
+    else:
+        last_success = scheduler.get("lastSuccessAt")
+        print(
+            "Server Smart Alerts details: "
+            f"status={scheduler.get('status')}, conclusion={scheduler.get('conclusion')}, "
+            f"last_run={scheduler.get('lastRunAt')}, last_success={last_success}, "
+            f"recent_failures={scheduler.get('recentFailureCount')}, "
+            f"recent_skips={scheduler.get('recentSkippedCount')}, "
+            f"stuck_runs={scheduler.get('stuckRunCount')}."
+        )
+        recent_runs = scheduler.get("recentRuns")
+        if isinstance(recent_runs, list):
+            for run in recent_runs[:5]:
+                if isinstance(run, dict):
+                    print(
+                        "  scheduler run: "
+                        f"number={run.get('number')}, created={run.get('createdAt')}, "
+                        f"status={run.get('status')}, conclusion={run.get('conclusion')}"
+                    )
 
-    last_success = scheduler.get("lastSuccessAt")
-    if not last_success:
-        fail("No successful Server Smart Alerts scheduler run is recorded.")
-    try:
-        last_success_time = datetime.fromisoformat(str(last_success).replace("Z", "+00:00"))
-        age_minutes = (datetime.now(timezone.utc) - last_success_time).total_seconds() / 60
-    except (TypeError, ValueError):
-        fail("Server Smart Alerts lastSuccessAt is not a valid timestamp.")
+        if not last_success:
+            failures.append("No successful Server Smart Alerts scheduler run is recorded.")
+            print("FAIL — No successful Server Smart Alerts run is recorded.")
+        else:
+            try:
+                last_success_time = datetime.fromisoformat(str(last_success).replace("Z", "+00:00"))
+                age_minutes = (datetime.now(timezone.utc) - last_success_time).total_seconds() / 60
+            except (TypeError, ValueError):
+                failures.append("Server Smart Alerts lastSuccessAt is not a valid timestamp.")
+                print("FAIL — Server Smart Alerts lastSuccessAt is not a valid timestamp.")
+            else:
+                if last_success_time.tzinfo is None or age_minutes < -1 or age_minutes > MAX_SCHEDULER_AGE_MINUTES:
+                    failures.append(
+                        f"Server Smart Alerts last success is outside the {MAX_SCHEDULER_AGE_MINUTES}-minute window "
+                        f"(age={age_minutes:.1f}m)."
+                    )
+                    print(
+                        f"FAIL — Server Smart Alerts last success is {age_minutes:.1f} minutes old; "
+                        f"limit is {MAX_SCHEDULER_AGE_MINUTES} minutes."
+                    )
+                else:
+                    print(f"PASS — Server Smart Alerts last success is {age_minutes:.1f} minutes old.")
 
-    if last_success_time.tzinfo is None or age_minutes < -1 or age_minutes > 45:
-        fail(f"Server Smart Alerts last success is outside the 45-minute window (age={age_minutes:.1f}m).")
-    if scheduler.get("isStuck") is True or int(scheduler.get("stuckRunCount") or 0) > 0:
-        fail("Server Smart Alerts reports a stuck scheduler run.")
+        try:
+            stuck_count = int(scheduler.get("stuckRunCount") or 0)
+        except (TypeError, ValueError):
+            stuck_count = 1
+        if scheduler.get("isStuck") is True or stuck_count > 0:
+            failures.append("Server Smart Alerts reports a stuck scheduler run.")
+            print("FAIL — Server Smart Alerts reports a stuck scheduler run.")
 
-    print(f"PASS — Server Smart Alerts last success {last_success} ({age_minutes:.1f} minutes ago).")
-
+    # Check the independent Re-entry ledger even when the unrelated Smart Alerts
+    # scheduler freshness gate fails. This avoids hiding a useful health result.
     reentry = jobs.get("reentry-alerts")
     if not reentry:
-        fail("Scheduler health did not include the Re-entry workflow.")
-
-    delivery = reentry.get("deliveryHealth")
-    if reentry.get("deliveryHealthError") or not isinstance(delivery, dict):
-        fail("Re-entry delivery ledger could not be read.")
-
-    counts = delivery.get("statusCounts")
-    if not isinstance(counts, dict):
-        fail("Re-entry delivery ledger did not return status counts.")
-    for status in ("sending", "accepted", "rejected", "uncertain"):
-        if not isinstance(counts.get(status), int) or counts[status] < 0:
-            fail(f"Re-entry delivery ledger has an invalid {status} count.")
-
-    ledger_rows = delivery.get("deliveryLedgerRowsInWindow")
-    if not isinstance(ledger_rows, int) or ledger_rows < 0:
-        fail("Re-entry delivery ledger row count is invalid.")
-
-    print(
-        "PASS — Re-entry delivery ledger readable; "
-        f"rows={ledger_rows}, accepted={counts['accepted']}, "
-        f"rejected={counts['rejected']}, uncertain={counts['uncertain']}, "
-        f"sending={counts['sending']}, "
-        f"active_watchlist={delivery.get('activeWatchlistRows')}."
-    )
-    if counts["accepted"] > 0 and delivery.get("lastAcceptedAt"):
-        print(f"Historical Telegram API acceptance recorded at {delivery['lastAcceptedAt']}.")
+        failures.append("Scheduler health did not include the Re-entry workflow.")
+        print("FAIL — Re-entry workflow is missing from the scheduler inventory.")
     else:
-        print("NOTICE — No accepted Re-entry Telegram delivery in the current ledger window.")
-        print("No test message was sent; this is not a Telegram delivery acceptance test.")
+        delivery = reentry.get("deliveryHealth")
+        if reentry.get("deliveryHealthError") or not isinstance(delivery, dict):
+            failures.append("Re-entry delivery ledger could not be read.")
+            print("FAIL — Re-entry delivery ledger could not be read.")
+        else:
+            counts = delivery.get("statusCounts")
+            valid_counts = isinstance(counts, dict) and all(
+                isinstance(counts.get(status), int) and counts[status] >= 0
+                for status in ("sending", "accepted", "rejected", "uncertain")
+            )
+            ledger_rows = delivery.get("deliveryLedgerRowsInWindow")
+            valid_rows = isinstance(ledger_rows, int) and ledger_rows >= 0
+            if not valid_counts:
+                failures.append("Re-entry delivery ledger has invalid status counts.")
+                print("FAIL — Re-entry delivery ledger has invalid status counts.")
+            elif not valid_rows:
+                failures.append("Re-entry delivery ledger row count is invalid.")
+                print("FAIL — Re-entry delivery ledger row count is invalid.")
+            else:
+                print(
+                    "PASS — Re-entry delivery ledger is readable; "
+                    f"rows={ledger_rows}, accepted={counts['accepted']}, "
+                    f"rejected={counts['rejected']}, uncertain={counts['uncertain']}, "
+                    f"sending={counts['sending']}, "
+                    f"active_watchlist={delivery.get('activeWatchlistRows')}."
+                )
+                if counts["accepted"] > 0 and delivery.get("lastAcceptedAt"):
+                    print(f"Historical Telegram API acceptance recorded at {delivery['lastAcceptedAt']}.")
+                else:
+                    print("NOTICE — No accepted Re-entry Telegram delivery in the current ledger window.")
+                    print("No test message was sent; ledger readability is not a Telegram acceptance test.")
+
+    return failures
 
 
 def main() -> int:
     headers = load_headers()
     verify_data_health(headers)
-    verify_scheduler_and_reentry(headers)
+    failures = verify_scheduler_and_reentry(headers)
+    if failures:
+        print("Production health verification found release-gate failures:")
+        for item in failures:
+            print(f"  - {item}")
+        return 1
+
     print("Production health verification completed using GET-only requests.")
     print("No Telegram messages were sent and no alert gates were changed.")
     return 0
