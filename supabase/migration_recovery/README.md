@@ -1,26 +1,37 @@
 # Supabase migration recovery
 
-The active `supabase/migrations/` directory restores all 30 migration versions
-recorded by the live project's `supabase_migrations.schema_migrations` history.
-`migration-ledger.manifest.json` records each path and Git blob SHA-1.
-Run `npm run migration:verify` to detect missing, modified, or unexpected active
-SQL files. Frontend CI runs this integrity check.
+The active `supabase/migrations/` directory contains the **30 exact SQL files**
+recorded by the live project's `supabase_migrations.schema_migrations` table,
+plus one pending, idempotent reconciliation migration. The 30 recorded file
+bodies and their hashes remain unchanged.
 
-## Important scope limitation
+The extra migration,
+`20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql`,
+is intentionally timestamped between `20261013231950` and the recorded
+`20261013233140` migration. This is required because the latter alters
+`portfolio_digest_runs` but the historical 30-file ledger never created it.
+The pending migration also repairs the other schema differences found during
+read-only production inspection. It is not yet applied to production.
 
-The restored ledger is exact, but it does **not** prove that replaying those
-statements alone reconstructs every object currently present in production.
-Read `UNTRACKED_SCHEMA_DRIFT.md` before using this history to provision a fresh
-database. Former repository files are preserved under
-`legacy_repository_files/` for comparison only and are not active migrations.
+Run `npm run migration:verify` to verify active migration hashes, inventory,
+and timestamp ordering. The PostgreSQL 17 full-replay test applies all 30
+recorded migrations plus the pending migration in order, and re-runs the
+pending migration to test idempotence. The fixture models only the Supabase
+baseline objects required by this migration slice; it is not a full Supabase
+local-stack run.
 
-The folder `candidates/` contains review-only SQL fragments for the missing
-`portfolio_digest_runs` prerequisite and confirmed schema/security drift.
-They are deliberately excluded from `supabase/migrations/` and the 30-entry
-manifest. The disposable PostgreSQL integration tests validate the recovery candidates,
-and the full-replay test applies all 30 recorded migrations in order against a
-fixture for the pre-existing Supabase baseline. This is not a full Supabase
-local-stack run. It is not a substitute for generating the active timestamped
-reconciliation migration with Supabase CLI and running a linked-project dry run.
+Before applying the pending backfilled migration to production, inspect:
 
-No production database migration was run as part of this recovery.
+```bash
+supabase migration list
+supabase db push --linked --include-all --dry-run
+```
+
+The dry run must list only the pending
+`20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql`.
+Review it against remote schema and data first. Do not use `migration repair`
+to fake the new version as applied, and do not run a production push without
+explicit release approval.
+
+No production database migration or application deployment was performed
+during this recovery work.
