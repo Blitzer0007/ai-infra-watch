@@ -3,8 +3,15 @@ run-name: Vercel Production Deploy • ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+    inputs:
+      confirm_production_deploy:
+        description: "Explicitly approve deploying the current main branch to production"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        required: true
+        default: "NO"
 
 permissions:
   contents: read
@@ -12,7 +19,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy latest main to Vercel
-    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy]'))
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_production_deploy == 'YES'
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
