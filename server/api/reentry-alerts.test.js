@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
+import { reentryTelegramReleaseEnabled, telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
+
+test('Re-entry Telegram sending requires both independent production approval flags', () => {
+  assert.equal(reentryTelegramReleaseEnabled({}), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'false', REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true', REENTRY_ALERTS_RELEASE_APPROVED: 'false' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true', REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), true);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'TRUE', REENTRY_ALERTS_RELEASE_APPROVED: 'TRUE' }), true);
+});
 
 test('Telegram delivery counts only a successful API response with a message id', () => {
   assert.equal(telegramAccepted(true, { ok: true, result: { message_id: 42 } }), true);

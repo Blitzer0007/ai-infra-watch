@@ -607,6 +607,11 @@ function assess(row,q) {
   if(targetReached) return {status:'WATCH_ENTRY',reasons:['Lower re-entry price reached, but trend confirmation or saved thesis is missing.','Review fresh company and market evidence before considering any action.']};
   return {status:'NOT_READY',reasons:['Price remains above your lower re-entry target and below the upper evidence-review threshold.']};
 }
+export function reentryTelegramReleaseEnabled(env = process.env) {
+  return String(env.REENTRY_ALERTS_ENABLED || '').trim().toLowerCase() === 'true' &&
+    String(env.REENTRY_ALERTS_RELEASE_APPROVED || '').trim().toLowerCase() === 'true';
+}
+
 export function telegramAccepted(httpOk, payload) {
   return httpOk === true && payload?.ok === true && Number.isInteger(payload?.result?.message_id) && payload.result.message_id > 0;
 }
@@ -842,6 +847,10 @@ export default async function handler(req,res) {
   res.setHeader('Cache-Control','no-store');
   const cron=await isCron(req);
   if(cron && req.method==='GET' && String(req.query?.run||'')==='true') {
+    // Two independent production approvals are required; missing values fail closed.
+    if (!reentryTelegramReleaseEnabled()) {
+      return res.status(200).json({ok:true,notificationsEnabled:false,scanStatus:'notifications_disabled',telegramSent:0,telegramPreviouslyAccepted:0});
+    }
     try { return res.status(200).json(await runScan({ allowNotifications: true })); }
     catch(e) { return res.status(500).json({ok:false,error:String(e?.message||e)}); }
   }
