@@ -42,44 +42,80 @@ async function db(path, options={}) {
   const text=await response.text(); return text ? JSON.parse(text) : null;
 }
 
-export function calculateReentryIndicators({ price, closes, adjustedCloses, timestamps, regularMarketTime }) {
+function newYorkMarketDateKey(epochMs) {
+  const instant = new Date(epochMs);
+  if (!Number.isFinite(instant.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(instant);
+  const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  return values.year && values.month && values.day ? values.year + '-' + values.month + '-' + values.day : null;
+}
+
+export function calculateReentryIndicators({ price, closes, adjustedCloses, timestamps, regularMarketTime, regularSessionEnd }) {
   const livePrice = Number(price);
-  const raw = Array.isArray(closes) ? closes.map(Number) : [];
-  const adjusted = Array.isArray(adjustedCloses) ? adjustedCloses.map(Number) : [];
-  const dates = Array.isArray(timestamps) ? timestamps.map(Number) : [];
-  if (!(livePrice > 0)) throw new Error('Invalid live quote for re-entry indicators');
-  if (!raw.length || raw.length !== adjusted.length || raw.length !== dates.length) {
-    throw new Error('Aligned raw and adjusted daily history is required for re-entry indicators');
+  if (!(livePrice > 0) || !Number.isFinite(livePrice)) {
+    throw new Error('Invalid live quote for re-entry indicators');
+  }
+  if (!Array.isArray(closes) || !Array.isArray(adjustedCloses) || !Array.isArray(timestamps) ||
+      closes.length === 0 || closes.length !== adjustedCloses.length || closes.length !== timestamps.length) {
+    throw new Error('Aligned raw, adjusted, and timestamped daily history is required for re-entry indicators');
   }
 
-  const regularMarketEpoch = Number(regularMarketTime);
-  const quoteEpochMs = Number.isFinite(regularMarketEpoch) && regularMarketEpoch > 0
-    ? regularMarketEpoch * 1000
-    : NaN;
-  const aligned = raw.map((rawClose, index) => ({
-    timestamp: dates[index],
-    rawClose,
-    adjustedClose: adjusted[index],
-  })).filter(point =>
-    Number.isFinite(point.timestamp) &&
-    Number.isFinite(point.rawClose) && point.rawClose > 0 &&
-    Number.isFinite(point.adjustedClose) && point.adjustedClose > 0
-  ).sort((a, b) => a.timestamp - b.timestamp);
+  const quoteEpoch = Number(regularMarketTime);
+  if (!Number.isFinite(quoteEpoch) || quoteEpoch <= 0) {
+    throw new Error('A valid market timestamp is required to identify completed re-entry bars');
+  }
+  const quoteEpochMs = quoteEpoch * 1000;
+  const quoteDay = newYorkMarketDateKey(quoteEpochMs);
+  if (!quoteDay) throw new Error('Invalid market date for re-entry indicators');
 
-  const unique = [];
-  for (const point of aligned) {
-    if (unique.length && unique[unique.length - 1].timestamp === point.timestamp) {
-      unique[unique.length - 1] = point;
-    } else {
-      unique.push(point);
+  const rows = [];
+  const seenEpochs = new Set();
+  const seenDays = new Set();
+  for (let index = 0; index < closes.length; index += 1) {
+    const rawClose = Number(closes[index]);
+    // Yahoo includes null closes for non-trading gaps. Those are not market bars.
+    if (!Number.isFinite(rawClose) || rawClose <= 0) continue;
+
+    const timestamp = Number(timestamps[index]);
+    const adjustedClose = Number(adjustedCloses[index]);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      throw new Error('A valid timestamp is required for every raw daily close');
     }
+    if (!Number.isFinite(adjustedClose) || adjustedClose <= 0) {
+      throw new Error('Complete split/dividend-adjusted coverage is required for every raw daily close');
+    }
+    if (seenEpochs.has(timestamp)) {
+      throw new Error('Duplicate daily bar timestamps were returned');
+    }
+    const day = newYorkMarketDateKey(timestamp * 1000);
+    if (!day) throw new Error('Invalid daily bar timestamp was returned');
+    if (seenDays.has(day)) {
+      throw new Error('Duplicate New York market dates were returned');
+    }
+    if (day > quoteDay) {
+      throw new Error('Future daily bars are not valid for the current market quote');
+    }
+    seenEpochs.add(timestamp);
+    seenDays.add(day);
+    rows.push({ timestamp, day, rawClose, adjustedClose });
   }
+  rows.sort((left, right) => left.timestamp - right.timestamp);
 
-  // Keep every indicator on the same completed-bar basis. A partially formed
-  // daily bar must not influence either the moving averages or the high-water mark.
-  const completed = Number.isFinite(quoteEpochMs)
-    ? unique.filter(point => point.timestamp * 1000 <= quoteEpochMs)
-    : unique;
+  // A daily chart timestamp is normally the session open, not the bar close.
+  // Therefore a same-day row is completed only when Yahoo's actual regular
+  // session end for that same New York date has passed.
+  const sessionEnd = Number(regularSessionEnd);
+  const sessionEndDay = Number.isFinite(sessionEnd) && sessionEnd > 0
+    ? newYorkMarketDateKey(sessionEnd * 1000)
+    : null;
+  const sameDayBarCompleted = sessionEndDay === quoteDay && quoteEpoch >= sessionEnd;
+  const completed = rows.filter(row => row.day < quoteDay || (row.day === quoteDay && sameDayBarCompleted));
+
   if (completed.length < 50) {
     throw new Error('At least 50 complete aligned adjusted daily bars are required');
   }
@@ -89,7 +125,7 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
     throw new Error('Invalid adjusted-close factor for re-entry indicators');
   }
 
-  const adjustedSeries = completed.map(point => point.adjustedClose);
+  const adjustedSeries = completed.map(row => row.adjustedClose);
   const average = count => {
     const sample = adjustedSeries.slice(-count);
     if (sample.length !== count) throw new Error('Insufficient adjusted bars for re-entry indicators');
@@ -103,7 +139,7 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
     sma50: average(50),
     drawdownFrom52WeekHighPct: high > 0 ? (high - adjustedLivePrice) / high * 100 : null,
     priceBasis: 'split_dividend_adjusted_close',
-    adjustmentReferenceDate: new Date(lastCompleted.timestamp * 1000).toISOString().slice(0, 10),
+    adjustmentReferenceDate: lastCompleted.day,
     adjustmentFactor,
     adjustedPointCount: completed.length,
     rawPointCount: completed.length,
@@ -125,19 +161,21 @@ async function quoteHistory(symbol) {
   const lastValidRaw=closes.map(Number).filter(v=>Number.isFinite(v)&&v>0).at(-1);
   const price=Number(meta.regularMarketPrice || lastValidRaw);
   const regularMarketTime=meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
+  const regularPeriod=meta.currentTradingPeriod?.regular;
+  const regularSessionEnd=regularPeriod?.end == null ? NaN : Number(regularPeriod.end);
   const indicators=calculateReentryIndicators({
     price,
     closes,
     adjustedCloses,
     timestamps,
     regularMarketTime,
+    regularSessionEnd,
   });
   const marketTime = Number.isFinite(regularMarketTime) && regularMarketTime > 0
     ? new Date(regularMarketTime * 1000).toISOString()
     : null;
-  const regularPeriod = meta.currentTradingPeriod?.regular;
-  const sessionStart = regularPeriod?.start == null ? NaN : Number(regularPeriod.start);
-  const sessionEnd = regularPeriod?.end == null ? NaN : Number(regularPeriod.end);
+  const sessionStart=regularPeriod?.start == null ? NaN : Number(regularPeriod.start);
+  const sessionEnd=regularSessionEnd;
   const regularSession = Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart > 0 && sessionEnd > sessionStart
     ? { start: sessionStart, end: sessionEnd }
     : null;
