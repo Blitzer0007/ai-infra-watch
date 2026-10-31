@@ -109,7 +109,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
 
   useEffect(() => {
     let cancelled = false;
-    authFetch('/api/market?route=market-data-health', { cache: 'no-store' })
+    authFetch('/api/market?route=market-data-health' + (marketDataHealthReload > 0 ? '&refresh=true' : ''), { cache: 'no-store' })
       .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body?.error || 'Market provider health unavailable');
