@@ -10,7 +10,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:unit": "tsx --test src/utils/*.test.ts server/api/*.test.js",
-    "security:audit": "node scripts/security-audit.mjs"
+    "security:audit": "node scripts/security-audit.mjs",
+    "migration:verify": "node scripts/verify-migration-ledger.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

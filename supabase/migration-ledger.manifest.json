@@ -1,0 +1,187 @@
+{
+  "source": "public.supabase_migrations.schema_migrations",
+  "sourceProject": "qjgnryjtrdwrbmlgdquk",
+  "note": "Git blob SHA-1 values verify exact restored SQL file contents; they are not cryptographic proof of database state.",
+  "migrations": [
+    {
+      "version": "20261002040357",
+      "name": "create_portfolio_holdings",
+      "file": "supabase/migrations/20261002040357_create_portfolio_holdings.sql",
+      "gitBlobSha1": "8fa128ea10a6c6c52609e3ef9105e1019510ecd9"
+    },
+    {
+      "version": "20261002085841",
+      "name": "portfolio_purchase_lots",
+      "file": "supabase/migrations/20261002085841_portfolio_purchase_lots.sql",
+      "gitBlobSha1": "692c0edadf090a8dbe3cd120f92a0414f25ec297"
+    },
+    {
+      "version": "20261002085858",
+      "name": "portfolio_purchase_lot_rpc",
+      "file": "supabase/migrations/20261002085858_portfolio_purchase_lot_rpc.sql",
+      "gitBlobSha1": "91c5b64f6af9d7933629d2106a15f8a13e60bb23"
+    },
+    {
+      "version": "20261002085957",
+      "name": "portfolio_purchase_lot_initial_rpc",
+      "file": "supabase/migrations/20261002085957_portfolio_purchase_lot_initial_rpc.sql",
+      "gitBlobSha1": "6883c59ae444b57e2eb27c95661bb3a34cb28e9f"
+    },
+    {
+      "version": "20261002120745",
+      "name": "portfolio_signal_scorecard",
+      "file": "supabase/migrations/20261002120745_portfolio_signal_scorecard.sql",
+      "gitBlobSha1": "bc1cbbdce886f0ecebc525c4805e56b5027b82b4"
+    },
+    {
+      "version": "20261002120754",
+      "name": "portfolio_signal_family_scorecard",
+      "file": "supabase/migrations/20261002120754_portfolio_signal_family_scorecard.sql",
+      "gitBlobSha1": "04f9fb8f8b397f9f0c35d9b40a465922df1f3522"
+    },
+    {
+      "version": "20261002143822",
+      "name": "add_forecast_decision_rules",
+      "file": "supabase/migrations/20261002143822_add_forecast_decision_rules.sql",
+      "gitBlobSha1": "27ad77f83cabc5e9bb02339f9331e8b52032f65d"
+    },
+    {
+      "version": "20261003021324",
+      "name": "forecast_evidence_snapshot",
+      "file": "supabase/migrations/20261003021324_forecast_evidence_snapshot.sql",
+      "gitBlobSha1": "9303ff4c979d18f008fc09e6b191894b19a5a863"
+    },
+    {
+      "version": "20261003130501",
+      "name": "server_alerts",
+      "file": "supabase/migrations/20261003130501_server_alerts.sql",
+      "gitBlobSha1": "eecc75537c867fd493b15e49444960b29276f850"
+    },
+    {
+      "version": "20261003133457",
+      "name": "forecast_validation_guards",
+      "file": "supabase/migrations/20261003133457_forecast_validation_guards.sql",
+      "gitBlobSha1": "c3d05a308932f7c31298a23d6ec4bea5b3500e47"
+    },
+    {
+      "version": "20261004033553",
+      "name": "portfolio_transactions_20261004",
+      "file": "supabase/migrations/20261004033553_portfolio_transactions_20261004.sql",
+      "gitBlobSha1": "67b64a616da2a34a8dc374b13ae6a58ac93165c0"
+    },
+    {
+      "version": "20261004052337",
+      "name": "decision_journal_20261004",
+      "file": "supabase/migrations/20261004052337_decision_journal_20261004.sql",
+      "gitBlobSha1": "b36f7c6d90af17c63748260af942002acc73689a"
+    },
+    {
+      "version": "20261004093628",
+      "name": "20261004_allocation_rules",
+      "file": "supabase/migrations/20261004093628_20261004_allocation_rules.sql",
+      "gitBlobSha1": "c4a2ac4de987eee91a3c62e22e9711d71cbec6a1"
+    },
+    {
+      "version": "20261004143120",
+      "name": "decision_quality_hardening",
+      "file": "supabase/migrations/20261004143120_decision_quality_hardening.sql",
+      "gitBlobSha1": "41185ff56445302086226e734d5a896ac079c173"
+    },
+    {
+      "version": "20261005145829",
+      "name": "forecast_learning_feedback_loop",
+      "file": "supabase/migrations/20261005145829_forecast_learning_feedback_loop.sql",
+      "gitBlobSha1": "44d523734a72875a02f57f48d218bd220424affd"
+    },
+    {
+      "version": "20261005172559",
+      "name": "add_server_smart_alerts_supabase_scheduler",
+      "file": "supabase/migrations/20261005172559_add_server_smart_alerts_supabase_scheduler.sql",
+      "gitBlobSha1": "c464c54e5426d332e5a682a7e1bb8dea57ad8722"
+    },
+    {
+      "version": "20261005172606",
+      "name": "run_server_smart_alerts_immediately",
+      "file": "supabase/migrations/20261005172606_run_server_smart_alerts_immediately.sql",
+      "gitBlobSha1": "6424d47805d0d091af8a2138988e62183a20f9dd"
+    },
+    {
+      "version": "20261005172902",
+      "name": "restore_server_smart_alerts_ten_minute_schedule",
+      "file": "supabase/migrations/20261005172902_restore_server_smart_alerts_ten_minute_schedule.sql",
+      "gitBlobSha1": "2648555715ac949b0730dd14928a9992eba98892"
+    },
+    {
+      "version": "20261005172936",
+      "name": "immediate_server_smart_alert_scan_again",
+      "file": "supabase/migrations/20261005172936_immediate_server_smart_alert_scan_again.sql",
+      "gitBlobSha1": "6424d47805d0d091af8a2138988e62183a20f9dd"
+    },
+    {
+      "version": "20261005173304",
+      "name": "restore_server_smart_alerts_ten_minute_schedule_final",
+      "file": "supabase/migrations/20261005173304_restore_server_smart_alerts_ten_minute_schedule_final.sql",
+      "gitBlobSha1": "2648555715ac949b0730dd14928a9992eba98892"
+    },
+    {
+      "version": "20261006031320",
+      "name": "forecast_scheduler_reliability",
+      "file": "supabase/migrations/20261006031320_forecast_scheduler_reliability.sql",
+      "gitBlobSha1": "5a9d529200128aea1f27ae6d8eee5e3cec79290b"
+    },
+    {
+      "version": "20261013151254",
+      "name": "portfolio_cash_flows_20261013",
+      "file": "supabase/migrations/20261013151254_portfolio_cash_flows_20261013.sql",
+      "gitBlobSha1": "ca11f44069ba1602b351b1c49f80b7e8347371f3"
+    },
+    {
+      "version": "20261013182018",
+      "name": "reentry_watchlist",
+      "file": "supabase/migrations/20261013182018_reentry_watchlist.sql",
+      "gitBlobSha1": "2cbc20fe95f1c897569196d38c6bc1c819d1ba8b"
+    },
+    {
+      "version": "20261013231950",
+      "name": "jev_autonomous_portfolio_lab",
+      "file": "supabase/migrations/20261013231950_jev_autonomous_portfolio_lab.sql",
+      "gitBlobSha1": "07f7efaf236861571425d3da01c74c53d5130075"
+    },
+    {
+      "version": "20261013233140",
+      "name": "portfolio_digest_runs_server_only_rls",
+      "file": "supabase/migrations/20261013233140_portfolio_digest_runs_server_only_rls.sql",
+      "gitBlobSha1": "7a083e0a1a43b10037b6dfa8da62585dff3c0ca8"
+    },
+    {
+      "version": "20261013233340",
+      "name": "restrict_portfolio_write_rpcs_and_harden_trigger",
+      "file": "supabase/migrations/20261013233340_restrict_portfolio_write_rpcs_and_harden_trigger.sql",
+      "gitBlobSha1": "a9452ca868ca3d3e7aaa73b26a4678e36a0fdcad"
+    },
+    {
+      "version": "20261019160523",
+      "name": "reentry_telegram_delivery_outbox_20261015",
+      "file": "supabase/migrations/20261019160523_reentry_telegram_delivery_outbox_20261015.sql",
+      "gitBlobSha1": "6d61e4e59c2e8f4b6a677682df89f2b4354e9598"
+    },
+    {
+      "version": "20261019160530",
+      "name": "reentry_dual_path_research_fields_20261015",
+      "file": "supabase/migrations/20261019160530_reentry_dual_path_research_fields_20261015.sql",
+      "gitBlobSha1": "ebd59f5f364d24e06f2c3072b57d460f90d6a010"
+    },
+    {
+      "version": "20261020021802",
+      "name": "private_historical_evidence_archive",
+      "file": "supabase/migrations/20261020021802_private_historical_evidence_archive.sql",
+      "gitBlobSha1": "1601b6f5ef9fa5a8cf2a304e48ab67b2070d4ed7"
+    },
+    {
+      "version": "20261031055343",
+      "name": "revoke_unused_direct_grants_private_tables_20261031",
+      "file": "supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql",
+      "gitBlobSha1": "9d5bdc28491deacfe6aff0ad82074e107e002f40"
+    }
+  ]
+}

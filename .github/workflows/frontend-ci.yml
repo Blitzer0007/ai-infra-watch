@@ -59,6 +59,9 @@ jobs:
       - name: Typecheck
         run: npm run lint
 
+      - name: Verify restored Supabase migration ledger
+        run: npm run migration:verify
+
       - name: Measurement unit tests
         run: npm run test:unit
 
