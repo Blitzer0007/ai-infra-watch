@@ -198,6 +198,48 @@ async function alphaHistory(symbol, range) {
   return { points, currency: 'USD', exchange: null };
 }
 
+/**
+ * Return a complete split- and dividend-adjusted close series.
+ *
+ * Raw-close providers remain useful for valuation and recent-price checks, but
+ * must not silently substitute for adjusted closes in long-horizon returns.
+ */
+export function requireAdjustedHistory(data) {
+  if (!data || data.stale || data.providerStatus === 'STALE_FALLBACK') {
+    throw new Error('Adjusted history unavailable: market history is stale.');
+  }
+  const points = Array.isArray(data.points) ? data.points : [];
+  if (!points.length) {
+    throw new Error('Adjusted history unavailable: no historical points were returned.');
+  }
+  const invalid = points.find(point =>
+    !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) ||
+    !(Number(point?.price) > 0) ||
+    !(Number(point?.adjusted === true ? point?.adjustedPrice : NaN) > 0)
+  );
+  if (invalid) {
+    throw new Error('Adjusted history unavailable: provider did not supply a complete split/dividend-adjusted close series.');
+  }
+  const ordered = [...points].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index - 1].date === ordered[index].date) {
+      throw new Error('Adjusted history unavailable: duplicate market dates were returned.');
+    }
+  }
+  return {
+    ...data,
+    priceBasis: 'split_dividend_adjusted_close',
+    adjusted: true,
+    points: ordered.map(point => ({
+      ...point,
+      rawPrice: Number(point.price),
+      price: Number(point.adjustedPrice),
+      adjustedPrice: Number(point.adjustedPrice),
+      priceBasis: 'split_dividend_adjusted_close',
+    })),
+  };
+}
+
 export async function history(symbol, range = '2y') {
   const key = cacheKey('history', symbol, range);
   const cached = cachedValue(key, 300000);

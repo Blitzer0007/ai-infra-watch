@@ -1,5 +1,5 @@
 import { createPublicKey, createVerify } from 'node:crypto';
-import { history as routedHistory } from '../../api/_market-data.js';
+import { history as routedHistory, requireAdjustedHistory } from '../../api/_market-data.js';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { coverageInterval, calibrationVerdict as getCalibrationVerdict } from '../utils/forecastCalibration.js';
 
@@ -88,24 +88,66 @@ async function verifyDueForecasts() {
   for (const forecast of due) {
     try {
       const marketData = await routedHistory(String(forecast.ticker).toUpperCase(), '5y');
-      const points = marketData.points || [];
+      const snapshot = forecast.evidence_snapshot && typeof forecast.evidence_snapshot === 'object'
+        ? forecast.evidence_snapshot
+        : {};
+      const adjustedRequired = snapshot.priceBasis === 'split_dividend_adjusted_close';
+      let points = marketData.points || [];
+      if (adjustedRequired) {
+        try {
+          points = requireAdjustedHistory(marketData).points;
+        } catch (error) {
+          deferred.push({
+            id: forecast.id,
+            ticker: forecast.ticker,
+            targetDate: forecast.target_date,
+            reason: error instanceof Error ? error.message : 'split/dividend-adjusted history unavailable.',
+          });
+          continue;
+        }
+      }
+
       // Never verify against a point before the forecast target date.
-      // If the market history has not reached the target yet, leave it pending.
+      // If the market history has not reached the target date, leave it pending.
       const point = points.find(item => item.date >= forecast.target_date);
       if (!point) {
         deferred.push({ id: forecast.id, ticker: forecast.ticker, targetDate: forecast.target_date, reason: 'market point for target date is not available yet.' });
         continue;
       }
       if (!(Number(forecast.entry_price) > 0) || !(Number(point.price) > 0)) {
-        throw new Error('Invalid forecast or market price for verification.'); 
+        throw new Error('Invalid forecast or market price for verification.');
       }
 
-      const actualReturn = (Number(point.price) / Number(forecast.entry_price) - 1) * 100;
+      let actualReturn;
+      if (adjustedRequired) {
+        const reference = snapshot.entryReference;
+        const entryPoint = reference?.date
+          ? points.find(item => item.date === String(reference.date))
+          : null;
+        if (!entryPoint || !(Number(entryPoint.rawPrice) > 0) || !(Number(entryPoint.price) > 0)) {
+          deferred.push({
+            id: forecast.id,
+            ticker: forecast.ticker,
+            targetDate: forecast.target_date,
+            reason: 'the forecast entry-date adjustment reference is unavailable.',
+          });
+          continue;
+        }
+        // Reapply the current provider adjustment factor to the original raw quote.
+        // This keeps future splits and dividends comparable with the target adjusted close.
+        const currentEntryAdjustmentFactor = Number(entryPoint.price) / Number(entryPoint.rawPrice);
+        const adjustedEntryPrice = Number(forecast.entry_price) * currentEntryAdjustmentFactor;
+        actualReturn = (Number(point.price) / adjustedEntryPrice - 1) * 100;
+      } else {
+        // Legacy forecast rows keep their original raw-close measurement basis.
+        actualReturn = (Number(point.price) / Number(forecast.entry_price) - 1) * 100;
+      }
+
       const patch = {
         status: 'verified',
         verified_at: new Date().toISOString(),
         actual_date: point.date,
-        actual_price: Number(point.price),
+        actual_price: Number(point.rawPrice ?? point.price),
         actual_return: actualReturn,
         median_error: actualReturn - Number(forecast.median)
       };
@@ -244,7 +286,7 @@ function runModelBacktest(history,horizon,model) {
 }
 async function modelHistory(ticker) {
   const data = await routedHistory(ticker, '5y');
-  return data.points || [];
+  return requireAdjustedHistory(data).points;
 }
 function chooseModel(v1,v2){
   if(!v1) return 'analogue-v2';
