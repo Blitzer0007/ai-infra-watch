@@ -306,7 +306,7 @@ jobs:
           generated="$(find supabase/migrations -maxdepth 1 -type f -name '*_create_portfolio_digest_runs_and_reconcile_schema_drift.sql' -print)"
           test -n "$generated"
           filename="$(basename "$generated")"
-          if ! [[ "$filename" =~ ^[0-9]{14}_reconcile_untracked_schema_drift\.sql$ ]]; then
+          if ! [[ "$filename" =~ ^[0-9]{14}_create_portfolio_digest_runs_and_reconcile_schema_drift\.sql$ ]]; then
             echo "::error::Supabase CLI generated an unexpected migration filename: $filename"
             exit 1
           fi
