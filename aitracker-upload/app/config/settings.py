@@ -113,7 +113,15 @@ JEV_ROUTE_THRESHOLD: float = _env_float("JEV_ROUTE_THRESHOLD", 0.75)
 # ---- production API security / browser access -----------------------
 # When set, /api/ask/autonomous requires Authorization: Bearer <token>.
 # Leave empty for local development / hermetic CI.
-AGENT_API_TOKEN: str = _env_str("AI_INFRA_AGENT_TOKEN", "")
+# Use the same precedence as api/agent-ask.js when authenticating the
+# internal Vercel proxy -> Python agent request. AIW_ACCESS_TOKEN and
+# AGENT_API_TOKEN remain supported for existing deployments.
+AGENT_API_TOKEN: str = (
+    _env_str("AI_INFRA_AGENT_TOKEN", "")
+    or _env_str("AIW_ACCESS_TOKEN", "")
+    or _env_str("AGENT_API_TOKEN", "")
+    or _env_str("CRON_SECRET", "")
+)
 CORS_ORIGINS: tuple[str, ...] = tuple(
     origin.strip()
     for origin in _env_str("CORS_ORIGINS", "*").split(",")
