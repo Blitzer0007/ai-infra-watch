@@ -29,8 +29,15 @@ app = FastAPI(
 
 
 def _require_auth(authorization: str | None) -> None:
-    expected = settings.AGENT_API_TOKEN or os.getenv("AIW_ACCESS_TOKEN", "").strip()
+    expected = settings.AGENT_API_TOKEN
     if not expected:
+        # Local development remains convenient, but a deployed Vercel agent
+        # must never become unauthenticated because a secret was omitted.
+        if os.getenv("VERCEL"):
+            raise HTTPException(
+                status_code=503,
+                detail="Agent API authentication is not configured",
+            )
         return
     prefix = "Bearer "
     if not authorization or not authorization.startswith(prefix):
