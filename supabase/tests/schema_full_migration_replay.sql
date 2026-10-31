@@ -159,7 +159,7 @@ $$;
 
 do $$
 declare
-  table_name text;
+  v_table_name text;
   private_tables text[] := array[
     'ai_quality_runs','decision_journal_entries','forecast_learning_runs',
     'forecast_scheduler_runs','historical_data_artifacts','jev_paper_proposals',
@@ -170,22 +170,22 @@ declare
     'server_alert_state','forecast_model_config','forecast_snapshots'
   ];
 begin
-  foreach table_name in array private_tables loop
+  foreach v_table_name in array private_tables loop
     if not coalesce((
       select c.relrowsecurity
       from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname='public' and c.relname=table_name
+      where n.nspname='public' and c.relname=v_table_name
     ), false) then
-      raise exception 'RLS is not enabled on public.%', table_name;
+      raise exception 'RLS is not enabled on public.%', v_table_name;
     end if;
-    if has_table_privilege('anon', format('public.%I', table_name), 'select,insert,update,delete') then
-      raise exception 'anon has DML on public.%', table_name;
+    if has_table_privilege('anon', format('public.%I', v_table_name), 'select,insert,update,delete') then
+      raise exception 'anon has DML on public.%', v_table_name;
     end if;
     if has_table_privilege('authenticated', format('public.%I', table_name), 'select,insert,update,delete') then
-      raise exception 'authenticated has DML on public.%', table_name;
+      raise exception 'authenticated has DML on public.%', v_table_name;
     end if;
     if not has_table_privilege('service_role', format('public.%I', table_name), 'select,insert,update,delete') then
-      raise exception 'service_role lost DML on public.%', table_name;
+      raise exception 'service_role lost DML on public.%', v_table_name;
     end if;
   end loop;
 
