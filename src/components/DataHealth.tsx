@@ -201,7 +201,8 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
             const history = row.history || {};
             const stale = quote.stale || history.stale;
             const fallback = quote.fallbackUsed || history.fallbackUsed;
-            const label = stale ? 'STALE' : fallback ? 'FALLBACK' : quote.available && history.available ? 'PRIMARY' : 'PARTIAL';
+            const adjustedHistoryComplete = history.adjustedCloseAvailable === true && !history.futureDateDetected && Number(history.invalidDateCount || 0) === 0;
+            const label = stale ? 'STALE' : fallback ? 'FALLBACK' : quote.available && history.available && adjustedHistoryComplete ? 'PRIMARY' : 'PARTIAL';
             const tone = stale ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
             return <div key={row.symbol} className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
