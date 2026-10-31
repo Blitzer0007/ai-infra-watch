@@ -190,7 +190,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Failures since last success: {job.recentFailureCount ?? 0}</span>
                 <span>Next expected: {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString() : 'not calculated'}</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-[8px] font-mono text-white/30">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2 text-[8px] font-mono text-white/30">
                 <span>Last run duration: {formatDuration(job.lastRunDurationMs)}</span>
                 <span>Last run age: {formatDuration(job.lastRunAgeMs)}</span>
                 <span>Unfinished: {job.unfinishedRunCount ?? 0}</span>
