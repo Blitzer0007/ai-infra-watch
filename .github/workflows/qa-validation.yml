@@ -16,6 +16,12 @@ on:
       - ".github/workflows/reentry-alerts.yml"
       - ".github/workflows/security-audit.yml"
   workflow_dispatch:
+    inputs:
+      run_linked_supabase_dry_run:
+        description: "Run a read-only linked Supabase migration dry run (no SQL is applied)"
+        required: true
+        type: boolean
+        default: false
   pull_request:
     paths:
       - "server/**"
@@ -312,3 +318,56 @@ jobs:
           fi
           echo "Supabase CLI generated migration path: $generated"
           echo "Supabase CLI migration filename generation: PASS"
+
+  supabase-linked-migration-dry-run:
+    name: Linked Supabase migration dry run (read-only)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_linked_supabase_dry_run == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: qjgnryjtrdwrbmlgdquk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+          github-token: ${{ github.token }}
+      - name: Require linked Supabase credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] || [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "::error::Configure SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD secrets to run the read-only linked migration dry run."
+            exit 1
+          fi
+      - name: Prepare disposable CLI workspace and link the production project
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          echo "SUPABASE_DRYRUN_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          cd "$workdir"
+          supabase init
+          cp -R "$GITHUB_WORKSPACE/supabase/migrations" "$workdir/supabase/"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - name: Inspect migration history and dry-run the pending migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SUPABASE_DRYRUN_WORKDIR"
+          supabase migration list
+          output="$(supabase db push --linked --include-all --dry-run 2>&1)"
+          printf '%s\n' "$output"
+          expected="20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql"
+          planned="$(printf '%s\n' "$output" | grep -Eo '[0-9]{14}_[a-z0-9_]+\\.sql' | sort -u || true)"
+          if [ "$planned" != "$expected" ]; then
+            echo "::error::Expected exactly one pending migration ($expected), received: ${planned:-none}."
+            exit 1
+          fi
+          if ! printf '%s\n' "$output" | grep -qi 'dry run'; then
+            echo "::error::Supabase CLI did not confirm dry-run mode."
+            exit 1
+          fi
+          echo "Read-only linked migration dry run passed: exactly one pending migration; no SQL was applied."
