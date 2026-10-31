@@ -1,7 +1,7 @@
 {
   "source": "public.supabase_migrations.schema_migrations",
   "sourceProject": "qjgnryjtrdwrbmlgdquk",
-  "note": "The first 30 entries match the live historical migration ledger exactly and their SQL bodies remain unchanged. The 31st entry is the applied idempotent schema-reconciliation migration, timestamped before the recorded 20261013233140 RLS migration because that historical migration assumes portfolio_digest_runs already exists. All 31 local migration versions now match the production ledger; no migrations are pending. Use supabase migration list --linked and supabase db push --linked --include-all --dry-run to verify the synchronized state. Git blob SHA-1 values verify repository file identity, not database state.",
+  "note": "The first 31 historical entries match the live migration ledger exactly and their SQL bodies remain unchanged. The 32nd entry adds the service-role-only Smart Alerts cron health RPC used by the production job-health endpoint. All 32 local migration versions now match the production ledger; no migrations are pending. Use supabase migration list --linked and supabase db push --linked --include-all --dry-run to verify the synchronized state. Git blob SHA-1 values verify repository file identity, not database state.",
   "migrations": [
     {
       "version": "20261002040357",
@@ -188,6 +188,12 @@
       "name": "revoke_unused_direct_grants_private_tables_20261031",
       "file": "supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql",
       "gitBlobSha1": "9d5bdc28491deacfe6aff0ad82074e107e002f40"
+    },
+    {
+      "version": "20261031175636",
+      "name": "server_smart_alerts_cron_health",
+      "file": "supabase/migrations/20261031175636_server_smart_alerts_cron_health.sql",
+      "gitBlobSha1": "388e30559c1a01c6acd67f74a4b669be643e4a86"
     }
   ],
   "recordedMigrationCount": 31,
