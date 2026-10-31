@@ -182,6 +182,12 @@
       "name": "revoke_unused_direct_grants_private_tables_20261031",
       "file": "supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql",
       "gitBlobSha1": "9d5bdc28491deacfe6aff0ad82074e107e002f40"
+    },
+    {
+      "version": "20261031125203",
+      "name": "reconcile_untracked_schema_drift",
+      "file": "supabase/migrations/20261031125203_reconcile_untracked_schema_drift.sql",
+      "gitBlobSha1": "7986b059631bd0b1fb8a7510fd94e84f3e0b0658"
     }
   ]
 }
