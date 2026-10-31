@@ -114,7 +114,7 @@ begin
 end;
 $$;
 
--- Exact recorded migration ledger, applied in ascending version order.
+-- Exact 30-entry recorded migration ledger plus one pending, ordered reconciliation migration.
 \ir ../migrations/20261002040357_create_portfolio_holdings.sql
 \ir ../migrations/20261002085841_portfolio_purchase_lots.sql
 \ir ../migrations/20261002085858_portfolio_purchase_lot_rpc.sql
@@ -140,10 +140,10 @@ $$;
 \ir ../migrations/20261013182018_reentry_watchlist.sql
 \ir ../migrations/20261013231950_jev_autonomous_portfolio_lab.sql
 
--- Required missing predecessor: the recorded RLS migration below alters
--- portfolio_digest_runs, but no CREATE TABLE for it exists in the recorded
--- 30-version set. This is a review-only, idempotent prerequisite.
-\ir ../migration_recovery/candidates/portfolio_digest_runs_prerequisite.sql
+-- This pending migration is timestamped before the historical RLS migration.
+-- It creates portfolio_digest_runs on a clean database and reconciles the
+-- untracked schema deltas while remaining idempotent on current production.
+\ir ../migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql
 \ir ../migrations/20261013233140_portfolio_digest_runs_server_only_rls.sql
 
 \ir ../migrations/20261013233340_restrict_portfolio_write_rpcs_and_harden_trigger.sql
@@ -152,10 +152,8 @@ $$;
 \ir ../migrations/20261020021802_private_historical_evidence_archive.sql
 \ir ../migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql
 
--- Reconcile production schema drift outside the historical ledger.
--- Run twice to verify that the candidate SQL is idempotent.
-\ir ../migrations/20261031125203_reconcile_untracked_schema_drift.sql
-\ir ../migrations/20261031125203_reconcile_untracked_schema_drift.sql
+-- Re-run the pending migration at the end to verify idempotence.
+\ir ../migrations/20261013233000_create_portfolio_digest_runs_and_reconcile_schema_drift.sql
 
 do $$
 declare
@@ -245,5 +243,5 @@ begin
 end;
 $$;
 
-select 'All 30 recorded migrations plus review-only reconciliation candidates: PASS' as result;
+select 'All 30 recorded migrations plus the pending ordered reconciliation migration: PASS' as result;
 rollback;
