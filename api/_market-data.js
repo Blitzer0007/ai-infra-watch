@@ -213,7 +213,7 @@ export function requireAdjustedHistory(data) {
     throw new Error('Adjusted history unavailable: no historical points were returned.');
   }
   const invalid = points.find(point =>
-    !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) ||
     !(Number(point?.price) > 0) ||
     !(Number(point?.adjusted === true ? point?.adjustedPrice : NaN) > 0)
   );
