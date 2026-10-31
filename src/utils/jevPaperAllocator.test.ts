@@ -16,7 +16,10 @@ describe('JEV paper allocator evidence and risk gates', () => {
       { evidenceFresh: false },
       { conflictCount: 1 },
       { gateAction: 'gather_more' },
-      { gateAction: 'stop' },
+      { gateAction: 'continue' },
+      { gateAction: 'insufficient' },
+      { gateAction: 'resolve_conflict' },
+      { gateAction: '' },
       { thesisBreaches: ['MSFT'] },
     ]) {
       const result = buildJevPaperAllocator({
@@ -27,6 +30,15 @@ describe('JEV paper allocator evidence and risk gates', () => {
       assert.equal(result.suggestedWeights.length, 0);
       assert.equal(result.balanceScore, null);
     }
+  });
+
+  it('accepts the backend stop decision only when all other evidence checks pass', () => {
+    const result = buildJevPaperAllocator({
+      candidates, capital: 10000, evidenceComplete: true, evidenceFresh: true,
+      conflictCount: 0, gateAction: 'stop',
+    });
+    assert.equal(result.allocationAllowed, true);
+    assert.equal(result.suggestedWeights.length, candidates.length);
   });
 
   it('keeps allocations within position, sector, and cash limits', () => {
