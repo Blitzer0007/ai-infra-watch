@@ -209,12 +209,12 @@ export function calculatePortfolioAttribution(inputs: PortfolioMetricInput[]): P
     .sort((a, b) => Math.abs(b.pnlContribution) - Math.abs(a.pnlContribution));
 }
 
-function toPriceMap(history: HistoricalPricePoint[] = []) {
-  return new Map(
+function toPriceMap(history: HistoricalPricePoint[] = []): Map<string, number> {
+  return new Map<string, number>(
     [...history]
       .filter(point => point?.date && Number.isFinite(Number(point.price)) && Number(point.price) > 0)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map(point => [point.date, Number(point.price)]),
+      .map(point => [point.date, Number(point.price)] as const),
   );
 }
 export function buildPortfolioDailySeriesFromTransactions(
