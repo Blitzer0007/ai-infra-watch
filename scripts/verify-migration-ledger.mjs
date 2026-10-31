@@ -24,6 +24,18 @@ if (uniqueVersions.size !== versions.length) failures.push('Duplicate migration 
 if (versions.some((version, index) => index > 0 && versions[index - 1] >= version)) {
   failures.push('Manifest migration versions must be strictly increasing');
 }
+for (const migration of manifest.migrations) {
+  const filename = path.basename(migration.file);
+  if (!filename.startsWith(String(migration.version) + '_')) {
+    failures.push(migration.file + ': filename timestamp does not match manifest version ' + migration.version);
+  }
+}
+for (const pending of manifest.pendingLocalMigrations || []) {
+  if (!versions.includes(String(pending))) failures.push('Pending migration version is missing from manifest: ' + pending);
+}
+if (Number(manifest.recordedMigrationCount) + (manifest.pendingLocalMigrations || []).length !== manifest.migrations.length) {
+  failures.push('Manifest recorded/pending migration counts do not match the active migration inventory');
+}
 
 
 for (const migration of manifest.migrations) {
