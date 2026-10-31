@@ -50,6 +50,18 @@ function ageSeconds(value, nowMs = Date.now()) {
   return Number.isFinite(timestamp) ? Math.max(0, Math.floor((nowMs - timestamp) / 1000)) : null;
 }
 
+function dateOnlyAgeDays(dateValue, nowMs = Date.now()) {
+  const date = String(dateValue || '');
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T00:00:00.000Z'))) {
+    return null;
+  }
+  const today = new Date(nowMs).toISOString().slice(0, 10);
+  const todayMs = Date.parse(today + 'T00:00:00.000Z');
+  const lastMs = Date.parse(date + 'T00:00:00.000Z');
+  if (!Number.isFinite(todayMs) || !Number.isFinite(lastMs) || lastMs > todayMs) return null;
+  return Math.floor((todayMs - lastMs) / 86400000);
+}
+
 export function summarizeMarketQuote(data, nowMs = Date.now()) {
   if (!data || !(Number(data.price) > 0)) return { available: false, errorCode: 'no_data' };
   return {
@@ -59,7 +71,7 @@ export function summarizeMarketQuote(data, nowMs = Date.now()) {
     fallbackUsed: Boolean(data.fallbackUsed),
     stale: Boolean(data.stale),
     cached: Boolean(data.cached),
-    cacheAgeMs: Number.isFinite(Number(data.cacheAgeMs)) ? Number(data.cacheAgeMs) : null,
+    cacheAgeMs: data.cacheAgeMs != null && Number.isFinite(Number(data.cacheAgeMs)) ? Number(data.cacheAgeMs) : null,
     asOf: data.asOf || data.marketTime || null,
     ageSeconds: ageSeconds(data.asOf || data.marketTime, nowMs),
     providerAttempts: Array.isArray(data.providerAttempts) ? data.providerAttempts.map(item => ({
@@ -72,25 +84,40 @@ export function summarizeMarketQuote(data, nowMs = Date.now()) {
 
 export function summarizeMarketHistory(data, nowMs = Date.now()) {
   const points = Array.isArray(data?.points) ? data.points : [];
-  const adjustedPoints = points.filter(point => point?.adjusted === true && Number(point?.adjustedPrice) > 0);
-  const firstDate = points[0]?.date || null;
-  const lastDate = points.at(-1)?.date || null;
-  const latestTimestamp = lastDate ? Date.parse(String(lastDate) + 'T23:59:59.000Z') : NaN;
+  const rawPoints = points.filter(point => Number.isFinite(Number(point?.price)) && Number(point.price) > 0);
+  const adjustedPoints = rawPoints.filter(point =>
+    point?.adjusted === true && Number.isFinite(Number(point?.adjustedPrice)) && Number(point.adjustedPrice) > 0
+  );
+  const invalidDateCount = rawPoints.filter(point => !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) ||
+    !Number.isFinite(Date.parse(String(point?.date || '') + 'T00:00:00.000Z'))).length;
+  const datedPoints = rawPoints
+    .filter(point => /^\\d{4}-\\d{2}-\\d{2}$/.test(String(point?.date || '')) &&
+      Number.isFinite(Date.parse(String(point.date) + 'T00:00:00.000Z')))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const firstDate = datedPoints[0]?.date || null;
+  const lastDate = datedPoints.at(-1)?.date || null;
+  const currentDate = new Date(nowMs).toISOString().slice(0, 10);
+  const futureDateDetected = Boolean(lastDate && lastDate > currentDate);
+  const adjustedCoveragePct = rawPoints.length ? Math.round((adjustedPoints.length / rawPoints.length) * 100) : 0;
+  const adjustedCloseAvailable = rawPoints.length > 0 && adjustedPoints.length === rawPoints.length && invalidDateCount === 0;
   return {
-    available: points.length > 0,
+    available: rawPoints.length > 0 && datedPoints.length > 0,
     provider: data?.provider || 'unknown',
     providerStatus: data?.providerStatus || (data?.cached ? 'CACHED' : 'PRIMARY'),
     fallbackUsed: Boolean(data?.fallbackUsed),
     stale: Boolean(data?.stale),
     cached: Boolean(data?.cached),
-    cacheAgeMs: Number.isFinite(Number(data?.cacheAgeMs)) ? Number(data.cacheAgeMs) : null,
+    cacheAgeMs: data?.cacheAgeMs != null && Number.isFinite(Number(data.cacheAgeMs)) ? Number(data.cacheAgeMs) : null,
     firstDate,
     lastDate,
-    ageDays: Number.isFinite(latestTimestamp) ? Math.max(0, Math.floor((nowMs - latestTimestamp) / 86400000)) : null,
-    pointCount: points.length,
+    ageDays: futureDateDetected ? null : dateOnlyAgeDays(lastDate, nowMs),
+    pointCount: rawPoints.length,
     adjustedPointCount: adjustedPoints.length,
-    adjustedCoveragePct: points.length ? Math.round((adjustedPoints.length / points.length) * 100) : 0,
-    adjustedCloseAvailable: points.length > 0 && adjustedPoints.length === points.length,
+    adjustedCoveragePct,
+    adjustedCloseAvailable,
+    adjustedCoverageStatus: adjustedCloseAvailable ? 'complete' : adjustedPoints.length > 0 ? 'partial' : rawPoints.length > 0 ? 'missing' : 'unavailable',
+    invalidDateCount,
+    futureDateDetected,
     currency: data?.currency || null,
     providerAttempts: Array.isArray(data?.providerAttempts) ? data.providerAttempts.map(item => ({
       provider: String(item.provider || 'unknown'),
