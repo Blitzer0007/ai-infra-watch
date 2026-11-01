@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { independentForecastRows } from '../../server/utils/forecastIndependence.js';
-import { calibrationVerdict } from '../../server/utils/forecastCalibration.js';
+import { calibrationVerdict, coverageInterval } from '../../server/utils/forecastCalibration.js';
 
 function row(overrides = {}) {
   return {
@@ -44,17 +44,49 @@ describe('forecast independence and calibration', () => {
     );
   });
 
+  it('keeps calibration insufficient when fewer than 50 forecasts have usable bounds', () => {
+    assert.equal(
+      calibrationVerdict(
+        { count: 49, lowerPct: 45, upperPct: 55 },
+        { count: 50, lowerPct: 75, upperPct: 85 },
+        50,
+      ),
+      'insufficient',
+    );
+    assert.equal(
+      calibrationVerdict(
+        { count: 50, lowerPct: null, upperPct: null },
+        { count: 50, lowerPct: 75, upperPct: 85 },
+        50,
+      ),
+      'insufficient',
+    );
+  });
+
+  it('excludes missing prediction bounds instead of coercing null to zero', () => {
+    const result = coverageInterval([
+      { actual_return: 3, p25: 1, p75: 5 },
+      { actual_return: 2, p25: null, p75: 4 },
+      { actual_return: 1, p25: 0, p75: undefined },
+      { actual_return: '', p25: 0, p75: 2 },
+    ], 'p25', 'p75');
+
+    assert.equal(result.count, 1);
+    assert.equal(result.hits, 1);
+    assert.equal(result.coveragePct, 100);
+  });
+
   it('only labels clearly narrow or wide calibration when the confidence interval excludes the target', () => {
     assert.equal(
-      calibrationVerdict({ lowerPct: 10, upperPct: 35 }, { lowerPct: 20, upperPct: 65 }, 50),
+      calibrationVerdict({ count: 50, lowerPct: 10, upperPct: 35 }, { count: 50, lowerPct: 20, upperPct: 65 }, 50),
       'too narrow',
     );
     assert.equal(
-      calibrationVerdict({ lowerPct: 65, upperPct: 90 }, { lowerPct: 90, upperPct: 98 }, 50),
+      calibrationVerdict({ count: 50, lowerPct: 65, upperPct: 90 }, { count: 50, lowerPct: 90, upperPct: 98 }, 50),
       'too wide',
     );
     assert.equal(
-      calibrationVerdict({ lowerPct: 35, upperPct: 65 }, { lowerPct: 70, upperPct: 90 }, 50),
+      calibrationVerdict({ count: 50, lowerPct: 35, upperPct: 65 }, { count: 50, lowerPct: 70, upperPct: 90 }, 50),
       'well calibrated',
     );
   });

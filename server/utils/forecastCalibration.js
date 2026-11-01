@@ -13,11 +13,15 @@ export function wilsonInterval(hits, total, z = 1.96) {
   };
 }
 
+function isPresentFiniteNumber(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+}
+
 export function coverageInterval(rows = [], lowerKey, upperKey) {
   const eligible = rows.filter(row =>
-    Number.isFinite(Number(row?.actual_return)) &&
-    Number.isFinite(Number(row?.[lowerKey])) &&
-    Number.isFinite(Number(row?.[upperKey])),
+    isPresentFiniteNumber(row?.actual_return) &&
+    isPresentFiniteNumber(row?.[lowerKey]) &&
+    isPresentFiniteNumber(row?.[upperKey]),
   );
   const hits = eligible.filter(row =>
     Number(row.actual_return) >= Number(row[lowerKey]) &&
@@ -34,7 +38,15 @@ export function coverageInterval(rows = [], lowerKey, upperKey) {
 }
 
 export function calibrationVerdict(p25p75Coverage, p10p90Coverage, count) {
-  if (Number(count) < 50 || p25p75Coverage == null || p10p90Coverage == null) return 'insufficient';
+  const validCoverage = interval =>
+    Number(interval?.count) >= 50 &&
+    isPresentFiniteNumber(interval?.lowerPct) &&
+    isPresentFiniteNumber(interval?.upperPct);
+  if (
+    Number(count) < 50 ||
+    !validCoverage(p25p75Coverage) ||
+    !validCoverage(p10p90Coverage)
+  ) return 'insufficient';
   const middleNarrow = p25p75Coverage.upperPct < 50;
   const wideNarrow = p10p90Coverage.upperPct < 80;
   const middleWide = p25p75Coverage.lowerPct > 50;

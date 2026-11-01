@@ -1,5 +1,6 @@
 import { createPublicKey, createVerify } from 'node:crypto';
 import { history as routedHistory, requireAdjustedHistory } from '../../api/_market-data.js';
+import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
 import { coverageInterval, calibrationVerdict as getCalibrationVerdict } from '../utils/forecastCalibration.js';
 
@@ -88,6 +89,17 @@ async function verifyDueForecasts() {
   for (const forecast of due) {
     try {
       const marketData = await routedHistory(String(forecast.ticker).toUpperCase(), '5y');
+      if (!hasFreshMarketHistory(marketData)) {
+        deferred.push({
+          id: forecast.id,
+          ticker: forecast.ticker,
+          targetDate: forecast.target_date,
+          reason: marketData?.stale === true
+            ? 'historical market data is stale; verification deferred'
+            : 'usable historical market data is unavailable; verification deferred',
+        });
+        continue;
+      }
       const snapshot = forecast.evidence_snapshot && typeof forecast.evidence_snapshot === 'object'
         ? forecast.evidence_snapshot
         : {};
@@ -286,7 +298,12 @@ function runModelBacktest(history,horizon,model) {
 }
 async function modelHistory(ticker) {
   const data = await routedHistory(ticker, '5y');
-  return requireAdjustedHistory(data).points;
+  if (!hasFreshMarketHistory(data)) return [];
+  try {
+    return requireAdjustedHistory(data).points;
+  } catch {
+    return [];
+  }
 }
 function chooseModel(v1,v2){
   if(!v1) return 'analogue-v2';
