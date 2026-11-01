@@ -76,6 +76,22 @@ test('portfolio daily series uses common available history and keeps 30-day wind
   assert.equal(Number(rows[0]?.returnPct.toFixed(2)), -4);
 });
 
+test('portfolio daily stress withholds dates when a weighted holding lacks a price', () => {
+  const histories = {
+    A: [
+      { date: '2026-09-01', price: 100 },
+      { date: '2026-09-02', price: 90 },
+      { date: '2026-09-03', price: 99 },
+    ],
+    B: [
+      { date: '2026-09-01', price: 100 },
+      { date: '2026-09-03', price: 110 },
+    ],
+  };
+  const rows = buildPortfolioDailySeries(histories, { A: 0.5, B: 0.5 }, 30);
+  assert.deepEqual(rows, []);
+});
+
 test('benchmark comparison uses overlapping dates and matched compounding', () => {
   const portfolio = [
     { date: '2026-09-01', price: 100 },
@@ -92,4 +108,37 @@ test('benchmark comparison uses overlapping dates and matched compounding', () =
   assert.equal(Number(result[0]?.portfolioReturnPct?.toFixed(2)), 10);
   assert.equal(Number(result[0]?.benchmarkReturnPct?.toFixed(2)), 4);
   assert.equal(Number(result[0]?.relativeReturnPct?.toFixed(2)), 6);
+});
+
+test('benchmark comparison aligns both returns to the same common price-date intervals', () => {
+  const portfolio = [
+    { date: '2026-09-01', price: 100 },
+    { date: '2026-09-02', price: 110 },
+    { date: '2026-09-03', price: 121 },
+    { date: '2026-09-04', price: 133.1 },
+  ];
+  const spy = [
+    { date: '2026-09-01', price: 100 },
+    // Missing 2026-09-02: the D1-D3 return must align against the same
+    // D1-D3 portfolio interval, not be compared with only the D2-D3 return.
+    { date: '2026-09-03', price: 121 },
+    { date: '2026-09-04', price: 133.1 },
+  ];
+  const result = comparePortfolioToBenchmarks(portfolio, { SPY: spy });
+  assert.equal(result[0]?.startDate, '2026-09-01');
+  assert.equal(result[0]?.endDate, '2026-09-04');
+  assert.equal(result[0]?.sampleDays, 2);
+  assert.equal(Number(result[0]?.portfolioReturnPct?.toFixed(2)), 33.1);
+  assert.equal(Number(result[0]?.benchmarkReturnPct?.toFixed(2)), 33.1);
+  assert.equal(Number(result[0]?.relativeReturnPct?.toFixed(4)), 0);
+});
+
+test('benchmark comparison withholds returns when fewer than two dates overlap', () => {
+  const result = comparePortfolioToBenchmarks(
+    [{ date: '2026-09-01', price: 100 }],
+    { SPY: [{ date: '2026-09-01', price: 100 }] },
+  );
+  assert.equal(result[0]?.sampleDays, 0);
+  assert.equal(result[0]?.portfolioReturnPct, null);
+  assert.equal(result[0]?.benchmarkReturnPct, null);
 });

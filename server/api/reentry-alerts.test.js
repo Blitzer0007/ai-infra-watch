@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
+import { reentryTelegramReleaseEnabled, telegramAccepted, isRegularUsEquitySession, isSameNewYorkMarketDate, isWithinRegularSessionBounds, canSendReentryNotification, resolveLastAlertSignature, classifyScan } from './reentry-alerts.js';
+
+test('Re-entry Telegram sending requires both independent production approval flags', () => {
+  assert.equal(reentryTelegramReleaseEnabled({}), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'false', REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true', REENTRY_ALERTS_RELEASE_APPROVED: 'false' }), false);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'true', REENTRY_ALERTS_RELEASE_APPROVED: 'true' }), true);
+  assert.equal(reentryTelegramReleaseEnabled({ REENTRY_ALERTS_ENABLED: 'TRUE', REENTRY_ALERTS_RELEASE_APPROVED: 'TRUE' }), true);
+});
 
 test('Telegram delivery counts only a successful API response with a message id', () => {
   assert.equal(telegramAccepted(true, { ok: true, result: { message_id: 42 } }), true);
@@ -491,3 +501,91 @@ test('scan status explicitly distinguishes fully deferred notifications from fai
   assert.equal(classifyScan({ activeRows: 1, evaluatedRows: 1, qualifyingCandidates: 0, notifyEligibleCandidates: 1, notificationsDeferred: 1, notificationsDeferredMissingSession: 1, telegramSent: 0, errors: 0 }), 'notifications_deferred_missing_session_metadata');
   assert.equal(classifyScan({ activeRows: 2, evaluatedRows: 2, qualifyingCandidates: 1, notifyEligibleCandidates: 2, notificationsDeferred: 1, notificationsDeferredNonScheduled: 1, telegramSent: 1, errors: 0 }), 'completed_with_deferred_notifications');
 });
+
+test('Re-entry indicators exclude the current daily row until the exchange session has closed', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 51 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const closes = Array(51).fill(100);
+  const adjustedCloses = Array(51).fill(50);
+  adjustedCloses[50] = 25; // same-day bar, timestamped at market open, but still in progress
+  const regularMarketTime = timestamps[50] + 60 * 60;
+  const regularSessionEnd = timestamps[50] + 6.5 * 60 * 60;
+  const result = calculateReentryIndicators({
+    price: 100, closes, adjustedCloses, timestamps, regularMarketTime, regularSessionEnd,
+  });
+  assert.equal(result.price, 100);
+  assert.equal(result.sma20, 50);
+  assert.equal(result.sma50, 50);
+  assert.equal(result.adjustmentReferenceDate, '2026-02-19');
+  assert.equal(result.adjustmentFactor, 0.5);
+  assert.equal(result.drawdownFrom52WeekHighPct, 0);
+  assert.equal(result.adjustedPointCount, 50);
+});
+
+test('Re-entry indicators can include the same-day bar only after the same-day session close', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 50 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const regularMarketTime = timestamps.at(-1) + 6.5 * 60 * 60;
+  const result = calculateReentryIndicators({
+    price: 100,
+    closes: Array(50).fill(100),
+    adjustedCloses: Array(50).fill(50),
+    timestamps,
+    regularMarketTime,
+    regularSessionEnd: timestamps.at(-1) + 6.5 * 60 * 60,
+  });
+  assert.equal(result.adjustedPointCount, 50);
+  assert.equal(result.adjustmentReferenceDate, '2026-02-19');
+});
+
+test('Re-entry indicators fail closed on missing, duplicate, future, or misaligned timestamps', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const options = {
+    price: 100,
+    closes: Array(60).fill(100),
+    adjustedCloses: Array(60).fill(100),
+    timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
+  };
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: timestamps.slice(1) }), /Aligned raw, adjusted/);
+  const missing = [...timestamps];
+  missing[20] = null;
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: missing }), /valid timestamp/);
+  const duplicate = [...timestamps];
+  duplicate[20] = duplicate[19];
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: duplicate }), /Duplicate daily bar timestamps/);
+  const future = [...timestamps];
+  future[59] = Date.UTC(2026, 3, 2, 14, 30) / 1000;
+  assert.throws(() => calculateReentryIndicators({ ...options, timestamps: future }), /Future daily bars/);
+});
+
+test('Re-entry indicators fail closed when any valid raw close lacks its adjusted close', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 60 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  const adjustedCloses = Array(60).fill(100);
+  adjustedCloses[20] = null;
+  assert.throws(() => calculateReentryIndicators({
+    price: 100,
+    closes: Array(60).fill(100),
+    adjustedCloses,
+    timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
+  }), /Complete split\/dividend-adjusted coverage/);
+});
+
+test('Re-entry adjusted indicators require at least 50 complete aligned daily points', async () => {
+  const { calculateReentryIndicators } = await import('./reentry-alerts.js');
+  const timestamps = Array.from({ length: 49 }, (_, i) => Date.UTC(2026, 0, 1 + i, 14, 30) / 1000);
+  assert.throws(() => calculateReentryIndicators({
+    price: 100,
+    closes: Array(49).fill(100),
+    adjustedCloses: Array(49).fill(100),
+    timestamps,
+    regularMarketTime: Date.UTC(2026, 3, 1, 21, 0) / 1000,
+    regularSessionEnd: Date.UTC(2026, 3, 1, 20, 0) / 1000,
+  }), /At least 50 complete aligned adjusted daily bars/);
+});
+

@@ -48,7 +48,7 @@ grant all privileges on table
   public.reentry_watchlist, public.server_alert_config, public.server_alert_state
 to anon, authenticated, service_role;
 
-\i supabase/migrations/20261031060000_revoke_unused_direct_table_grants.sql
+\i supabase/migrations/20261031055343_revoke_unused_direct_grants_private_tables_20261031.sql
 
 do $$
 declare

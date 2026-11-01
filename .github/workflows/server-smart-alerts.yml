@@ -1,11 +1,9 @@
 name: Server Smart Alerts
 run-name: Server Smart Alerts • ${{ github.event.schedule || 'manual' }}
 
+# Supabase pg_cron is the single production scheduler (every 10 minutes).
+# Keep this workflow manual-only as an explicit OIDC-authenticated recovery path.
 on:
-  schedule:
-    # Evaluate server-side price/Smart Move alerts every 10 minutes.
-    # Catalyst feeds are scanned every 30 minutes by the endpoint to reduce upstream load.
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
