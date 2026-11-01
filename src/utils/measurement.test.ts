@@ -163,6 +163,32 @@ describe('transaction-aware portfolio history', () => {
     assert.equal(Number(rows[0].returnPct.toFixed(2)), 25);
   });
 
+  it('withholds portfolio history when any active holding has a missing price date', () => {
+    const incompleteHistories = {
+      A: [
+        { date: '2026-06-01', price: 100 },
+        { date: '2026-06-02', price: 90 },
+        { date: '2026-06-03', price: 99 },
+      ],
+      B: [
+        { date: '2026-06-01', price: 100 },
+        // B is missing 2026-06-02; its weight must not be reassigned to A.
+        { date: '2026-06-03', price: 110 },
+      ],
+    };
+    const heldTransactions = [
+      { symbol: 'A', transactionType: 'BUY' as const, tradeDate: '2026-05-29', quantity: 1 },
+      { symbol: 'B', transactionType: 'BUY' as const, tradeDate: '2026-05-29', quantity: 1 },
+    ];
+
+    assert.deepEqual(buildPortfolioDailySeriesFromTransactions(incompleteHistories, heldTransactions, 30), []);
+    assert.deepEqual(buildPortfolioDailySeriesFromTransactions(
+      { A: incompleteHistories.A },
+      heldTransactions,
+      30,
+    ), []);
+  });
+
   it('builds a market-performance index without counting later cash additions as returns', () => {
     const rows = buildPortfolioPerformanceIndexFromTransactions(histories, transactions);
     assert.equal(rows[0].date, '2026-05-05');
