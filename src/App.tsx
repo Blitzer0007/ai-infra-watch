@@ -41,6 +41,7 @@ import DataHealth from './components/DataHealth';
 import AIQualityLab from './components/AIQualityLab';
 
 type LivePrice = {
+  currency?: string | null; isMarketSessionOpen?: boolean | null; status?: string; simulated?: boolean; fallbackUsed?: boolean;
   price: number;
   changePct: number;
   provider?: string;
@@ -82,7 +83,7 @@ export default function App() {
 
   useEffect(() => {
     const syncServerAlertConfig = async (cfg: AppConfig) => {
-      if (!getAccessToken()) return;
+      if ((import.meta as any).env.DEV || (import.meta as any).env.VITE_QA_MODE === 'true' || !getAccessToken()) return;
       try {
         await authFetch('/api/alert-config', {
           method: 'POST',
@@ -172,6 +173,11 @@ export default function App() {
               changePct: res.changePct,
               provider: res.provider,
               retrievedAt: res.retrievedAt,
+              currency: res.currency,
+              isMarketSessionOpen: res.isMarketSessionOpen,
+              status: res.status,
+              simulated: res.simulated,
+              fallbackUsed: res.fallbackUsed,
               marketTime: res.marketTime,
               asOf: res.asOf,
               stale: res.stale,
@@ -262,6 +268,11 @@ export default function App() {
               changePct: res.changePct,
               provider: res.provider,
               retrievedAt: res.retrievedAt,
+              currency: res.currency,
+              isMarketSessionOpen: res.isMarketSessionOpen,
+              status: res.status,
+              simulated: res.simulated,
+              fallbackUsed: res.fallbackUsed,
               marketTime: res.marketTime,
               asOf: res.asOf,
               stale: res.stale,

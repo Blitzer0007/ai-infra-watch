@@ -1,3 +1,4 @@
+import FinancialGlossary from './education/FinancialGlossary';
 import { useMemo, useState } from 'react';
 import {
   ArrowRight, BookOpen, CheckCircle2, CircleHelp, FileSearch, Gauge,
@@ -185,6 +186,7 @@ export default function HelpGuide({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
+      <FinancialGlossary />
       <div className="aiw-page-header flex flex-col gap-2 border-b border-white/10 pb-5">
         <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-mono uppercase tracking-[0.2em]">
           <BookOpen className="w-4 h-4" />

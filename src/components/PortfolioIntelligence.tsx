@@ -1,3 +1,6 @@
+import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
+import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
+import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
 import DataTable from './DataTable';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
@@ -24,6 +27,7 @@ import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../
 import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
 type Price = {
+  currency?: string; isMarketSessionOpen?: boolean; status?: string; simulated?: boolean; fallbackUsed?: boolean;
   price: number;
   changePct: number;
   provider?: string;
@@ -223,10 +227,37 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
   const [rotationGroup, setRotationGroup] = useState<string>('All');
   const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices, rotationHorizon), [portfolioHistory.histories, livePrices, rotationHorizon]);
-  const analyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
+  const rawAnalyses = useMemo(() => { const base = buildPositionAnalyses(livePrices, intelligence, positions); const totalValue = base.reduce((sum, item) => sum + (item.currentValue ?? item.investedValue), 0); return base.map(item => { const weight = totalValue > 0 ? (item.currentValue ?? item.investedValue) / totalValue : 0; return { ...item, portfolioWeight: weight, minorPosition: weight < 0.02 }; }); }, [livePrices, intelligence, positions]);
+  const tradePerformance = useMemo(() => calculatePortfolioTradingPerformance(
+    rawAnalyses.map(item => ({
+      symbol: item.symbol,
+      quantity: item.quantity,
+      averageCost: item.averageCost,
+      currentPrice: item.livePrice != null && !item.liveStale ? item.livePrice : null,
+    })),
+    portfolioTransactions,
+    rawAnalyses.length === 0 ? portfolioTransactions.length > 0 : rawAnalyses.every(item => item.livePrice != null && !item.liveStale),
+  ), [rawAnalyses, portfolioTransactions]);
+  const decisionCards = useMemo(() => {
+    const now = Date.now();
+    return rawAnalyses.map(position => {
+      const group = intelligence.groups.find(item => item.name === position.group);
+      const evidenceSymbols = [...new Set([...(group?.members ?? []), ...position.peers])];
+      const evidenceValidated = evidenceSymbols.length > 0 && evidenceSymbols.every(symbol =>
+        evaluateDecisionEligibility(normalizeDecisionQuote(symbol, livePrices[symbol]), true, true, now).eligibleForDecision);
+      return adaptDecisionCard(position, normalizeDecisionQuote(position.symbol, livePrices[position.symbol]), tradePerformance.status === 'complete', now, evidenceValidated);
+    });
+  }, [rawAnalyses, intelligence, livePrices, tradePerformance.status]);
+  const commandSummary = useMemo(() => summarizeDecisionCards(decisionCards), [decisionCards]);
+  const analyses = useMemo(() => rawAnalyses.map((position, index) => {
+    const card = decisionCards[index];
+    return card.dataQuality.eligibleForDecision ? position : { ...position, state: 'INSUFFICIENT DATA' as const,
+      rationale: card.reasons[0].explanation, strategyContext: card.reasons[0].explanation,
+      averageInAlert: false, recoveryAlert: false, potentialUpsideSignal: 'INSUFFICIENT DATA' as const };
+  }), [rawAnalyses, decisionCards]);
   const signalScorecardSentRef = useRef(new Set<string>());
   useEffect(() => {
-    if (!analyses.length) return;
+    if ((import.meta as any).env.DEV || (import.meta as any).env.VITE_QA_MODE === 'true' || !analyses.length) return;
     const today = new Date().toISOString().slice(0, 10);
     const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
     const pending = analyses.filter(item => item.state !== 'INSUFFICIENT DATA').filter(item => {
@@ -420,16 +451,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const liveUnrealizedPct = liveCurrentTotal != null && investedTotal
     ? (liveUnrealized as number / investedTotal) * 100
     : null;
-  const tradePerformance = useMemo(() => calculatePortfolioTradingPerformance(
-    analyses.map(item => ({
-      symbol: item.symbol,
-      quantity: item.quantity,
-      averageCost: item.averageCost,
-      currentPrice: item.livePrice != null && !item.liveStale ? item.livePrice : null,
-    })),
-    portfolioTransactions,
-    allQuotesFresh,
-  ), [analyses, portfolioTransactions, allQuotesFresh]);
   const accountingUnrealized = tradePerformance.unrealizedPnl ?? liveUnrealized;
   const accountingUnrealizedPct = tradePerformance.unrealizedPnl != null && tradePerformance.openCostBasis != null && tradePerformance.openCostBasis > 0
     ? tradePerformance.unrealizedPnl / tradePerformance.openCostBasis * 100
@@ -652,6 +673,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
+      {tab === 'overview' && <PortfolioCommandCenter summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
+        onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
+        onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }} />}
       <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>

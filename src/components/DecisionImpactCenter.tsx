@@ -9,6 +9,7 @@ type ActionItem = {
   title: string;
   detail: string;
   impact: number | null;
+  explanation?: { origin: string; title: string; detail: string; evidenceStatus: string };
 };
 
 type DecisionData = {
@@ -165,6 +166,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
                       <span className="text-[9px] text-white/35">{item.title}</span>
                     </div>
                     <div className="text-[10px] leading-4 text-white/55 mt-1">{item.detail}</div>
+                    {item.explanation && <details className="mt-2 text-xs text-white/70"><summary>Rule explanation</summary><p>{item.explanation.origin}: {item.explanation.detail}</p><p>{item.explanation.evidenceStatus}</p></details>}
                   </div>
                   {item.impact != null && <span className={'text-[10px] font-mono font-bold shrink-0 ' + (item.impact >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{money(item.impact)}</span>}
                 </div>

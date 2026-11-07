@@ -4,6 +4,7 @@ type Props = FreshnessInput & {
   className?: string;
   showAge?: boolean;
   labelOverride?: string;
+  provider?: string | null;
 };
 
 function tone(label: string) {
@@ -13,15 +14,15 @@ function tone(label: string) {
   return 'border-rose-400/20 bg-rose-400/5 text-rose-300';
 }
 
-export default function FreshnessBadge({ className = '', showAge = true, labelOverride, ...input }: Props) {
+export default function FreshnessBadge({ className = '', showAge = true, labelOverride, provider, ...input }: Props) {
   const result = classifyFreshness(input);
   const label = labelOverride || result.label;
   const age = showAge ? formatFreshnessAge(result.ageMinutes) : '';
   return (
     <span
       data-testid="freshness-badge"
-      title={result.referenceTime ? 'Reference: ' + new Date(result.referenceTime).toLocaleString() : 'No reliable timestamp available'}
-      className={'inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[9px] font-mono font-black uppercase tracking-wider ' + tone(label) + ' ' + className}
+      title={['Source: ' + (provider || 'unavailable'), 'Market time: ' + (input.marketTime ? new Date(input.marketTime).toLocaleString() : 'unavailable'), 'Retrieved: ' + (input.retrievedAt ? new Date(input.retrievedAt).toLocaleString() : 'unavailable')].join(' · ')}
+      className={'inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-mono font-black uppercase tracking-wider ' + tone(label) + ' ' + className}
     >
       <span aria-hidden="true" className={'w-1.5 h-1.5 rounded-full ' + (label === 'Live' ? 'bg-emerald-300' : label === 'Delayed' ? 'bg-amber-300' : label === 'Unknown' ? 'bg-rose-300' : 'bg-white/30')} />
       {label}{age ? ' · ' + age : ''}

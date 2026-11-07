@@ -78,6 +78,11 @@ async function yahooQuote(symbol) {
     changePct: Number.isFinite(previous) && previous !== 0 ? ((price / previous) - 1) * 100 : 0,
     source: 'Yahoo Finance',
     provider: 'yahoo',
+    currency: typeof meta?.currency === 'string' ? meta.currency : null,
+    retrievedAt: new Date().toISOString(),
+    adjustedBasis: 'raw',
+    isMarketSessionOpen: Number.isFinite(meta?.currentTradingPeriod?.regular?.start) && Number.isFinite(meta?.currentTradingPeriod?.regular?.end)
+      ? Date.now() >= meta.currentTradingPeriod.regular.start * 1000 && Date.now() < meta.currentTradingPeriod.regular.end * 1000 : null,
     marketTime: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : null,
     asOf: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : new Date().toISOString(),
     stale: false
@@ -97,6 +102,11 @@ async function finnhubQuote(symbol) {
     changePct: Number.isFinite(j.dp) ? j.dp : 0,
     source: 'Finnhub',
     provider: 'finnhub',
+    marketTime: Number.isFinite(j.t) && j.t > 0 ? new Date(j.t * 1000).toISOString() : null,
+    retrievedAt: new Date().toISOString(),
+    currency: null,
+    isMarketSessionOpen: null,
+    adjustedBasis: 'raw',
     asOf: j.t ? new Date(j.t * 1000).toISOString() : new Date().toISOString(),
     stale: false
   };
@@ -118,6 +128,11 @@ async function alphaQuote(symbol) {
     changePct: Number(q?.['10. change percent']?.replace('%', '')) || 0,
     source: 'Alpha Vantage',
     provider: 'alpha-vantage',
+    marketTime: null,
+    retrievedAt: new Date().toISOString(),
+    currency: null,
+    isMarketSessionOpen: null,
+    adjustedBasis: 'raw',
     asOf: q?.['07. latest trading day'] ? q['07. latest trading day'] + 'T00:00:00.000Z' : new Date().toISOString(),
     stale: false
   };

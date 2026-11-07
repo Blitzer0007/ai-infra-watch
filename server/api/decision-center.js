@@ -778,7 +778,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       checkedAt: new Date().toISOString(),
-      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3),
+      actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3).map(item => ({ ...item,
+        explanation: { origin: 'decision-center.rules', title: item.title, detail: item.detail, evidenceStatus: 'See existing rule state and quote coverage; not a new position classification' },
+      })),
       rules: portfolioRules,
       portfolio: {
         holdings: holdingRows.length,

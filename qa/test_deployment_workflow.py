@@ -8,7 +8,8 @@ def test_production_deploy_requires_explicit_opt_in():
     workflow = (ROOT / ".github" / "workflows" / "vercel-production-deploy.yml").read_text()
     assert "workflow_run:" not in workflow
     assert "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'" in workflow
-    assert "contains(github.event.head_commit.message, '[deploy]')" in workflow
+    assert "inputs.confirm_production_deploy == 'YES'" in workflow
+    assert "  push:" not in workflow
     assert "vercel deploy --prebuilt --archive=tgz --prod" in workflow
 
 
