@@ -53,9 +53,13 @@ Count a Telegram delivery as successful only when Telegram confirms the send (`o
 
 ### Production deployment
 
-Production deployment is intentionally opt-in. The Vercel workflow deploys from `main` only when manually dispatched on `main` or when a push commit message includes `[deploy]`. Ordinary CI success or merging a regular PR must not be treated as production deployment approval.
+Production deployment is intentionally opt-in. The Vercel workflow deploys from `main` only when manually dispatched on `main` with `confirm_production_deploy` set to `YES`. Ordinary CI success or merging a regular PR must not be treated as production deployment approval.
 
 Before a release, verify the current main-branch CI and authenticated read-only smoke test, review the release-gate issue, check Vercel's deployment status, and confirm that any security incidents requiring disposition have been handled through the authorized security dashboard. Do not deploy while a release gate is blocked unless the release scope and risk decision are explicitly approved.
+
+## Cloud development and test isolation
+
+Develop on a feature branch in Codex Cloud; see [the Cloud workflow](docs/cloud-development.md). PR validation uses mocked UI APIs and disposable databases. Live QA jobs require a manual dispatch on `main` with `run_live_checks=true`; linked Supabase inspection requires its separate opt-in. Never use production credentials for feature development.
 
 ## Useful references
 

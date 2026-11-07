@@ -84,6 +84,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
   source: 'live';
   provider?: string;
   retrievedAt?: string;
+  currency?: string | null;
+  isMarketSessionOpen?: boolean | null;
+  status?: string;
+  simulated?: boolean;
+  fallbackUsed?: boolean;
   marketTime?: string | null;
   asOf?: string | null;
   stale?: boolean;
@@ -106,6 +111,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       source: 'live',
       provider: data.provider,
       retrievedAt: data.retrievedAt,
+      currency: data.currency,
+      isMarketSessionOpen: data.isMarketSessionOpen,
+      status: data.status,
+      simulated: data.simulated,
+      fallbackUsed: data.fallbackUsed,
       marketTime: data.marketTime,
       asOf: data.asOf,
       stale: data.stale === true,
@@ -155,6 +165,11 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
         source: 'live',
         provider: data.provider,
         retrievedAt: data.retrievedAt,
+        currency: data.currency,
+        isMarketSessionOpen: data.isMarketSessionOpen,
+        status: data.status,
+        simulated: data.simulated,
+        fallbackUsed: data.fallbackUsed,
         marketTime: data.marketTime,
         asOf: data.asOf,
         stale: data.stale === true,

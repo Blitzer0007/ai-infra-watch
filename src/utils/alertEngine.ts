@@ -149,6 +149,7 @@ export function requestBrowserNotifications(): Promise<NotificationPermission> {
 }
 
 export async function notifyTelegram(events: AlertEvent[]): Promise<void> {
+  if ((import.meta as any).env?.DEV || (import.meta as any).env?.VITE_QA_MODE === 'true') return;
   if (!events.length || !getAccessToken() || !isTelegramEnabled()) return;
 
   try {
