@@ -35,3 +35,27 @@ test('missing evidence is explicit and accounting failure withholds return', () 
   const card = adaptDecisionCard(position,quote,false,now,true);
   assert.equal(card.state,'INSUFFICIENT DATA'); assert.equal(card.positionReturnPct,null); assert.ok(card.reasons.some(r => !r.evidenceIds.length));
 });
+test('supporting metrics include source-specific, timestamped citations', () => {
+  const peer = {...quote,symbol:'AMD',provider:'independent'};
+  const card = adaptDecisionCard(position,quote,true,now,true,[peer]);
+  const citation = card.evidence.find(e => e.id === 'support:AMD:independent');
+  assert.equal(citation?.source,'independent'); assert.equal(citation?.observedAt,peer.marketTime);
+  assert.ok(card.reasons[0].evidenceIds.includes(citation!.id));
+});
+test('summary uses chronological timestamps across offsets and withholds overflow', () => {
+  const a = adaptDecisionCard(position,quote,true,now,true);
+  const b = {...a,symbol:'AMD',dataQuality:{...a.dataQuality,marketTime:'2026-11-06T19:00:00+02:00'}};
+  assert.equal(summarizeDecisionCards([a,b]).asOf,'2026-11-06T17:00:00.000Z');
+  const overflow = {...a,priceUsd:Number.MAX_VALUE,quantity:2};
+  assert.equal(summarizeDecisionCards([overflow]).portfolioValueUsd,null);
+  assert.equal(summarizeDecisionCards([overflow]).topConcentrationPct,null);
+});
+test('a decision from a different symbol or price snapshot cannot display a current return', () => {
+  for (const patch of [{symbol:'AMD'},{price:150}]) {
+    const card = adaptDecisionCard(position,{...quote,...patch},true,now,true);
+    assert.equal(card.state,'INSUFFICIENT DATA');
+    assert.equal(card.positionReturnPct,null);
+    assert.equal(card.dataQuality.status,'conflicting');
+    assert.equal(card.historicalAssessment.asOf,null);
+  }
+});

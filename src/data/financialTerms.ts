@@ -30,3 +30,7 @@ export const financialTerms: FinancialTermDefinition[] = definitions.map(([id,la
   relatedTermIds: id === 'risk-reward' ? ['volatility', 'drawdown'] : ['risk-reward'],
 }));
 export function findFinancialTerm(id: string) { return financialTerms.find(term => term.id === id); }
+export function searchFinancialTerms(query: string) {
+  const term = query.trim().toLowerCase();
+  return financialTerms.filter(item => !term || [item.label, item.shortDefinition, item.id].some(value => value.toLowerCase().includes(term)));
+}

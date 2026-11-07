@@ -541,7 +541,7 @@ export default function App() {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end border-t border-white/5 pt-3 md:pt-0 md:border-0">
+            <div className="flex flex-wrap items-center gap-3 w-full min-w-0 md:w-auto justify-between md:justify-end border-t border-white/5 pt-3 md:pt-0 md:border-0">
               {liveData && liveData.timestamp && (
                 <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider">
                   SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
@@ -563,7 +563,7 @@ export default function App() {
               <button
                 onClick={() => handleFetchLiveData(true)}
                 disabled={isLiveLoading}
-                className="bg-emerald-500 hover:bg-emerald-600 text-black px-4 py-2 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer shadow-[0_4px_12px_rgba(16,185,129,0.15)]"
+                className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-black px-4 py-2 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer shadow-[0_4px_12px_rgba(16,185,129,0.15)]"
               >
                 <span className={isLiveLoading ? "animate-spin" : ""}>🔄</span>
                 <span>{isLiveLoading ? "SYNCHRONIZING..." : "REFRESH FEED"}</span>

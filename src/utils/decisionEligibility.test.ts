@@ -14,3 +14,16 @@ test('weekend last close uses explicit session and observation provenance', () =
 });
 test('accounting and evidence are independently mandatory', () => { assert.equal(evaluate(quote,false,true,now).eligibleForDecision,false); assert.equal(evaluate(quote,true,false,now).eligibleForDecision,false); });
 test('normalization retains missing fields and simulation markers', () => { assert.equal(normalizeDecisionQuote('NVDA',{price:100,provider:'qa'}).status,'simulated'); assert.equal(normalizeDecisionQuote('NVDA',undefined).price,null); });
+test('closed session without close provenance and date-only timestamps cannot be actionable', () => {
+  assert.equal(evaluate({...quote,isMarketSessionOpen:false},true,true,now).eligibleForDecision,false);
+  assert.equal(evaluate({...quote,marketTime:'2026-11-06'},true,true,now).eligibleForDecision,false);
+  assert.equal(evaluate(normalizeDecisionQuote('NVDA',{...quote,status:'provider-error'}),true,true,now).eligibleForDecision,false);
+});
+test('freshness cannot overwrite numeric failures and conflicts cannot hide simulation', () => {
+  const delayed = {...quote,marketTime:'2026-11-06T17:00:00Z',price:-1};
+  assert.equal(evaluate(delayed,true,true,now).status,'invalid');
+  assert.equal(evaluate({...quote,currency:null},true,true,now).status,'missing');
+  const simulated = normalizeDecisionQuote('NVDA',{...quote,simulated:true,independentObservations:[null]});
+  assert.equal(simulated.status,'simulated');
+  assert.equal(evaluate(simulated,true,true,now).eligibleForDecision,false);
+});

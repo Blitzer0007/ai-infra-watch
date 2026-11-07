@@ -1,3 +1,4 @@
+import { regularSessionMetadata } from '../server/services/marketDataValidation.js';
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
   SOXL: 'SOXL',
@@ -81,9 +82,7 @@ async function yahooQuote(symbol) {
     currency: typeof meta?.currency === 'string' ? meta.currency : null,
     retrievedAt: new Date().toISOString(),
     adjustedBasis: 'raw',
-    isMarketSessionOpen: Number.isFinite(meta?.currentTradingPeriod?.regular?.start) && Number.isFinite(meta?.currentTradingPeriod?.regular?.end)
-      ? Date.now() >= meta.currentTradingPeriod.regular.start * 1000 && Date.now() < meta.currentTradingPeriod.regular.end * 1000 : null,
-    marketTime: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : null,
+    ...regularSessionMetadata(meta),
     asOf: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : new Date().toISOString(),
     stale: false
   };

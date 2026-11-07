@@ -243,9 +243,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     return rawAnalyses.map(position => {
       const group = intelligence.groups.find(item => item.name === position.group);
       const evidenceSymbols = [...new Set([...(group?.members ?? []), ...position.peers])];
-      const evidenceValidated = evidenceSymbols.length > 0 && evidenceSymbols.every(symbol =>
-        evaluateDecisionEligibility(normalizeDecisionQuote(symbol, livePrices[symbol]), true, true, now).eligibleForDecision);
-      return adaptDecisionCard(position, normalizeDecisionQuote(position.symbol, livePrices[position.symbol]), tradePerformance.status === 'complete', now, evidenceValidated);
+      const supportingQuotes = evidenceSymbols.map(symbol => normalizeDecisionQuote(symbol, livePrices[symbol]));
+      const evidenceValidated = supportingQuotes.length > 0 && supportingQuotes.every(quote =>
+        evaluateDecisionEligibility(quote, true, true, now).eligibleForDecision);
+      return adaptDecisionCard(position, normalizeDecisionQuote(position.symbol, livePrices[position.symbol]), tradePerformance.status === 'complete', now, evidenceValidated, supportingQuotes);
     });
   }, [rawAnalyses, intelligence, livePrices, tradePerformance.status]);
   const commandSummary = useMemo(() => summarizeDecisionCards(decisionCards), [decisionCards]);
@@ -673,7 +674,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
-      {tab === 'overview' && <PortfolioCommandCenter summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
+      {tab === 'overview' && <PortfolioCommandCenter explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'} summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
         onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
         onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }} />}
       <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
