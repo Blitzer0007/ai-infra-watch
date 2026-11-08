@@ -1,6 +1,8 @@
 # AI Infra Watch — Release 2 engineering plan
 
 Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; the [read-only inbox and focused Portfolio workspaces](release2-inbox-portfolio-review.md) implement the first R2.3 reader slice. The [fictional notification-policy preview](release2-notification-policy-preview.md) adds the offline proposal slice of R2.3. Financial/provider work, authoritative live policy adapters and evaluation extensions remain pending. No new sending policy is activated.
+
+The [controlled JEV increment and REA review](release2-jev-and-rea-review.md) add an on-demand Opportunities coverage review through the existing TypeSafe connector. Live development credit use awaits secure Cloud configuration; REA remains uninstalled.
 Prepared: 8 November 2026, Asia/Kolkata.
 Inspected code baseline: `4c008237453d8e31944cb5fba00cac9726f49501`.
 Repository: `Blitzer0007/ai-infra-watch`.

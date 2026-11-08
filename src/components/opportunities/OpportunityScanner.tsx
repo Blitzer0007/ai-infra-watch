@@ -4,6 +4,7 @@ import { captureResearchSnapshot, type ResearchSnapshot } from '../../utils/rese
 import { scanResearchSnapshot, type ResearchCandidate, type ResearchStatus } from '../../utils/opportunityResearch';
 import OpportunityCard, { researchLabels } from './OpportunityCard';
 import { formatReviewDate } from '../../utils/portfolioReview';
+import OpportunityJevReview from './OpportunityJevReview';
 
 type Props = { holdings:readonly string[]; watchlist:readonly string[]; quotes:Record<string,Record<string,unknown>|undefined>; loading?:boolean; holdingsAvailable?:boolean };
 export default function OpportunityScanner({ holdings, watchlist, quotes, loading = false, holdingsAvailable = true }:Props) {
@@ -32,6 +33,7 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
       <p className="break-words text-sm">Captured {formatReviewDate(scan.snapshot.capturedAt)} · {scan.snapshot.universe.holdingsCoverage === 'unavailable' ? 'Holdings unavailable' : scan.snapshot.universe.holdings+' holdings'} · {scan.snapshot.universe.watchlistOnly} watchlist-only symbols</p>
       {scan.snapshot.universe.holdingsCoverage === 'unavailable' && <p role="status" className="text-amber-200">Holdings could not be loaded. This is watchlist coverage only, not a complete portfolio scan.</p>}
       <p className="text-sm text-white/70">Frozen evaluation, not a live forecast. Run again after inputs refresh. The universe is your current list, not the whole market or a historical sample.</p>
+      <OpportunityJevReview candidates={scan.candidates} />
       {(scan.snapshot.universe.omittedHoldings+scan.snapshot.universe.omittedWatchlist+scan.snapshot.universe.invalidSymbols)>0 && <p role="status" className="text-amber-200">Coverage limited: {scan.snapshot.universe.omittedHoldings} holdings, {scan.snapshot.universe.omittedWatchlist} watchlist symbols and {scan.snapshot.universe.invalidSymbols} invalid symbols omitted by input limits.</p>}
       {!scan.candidates.length ? <p role="status">No holdings or watchlist symbols are available in this snapshot.</p> : <>
         <p className="text-sm">Research input coverage: {scan.candidates.filter(item => item.dataEligibility === 'eligible').length}/{scan.candidates.length} eligible · 0 validated signal families</p>

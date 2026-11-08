@@ -17,6 +17,8 @@ on:
       - "api/live-data.js"
       - "aitracker-upload/app/eval/**"
       - "aitracker-upload/tests/eval/**"
+      - "aitracker-upload/app/jev/**"
+      - "aitracker-upload/tests/agents/test_opportunity_jev_review.py"
       - ".github/workflows/ai-quality-gate.yml"
   push:
     branches: [main]
@@ -32,6 +34,8 @@ on:
       - "api/ai-quality.js"
       - "aitracker-upload/app/eval/**"
       - "aitracker-upload/tests/eval/**"
+      - "aitracker-upload/app/jev/**"
+      - "aitracker-upload/tests/agents/test_opportunity_jev_review.py"
       - ".github/workflows/ai-quality-gate.yml"
 
 jobs:
@@ -51,7 +55,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/eval
+        run: python -m pytest -q aitracker-upload/tests/eval aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_opportunity_jev_review.py
       - name: Run deterministic AI quality gate
         run: python scripts/ai_quality_gate.py --json-out /tmp/current-quality.json
       - name: Run red-team harness
