@@ -70,6 +70,11 @@ export function captureEarningsCalendar(payload: unknown, receivedAt: string, re
     return result;
   }
   const rows = body.upcoming;
+  if ((body.simulated != null && body.simulated !== false) || body.status === 'simulated') {
+    result.issues = ['The feed is marked simulated or has an invalid simulation marker. No real calendar data is available.'];
+    result.rejectedRows = rows.length;
+    return result;
+  }
   if (rows.length > MAX_CATALYST_EVENTS) {
     result.issues = ['The event limit was exceeded. The snapshot is withheld to avoid silently losing corrections.'];
     result.rejectedRows = rows.length;
@@ -81,8 +86,10 @@ export function captureEarningsCalendar(payload: unknown, receivedAt: string, re
   const events = new Map<string, CatalystEvent>();
   const conflicts = new Set<string>();
   const occurrences = new Map<string, number>();
+  let simulatedRows = 0;
   for (const value of rows) {
     const row = object(value);
+    if ((row.simulated != null && row.simulated !== false) || row.status === 'simulated') { result.rejectedRows++; simulatedRows++; continue; }
     const id = typeof row.id === 'string' && row.id.length <= 160 ? text(row.id) : '';
     const symbol = text(row.symbol, 15).toUpperCase();
     const date = row.date;
@@ -116,9 +123,11 @@ export function captureEarningsCalendar(payload: unknown, receivedAt: string, re
   // Conflicting stable IDs are withheld, never resolved by arrival order.
   for (const id of conflicts) { events.delete(id); result.rejectedRows += occurrences.get(id) || 0; }
   if (conflicts.size) result.issues.push(`${conflicts.size} conflicting event IDs were withheld.`);
+  if (simulatedRows) result.issues.push('Simulated calendar records or invalid simulation markers were withheld.');
   result.events = [...events.values()].sort((a, b) => key(a).localeCompare(key(b)));
   if (result.rejectedRows) result.issues.push(`${result.rejectedRows} invalid or conflicting event rows were withheld.`);
   if (result.rejectedRows || result.events.some(event => event.issues.length)) result.status = 'partial';
+  if (result.rejectedRows && !result.events.length) result.status = 'unavailable';
   return result;
 }
 

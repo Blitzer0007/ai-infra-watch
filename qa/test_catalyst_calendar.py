@@ -154,3 +154,11 @@ def test_stale_snapshot_and_failed_reload_are_not_healthy_empty_data(page):
     calendar.get_by_text('Calendar data is unavailable.',exact=False).wait_for()
     assert calendar.get_by_test_id('catalyst-event').count()==0
     assert 'No loaded events match' not in calendar.inner_text()
+
+
+def test_simulated_calendar_rows_never_appear_as_confirmed_events(page):
+    prepare(page,[fixture_event(simulated=True)])
+    calendar=load_snapshot(page)
+    calendar.get_by_text('Calendar data is unavailable.',exact=False).wait_for()
+    assert calendar.get_by_test_id('catalyst-event').count()==0
+    assert 'Simulated calendar records' in calendar.inner_text()

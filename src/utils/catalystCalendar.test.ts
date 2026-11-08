@@ -140,3 +140,16 @@ test('an explicitly estimated date never presents issuer confirmation evidence',
   assert.equal(result.events[0].confirmation,'estimated');
   assert.equal(result.events[0].confirmationEvidence,null);
 });
+test('simulated feed/row metadata cannot become a real confirmed catalyst or healthy empty data', () => {
+  for (const simulated of [true,'true',1]) {
+    const result=capture([event()],{simulated});
+    assert.equal(result.status,'unavailable'); assert.equal(result.events.length,0);
+    const row=capture([event({simulated})]);
+    assert.equal(row.status,'unavailable'); assert.equal(row.events.length,0);
+  }
+  assert.equal(capture([event({status:'simulated'})]).status,'unavailable');
+  assert.equal(capture([event()],{status:'simulated'}).status,'unavailable');
+  const mixed=capture([event(),event({id:'fake',simulated:true})]);
+  assert.equal(mixed.status,'partial'); assert.equal(mixed.events.length,1); assert.equal(mixed.rejectedRows,1);
+  assert.equal(capture([event({simulated:false})],{simulated:false}).events[0].confirmation,'confirmed');
+});
