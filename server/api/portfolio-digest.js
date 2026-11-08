@@ -3,6 +3,7 @@ import { requireAccess } from '../../api/_access-auth.js';
 import { evaluatePortfolioReturnAlerts } from './portfolio-return-alerts.js';
 import { evaluatePortfolioHoldingReturnAlerts } from './portfolio-holding-return-alerts.js';
 import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
+import { buildTelegramDecisionBrief, buildTelegramDigestPayload } from '../utils/dailyDecisionBrief.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -504,6 +505,7 @@ async function buildDigest(decisionJournal) {
     return {
       date: localDate,
       text: buildDecisionFirstText(decision, localDate, weekly, decisionResult.error),
+      telegramBrief: buildTelegramDecisionBrief(decision, localDate, weekly),
       rows,
       totalValue,
       totalPnl,
@@ -591,6 +593,7 @@ async function buildDigest(decisionJournal) {
   return {
     date,
     text: lines.join('\n'),
+    telegramBrief: buildTelegramDecisionBrief(null, localDate),
     rows,
     totalValue,
     totalPnl,
@@ -627,27 +630,9 @@ async function deliver(digest, channels) {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if ((channels.includes('telegram') || (!channels.length && botToken && chatId)) && botToken && chatId) {
     try {
-      const dashboardBase = 'https://ai-infra-watch-theta.vercel.app';
-      const actions = Array.isArray(digest?.decision?.actionItems) ? digest.decision.actionItems.slice(0, 3) : [];
-      const inlineKeyboard = [];
-      for (const item of actions) {
-        const symbol = String(item?.symbol || '').trim().toUpperCase();
-        if (!symbol) continue;
-        inlineKeyboard.push([
-          { text: 'Review ' + symbol, url: dashboardBase + '/portfolio?portfolio_tab=holdings&portfolio_symbol=' + encodeURIComponent(symbol) },
-          { text: 'Journal ' + symbol, url: dashboardBase + '/overview' },
-        ]);
-      }
-      inlineKeyboard.push([
-        { text: 'Open Decision Center', url: dashboardBase + '/overview' },
-        { text: 'Open Watchlist', url: dashboardBase + '/watchlist' },
-      ]);
       telegram.attempted = true;
       const response = await fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        chat_id: chatId,
-        text: digest.text,
-        reply_markup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
-        disable_web_page_preview: true,
+        ...buildTelegramDigestPayload(digest, chatId),
       }), signal: AbortSignal.timeout(10000) });
       const payload = await response.json().catch(() => null);
       if (!isTelegramMessageAccepted(response.ok, payload)) {

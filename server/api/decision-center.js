@@ -1,6 +1,7 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
 import { independentForecastCount } from '../utils/forecastIndependence.js';
+import { summarizeDecisionActions } from '../utils/dailyDecisionBrief.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -778,6 +779,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       checkedAt: new Date().toISOString(),
+      actionSummary: summarizeDecisionActions(actionItems),
       actionItems: actionItems.filter(item => item.severity !== 'SETUP').slice(0, 3).map(item => ({ ...item,
         explanation: { origin: 'decision-center.rules', title: item.title, detail: item.detail, evidenceStatus: 'See existing rule state and quote coverage; not a new position classification' },
       })),
