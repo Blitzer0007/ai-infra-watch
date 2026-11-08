@@ -1,4 +1,5 @@
 import { WatchlistItem } from './types';
+import { parseQuoteObservation } from './utils/quoteObservation';
 
 export interface AppConfig {
   finnhubKey: string;
@@ -78,9 +79,9 @@ export function formatPct(p: number | undefined): string {
 export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefresh = false): Promise<{
   price: number;
   changePct: number;
-  low: number;
-  high: number;
-  prevClose: number;
+  low: number | null;
+  high: number | null;
+  prevClose: number | null;
   source: 'live';
   provider?: string;
   retrievedAt?: string;
@@ -101,13 +102,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     );
     if (!res.ok) throw new Error('Server quote request failed: HTTP ' + res.status);
     const data = await res.json();
-    if (!Number.isFinite(data?.price)) throw new Error('Server quote returned no price');
+    const observed = parseQuoteObservation(data, symbol);
+    if (!observed) throw new Error('Server quote returned no usable price and daily move');
     return {
-      price: data.price,
-      changePct: Number(data.changePct) || 0,
-      low: Number(data.low) || data.price,
-      high: Number(data.high) || data.price,
-      prevClose: Number(data.prevClose) || data.price,
+      ...observed,
       source: 'live',
       provider: data.provider,
       retrievedAt: data.retrievedAt,
@@ -129,16 +127,13 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     const data = await res.json();
     
     // Finnhub fields: c=current, d=change, dp=percent change, h=high, l=low, o=open, pc=prev close
-    if (data.c === 0 && data.pc === 0) {
+    const observed = parseQuoteObservation({price:data.c,changePct:data.dp,low:data.l,high:data.h,prevClose:data.pc}, symbol);
+    if (!observed) {
       throw new Error(`Symbol ${symbol} not found or rate limit hit.`);
     }
     
     return {
-      price: data.c,
-      changePct: data.dp,
-      low: data.l,
-      high: data.h,
-      prevClose: data.pc,
+      ...observed,
       source: 'live',
       provider: 'Finnhub',
       retrievedAt: new Date().toISOString(),
@@ -155,13 +150,10 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       );
       if (!res.ok) throw new Error('Server quote fallback failed: HTTP ' + res.status);
       const data = await res.json();
-      if (!Number.isFinite(data?.price)) throw new Error('No live quote available');
+      const observed = parseQuoteObservation(data, symbol);
+      if (!observed) throw new Error('No usable price and daily move available');
       return {
-        price: data.price,
-        changePct: Number(data.changePct) || 0,
-        low: Number(data.low) || data.price,
-        high: Number(data.high) || data.price,
-        prevClose: Number(data.prevClose) || data.price,
+        ...observed,
         source: 'live',
         provider: data.provider,
         retrievedAt: data.retrievedAt,

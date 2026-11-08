@@ -23,6 +23,7 @@ Assessment: 8 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 - Explicit TypeSafe/JEV coverage review with bounded attempts and typed outputs; live development credentials remain unconfigured.
 - Ghostfolio-inspired holding drilldown, using actual isolated REA CLI source analysis with explicitly partial coverage; no full runtime parity claim.
 - Compact Telegram daily-decision presentation and correct holding-review links; mocked transport verification only.
+- Frontend missing-data analytics: explicit group/rotation coverage, matched source windows, no invented neutral rankings, strict quote parsing and unavailable/reset stress states. Source provenance and model calibration remain separate open work.
 
 ## Next implementation order
 
@@ -39,4 +40,4 @@ Production status: no merge/deployment, hosted database change, Telegram message
 
 The user's subsequent request adds a repository-wide rule/calculation audit. The [first audit pass](release2-calculation-audit.md) inventories 297 source files and corrects verified rule, accounting, benchmark, peer and interval issues. Comprehensive numerical sign-off remains open. The approximately 55% figure still describes the planned Release 2 engineering scope; it is not a percentage of all calculations proven correct. No upward progress credit is taken merely for inventory size or passing tests.
 
-Immediate next priority: missing-data behavior in legacy group/rotation/stress scores and the shared rule-input contract, then adjusted/point-in-time calculation provenance and broader accounting invariants. The company dossier follows those reliability gates.
+The [frontend missing-data follow-up](release2-missing-data-analytics.md) is implemented. Immediate next priority: shared rule/source-input contracts, remaining concentration/attribution cost fallbacks, adjusted/point-in-time calculation provenance and broader accounting invariants. The company dossier follows those reliability gates. The engineering estimate remains approximately 55% until the remaining feature/data/evaluation scope is delivered; test counts alone do not increase it.

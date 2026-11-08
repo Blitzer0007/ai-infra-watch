@@ -34,7 +34,7 @@ export type PortfolioConcentration = {
 export type PortfolioStressResult = StressResult & {
   weightedAvgMove: number | null;
   weightedBreadth: number | null;
-  concentrationPenalty: number;
+  concentrationPenalty: number | null;
 };
 
 export type HistoricalPricePoint = {
@@ -59,6 +59,10 @@ export type BenchmarkComparison = {
 };
 
 export function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
+function macroCountLoad(high: number, medium: number): number | null {
+  if (![high, medium].every(value => Number.isSafeInteger(value) && value >= 0)) return null;
+  return clamp(high * 12 + medium * 6, 0, 30);
+}
 
 export function calculateStressScore(input: StressInput): StressResult {
   const moves = input.dailyChanges.filter((value) => Number.isFinite(value));
@@ -66,20 +70,19 @@ export function calculateStressScore(input: StressInput): StressResult {
     ? moves.filter((value) => value >= 0).length / moves.length
     : null;
   const avgMove = moves.length
-    ? moves.reduce((sum, value) => sum + value, 0) / moves.length
+    ? moves.reduce((sum, value) => sum + value / moves.length, 0)
     : null;
-  const breadthStress = breadth == null ? 0 : (1 - breadth) * 40;
-  const moveStress = avgMove == null ? 0 : clamp((-avgMove / 5) * 30, 0, 30);
-  const macroLoad = clamp(
-    Math.max(0, input.highMacroCount) * 12 + Math.max(0, input.mediumMacroCount) * 6,
-    0,
-    30,
-  );
-  const score = Math.round(clamp(breadthStress + moveStress + macroLoad, 0, 100));
+  const breadthStress = breadth == null ? null : (1 - breadth) * 40;
+  const moveStress = avgMove == null ? null : clamp((-avgMove / 5) * 30, 0, 30);
+  const macroLoad = macroCountLoad(input.highMacroCount, input.mediumMacroCount);
+  const complete = moves.length > 0 && moves.length === input.dailyChanges.length && Number.isFinite(avgMove) && macroLoad != null;
+  const score = complete ? Math.round(clamp(breadthStress + moveStress + macroLoad, 0, 100)) : null;
 
   return {
     score,
-    label: score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained',
+    label: stressLabel(score),
+    coverage: moves.length === 0 ? 'unavailable' : complete ? 'complete' : 'partial',
+    expectedCount: input.dailyChanges.length,
     breadth,
     avgMove,
     breadthStress,
@@ -93,15 +96,19 @@ export function calculatePortfolioStressScore(
   inputs: PortfolioMetricInput[],
   highMacroCount = 0,
   mediumMacroCount = 0,
-  macroLoadOverride?: number,
+  macroLoadOverride?: number | null,
 ): PortfolioStressResult {
-  const valid = inputs.filter(item =>
+  // A known zero-value row has no exposure. Missing/invalid values remain in
+  // the expected set and can never disappear from the portfolio denominator.
+  const expected = inputs.filter(item => item.currentValue !== 0);
+  const valid = expected.filter(item =>
     Number.isFinite(item.dailyChangePct ?? NaN) &&
     Number.isFinite(item.currentValue ?? NaN) &&
     (item.currentValue ?? 0) > 0
   );
   const total = valid.reduce((sum, item) => sum + (item.currentValue ?? 0), 0);
-  const weightedMoves = total
+  const complete = expected.length > 0 && valid.length === expected.length && Number.isFinite(total) && total > 0;
+  const weightedMoves = complete
     ? valid.map(item => ({
         move: item.dailyChangePct as number,
         weight: (item.currentValue as number) / total,
@@ -113,24 +120,20 @@ export function calculatePortfolioStressScore(
   const weightedBreadth = weightedMoves.length
     ? weightedMoves.reduce((sum, item) => sum + (item.move >= 0 ? item.weight : 0), 0)
     : null;
-  const breadthStress = weightedBreadth == null ? 0 : (1 - weightedBreadth) * 40;
-  const moveStress = weightedAvgMove == null ? 0 : clamp((-weightedAvgMove / 5) * 30, 0, 30);
-  const macroLoad = Number.isFinite(macroLoadOverride)
-    ? clamp(Number(macroLoadOverride), 0, 30)
-    : clamp(
-      Math.max(0, highMacroCount) * 12 + Math.max(0, mediumMacroCount) * 6,
-      0,
-      30,
-    );
-  const concentration = calculatePortfolioConcentration(inputs);
-  const concentrationPenalty = concentration.hhi == null
-    ? 0
-    : clamp(Math.max(0, concentration.hhi - 0.15) * 20, 0, 5);
-  const score = Math.round(clamp(breadthStress + moveStress + macroLoad + concentrationPenalty, 0, 100));
+  const breadthStress = weightedBreadth == null ? null : (1 - weightedBreadth) * 40;
+  const moveStress = weightedAvgMove == null ? null : clamp((-weightedAvgMove / 5) * 30, 0, 30);
+  const macroLoad = macroLoadOverride === undefined ? macroCountLoad(highMacroCount, mediumMacroCount)
+    : Number.isFinite(macroLoadOverride) && macroLoadOverride >= 0 ? clamp(macroLoadOverride, 0, 30) : null;
+  const concentration = complete ? calculatePortfolioConcentration(valid) : null;
+  const concentrationPenalty = concentration?.hhi == null ? null : clamp(Math.max(0, concentration.hhi - 0.15) * 20, 0, 5);
+  const score = complete && Number.isFinite(weightedAvgMove) && macroLoad != null && concentrationPenalty != null
+    ? Math.round(clamp(breadthStress + moveStress + macroLoad + concentrationPenalty, 0, 100)) : null;
 
   return {
     score,
-    label: score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained',
+    label: stressLabel(score),
+    coverage: valid.length === 0 ? 'unavailable' : score == null ? 'partial' : 'complete',
+    expectedCount: expected.length,
     breadth: weightedBreadth,
     avgMove: weightedAvgMove,
     breadthStress,
@@ -145,9 +148,10 @@ export function calculatePortfolioStressScore(
 
 export function applyStressHysteresis(
   previousScore: number | null,
-  rawScore: number,
+  rawScore: number | null,
   deadband = 4,
-): number {
+): number | null {
+  if (rawScore == null || !Number.isFinite(rawScore)) return null;
   const next = clamp(Math.round(rawScore), 0, 100);
   if (previousScore == null || !Number.isFinite(previousScore)) return next;
   return Math.abs(next - previousScore) <= Math.max(0, deadband)
@@ -503,15 +507,20 @@ export type StressInput = {
 };
 
 export type StressResult = {
-  score: number;
-  label: 'Elevated' | 'Watch' | 'Contained';
+  score: number | null;
+  label: 'Elevated' | 'Watch' | 'Contained' | 'Insufficient data';
+  coverage: 'complete' | 'partial' | 'unavailable';
+  expectedCount: number;
   breadth: number | null;
   avgMove: number | null;
-  breadthStress: number;
-  moveStress: number;
-  macroLoad: number;
+  breadthStress: number | null;
+  moveStress: number | null;
+  macroLoad: number | null;
   freshCount: number;
 };
+export function stressLabel(score: number | null): StressResult['label'] {
+  return score == null || !Number.isFinite(score) ? 'Insufficient data' : score >= 70 ? 'Elevated' : score >= 45 ? 'Watch' : 'Contained';
+}
 
 export function median(values: number[]): number | null {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);

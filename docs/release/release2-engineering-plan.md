@@ -6,6 +6,8 @@ Current [progress estimate](release2-progress.md): approximately 55% engineering
 
 Latest steering prioritizes the [calculation/rule audit](release2-calculation-audit.md) before further dossier calculations. The first correction pass is implemented; complete numerical sign-off, missing-data semantics, historical adjustment/provenance and model-calibration review remain open.
 
+The [frontend missing-data follow-up](release2-missing-data-analytics.md) adds explicit group/rotation coverage, matched dates, strict quote parsing and nullable stress/reset behavior. Shared source/rule contracts, remaining accounting fallbacks, historical provenance and calibration remain open.
+
 The [controlled JEV increment](release2-jev-and-rea-review.md) adds an on-demand Opportunities coverage review through the existing TypeSafe connector. Live development credit use awaits secure Cloud configuration. The [first feature-mirroring increment](release2-holding-detail-mirroring.md) uses an isolated REA 6.8.0 CLI for selected public-source analysis and implements a Ghostfolio-inspired holding-detail dialog.
 
 User direction: prioritize REA for feature mirroring, not general debugging. The [reference/model shortlist](feature-mirroring-and-nvidia-shortlist.md) selects Ghostfolio-style holdings drilldown first, followed by sourced company research inspired by Stock Analysis and Simply Wall St. NVIDIA baseline: `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1` (without OpenRouter's `:free` suffix). Selected-source REA analysis has run; full reference-runtime parity and secure Cloud model configuration remain unverified. No live provider call has occurred.

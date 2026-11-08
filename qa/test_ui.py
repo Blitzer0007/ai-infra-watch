@@ -248,7 +248,7 @@ def test_money_rotation_semantic_colors_mount(page):
     page.get_by_label("Portfolio section", exact=True).select_option("rotation")
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
-    for label in ("Strengthening", "Weakening", "Mixed", "Insufficient"):
+    for label in ("Positive", "Negative", "Flat", "Insufficient"):
         portfolio.get_by_text(label, exact=True).wait_for(state="visible", timeout=30000)
 
 

@@ -1,4 +1,4 @@
-import type { IntelligenceSnapshot, PricePoint } from './intelligence';
+import { usablePricePoint, type IntelligenceSnapshot, type PricePoint } from './intelligence';
 import type { PortfolioPurchaseLot, StoredPortfolioHolding, BrokerAlert, RuleStage } from './portfolioApi';
 import { STOCK_UNIVERSE } from './stockUniverse';
 
@@ -136,7 +136,7 @@ export function buildPositionAnalyses(
 ): PositionAnalysis[] {
   return positions.map((position) => {
     const quote = prices[position.symbol];
-    const livePrice = quote?.price ?? null;
+    const livePrice = quote && Number.isFinite(quote.price) && quote.price > 0 ? quote.price : null;
     const liveIsFresh = livePrice != null && quote?.stale !== true;
     const currentValue = liveIsFresh ? livePrice * position.quantity : null;
     const pnl = liveIsFresh ? (currentValue ?? 0) - position.investedValue : 0;
@@ -145,11 +145,11 @@ export function buildPositionAnalyses(
 
     const peerReturns = position.peers
       .map((symbol) => prices[symbol])
-      .filter((peer): peer is PricePoint => peer != null && peer.stale !== true)
+      .filter(usablePricePoint)
       .map((peer) => peer.changePct)
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const peerAverageChange = avg(peerReturns);
-    const dailyChangePct = liveIsFresh ? (quote?.changePct ?? null) : null;
+    const dailyChangePct = usablePricePoint(quote) ? quote.changePct : null;
     const vsPeers = dailyChangePct != null && peerAverageChange != null
       ? dailyChangePct - peerAverageChange
       : null;
@@ -165,7 +165,7 @@ export function buildPositionAnalyses(
       groupScore >= (isLeveraged ? 68 : 62) &&
       groupBreadth >= (isLeveraged ? 0.67 : 0.50) &&
       relativeToUniverse >= 0 &&
-      (vsPeers == null || vsPeers >= 0);
+      vsPeers != null && vsPeers >= 0;
 
     const riskEligible = groupScore != null && (
       (groupScore <= (isLeveraged ? 45 : 38) && pnlPct <= -10) ||
@@ -173,9 +173,11 @@ export function buildPositionAnalyses(
     );
 
     let state: PositionAnalysis['state'] = 'INSUFFICIENT DATA';
-    if (liveIsFresh && riskEligible) state = 'RISK REVIEW';
-    else if (liveIsFresh && addEligible) state = 'ADD REVIEW';
-    else if (liveIsFresh) state = 'HOLD / WATCH';
+    const supportingMetricsAvailable = group?.coverage.status === 'complete' && position.peers.length > 0 &&
+      peerReturns.length === position.peers.length && groupScore != null && groupBreadth != null && relativeToUniverse != null && vsPeers != null;
+    if (liveIsFresh && supportingMetricsAvailable && riskEligible) state = 'RISK REVIEW';
+    else if (liveIsFresh && supportingMetricsAvailable && addEligible) state = 'ADD REVIEW';
+    else if (liveIsFresh && supportingMetricsAvailable) state = 'HOLD / WATCH';
 
     const rationale = state === 'ADD REVIEW'
       ? 'Group momentum, breadth and relative strength currently align with the configured review thresholds.'
@@ -236,7 +238,7 @@ export function buildPositionAnalyses(
       riskTrigger,
       whatIfProfitAt10Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
       whatIfProfitAt20Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
-      potentialUpsideSignal: groupScore == null || groupBreadth == null
+      potentialUpsideSignal: !liveIsFresh || !supportingMetricsAvailable || groupScore == null || groupBreadth == null
         ? 'INSUFFICIENT DATA'
         : groupScore >= 62 && groupBreadth >= 0.5
           ? 'SUPPORTED'
@@ -254,7 +256,7 @@ export function buildPositionAnalyses(
           : state === 'ADD REVIEW'
             ? 'Current group breadth/relative strength and peer-relative evidence meet the configured review thresholds. This is a review signal, not an automatic buy instruction.'
             : state === 'INSUFFICIENT DATA'
-              ? 'A fresh market quote is required before calculating current P&L and review signals.'
+              ? 'Usable price, group and peer observations are required before assessing review signals.'
               : 'Continue monitoring the holding against its purchase thesis, group strength, peers, catalysts and risk signals before changing exposure.',
     };
   });

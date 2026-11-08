@@ -36,7 +36,7 @@ New numerical helpers are pure and add no dependency or endpoint. No stored rule
 
 | Priority | Area | Remaining evidence/decision |
 | --- | --- | --- |
-| High | Missing-data semantics in legacy group/rotation/stress displays | Some legacy helpers represent empty group samples with numerical baselines; trace every caller before claiming scores or labels are trustworthy with no observations. Keep existing decision-card eligibility gates intact |
+| High | Missing-data semantics in legacy group/rotation/stress displays | The [frontend follow-up](release2-missing-data-analytics.md) corrects the identified empty/partial score and quote-ingress defects. Shared source-status/provenance and remaining cost-fallback consumers still require review; decision-card eligibility gates remain intact |
 | High | Adjusted prices and point-in-time provenance | Reconcile split/dividend adjustment, ticker changes/delistings and as-of source times across portfolio history, benchmark/peer views, forecasts and Python event studies; fixtures cannot prove real historical coverage |
 | High | Shared client/server accounting contract | Corrections have cross-layer regression cases, but duplicated implementations remain; extend generated invariant cases for lots, full liquidation, invalid sequences, rounding, missing flows and FX rather than claiming parity from a few examples |
 | High | Rule configuration lifecycle | Validate all rule types at API boundaries; define explicit invalid-configuration reporting, stale staged activation invalidation, calendar/session distinctions and signed/leveraged-product assumptions |
@@ -46,6 +46,8 @@ New numerical helpers are pure and add no dependency or endpoint. No stored rule
 | Medium | Earnings and Python analytics | Offline tests cover surprise denominators and post-event trading-session anchors. Verify adjusted/non-finite candle handling and event-time/source corrections against the shared protocol before treating results as investment evidence |
 
 This report does not mark every arithmetic-bearing file correct. Inventory, detailed formula review, fixture verification, model calibration and production-data verification are separate evidence levels. The next implementation priority is completing the missing-data/rule-contract audit before adding company-dossier calculations.
+
+Subsequent increment: [missing-data analytics correction](release2-missing-data-analytics.md), with explicit coverage, no neutral ranking defaults, matched rotation date windows, honest horizon comparisons, nullable stress and quote parsing without fabricated zero moves. The shared rule/source contract, concentration/attribution fallback and calibration work remain open.
 
 ## Verification and safety
 

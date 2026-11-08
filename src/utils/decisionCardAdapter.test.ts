@@ -7,7 +7,7 @@ import type { ValidatedQuote } from './decisionEligibility';
 const now = Date.parse('2026-11-06T18:00:00Z');
 const base: PortfolioPosition = { symbol:'NVDA',name:'Nvidia',group:'Chips',theme:'AI',peers:['AMD'],geo:'US',quantity:2,averageCost:90,investedValue:180,snapshotCurrentValue:180 };
 const prices = { NVDA:{price:100,changePct:2}, AMD:{price:100,changePct:1}, SOXL:{price:100,changePct:2} };
-const intelligence = {groups:[{name:'Chips',score:65,breadth:0.6,relativeToUniverse:1,members:['NVDA','AMD'],avgChange:1}],portfolioBreadth:1,portfolioAverage:1,universeAverage:1,topGroup:'Chips',bottomGroup:'Chips',pairSignals:[]} satisfies IntelligenceSnapshot;
+const intelligence = {groups:[{name:'Chips',score:65,breadth:0.6,relativeToUniverse:1,members:['NVDA','AMD'],avgChange:1,coverage:{observed:2,expected:2,status:'complete'}}],portfolioBreadth:1,portfolioAverage:1,universeAverage:1,topGroup:'Chips',bottomGroup:'Chips',pairSignals:[]} satisfies IntelligenceSnapshot;
 const quote: ValidatedQuote = {symbol:'NVDA',price:100,currency:'USD',provider:'fixture-authority',marketTime:'2026-11-06T17:59:00Z',retrievedAt:'2026-11-06T18:00:00Z',isMarketSessionOpen:true,status:'valid',fallbackUsed:false};
 const position = buildPositionAnalyses(prices,intelligence,[base])[0];
 test('adapter preserves engine states and friendly labels', () => {
