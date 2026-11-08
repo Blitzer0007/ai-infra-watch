@@ -109,6 +109,7 @@ def test_exact_times_change_zone_while_date_only_days_are_preserved(page):
     assert '11/12/2026' in exact.inner_text()
     assert page.evaluate('localStorage.getItem("aiw-review-timezone")')=='Asia/Kolkata'
     page.get_by_test_id('nav-portfolio').click()
+    page.get_by_role('heading',name='Portfolio Overview & Decisions',level=1,exact=True).wait_for()
     page.get_by_role('combobox',name='Review timezone').wait_for()
     assert page.get_by_role('combobox',name='Review timezone').input_value()=='Asia/Kolkata'
 
