@@ -1,6 +1,6 @@
 # Release 2 — controlled JEV credit use and REA status
 
-Branch: `feature/release2-opportunity-research`, stacked draft PR #168. The user confirmed credits are in the official TypeSafe console. No production access, deployment or REA installation is included.
+Branch: `feature/release2-opportunity-research`, stacked draft PR #168. The user confirmed credits are in the official TypeSafe console. This records the JEV increment and subsequent mirroring plan. Latest REA execution and holding-detail implementation are documented in the [first mirroring review](release2-holding-detail-mirroring.md). No production access or deployment is included.
 
 ## Existing JEV integration
 
@@ -42,11 +42,31 @@ This code change is still a draft. The production endpoint will not gain the new
 
 ## REA: current use and practical benefit
 
-**REA is not installed, registered as a callable tool, imported, or used in AI Infra Watch.** The earlier instruction to evaluate `morluto/rea` without installing it is preserved. Existing Codex/source inspection and Playwright checks are not represented as REA usage.
+**REA 6.8.0 is now installed and used as an isolated Cloud CLI for the requested feature-mirroring increment.** It is outside the application dependency tree, has no MCP/agent registration, and is not part of the application runtime. Earlier source inspection and Playwright checks remain distinct from the actual REA run; see the [retained evidence and limits](release2-holding-detail-mirroring.md).
 
-The [official REA README](https://github.com/morluto/rea/blob/main/README.md) describes developer tools for inspecting JavaScript/Electron applications, websites, runtime behavior and native binaries, returning analysis evidence to an agent. Its practical potential here is a targeted investigation of a named reference feature/navigation flow, application-module boundaries or difficult runtime behavior. It is not a market-data provider, stock-selection engine, accounting system or substitute for evaluation evidence.
+The user's intended primary use is **feature mirroring**, rather than general debugging or architecture inspection. The [official REA README](https://github.com/morluto/rea/blob/main/README.md) describes inspecting a selected application/website feature, returning evidence of how it works, and using those findings to build a version in the target project. That is the workflow to prioritize for AI Infra Watch.
 
-Compatibility inspection against the published `6.8.0` package metadata: this Cloud runtime's Node `24.22.1` satisfies `^22.23.4 || ^24.22.1 || >=26.12.1`; a procps `ps` executable is present on Linux. This establishes basic prerequisite compatibility only. MCP registration/restart, runtime behavior, resource use and any native-analysis engines are untested. An approved development-only trial would be isolated from the application runtime and production credentials. No installation, runtime configuration or source incorporation occurred.
+For each selected reference feature:
+
+1. Identify the reference URL/repository, exact feature and desired behavior. Start with one bounded flow rather than a whole-product clone.
+2. Use REA to capture relevant page structure, interactions, navigation, loading/empty/error states and supporting implementation evidence where available. Keep observations and inferred behavior distinct.
+3. Produce a parity specification mapping the reference behavior to AI Infra Watch's components, accessibility/responsive requirements and existing financial/data-quality constraints.
+4. Build the feature in Codex Cloud using an original implementation, retaining applicable attribution when source code is reused.
+5. Verify the resulting behavior with interaction tests and side-by-side screenshots. Record supported parity and remaining gaps; a similar screenshot alone does not prove the feature works.
+
+REA supplies source-analysis evidence; implementation and verification complete the mirroring flow. It supplies no market data or independent validation of investment rules. The [reference shortlist and first brief](feature-mirroring-and-nvidia-shortlist.md) select Ghostfolio-style holdings drilldown. The bounded selected-source analysis is complete with explicit partial graph coverage; full reference-runtime parity remains unverified.
+
+This Cloud runtime's Node `24.22.1` and Linux `ps` satisfy REA 6.8.0's prerequisites. The isolated CLI completed selected-source analysis; it ran no reference application code. MCP registration, native-analysis engines and full reference-browser behavior are untested. No application dependency, agent configuration or source-code incorporation was added.
+
+## NVIDIA model role and existing compatibility
+
+The user supplied NVIDIA base URL `https://integrate.api.nvidia.com/v1` and `openai/gpt-oss-20b:free`. NVIDIA's [official inference reference](https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-20b-infer) uses `openai/gpt-oss-20b` without `:free`; the suffix belongs to an OpenRouter route. The [model shortlist](feature-mirroring-and-nvidia-shortlist.md) recommends the corrected 20B model as the baseline, with separate text and vision challengers to evaluate. Account/model-specific access and limits remain unverified.
+
+The existing Python LLM client already supports an OpenAI-compatible base URL. For a confirmed compatible NVIDIA endpoint, the current transport uses `LLM_PROVIDER=openai`, `OPENAI_BASE_URL`, server-side `OPENAI_API_KEY` and `LLM_MODEL`; the provider name describes the transport and does not require sending requests to OpenAI when the NVIDIA URL is explicitly configured. No values or credentials were changed here.
+
+Use NVIDIA for evidence-grounded research summaries and explanations, JEV for typed triage, and REA for reference-feature mirroring. NVIDIA output cannot create missing financial observations or override deterministic evidence/accounting gates. REA's documented MCP workflow is agent-driven; a direct NVIDIA-to-REA agent integration has not been established or tested.
+
+Before a live NVIDIA run, confirm the exact model ID/base URL, configure a development credential in Cloud settings scoped to the selected NVIDIA host, and check the model's supported parameters and quotas. Explicitly review `LLM_FINAL_MODEL` and `LLM_FINAL_REASONING_EFFORT`: current settings contain an NVIDIA-specific final-model default, which must not silently switch the user's chosen model or send an unsupported parameter. Keep tests stubbed, requests/token limits bounded and production settings unchanged.
 
 ## Verification and remaining work
 

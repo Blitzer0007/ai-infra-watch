@@ -2,7 +2,9 @@
 
 Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; the [read-only inbox and focused Portfolio workspaces](release2-inbox-portfolio-review.md) implement the first R2.3 reader slice. The [fictional notification-policy preview](release2-notification-policy-preview.md) adds the offline proposal slice of R2.3. Financial/provider work, authoritative live policy adapters and evaluation extensions remain pending. No new sending policy is activated.
 
-The [controlled JEV increment and REA review](release2-jev-and-rea-review.md) add an on-demand Opportunities coverage review through the existing TypeSafe connector. Live development credit use awaits secure Cloud configuration; REA remains uninstalled.
+The [controlled JEV increment](release2-jev-and-rea-review.md) adds an on-demand Opportunities coverage review through the existing TypeSafe connector. Live development credit use awaits secure Cloud configuration. The [first feature-mirroring increment](release2-holding-detail-mirroring.md) uses an isolated REA 6.8.0 CLI for selected public-source analysis and implements a Ghostfolio-inspired holding-detail dialog.
+
+User direction: prioritize REA for feature mirroring, not general debugging. The [reference/model shortlist](feature-mirroring-and-nvidia-shortlist.md) selects Ghostfolio-style holdings drilldown first, followed by sourced company research inspired by Stock Analysis and Simply Wall St. NVIDIA baseline: `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1` (without OpenRouter's `:free` suffix). Selected-source REA analysis has run; full reference-runtime parity and secure Cloud model configuration remain unverified. No live provider call has occurred.
 Prepared: 8 November 2026, Asia/Kolkata.
 Inspected code baseline: `4c008237453d8e31944cb5fba00cac9726f49501`.
 Repository: `Blitzer0007/ai-infra-watch`.
@@ -49,7 +51,7 @@ Develop improved alert prioritization/digest proposals as preview-only policy ou
 
 Cross-device read/unread state, paid data vendors, larger universes, a full financial statement explorer, extended scenario planning, LLM-generated research synthesis and automated calendar ingestion are optional follow-ups. A scenario planner, if added, remains a local hypothetical exposure view with no order action and no accounting mutation.
 
-Out of scope: broker integration, trade execution, trading bots, a full OpenBB/Ghostfolio deployment, Redis, a persistent autonomous agent, high-frequency scanning, REA installation, production-secret access and automatic production deployment.
+Out of scope: broker integration, trade execution, trading bots, a full OpenBB/Ghostfolio deployment, Redis, a persistent autonomous agent, high-frequency scanning, global REA/agent configuration changes, production-secret access and automatic production deployment. The bounded isolated REA CLI used for the requested mirroring increment is documented separately.
 
 ## 3. Repository reuse and concrete findings
 

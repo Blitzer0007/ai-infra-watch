@@ -287,6 +287,7 @@ def test_exploratory_sorting_portfolio_scenarios(page):
     page.goto("/portfolio", wait_until="domcontentloaded")
     page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
     page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_role("button",name="Open selected holding",exact=True).click()
     page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     _assert_sort_control(_table_with_header(page, "Reference"), "Reference")
 
@@ -350,6 +351,7 @@ def test_exploratory_global_table_accessibility(page):
         if nav_id == "portfolio":
             page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
             page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+            page.get_by_role("button",name="Open selected holding",exact=True).click()
             page.get_by_text("Company, valuation and analyst detail", exact=True).click()
         table = _table_with_header(page, label)
         assert table.locator("thead").count() == 1

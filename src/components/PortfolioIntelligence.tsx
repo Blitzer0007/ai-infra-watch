@@ -1,9 +1,11 @@
 import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
+import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
+import { HOLDING_FILTERS, HOLDING_SORTS, readHoldingNavigation, writeHoldingNavigation, type HoldingFilter, type HoldingSort } from '../utils/holdingDetailNavigation';
 import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
 import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
 import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
 import DataTable from './DataTable';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
@@ -76,9 +78,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
-  const [holdingFilter, setHoldingFilter] = useState<'All' | 'Up today' | 'Down today' | 'Below your buy price' | 'Needs attention'>('All');
-  const [holdingSort, setHoldingSort] = useState<'Symbol' | 'Return %' | 'Today' | 'Value' | 'Attention'>('Symbol');
-  const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
+  const [holdingFilter, setHoldingFilter] = useState<HoldingFilter>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).filter);
+  const [holdingSort, setHoldingSort] = useState<HoldingSort>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).sort);
+  const [detailSymbol,setDetailSymbol]=useState(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).detail);
+  const [selected, setSelected] = useState(() => readHoldingNavigation(new URLSearchParams(window.location.search)).detail || new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
+  const detailOwner=useId();const closingDetail=useRef(false);const currentTab=useRef(tab);currentTab.current=tab;
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
@@ -135,6 +140,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     if (nextTab === tab) return;
     const params = new URLSearchParams(window.location.search);
     params.set('portfolio_tab', nextTab);
+    params.delete('portfolio_detail');setDetailSymbol(null);
     window.history.pushState(window.history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash);
     focusSection.current = true;
     setTab(nextTab);
@@ -150,22 +156,49 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
-      focusSection.current = true;
-      setTab(portfolioTabFromValue(params.get('portfolio_tab')));
+      const nextTab=portfolioTabFromValue(params.get('portfolio_tab'));
+      const view=readHoldingNavigation(params);
+      focusSection.current = nextTab!==currentTab.current;
+      setTab(nextTab);setDetailSymbol(view.detail);setHoldingFilter(view.filter);setHoldingSort(view.sort);closingDetail.current=false;
       setQ(params.get('portfolio_q') || '');
       setGroup(params.get('portfolio_group') || 'All');
-      setSelected(params.get('portfolio_symbol') || 'NVDA');
+      setSelected(view.detail || params.get('portfolio_symbol') || 'NVDA');
     };
     window.addEventListener('popstate', restore);
     return () => window.removeEventListener('popstate', restore);
   }, []);
+  const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
+    if(!holdings.some(holding=>holding.symbol===symbol))return;
+    const params=new URLSearchParams(window.location.search);params.set('portfolio_tab','holdings');params.set('portfolio_symbol',symbol);params.delete('portfolio_detail');
+    const parent=window.location.pathname+'?'+params.toString()+window.location.hash;
+    window.history.replaceState(window.history.state,'',parent);
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol};params.set('portfolio_detail',symbol);
+    window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    closingDetail.current=false;setSelected(symbol);setDetailSymbol(symbol);
+  };
+  const closeHoldingDetail=()=>{
+    if(closingDetail.current)return;closingDetail.current=true;
+    if(listOrigin.current&&window.history.state?.aiwHoldingDetailOwner===detailOwner){window.history.back();return;}
+    const params=new URLSearchParams(window.location.search);params.delete('portfolio_detail');
+    window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);setDetailSymbol(null);closingDetail.current=false;
+  };
+  const restoreHoldingList=()=>{
+    const origin=listOrigin.current;
+    requestAnimationFrame(()=>{
+      const params=new URLSearchParams(window.location.search);
+      if(window.location.pathname!=='/portfolio'||params.get('portfolio_tab')!=='holdings'||readHoldingNavigation(params).detail)return;
+      const fallback=Array.from(document.querySelectorAll<HTMLElement>('[data-holding-symbol]')).find(node=>node.dataset.holdingSymbol===(origin?.symbol||detailSymbol));
+      const target=origin?.trigger?.isConnected?origin.trigger:fallback||sectionHeading.current;
+      target?.focus({preventScroll:true});if(origin)window.scrollTo({top:origin.scrollY,behavior:'instant'});
+    });
+  };
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
     localStorage.setItem('aiw-portfolio-view-mode', mode);
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    let params = new URLSearchParams(window.location.search);
     params.set('portfolio_tab', tab);
 
     if (q.trim()) params.set('portfolio_q', q.trim());
@@ -176,11 +209,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
     if (selected) params.set('portfolio_symbol', selected);
     else params.delete('portfolio_symbol');
+    params=writeHoldingNavigation(params,{filter:holdingFilter,sort:holdingSort,detail:detailSymbol});
 
     const query = params.toString();
     const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
     window.history.replaceState(window.history.state, '', url);
-  }, [tab, q, group, selected]);
+  }, [tab, q, group, selected, holdingFilter, holdingSort, detailSymbol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,7 +236,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, []);
   useEffect(() => {
     let cancelled = false;
-    if (tab !== 'holdings') return;
+    if (tab !== 'holdings' || !detailSymbol || !holdings.some(holding=>holding.symbol===detailSymbol)) return;
     if (!selected) {
       setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
       return () => { cancelled = true; };
@@ -230,7 +264,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
       });
     return () => { cancelled = true; };
-  }, [selected, tab]);
+  }, [selected, tab, detailSymbol, holdings.map(holding=>holding.symbol).join(',')]);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,11 +343,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     }));
   }, [analyses]);
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
+  const detailAnalysis=analyses.find(position=>position.symbol===detailSymbol);
+  const detailQuote=detailSymbol?normalizeDecisionQuote(detailSymbol,livePrices[detailSymbol]):null;
   const selectedPeerSet = useMemo(() => selectedAnalysis ? selectDynamicPeers(STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol) ?? selectedAnalysis as any, livePrices) : { primary: null, core: [], extended: [] }, [selectedAnalysis?.symbol, livePrices]);
 
   useEffect(() => {
     let cancelled = false;
     if (!['holdings','evidence'].includes(tab)) return;
+    if(tab==='holdings'&&(!detailSymbol||selectedAnalysis?.symbol!==detailSymbol))return;
     if (!selectedAnalysis?.symbol) {
       setAnalystConsensus(null);
       return () => { cancelled = true; };
@@ -330,7 +367,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
       .finally(() => { if (!cancelled) setAnalystLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, tab]);
+  }, [selectedAnalysis?.symbol, tab, detailSymbol]);
 
   useEffect(() => {
     if (!holdings.length) return;
@@ -339,7 +376,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    if (tab !== 'holdings') return;
+    if (tab !== 'holdings' || !detailSymbol || selectedAnalysis?.symbol!==detailSymbol) return;
     if (!selected) {
       setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
       return () => { cancelled = true; };
@@ -357,7 +394,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
       });
     return () => { cancelled = true; };
-  }, [selected, chartRange, tab]);
+  }, [selected, chartRange, tab, detailSymbol, selectedAnalysis?.symbol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -400,7 +437,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    if (tab !== 'holdings') return;
+    if (tab !== 'holdings' || !detailSymbol || selectedAnalysis?.symbol!==detailSymbol) return;
     if (!selectedAnalysis) {
       setPeerComparison(null);
       return () => { cancelled = true; };
@@ -439,7 +476,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, detailSymbol]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -721,6 +758,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         {!analyses.length && <option value="">No holdings available</option>}
         {analyses.map(holding=><option key={holding.symbol} value={holding.symbol}>{holding.symbol} · {holding.name}</option>)}
       </FilterSelect>}
+      {tab==='holdings'&&selectedAnalysis&&<button type="button" aria-haspopup="dialog" onClick={event=>openHoldingDetail(selectedAnalysis.symbol,event.currentTarget)} className="rounded-lg border border-cyan-200/40 px-4 py-2 text-sm font-semibold text-cyan-100">Open selected holding</button>}
       {holdingsVisited && <div hidden={tab !== 'holdings'}>
           <details className="rounded-xl border border-white/15 p-4" data-testid="portfolio-management">
             <summary className="cursor-pointer text-sm font-semibold">Manage positions and purchases</summary>
@@ -911,14 +949,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                     onChange={e => setHoldingFilter(e.target.value as typeof holdingFilter)}
                     label="Filter your holdings by status"
                   >
-                    {['All', 'Up today', 'Down today', 'Below your buy price', 'Needs attention'].map(value => <option key={value}>{value}</option>)}
+                    {HOLDING_FILTERS.map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
                   <FilterSelect
                     value={holdingSort}
                     onChange={e => setHoldingSort(e.target.value as typeof holdingSort)}
                     label="Sort your holdings"
                   >
-                    {['Symbol', 'Return %', 'Today', 'Value', 'Attention'].map(value => <option key={value}>{value}</option>)}
+                    {HOLDING_SORTS.map(value => <option key={value}>{value}</option>)}
                   </FilterSelect>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
@@ -927,11 +965,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2" data-testid="holding-list">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={trigger => openHoldingDetail(h.symbol,trigger)} />)}</div>
               </Panel>
           <details className="rounded-xl border border-white/15 p-4"><summary className="cursor-pointer text-sm font-semibold">Holdings table</summary>
 
-          <Panel title="Holdings" subtitle="Compact portfolio view. Select a row to open the holding context below.">
+          <Panel title="Holdings" subtitle="Compact portfolio view. Select a stock to open its holding details.">
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[760px] text-left">
                 <thead className="bg-black/20">
@@ -948,7 +986,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   {filtered.map(h => (
                     <tr key={h.symbol} className={selected === h.symbol ? 'bg-cyan-300/[.04]' : 'hover:bg-white/[.02]'}>
                       <td className="px-3 py-3">
-                        <button type="button" onClick={() => setSelected(h.symbol)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
+                        <button type="button" aria-label={'Open '+h.symbol+' holding details from table'} aria-haspopup="dialog" onClick={event => openHoldingDetail(h.symbol,event.currentTarget)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
                         <div className="text-[9px] text-white/30 mt-0.5">{h.name}</div>
                       </td>
                       <td className="px-3 py-3 font-mono text-[10px]">{((h.portfolioWeight || 0) * 100).toFixed(1)}%</td>
@@ -964,15 +1002,17 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </div>
           </Panel>
           </details>
-          {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-          <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary>
-            <div className="mt-4 space-y-4">
-          {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-          {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
-            </div>
-          </details>
         </div>
       )}
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
+        {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
+          {detailQuote&&<FreshnessBadge {...detailQuote} expandable />}
+          <p className="text-sm text-white/75">Existing review state: {decisionCards.find(card=>card.symbol===detailSymbol)?.state||'INSUFFICIENT DATA'}. Source and accounting gaps remain unchanged.</p>
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button><button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button></div>
+          <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />
+          <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary><div className="mt-4 space-y-4"><PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/><PeerCounterfactualPanel h={detailAnalysis} comparison={peerComparison} loading={peerLoading}/></div></details>
+        </>}
+      </HoldingDetailDialog>}
 
       {tab === 'evidence' && (
         <div className="space-y-4">
@@ -1254,12 +1294,12 @@ function MiniMetric({label,value,valueClass='text-white/75'}:{label:string;value
   </div>;
 }
 
-function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:()=>void;key?: string}) {
+function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;onSelect:(trigger:HTMLButtonElement)=>void;key?: string}) {
   const pnlClass = h.livePrice == null ? 'text-white/35' : h.pnl >= 0 ? 'text-emerald-300' : 'text-rose-300';
   const dailyClass = h.dailyChangePct == null ? 'text-white/35' : h.dailyChangePct >= 0 ? 'text-emerald-300' : 'text-rose-300';
   const value = h.currentValue ?? h.investedValue;
   const weight = (h.portfolioWeight || 0) * 100;
-  return <button type="button" onClick={onSelect} aria-pressed={selected} className={'group w-full text-left border rounded-xl p-3 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-300/50 ' + (selected ? 'border-cyan-300/30 bg-cyan-300/[.05] shadow-[inset_3px_0_0_rgba(103,232,249,.85)]' : 'border-white/5 bg-white/[.02] hover:border-white/10 hover:bg-white/[.035]')}>
+  return <button type="button" onClick={event=>onSelect(event.currentTarget)} aria-label={'Open '+h.symbol+' holding details'} data-holding-symbol={h.symbol} aria-haspopup="dialog" aria-pressed={selected} className={'group w-full text-left border rounded-xl p-3 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-300/50 ' + (selected ? 'border-cyan-300/30 bg-cyan-300/[.05] shadow-[inset_3px_0_0_rgba(103,232,249,.85)]' : 'border-white/5 bg-white/[.02] hover:border-white/10 hover:bg-white/[.035]')}>
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -1530,8 +1570,8 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
-      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'QUOTE NEEDS REFRESH' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / price history</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.livePrice==null?'QUOTE UNAVAILABLE':h.liveStale?'QUOTE NEEDS REFRESH':'PRICE SNAPSHOT'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
     <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>

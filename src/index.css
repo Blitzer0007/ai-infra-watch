@@ -31,6 +31,13 @@ main h1:focus, main:focus { outline-offset: -2px; }
   font-weight: 700; transform: translateY(-200%);
 }
 .aiw-skip-link:focus { transform: translateY(0); }
+.aiw-holding-dialog {
+  position: fixed; inset: 0; margin: auto; width: calc(100% - 1rem);
+  max-width: 72rem; max-height: calc(100dvh - 1rem); overflow-y: auto;
+  border: 1px solid #ffffff40; border-radius: 1rem; padding: 0;
+  background: #0f1115; color: white; overscroll-behavior: contain;
+}
+.aiw-holding-dialog::backdrop { background: #000b; }
 .aiw-ticker-toggle {
   position: absolute; right: 0; top: 0; z-index: 51; min-height: 2rem;
   padding: 0 .75rem; background: #15181E; color: #d1d5db;

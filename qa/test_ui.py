@@ -199,6 +199,7 @@ def test_analyst_expectations_panel(page):
     page.get_by_test_id("nav-portfolio").click()
     page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
     page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_role("button",name="Open selected holding",exact=True).click()
     page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
     assert "EXTERNAL ANALYST EXPECTATIONS" in page.get_by_test_id("analyst-expectations").inner_text().upper()
@@ -257,12 +258,14 @@ def test_exit_profit_scenarios_identify_selected_ticker(page):
     page.goto("/portfolio?portfolio_tab=holdings", wait_until="domcontentloaded")
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="visible", timeout=30000)
+    page.get_by_role("button",name="Open selected holding",exact=True).click()
     page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     page.get_by_text("What-if price scenarios", exact=True).wait_for(state="visible", timeout=30000)
     section = page.get_by_text("What-if price scenarios", exact=True).locator("..")
     assert "NVDA" in section.inner_text()
-    portfolio.get_by_text("Stock symbol", exact=True).wait_for(state="visible", timeout=30000)
-    assert "NVDA" in portfolio.get_by_text("Stock symbol", exact=True).locator("..").inner_text()
+    dialog=page.get_by_role("dialog",name="NVDA holding details",exact=True)
+    dialog.get_by_text("Stock symbol", exact=True).wait_for(state="visible", timeout=30000)
+    assert "NVDA" in dialog.get_by_text("Stock symbol", exact=True).locator("..").inner_text()
 
 
 def test_held_portfolio_filters_and_sort_mount(page):

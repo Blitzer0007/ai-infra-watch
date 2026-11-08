@@ -92,7 +92,7 @@ jobs:
           QA_UI_MOCKS: "true"
           QA_LOGIN_BASE_URL: http://127.0.0.1:3001
           QA_ARTIFACT_DIR: /tmp/aiw-uiux
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py qa/test_holding_detail.py
       - name: Upload fixture-only UI audit evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,6 +105,7 @@ jobs:
             /tmp/aiw-uiux/portfolio-focused-*.png
             /tmp/aiw-uiux/notification-policy-*.png
             /tmp/aiw-uiux/opportunity-jev-*.png
+            /tmp/aiw-uiux/holding-detail-*.png
           if-no-files-found: ignore
           retention-days: 7
 
