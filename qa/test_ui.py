@@ -162,7 +162,7 @@ def test_ai_quality_lab_mounts(page):
     page.get_by_test_id("nav-quality").click()
     lab = page.get_by_test_id("ai-quality-lab")
     lab.wait_for(state="attached", timeout=30000)
-    assert "AI QUALITY LAB" in lab.inner_text()
+    lab.get_by_role("heading", name="AI Quality Lab", level=1, exact=True).wait_for(state="visible")
 
 def test_portfolio_manager_create_flow(page):
     mock_local_apis(page)
