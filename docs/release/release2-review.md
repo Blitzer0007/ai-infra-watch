@@ -49,3 +49,4 @@ Rollback is an application-code revert; no database rollback or message replay i
 - [Snapshot-backed catalyst calendar](release2-calendar-review.md), with source/coverage and correction limitations. This adds Calendar as the sixteenth application route; the private access screen is checked separately.
 
 - [Read-only alert inbox and focused Portfolio Intelligence](release2-inbox-portfolio-review.md): bounded recipient-scoped SELECT reader, local acknowledgement, clear delivery semantics, and task-based portfolio navigation. Inbox adds the seventeenth route. Notification activation remains out of scope.
+- [Fictional notification-policy preview](release2-notification-policy-preview.md): collapsed inbox tool, pure deterministic proposal evaluator, stable scoped episode checks, known-acceptance duplicate suppression, explicit unknown/reconciliation states and draft cooldown/digest options. No actual settings, ledger records or sender are connected.

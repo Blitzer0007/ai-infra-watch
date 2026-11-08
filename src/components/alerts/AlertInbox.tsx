@@ -4,6 +4,7 @@ import { loadInboxReadIds, normalizeServerInbox, readBrowserInbox, saveInboxRead
 import { loadReviewTimeZone } from '../../utils/reviewPreferences';
 import { formatReviewDate } from '../../utils/portfolioReview';
 import { FilterInput, FilterSelect } from '../FilterControls';
+import NotificationPolicyPreview from './NotificationPolicyPreview';
 const inboxStorage={getItem:(key:string)=>localStorage.getItem(key),setItem:(key:string,value:string)=>localStorage.setItem(key,value)};
 const labels:Record<InboxState,string>={accepted:'Provider accepted',rejected:'Rejected',uncertain:'Uncertain',sending:'Sending / pending',unknown:'Delivery unknown'};
 export default function AlertInbox({onOpenHealth}:{onOpenHealth:()=>void}){
@@ -54,5 +55,6 @@ export default function AlertInbox({onOpenHealth}:{onOpenHealth:()=>void}){
     </article>)}</section>
     {server?.nextCursor&&<button type="button" disabled={loading||server.items.length>=1000} onClick={()=>void loadServer(true)} className="rounded-lg border border-white/25 px-4 py-2 text-sm">Load next server page</button>}
     {!!server&&<p className="text-sm text-white/70">Loaded server window: {formatReviewDate(server.from,undefined,timeZone)} through {formatReviewDate(server.until,undefined,timeZone)}. At most 1,000 records are retained in this view; refine the window if needed.</p>}
+    <details className="rounded-xl border border-white/15 p-4"><summary className="cursor-pointer font-semibold">Explore notification policy · fictional preview</summary><NotificationPolicyPreview /></details>
   </div>;
 }
