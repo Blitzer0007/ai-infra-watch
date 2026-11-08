@@ -68,6 +68,16 @@ jobs:
         run: python -m pip install -r qa/requirements.txt
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
+      - name: Build private-access preview
+        env:
+          VITE_QA_MODE: "false"
+        run: npm run build
+      - name: Start private-access preview
+        run: |
+          nohup npm exec vite -- preview --host 127.0.0.1 --port 3001 > /tmp/aiw-access.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3001/ >/dev/null && exit 0; sleep 2; done
+          cat /tmp/aiw-access.log
+          exit 1
       - name: Start local app
         env:
           VITE_QA_MODE: "true"
@@ -80,7 +90,17 @@ jobs:
         env:
           QA_BASE_URL: http://127.0.0.1:3000
           QA_UI_MOCKS: "true"
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py
+          QA_LOGIN_BASE_URL: http://127.0.0.1:3001
+          QA_ARTIFACT_DIR: /tmp/aiw-uiux
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py
+      - name: Upload fixture-only UI audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uiux-audit
+          path: /tmp/aiw-uiux/uiux-audit
+          if-no-files-found: ignore
+          retention-days: 7
 
   safety:
     name: Offline CI safety regression tests

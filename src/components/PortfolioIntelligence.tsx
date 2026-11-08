@@ -674,13 +674,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
-      {tab === 'overview' && <PortfolioCommandCenter explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'} summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
-        onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
-        onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }} />}
       <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>
-          <div className="text-2xl font-black mt-2">Portfolio Overview &amp; Decisions</div>
+          <h1 className="text-2xl font-black mt-2">Portfolio Overview &amp; Decisions</h1>
           <div className="text-xs text-white/45 mt-1">Your holdings · live prices · performance · risks · evidence · market comparisons</div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
@@ -695,6 +692,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           </div>
         </div>
       </div>
+
+      {tab === 'overview' && <PortfolioCommandCenter explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'} summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
+        onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
+        onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }} />}
 
       <PortfolioManager holdings={holdings} onChanged={setHoldings} />
       {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} />}

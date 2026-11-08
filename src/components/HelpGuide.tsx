@@ -186,7 +186,6 @@ export default function HelpGuide({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
-      <FinancialGlossary />
       <div className="aiw-page-header flex flex-col gap-2 border-b border-white/10 pb-5">
         <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-mono uppercase tracking-[0.2em]">
           <BookOpen className="w-4 h-4" />
@@ -199,6 +198,8 @@ export default function HelpGuide({ onNavigate }: Props) {
           Plain-English explanations of every major screen, score and evidence label. Use the examples to understand what the application is telling you — and what it is not telling you.
         </p>
       </div>
+
+      <FinancialGlossary />
 
       <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 md:p-5">
         <div className="flex items-start gap-3">
@@ -217,8 +218,9 @@ export default function HelpGuide({ onNavigate }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-4">
         <div className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-white/35 mb-3">Find a concept</div>
+          <label htmlFor="guide-search" className="block text-xs font-mono text-white/70 mb-3">Find a concept</label>
           <input
+            id="guide-search"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search Portfolio Intelligence, evidence, scores..."

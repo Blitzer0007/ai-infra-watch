@@ -383,9 +383,12 @@ export default function AIQualityLab() {
             </button>
           </div>
 
-          <textarea value={question} onChange={e => setQuestion(e.target.value)} rows={2} placeholder="Evaluation question..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
-          <textarea value={response} onChange={e => setResponse(e.target.value)} rows={7} placeholder="Paste the model response..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
-          <textarea value={sources} onChange={e => setSources(e.target.value)} rows={7} placeholder="Paste retrieved source snippets, one claim-bearing passage per line..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
+          <label htmlFor="quality-question" className="block text-sm font-semibold text-white/80">Evaluation question</label>
+          <textarea id="quality-question" value={question} onChange={e => setQuestion(e.target.value)} rows={2} placeholder="Evaluation question..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
+          <label htmlFor="quality-response" className="block text-sm font-semibold text-white/80">Model response</label>
+          <textarea id="quality-response" value={response} onChange={e => setResponse(e.target.value)} rows={7} placeholder="Paste the model response..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
+          <label htmlFor="quality-sources" className="block text-sm font-semibold text-white/80">Source evidence</label>
+          <textarea id="quality-sources" value={sources} onChange={e => setSources(e.target.value)} rows={7} placeholder="Paste retrieved source snippets, one claim-bearing passage per line..." className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white outline-none focus:border-emerald-400/40" />
 
           {metrics && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">

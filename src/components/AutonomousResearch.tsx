@@ -285,7 +285,9 @@ export default function AutonomousResearch() {
           }}
           className="space-y-3"
         >
+          <label htmlFor="research-question" className="block text-sm font-semibold text-white/80">Research question</label>
           <textarea
+            id="research-question"
             data-testid="research-question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}

@@ -58,6 +58,28 @@ export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuDialogRef = useRef<HTMLDialogElement>(null);
+  const pendingNavigation = useRef(false);
+  const [isTickerPaused, setIsTickerPaused] = useState(false);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen || !menuDialogRef.current) return;
+    const dialog = menuDialogRef.current;
+    dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const desktop = window.matchMedia('(min-width: 1280px) and (hover: hover) and (pointer: fine)');
+    const closeOnDesktop = () => { if (desktop.matches) setIsMobileMenuOpen(false); };
+    desktop.addEventListener('change', closeOnDesktop);
+    closeOnDesktop();
+    return () => {
+      desktop.removeEventListener('change', closeOnDesktop);
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      menuTriggerRef.current?.focus({ preventScroll: true });
+    };
+  }, [isMobileMenuOpen]);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
   const [portfolioSymbolsLoading, setPortfolioSymbolsLoading] = useState(true);
@@ -316,6 +338,7 @@ export default function App() {
 
   const handleNavigate = (view: string) => {
     const nextView = VIEW_IDS.has(view) ? view : 'overview';
+    pendingNavigation.current = nextView !== activeView;
     setActiveView(nextView);
     setIsMobileMenuOpen(false);
     const nextPath = VIEW_PATHS[nextView] || '/overview';
@@ -323,10 +346,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onPopState = () => setActiveView(viewFromPath(window.location.pathname));
+    const onPopState = () => {
+      const nextView = viewFromPath(window.location.pathname);
+      if (nextView !== activeView) {
+        pendingNavigation.current = true;
+        setIsMobileMenuOpen(false);
+        setActiveView(nextView);
+      }
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [activeView]);
 
   const reloadSettings = () => {
     setConfig(loadConfig());
@@ -362,9 +392,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0F1115] text-[#F3F4F6] flex flex-col font-sans selection:bg-emerald-500/35 selection:text-white">
+      <a href="#main-content" className="aiw-skip-link">Skip to main content</a>
       {/* 1. TOP LIVE FINANCIAL TICKER MARQUEE */}
       <div className="bg-[#0F1115] border-b border-white/10 h-8 flex items-center overflow-hidden relative z-50">
-        <div className="flex whitespace-nowrap animate-[marquee_50s_linear_infinite] hover:[animation-play-state:paused] cursor-pointer">
+        <div className="flex whitespace-nowrap animate-[marquee_50s_linear_infinite] hover:[animation-play-state:paused]" style={{ animationPlayState: isTickerPaused ? 'paused' : undefined }}>
           {Object.keys(STOCK_METADATA).map((sym) => {
             const p = tickerPrices[sym];
             const isUp = p ? p.changePct >= 0 : true;
@@ -386,7 +417,7 @@ export default function App() {
             const p = tickerPrices[sym];
             const isUp = p ? p.changePct >= 0 : true;
             return (
-              <span key={`dup-${sym}`} className="mx-6 text-[10px] font-mono inline-flex items-center space-x-1.5 select-none">
+              <span aria-hidden="true" key={`dup-${sym}`} className="mx-6 text-[10px] font-mono inline-flex items-center space-x-1.5 select-none">
                 <span className="text-white/40 font-bold uppercase tracking-wider">{sym}</span>
                 <span className="text-[#F3F4F6] font-bold">
                   {p ? `$${formatPrice(p.price)}` : '—'}
@@ -401,8 +432,9 @@ export default function App() {
         </div>
       </div>
 
+      <button type="button" className="aiw-ticker-toggle" aria-pressed={isTickerPaused} onClick={() => setIsTickerPaused(paused => !paused)}>{isTickerPaused ? 'Resume ticker' : 'Pause ticker'}</button>
       {/* 2. BODY LAYOUT */}
-      <div className="flex flex-col xl:flex-row flex-1 relative w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex flex-col xl:flex-row flex-1 relative w-full min-w-0 max-w-full">
         {/* DESKTOP SIDEBAR */}
         <aside className="aiw-desktop-sidebar fixed top-8 bottom-0 left-0 z-40 flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 overflow-y-auto">
           {/* Brand header */}
@@ -415,7 +447,7 @@ export default function App() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 flex flex-col space-y-1.5">
+          <nav aria-label="Main navigation" className="flex-1 flex flex-col space-y-1.5">
             <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Dashboard Hub</span>
 {navigationItems.map((item) => {
               const IconComp = item.icon;
@@ -423,6 +455,8 @@ export default function App() {
               return (
                 <button
                   key={item.id}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
                   data-testid={"nav-" + item.id}
                   onClick={() => handleNavigate(item.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
@@ -461,6 +495,9 @@ export default function App() {
 
           <button
             type="button"
+            ref={menuTriggerRef}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-navigation"
             aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="p-1.5 bg-white/5 border border-white/10 text-white rounded-lg cursor-pointer"
@@ -469,17 +506,32 @@ export default function App() {
           </button>
         </div>
 
-        {/* MOBILE SIDEBAR DRAWERS */}
-        <AnimatePresence>
+        {/* A native modal keeps background content inert and supports Escape. */}
           {isMobileMenuOpen && (
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.25 }}
-              className="aiw-mobile-drawer fixed inset-y-16 left-0 w-72 bg-[#0F1115] border-r border-white/10 p-6 z-40 flex flex-col space-y-8"
+            <dialog
+              ref={menuDialogRef}
+              id="mobile-navigation"
+              aria-label="Navigation menu"
+              className="aiw-mobile-drawer bg-[#0F1115] border-r border-white/10 p-4 text-white"
+              onCancel={event => { event.preventDefault(); setIsMobileMenuOpen(false); }}
+              onClick={event => {
+                const box = event.currentTarget.getBoundingClientRect();
+                if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) setIsMobileMenuOpen(false);
+              }}
+              onKeyDown={event => {
+                if (event.key !== 'Tab') return;
+                const buttons = (event.currentTarget as HTMLDialogElement).querySelectorAll<HTMLButtonElement>('button');
+                const first = buttons[0];
+                const last = buttons[buttons.length - 1];
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+              }}
             >
-              <nav className="flex-1 flex flex-col space-y-1.5 pt-4">
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <h2 className="font-bold">Dashboard navigation</h2>
+                <button type="button" autoFocus aria-label="Close navigation menu" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg border border-white/20 p-2"><X className="w-5 h-5" /></button>
+              </div>
+              <nav aria-label="Main navigation" className="flex-1 flex flex-col space-y-1.5">
                 <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Dashboard Hub</span>
                 {navigationItems.map((item) => {
                   const IconComp = item.icon;
@@ -511,79 +563,58 @@ export default function App() {
                 <p>System Ver: 1.2.4</p>
                 <p>Network status: Online</p>
               </div>
-            </motion.div>
+            </dialog>
           )}
-        </AnimatePresence>
 
         {/* 3. MAIN DASHBOARD MAINSPACE CONTAINER */}
-        <main className="aiw-main flex-1 w-full min-w-0 max-w-full bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)]">
+        <main id="main-content" tabIndex={-1} className="aiw-main flex-1 w-full min-w-0 max-w-full bg-[#0F1115] p-4 md:p-6 lg:p-8 min-h-[calc(100vh-2rem)]">
           <div className="max-w-7xl mx-auto mb-4 flex justify-end">
             <UniversalSearch onNavigate={handleNavigate} />
           </div>
-          {/* Universal Live AI Sync Controller Panel */}
-          <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#15181E]/40 border border-white/10 rounded-2xl p-4 gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="relative flex-shrink-0">
-                <span className={`w-2.5 h-2.5 rounded-full block ${isLiveLoading ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
+          <section aria-label="Market feed status" className="aiw-feed-status max-w-7xl mx-auto mb-6 flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-[#15181E]/40 p-3">
+            <details className="min-w-0 flex-1">
+              <summary className="cursor-pointer text-sm font-semibold text-white/80">
+                Market feed <span className="font-normal text-xs text-white/60">{isLiveLoading ? 'Synchronizing…' : liveError ? 'Unavailable' : 'Details'}</span>
+              </summary>
+              <div className="mt-3 space-y-2 text-xs text-white/70">
+                <p>{isLiveLoading ? 'Compiling market quotes and infrastructure headlines…' : liveData?.marketSentiment || 'Quotes and news from the configured public data feeds.'}</p>
+                <p>Build {liveData?.build?.commit ? liveData.build.commit.slice(0, 7) : 'LOCAL'} · {liveData?.build?.environment || 'unknown'}</p>
+                {liveData?.timestamp && <p>Synced: {new Date(liveData.timestamp).toLocaleTimeString()}</p>}
+                {(() => {
+                  const quotes = Object.values(tickerPrices) as LivePrice[];
+                  return quotes.length ? <p>Quote freshness · {quotes.filter(item => !item.stale).length} current · {quotes.filter(item => item.stale).length} last close</p> : <p>No quote timestamps available.</p>;
+                })()}
+                <p>Auto refresh: feed every 5 minutes · quotes every 60 seconds{lastQuoteRefresh ? ' · last quote ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}</p>
               </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">Live Market Intelligence</span>
-                  <span className="text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    {isLiveLoading ? 'SYNCHRONIZING' : 'ACTIVE FEED'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-white/60 leading-normal mt-0.5">
-                  {isLiveLoading 
-                    ? "Compiling live market quotes from Yahoo Finance and AI-infrastructure headlines from GDELT..." 
-                    : liveData?.marketSentiment 
-                      ? `Global AI Market: "${liveData.marketSentiment}"`
-                      : "Live market quotes and AI-infrastructure news from the configured public data feeds."}
-                </p>
-                <div className="mt-1 text-[9px] font-mono text-white/25 uppercase tracking-wider">
-                  BUILD {liveData?.build?.commit ? liveData.build.commit.slice(0, 7) : 'LOCAL'} · {liveData?.build?.environment || 'unknown'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-3 w-full min-w-0 md:w-auto justify-between md:justify-end border-t border-white/5 pt-3 md:pt-0 md:border-0">
-              {liveData && liveData.timestamp && (
-                <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider">
-                  SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
-                </span>
-              )}
-              {(() => {
-                const quoteValues = Object.values(tickerPrices) as LivePrice[];
-                const fresh = quoteValues.filter(item => !item.stale).length;
-                const stale = quoteValues.filter(item => item.stale).length;
-                return quoteValues.length ? (
-                  <span className="text-[8px] font-mono uppercase tracking-wider text-white/35">
-                    QUOTE FRESHNESS · {fresh} current · {stale} last close
-                  </span>
-                ) : null;
-              })()}
-              <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
-                AUTO: FEED 5M · QUOTES 60S{lastQuoteRefresh ? ' · LAST QUOTE ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
-              </span>
-              <button
-                onClick={() => handleFetchLiveData(true)}
-                disabled={isLiveLoading}
-                className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-black px-4 py-2 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer shadow-[0_4px_12px_rgba(16,185,129,0.15)]"
-              >
-                <span className={isLiveLoading ? "animate-spin" : ""}>🔄</span>
-                <span>{isLiveLoading ? "SYNCHRONIZING..." : "REFRESH FEED"}</span>
-              </button>
-            </div>
-          </div>
+            </details>
+            <button type="button" onClick={() => handleFetchLiveData(true)} disabled={isLiveLoading}
+              className="shrink-0 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black hover:bg-emerald-400 disabled:opacity-50">
+              {isLiveLoading ? 'SYNCHRONIZING...' : 'REFRESH FEED'}
+            </button>
+          </section>
 
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView}
+              data-view={activeView}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              onAnimationComplete={reloadSettings}
+              onAnimationComplete={definition => {
+                reloadSettings();
+                if (typeof definition === 'object' && definition.opacity === 1) {
+                  const heading = document.querySelector<HTMLElement>('main h1');
+                  const isCurrentPage = heading?.closest('[data-view]')?.getAttribute('data-view') === viewFromPath(window.location.pathname);
+                  if (heading && isCurrentPage) document.title = heading.textContent + ' · AI Infra Watch';
+                  if (pendingNavigation.current && heading && isCurrentPage) {
+                    heading.tabIndex = -1;
+                    heading.focus({ preventScroll: true });
+                    heading.scrollIntoView({ block: 'start' });
+                    pendingNavigation.current = false;
+                  }
+                }
+              }}
               className="max-w-7xl mx-auto"
             >
               {activeView === 'overview' && <Overview config={config} onNavigate={handleNavigate} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} news={liveData?.news} timestamp={liveData?.timestamp} evidenceAvailability={liveData?.evidenceAvailability} />}

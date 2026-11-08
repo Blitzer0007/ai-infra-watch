@@ -231,9 +231,11 @@ export default function Settings() {
           </div>
 
           <form onSubmit={handleSaveKey} className="space-y-3">
-            <label className="text-[9px] font-mono uppercase tracking-widest text-white/35 block">Finnhub API key</label>
+            <label htmlFor="finnhub-key" className="text-xs font-mono text-white/70 block">Finnhub API key (optional)</label>
             <input
               type="password"
+              id="finnhub-key"
+              autoComplete="off"
               placeholder="Optional — paste your Finnhub key"
               value={apiKeyInput}
               onChange={e => setApiKeyInput(e.target.value)}

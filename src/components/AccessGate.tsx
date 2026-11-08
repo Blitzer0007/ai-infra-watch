@@ -33,7 +33,7 @@ export default function AccessGate({ children }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4">
+    <main className="min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15181E] p-6 shadow-2xl">
         <div className="flex items-center gap-3 mb-5">
           <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-2.5">
@@ -44,10 +44,15 @@ export default function AccessGate({ children }: Props) {
             <h1 className="text-xl font-semibold mt-1">Private dashboard</h1>
           </div>
         </div>
-        <p className="text-xs text-white/45 leading-relaxed mb-5">
+        <p id="access-help" className="text-sm text-white/70 leading-relaxed mb-5">
           Enter your private access token. It is kept only for this browser session and is sent over HTTPS to protected API routes.
         </p>
+        <label htmlFor="access-token" className="block text-sm font-semibold mb-2">Access token</label>
         <input
+          id="access-token"
+          autoComplete="off"
+          aria-describedby={error ? 'access-help access-error' : 'access-help'}
+          aria-invalid={!!error}
           autoFocus
           type="password"
           value={draft}
@@ -55,7 +60,7 @@ export default function AccessGate({ children }: Props) {
           placeholder="Access token"
           className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm outline-none focus:border-emerald-400/40"
         />
-        {error && <div className="mt-3 rounded-lg border border-rose-400/15 bg-rose-400/5 px-3 py-2 text-xs text-rose-300">{error}</div>}
+        {error && <div id="access-error" role="alert" className="mt-3 rounded-lg border border-rose-400/15 bg-rose-400/5 px-3 py-2 text-sm text-rose-300">{error}</div>}
         <button
           type="submit"
           disabled={busy || !draft.trim()}
@@ -64,9 +69,9 @@ export default function AccessGate({ children }: Props) {
           {busy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</span> : 'Unlock dashboard'}
         </button>
         <div className="mt-4 text-[10px] text-white/25 leading-relaxed">
-          If access is not configured, set <span className="font-mono text-white/40">AIW_ACCESS_TOKEN</span> in Vercel before deployment.
+          Need access? Contact your dashboard administrator.
         </div>
       </form>
-    </div>
+    </main>
   );
 }

@@ -25,7 +25,7 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
   return <section aria-label="Opportunity research scanner" data-testid="opportunity-scanner" className="min-w-0 space-y-4">
     <h1 className="text-3xl font-bold">Opportunity research</h1>
     <p className="text-base text-white/80">Review your holdings and watchlist using a frozen copy of already-loaded data.</p>
-    <p className="rounded-xl border border-amber-300/30 p-4 text-sm text-amber-100">Experimental research only. Scanning makes no provider request, sends no alert, and does not change holding decisions. Missing fundamentals and asset/listing provenance remain missing. Real enrichment is not connected in this first increment.</p>
+    <p className="rounded-xl border border-amber-300/30 p-4 text-sm text-amber-100">Experimental research only. Uses data already loaded in this dashboard. Scanning does not refresh prices, send alerts, or change holding decisions. Company fundamentals and listing details may be unavailable; missing data stays marked as missing.</p>
     <button type="button" onClick={run} disabled={loading} className="rounded-lg bg-cyan-200 px-4 py-3 font-bold text-black disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">{loading ? 'Waiting for loaded snapshot…' : 'Scan loaded snapshot'}</button>
     {error && <p role="alert" className="text-amber-200">{error}</p>}
     {!scan ? <p role="status">No scan has run. Choose Scan loaded snapshot to inspect available coverage.</p> : <>
