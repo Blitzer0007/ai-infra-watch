@@ -4,6 +4,8 @@ Status: implementation in progress. R2.1 snapshot research and the first UI/UX p
 
 Current [progress estimate](release2-progress.md): approximately 55% engineering complete / 45% pending, with production rollout not started. The [daily Telegram brief](release2-daily-telegram-review.md) adds concise presentation, full-versus-shown queue counts and correct holding links to the existing digest, tested with fictional transports only. Next implementation: sourced, sectioned company research.
 
+Latest steering prioritizes the [calculation/rule audit](release2-calculation-audit.md) before further dossier calculations. The first correction pass is implemented; complete numerical sign-off, missing-data semantics, historical adjustment/provenance and model-calibration review remain open.
+
 The [controlled JEV increment](release2-jev-and-rea-review.md) adds an on-demand Opportunities coverage review through the existing TypeSafe connector. Live development credit use awaits secure Cloud configuration. The [first feature-mirroring increment](release2-holding-detail-mirroring.md) uses an isolated REA 6.8.0 CLI for selected public-source analysis and implements a Ghostfolio-inspired holding-detail dialog.
 
 User direction: prioritize REA for feature mirroring, not general debugging. The [reference/model shortlist](feature-mirroring-and-nvidia-shortlist.md) selects Ghostfolio-style holdings drilldown first, followed by sourced company research inspired by Stock Analysis and Simply Wall St. NVIDIA baseline: `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1` (without OpenRouter's `:free` suffix). Selected-source REA analysis has run; full reference-runtime parity and secure Cloud model configuration remain unverified. No live provider call has occurred.

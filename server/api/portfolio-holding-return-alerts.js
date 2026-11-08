@@ -129,7 +129,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
     const symbol = String(tx.symbol || '').trim().toUpperCase();
     const quantity = Number(tx.quantity);
     const amount = Number(tx.amount);
-    const brokerage = Math.max(0, Number(tx.brokerage) || 0);
+    const brokerage = Number(tx.brokerage ?? 0);
     if (!symbol) continue;
     const position = inventory.get(symbol) || {
       quantity: 0,
@@ -139,7 +139,8 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
       currencies: new Set(),
       invalid: false,
     };
-    if (!(quantity > 0) || !(amount > 0) || !['BUY', 'SELL'].includes(tx.transaction_type)) {
+    if (!Number.isFinite(quantity) || !(quantity > 0) || !Number.isFinite(amount) || !(amount > 0) ||
+      !Number.isFinite(brokerage) || brokerage < 0 || !['BUY', 'SELL'].includes(tx.transaction_type)) {
       position.invalid = true;
       inventory.set(symbol, position);
       continue;
@@ -156,7 +157,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
         position.invalid = true;
       } else {
         const averageCost = position.costBasis / position.quantity;
-        const proceeds = Math.max(0, amount - brokerage);
+        const proceeds = amount - brokerage;
         position.realizedPnl += proceeds - averageCost * quantity;
         position.quantity -= quantity;
         position.costBasis -= averageCost * quantity;
@@ -180,7 +181,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
     const expected = holdingsBySymbol.get(symbol) || 0;
     const tolerance = Math.max(0.00001, Math.abs(expected) * 0.0001);
     const quantityMismatch = Math.abs(position.quantity - expected) > tolerance;
-    const currencyMismatch = position.currencies.size !== 1;
+    const currencyMismatch = position.currencies.size !== 1 || !position.currencies.has('USD');
     const valid = !position.invalid && !quantityMismatch && !currencyMismatch && position.quantity > 0 && position.costBasis > 0;
     result.set(symbol, {
       quantity: position.quantity,

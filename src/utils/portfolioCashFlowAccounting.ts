@@ -36,7 +36,7 @@ export function calculateAccountCashFlowPerformance(holdings: CashFlowHolding[],
   for (const row of trades) {
     const symbol = String(row.symbol).trim().toUpperCase(), quantity = Number(row.quantity), amount = Number(row.amount), brokerage = Number(row.brokerage || 0);
     tradeQty.set(symbol, (tradeQty.get(symbol) || 0) + (row.transactionType === 'SELL' ? -quantity : quantity));
-    tradeCashUsd += row.transactionType === 'BUY' ? -(amount + brokerage) : Math.max(0, amount - brokerage);
+    tradeCashUsd += row.transactionType === 'BUY' ? -(amount + brokerage) : amount - brokerage;
   }
   const symbols = new Set([...holdingQty.keys(), ...tradeQty.keys()]);
   const quantityMismatchSymbols = [...symbols].filter(symbol => {

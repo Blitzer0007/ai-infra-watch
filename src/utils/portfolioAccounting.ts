@@ -25,7 +25,8 @@ export type PortfolioAccountingStatus =
   | 'quotes-incomplete'
   | 'transaction-ledger-unavailable'
   | 'quantity-mismatch'
-  | 'mixed-currency';
+  | 'mixed-currency'
+  | 'unsupported-currency';
 
 export type PortfolioTradingPerformance = {
   status: PortfolioAccountingStatus;
@@ -90,6 +91,7 @@ export function calculatePortfolioTradingPerformance(
 
   const currencies = [...new Set(transactions.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
   if (currencies.length !== 1) return { ...base, status: 'mixed-currency' };
+  if (currencies[0] !== 'USD') return { ...base, status: 'unsupported-currency' };
 
   const hasInvalidTransactions = transactions.some(row =>
     !String(row.symbol || '').trim() ||
@@ -131,7 +133,7 @@ export function calculatePortfolioTradingPerformance(
       holding.quantity += quantity;
       holding.costBasis += buyCost;
     } else {
-      const proceeds = Math.max(0, Number(row.amount) - brokerage);
+      const proceeds = Number(row.amount) - brokerage;
       netSaleProceeds += proceeds;
       const tolerance = Math.max(0.00001, Math.abs(holding.quantity) * 0.0001);
       if (holding.quantity + tolerance < quantity || holding.quantity <= 0) {

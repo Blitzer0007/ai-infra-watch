@@ -530,8 +530,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       ? (tradePerformance.reviewTransactionCount || tradePerformance.derivedTransactionCount) + ' trade records flagged · verify values'
       : tradePerformance.status === 'quantity-mismatch'
         ? 'Trade quantities do not reconcile · total P&L withheld'
-        : tradePerformance.status === 'mixed-currency'
-          ? 'Mixed currencies · total P&L withheld'
+        : ['mixed-currency', 'unsupported-currency'].includes(tradePerformance.status)
+          ? 'Unsupported trade currency · total P&L withheld'
           : tradePerformance.status === 'quotes-incomplete'
             ? 'Fresh quotes required · total P&L withheld'
             : 'Transaction history unavailable · total P&L withheld';

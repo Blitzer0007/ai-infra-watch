@@ -34,3 +34,9 @@ Assessment: 8 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 NVIDIA baseline remains `openai/gpt-oss-20b` at NVIDIA's endpoint (no `:free` suffix). Live NVIDIA/JEV evaluations await a securely configured development credential and allowed host. REA remains a feature-mirroring investigation tool, outside the application's runtime.
 
 Production status: no merge/deployment, hosted database change, Telegram message or production secret/API access is included in these increments. Approval to develop is not approval to activate a new delivery policy or run live acceptance checks.
+
+## Expanded calculation-audit scope
+
+The user's subsequent request adds a repository-wide rule/calculation audit. The [first audit pass](release2-calculation-audit.md) inventories 297 source files and corrects verified rule, accounting, benchmark, peer and interval issues. Comprehensive numerical sign-off remains open. The approximately 55% figure still describes the planned Release 2 engineering scope; it is not a percentage of all calculations proven correct. No upward progress credit is taken merely for inventory size or passing tests.
+
+Immediate next priority: missing-data behavior in legacy group/rotation/stress scores and the shared rule-input contract, then adjusted/point-in-time calculation provenance and broader accounting invariants. The company dossier follows those reliability gates.

@@ -26,7 +26,7 @@ function exercise(method, decisionAvailable = true) {
     };
     const {default:handler}=await import('./server/api/portfolio-digest.js');
     let status=200,body; const res={setHeader(){},status(code){status=code;return this;},json(value){body=value;return this;}};
-    await handler({method:${JSON.stringify(method)},headers:{authorization:'Bearer fictional-test-access'},query:{},body:{channels:'telegram'}},res);
+    await handler({method:${JSON.stringify(method)},headers:{authorization:'Bearer fixture-access'},query:{},body:{channels:'telegram'}},res);
     assert.equal(status,200,JSON.stringify(body));
     assert.ok(body.telegramBrief.text.length<=3600);
     assert.equal(calls.filter(item=>item.method!=='GET').length,${method === 'GET' ? 0 : 1});
@@ -40,7 +40,7 @@ function exercise(method, decisionAvailable = true) {
   `;
   return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], {
     cwd: process.cwd(), timeout: 15000, encoding: 'utf8',
-    env: { PATH: process.env.PATH, AIW_ACCESS_TOKEN: 'fictional-test-access', SUPABASE_URL: 'https://digest-fixture.invalid',
+    env: { PATH: process.env.PATH, AIW_ACCESS_TOKEN: 'fixture-access', SUPABASE_URL: 'https://digest-fixture.invalid',
       SUPABASE_SERVICE_ROLE_KEY: 'fictional-test-service', TELEGRAM_BOT_TOKEN: 'fictional-test-bot', TELEGRAM_CHAT_ID: 'fictional-chat',
       PORTFOLIO_DIGEST_TIMEZONE: 'Asia/Kolkata' },
   }).trim());

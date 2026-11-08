@@ -52,6 +52,8 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null) {
   if (Array.isArray(portfolio.quantityMismatchSymbols) && portfolio.quantityMismatchSymbols.length)
     warnings.push('Transaction quantities do not reconcile; verify the ledger.');
   if (decision.earningsStatus !== 'ok') warnings.push('EARNINGS CALENDAR UNAVAILABLE; upcoming-event coverage is unknown.');
+  if (Array.isArray(decision.rules?.configurationIssues) && decision.rules.configurationIssues.length)
+    warnings.push('Rule settings need review; invalid allocation fields were ignored.');
   if (warnings.length) lines.push('VERIFY DATA FIRST', ...warnings.map(value => '• ' + value), '');
 
   const returned = Array.isArray(decision.actionItems) ? decision.actionItems.filter(isPrompt) : [];

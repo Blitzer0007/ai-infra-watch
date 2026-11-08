@@ -105,7 +105,7 @@ export type PeerCounterfactual = {
   difference: number | null;
   differencePctPoints: number | null;
   basis: 'broker-transactions' | 'single-entry';
-  status: 'available' | 'history-unavailable' | 'entry-unavailable' | 'peer-unavailable';
+  status: 'available' | 'history-unavailable' | 'entry-unavailable' | 'peer-unavailable' | 'cash-flow-unavailable';
 };
 
 function normalizeTheme(value: string) {
@@ -171,7 +171,8 @@ export function calculatePeerCounterfactual(input: {
     .filter(row => row.symbol.toUpperCase() === holding.symbol.toUpperCase() && row.tradeDate)
     .sort((a, b) => a.tradeDate.localeCompare(b.tradeDate) || a.sourceRow - b.sourceRow);
 
-  const peerPriceAt = (date: string) => ordered.find(row => row.date >= date) ?? ordered.at(-1) ?? null;
+  // Never use a later bar to fill an earlier trade or silently skip a cash flow.
+  const peerPriceAt = (date: string) => [...ordered].reverse().find(row => row.date <= date) ?? null;
   const firstTransaction = relevantTransactions[0];
   const entryDate = firstTransaction?.tradeDate || purchaseDate;
   const entry = peerPriceAt(entryDate);
@@ -187,37 +188,50 @@ export function calculatePeerCounterfactual(input: {
   }
 
   if (relevantTransactions.length) {
+    const unavailable = (): PeerCounterfactual => ({ peer, purchaseDate, peerEntryDate: entry.date, peerEntryPrice: entry.price,
+      peerCurrentPrice, hypotheticalShares: null, hypotheticalValue: null, hypotheticalProfit: null, hypotheticalReturnPct: null,
+      actualProfit: null, actualReturnPct: null, actualCostBasis: null, difference: null, differencePctPoints: null,
+      basis: 'broker-transactions', status: 'cash-flow-unavailable' });
     let peerShares = 0;
     let grossBuys = 0;
     let grossSales = 0;
+    let actualQuantity = 0;
 
     for (const transaction of relevantTransactions) {
       const amount = Number(transaction.amount);
-      if (!(amount > 0)) continue;
+      const fee = Number(transaction.brokerage ?? 0), quantity = Number(transaction.quantity);
+      if (!Number.isFinite(amount) || !(amount > 0) || !Number.isFinite(fee) || fee < 0 ||
+        !Number.isFinite(quantity) || !(quantity > 0) || !['BUY', 'SELL'].includes(transaction.transactionType) ||
+        String(transaction.currency || 'USD').trim().toUpperCase() !== 'USD') return unavailable();
       const peerPoint = peerPriceAt(transaction.tradeDate);
-      if (!peerPoint || !(peerPoint.price > 0)) continue;
+      if (!peerPoint || !(peerPoint.price > 0)) return unavailable();
 
       if (transaction.transactionType === 'BUY') {
-        peerShares += amount / peerPoint.price;
-        grossBuys += amount;
+        peerShares += (amount + fee) / peerPoint.price;
+        grossBuys += amount + fee;
+        actualQuantity += quantity;
       } else {
-        const desiredSaleShares = amount / peerPoint.price;
+        const proceeds = amount - fee;
+        const desiredSaleShares = proceeds / peerPoint.price;
+        if (proceeds < 0 || desiredSaleShares > peerShares + 0.000001 || quantity > actualQuantity + 0.000001) return unavailable();
         const saleShares = Math.min(peerShares, desiredSaleShares);
         peerShares -= saleShares;
-        grossSales += saleShares * peerPoint.price;
+        grossSales += proceeds;
+        actualQuantity -= quantity;
       }
     }
+    if (Math.abs(actualQuantity - holding.quantity) > Math.max(0.00001, Math.abs(holding.quantity) * 0.0001)) return unavailable();
 
     const netInvested = grossBuys - grossSales;
     const hypotheticalValue = peerShares * peerCurrentPrice;
     const hypotheticalProfit = hypotheticalValue - netInvested;
-    const hypotheticalReturnPct = netInvested ? (hypotheticalProfit / netInvested) * 100 : null;
+    const hypotheticalReturnPct = netInvested > 0 ? (hypotheticalProfit / netInvested) * 100 : null;
 
     const actualValue = actualCurrentPrice != null && Number.isFinite(actualCurrentPrice)
       ? actualCurrentPrice * holding.quantity
       : null;
     const actualProfit = actualValue != null ? actualValue - netInvested : null;
-    const actualReturnPct = actualProfit != null && netInvested ? (actualProfit / netInvested) * 100 : null;
+    const actualReturnPct = actualProfit != null && netInvested > 0 ? (actualProfit / netInvested) * 100 : null;
     const difference = actualProfit != null ? hypotheticalProfit - actualProfit : null;
     const differencePctPoints = actualReturnPct != null && hypotheticalReturnPct != null
       ? hypotheticalReturnPct - actualReturnPct

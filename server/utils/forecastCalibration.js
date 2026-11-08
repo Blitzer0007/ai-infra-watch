@@ -1,7 +1,7 @@
 export function wilsonInterval(hits, total, z = 1.96) {
   const n = Number(total);
   const k = Number(hits);
-  if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(k) || k < 0 || k > n) return null;
+  if (!Number.isSafeInteger(n) || n <= 0 || !Number.isSafeInteger(k) || k < 0 || k > n || !Number.isFinite(z) || z <= 0) return null;
   const p = k / n;
   const z2 = z * z;
   const denominator = 1 + z2 / n;
@@ -14,14 +14,14 @@ export function wilsonInterval(hits, total, z = 1.96) {
 }
 
 function isPresentFiniteNumber(value) {
-  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+  return (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
 }
 
 export function coverageInterval(rows = [], lowerKey, upperKey) {
   const eligible = rows.filter(row =>
     isPresentFiniteNumber(row?.actual_return) &&
     isPresentFiniteNumber(row?.[lowerKey]) &&
-    isPresentFiniteNumber(row?.[upperKey]),
+    isPresentFiniteNumber(row?.[upperKey]) && Number(row[lowerKey]) <= Number(row[upperKey]),
   );
   const hits = eligible.filter(row =>
     Number(row.actual_return) >= Number(row[lowerKey]) &&
