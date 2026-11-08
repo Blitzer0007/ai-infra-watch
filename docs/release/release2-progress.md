@@ -27,8 +27,8 @@ Assessment: 8 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 
 ## Next implementation order
 
-1. Company dossier: sectioned business/growth/financial health/valuation/risks/sources, initially over supported normalized facts. Preserve explicit unavailable/unsuitable states and deterministic financial rules.
-2. Financial observation adapters: source/period/currency/reporting-basis integrity and bounded resource budgets; reuse existing SEC/fundamental paths before new providers. External access/coverage is separate from building the interface.
+1. Shared source/rule contracts: correct Python quote-time/default-zero/USD handling, carry metadata into decision consumers, bound SEC/provider use, and distinguish upstream failure from successful empty results. The [data-source audit](release2-data-source-audit.md) documents confirmed fixes and remaining paths.
+2. Financial observation adapters and company dossier: establish source/period/currency/adjustment/reporting-basis integrity before sectioned business/growth/financial-health/valuation/risks/sources views. Reuse existing SEC/fundamental paths and preserve explicit unavailable states. Actual access/coverage is separate from building the interface.
 3. Alert coverage and scheduler transparency: add bounded read-only classes/status without triggering scans, retries or deliveries.
 4. Offline evaluation protocol and horizon compatibility, followed by integrated regression/release-candidate review.
 
@@ -40,4 +40,4 @@ Production status: no merge/deployment, hosted database change, Telegram message
 
 The user's subsequent request adds a repository-wide rule/calculation audit. The [first audit pass](release2-calculation-audit.md) inventories 297 source files and corrects verified rule, accounting, benchmark, peer and interval issues. Comprehensive numerical sign-off remains open. The approximately 55% figure still describes the planned Release 2 engineering scope; it is not a percentage of all calculations proven correct. No upward progress credit is taken merely for inventory size or passing tests.
 
-The [frontend missing-data follow-up](release2-missing-data-analytics.md) is implemented. Immediate next priority: shared rule/source-input contracts, remaining concentration/attribution cost fallbacks, adjusted/point-in-time calculation provenance and broader accounting invariants. The company dossier follows those reliability gates. The engineering estimate remains approximately 55% until the remaining feature/data/evaluation scope is delivered; test counts alone do not increase it.
+The [frontend missing-data follow-up](release2-missing-data-analytics.md) and first [data-source reliability pass](release2-data-source-audit.md) are implemented. The latter unifies Vercel quote normalization, preserves unknown metadata and disables the standalone generated/canned feed. Python/source-input parity, bounded provider use, remaining concentration/attribution cost fallbacks, adjusted/point-in-time calculation provenance and broader accounting invariants remain open. The company dossier follows those reliability gates. The engineering estimate remains approximately 55% until the remaining feature/data/evaluation scope is delivered; test counts alone do not increase it.

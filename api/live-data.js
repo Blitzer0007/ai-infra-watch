@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { summarizeQuoteCoverage } from '../server/services/marketDataValidation.js';
 
 function loadConfiguredSymbols() {
   try {
@@ -542,15 +543,15 @@ export default async function handler(req, res) {
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, latestAt: politicalLatestAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: politicalLatestAt, fallback: Boolean(politicalResult?.upstreamError), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }), feedHealth: feedHealth(politicalResult), conflictStatus: politicalConflicts.length ? 'CONFLICT' : 'CLEAR', conflicts: politicalConflicts };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, latestAt: congressLatestAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: congressLatestAt, stale: Boolean(congressResult?.stale), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }), feedHealth: feedHealth(congressResult) };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  const latestMarketQuote = Object.values(stockPrices).reduce((latest, item) => {
-    if (!latest || String(item?.marketTime || item?.retrievedAt || item?.asOf || '') > String(latest.marketTime || latest.retrievedAt || latest.asOf || '')) return item;
-    return latest;
-  }, null);
+  const marketCoverage = summarizeQuoteCoverage(stockPrices, SYMBOLS);
   evidenceAvailability.market = {
     ...evidenceAvailability.market,
-    retrievedAt: latestMarketQuote?.retrievedAt || latestMarketQuote?.asOf || null,
-    marketTime: latestMarketQuote?.marketTime || latestMarketQuote?.asOf || null,
-    asOf: latestMarketQuote?.asOf || latestMarketQuote?.marketTime || null,
+    coverage: marketCoverage,
+    provider: marketCoverage.providers.length===1?marketCoverage.providers[0]:marketCoverage.providers.length?'multiple':null,
+    source: marketCoverage.providers.length>1?'Multiple market providers':evidenceAvailability.market.source,
+    retrievedAt: feedRetrievedAt,
+    marketTime: marketCoverage.asOf,
+    asOf: marketCoverage.asOf,
     refreshIntervalSeconds: 60,
   };
 

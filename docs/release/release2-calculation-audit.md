@@ -51,6 +51,8 @@ Subsequent increment: [missing-data analytics correction](release2-missing-data-
 
 ## Verification and safety
 
+Subsequent [data-source follow-up](release2-data-source-audit.md): corrected Vercel quote normalization, provenance/coverage and history-currency defaults, and disabled standalone model-generated/canned financial observations. Selected REA analysis is explicitly partial; manual review additionally found open Python timestamp/default-value and SEC budget/filing-label issues. Source availability, source suitability and numerical correctness remain separate gates. Comprehensive calculation sign-off is still open.
+
 Seventeen additional regression cases cover rule boundaries/priority/provenance, fee losses, currency, malformed ledgers, chronological accounting identity, peer dates/fees/cash-flow eligibility and forecast interval arithmetic. Total Node/TypeScript suite: **497 passed**. TypeScript, source security audit, production build, local migration-manifest integrity and whitespace checks passed. Exact-head CI is tracked in draft PR #168.
 
 Additional offline Python/evaluation/workflow selection: **59 passed, 1 live test deselected**. An initial broader selection reached a live-tagged test that stopped at `NO_KEY` before any provider request; the corrected run explicitly excludes live tests. Existing pytest marker warnings remain. A long fictional bearer token in an integration fixture triggered the source scanner; the fixture now uses a short, clearly fictional value. The scanner and production authentication rules are unchanged.

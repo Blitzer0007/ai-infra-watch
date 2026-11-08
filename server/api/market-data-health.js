@@ -47,7 +47,7 @@ function summarizeProviderFailure(error) {
 
 function ageSeconds(value, nowMs = Date.now()) {
   const timestamp = Date.parse(String(value || ''));
-  return Number.isFinite(timestamp) ? Math.max(0, Math.floor((nowMs - timestamp) / 1000)) : null;
+  return Number.isFinite(timestamp) && timestamp <= nowMs + 120000 ? Math.max(0, Math.floor((nowMs - timestamp) / 1000)) : null;
 }
 
 function dateOnlyAgeDays(dateValue, nowMs = Date.now()) {
@@ -63,7 +63,9 @@ function dateOnlyAgeDays(dateValue, nowMs = Date.now()) {
 }
 
 export function summarizeMarketQuote(data, nowMs = Date.now()) {
-  if (!data || !(Number(data.price) > 0)) return { available: false, errorCode: 'no_data' };
+  if (!data || typeof data.price!=='number' || !Number.isFinite(data.price) || data.price<=0) return { available: false, errorCode: 'no_data' };
+  const observation = data.marketTime || (data.marketTimePrecision !== 'date-only' ? data.asOf : null) || null;
+  const exactObservation = typeof observation==='string'&&/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(observation) ? observation : null;
   return {
     available: true,
     provider: data.provider || 'unknown',
@@ -72,8 +74,12 @@ export function summarizeMarketQuote(data, nowMs = Date.now()) {
     stale: Boolean(data.stale),
     cached: Boolean(data.cached),
     cacheAgeMs: data.cacheAgeMs != null && Number.isFinite(Number(data.cacheAgeMs)) ? Number(data.cacheAgeMs) : null,
-    asOf: data.asOf || data.marketTime || null,
-    ageSeconds: ageSeconds(data.asOf || data.marketTime, nowMs),
+    asOf: exactObservation,
+    ageSeconds: ageSeconds(exactObservation, nowMs),
+    futureTimestampDetected: exactObservation!=null&&Date.parse(exactObservation)>nowMs+120000,
+    marketDate: data.marketDate || null,
+    metadataCoverage: {dailyMove:typeof data.changePct==='number'&&Number.isFinite(data.changePct),currency:typeof data.currency==='string'&&!!data.currency,
+      marketTime:typeof data.marketTime==='string'&&Number.isFinite(Date.parse(data.marketTime)),session:typeof data.isMarketSessionOpen==='boolean'},
     providerAttempts: Array.isArray(data.providerAttempts) ? data.providerAttempts.map(item => ({
       provider: String(item.provider || 'unknown'),
       status: item.status === 'ok' ? 'ok' : 'failed',
