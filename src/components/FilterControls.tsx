@@ -70,7 +70,7 @@ export function FilterBar({ children, resultCount, totalCount, onClear, clearLab
 }) {
   return (
     <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[.02] p-3" role="group" aria-label="Table filters">
-      <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">{children}</div>
+      <div className="flex min-w-0 flex-1 basis-full flex-wrap items-end gap-2 sm:basis-0">{children}</div>
       {(resultCount != null || onClear) && (
         <div className="flex items-center gap-2 shrink-0">
           {resultCount != null && <span className="text-[9px] font-mono text-white/35" aria-live="polite">{totalCount != null ? resultCount + ' of ' + totalCount : resultCount + ' results'}</span>}

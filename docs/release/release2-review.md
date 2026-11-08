@@ -42,3 +42,8 @@ Existing CSS/bundle warnings remain. Future scanner families and actual provider
 Keep Release 2 separate from Release 1. If Release 1 remains unmerged, target a stacked draft PR at its feature branch; do not merge it as a development shortcut. Require checks on the exact head before review.
 
 Rollback is an application-code revert; no database rollback or message replay is required. No merge, Vercel deployment, production Supabase modification or Telegram delivery is authorized by completing this increment.
+
+## Subsequent review increments
+
+- [Page-by-page UI/UX audit and improvements](uiux-audit.md).
+- [Snapshot-backed catalyst calendar](release2-calendar-review.md), with source/coverage and correction limitations. This adds Calendar as the sixteenth application route; the private access screen is checked separately.

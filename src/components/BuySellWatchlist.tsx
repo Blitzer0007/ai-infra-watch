@@ -7,6 +7,7 @@ import { authFetch } from '../utils/apiAuth';
 import { loadAlertEvents, saveAlertEvents } from '../utils/alertEngine';
 import { fetchPortfolioHoldings, StoredPortfolioHolding } from '../utils/portfolioApi';
 import EarningsAlerts from './EarningsAlerts';
+import type { CatalystSnapshot } from '../utils/catalystCalendar';
 import ReentryIntelligence from './ReentryIntelligence';
 
 type LiveQuote = {
@@ -41,7 +42,7 @@ function freshness(quote?: LiveQuote) {
   return 'Live quote';
 }
 
-export default function BuySellWatchlist() {
+export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSnapshot?: (snapshot: CatalystSnapshot) => void }) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [quotes, setQuotes] = useState<Record<string, LiveQuote>>({});
   const [lastRefresh, setLastRefresh] = useState<number | null>(null);
@@ -367,7 +368,7 @@ export default function BuySellWatchlist() {
 
       <ReentryIntelligence />
 
-      <EarningsAlerts />
+      <EarningsAlerts onSnapshot={onEarningsSnapshot} />
 
       <details className="rounded-2xl border border-white/10 bg-white/[.02] p-4 md:p-5">
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-widest text-amber-200">Portfolio rules</div><h2 className="text-sm font-black text-white mt-1">Targets, risk limits and exit rules</h2><p className="text-[10px] text-white/35 mt-1">Review the rules saved for the holdings you own.</p></div><Settings2 className="w-4 h-4 text-white/30" /></summary>

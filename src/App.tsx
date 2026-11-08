@@ -1,4 +1,6 @@
 import OpportunityScanner from './components/opportunities/OpportunityScanner';
+import CatalystCalendar from './components/calendar/CatalystCalendar';
+import { unavailableCatalystSnapshot } from './utils/catalystCalendar';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -14,9 +16,9 @@ import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
 import UniversalSearch from './components/UniversalSearch';
 
-const VIEW_IDS = new Set(['overview','opportunities','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
+const VIEW_IDS = new Set(['overview','opportunities','calendar','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
-  opportunities: '/opportunities', overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
+  calendar: '/calendar', opportunities: '/opportunities', overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
   portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', 'jev-lab': '/jev-lab', quality: '/quality', outlook: '/outlook',
   health: '/health', guide: '/guide', settings: '/settings'
 };
@@ -54,6 +56,7 @@ type LivePrice = {
 };
 
 export default function App() {
+  const [calendarSnapshot, setCalendarSnapshot] = useState(unavailableCatalystSnapshot);
   const [activeView, setActiveView] = useState<string>(() => viewFromPath(window.location.pathname));
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
@@ -379,6 +382,7 @@ export default function App() {
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
+    { id: 'calendar', label: 'Catalyst Calendar', index: 'R2', icon: Calendar },
     { id: 'opportunities', label: 'Opportunities', index: 'R2', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
@@ -623,7 +627,8 @@ export default function App() {
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
               {activeView === 'macro' && <MacroPolitics onNavigate={handleNavigate} liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} evidenceAvailability={liveData?.evidenceAvailability} />}
               {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} loading={isLiveLoading || portfolioSymbolsLoading} holdingsAvailable={portfolioSymbolsAvailable} />}
-              {activeView === 'watchlist' && <BuySellWatchlist />}
+              {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
+              {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
