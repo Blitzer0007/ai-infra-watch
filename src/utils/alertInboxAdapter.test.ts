@@ -12,7 +12,7 @@ test('browser detections cannot forge provider acceptance or episode correlation
 test('browser empty, unavailable, corrupt and fully invalid histories stay distinct',()=>{
   assert.equal(readBrowserInbox({getItem:()=>null},now).status,'available');assert.equal(browser([]).items.length,0);
   assert.equal(readBrowserInbox({getItem:()=>{throw new Error();}},now).status,'unavailable');assert.equal(readBrowserInbox({getItem:()=>'{bad'},now).status,'unavailable');
-  for(const rows of [{},[null],[local({timestamp:now+1})],[local({simulated:true})]])assert.equal(browser(rows).status,'unavailable');
+  for(const rows of [{},[null],[local({timestamp:now+1})],[local({simulated:true})],[local({severity:'unsupported'})]])assert.equal(browser(rows).status,'unavailable');
 });
 test('browser rows are bounded, deduplicated, redacted and conflicting IDs withheld',()=>{
   assert.equal(browser([local(),local()]).items.length,1);
@@ -22,7 +22,7 @@ test('browser rows are bounded, deduplicated, redacted and conflicting IDs withh
   assert.doesNotMatch(browser([local({message:'See https://example.com/?token=fixture-secret Bearer fixture-auth'})]).items[0].explanation,/fixture-secret|fixture-auth/);
 });
 test('server normalization validates source/window and strips all unknown payload data',()=>{
-  const payload=server();const result=normalizeServerInbox({...payload,token:'private',chat_id:'private'});assert.equal(result.items[0].deliveryState,'accepted');assert.doesNotMatch(JSON.stringify(result),/private/);
+  const payload=server();const result=normalizeServerInbox({...payload,token:'private',chat_id:'private'});assert.equal(result.items[0].deliveryState,'accepted');assert.equal(result.items[0].severity,null);assert.doesNotMatch(JSON.stringify(result),/private/);
   for(const value of [null,{}, {...payload,source:'other'},{...payload,simulated:true},{...payload,from:'2026-01-01T00:00:00Z'},{...payload,items:[{}]}])assert.throws(()=>normalizeServerInbox(value));
 });
 test('acceptance without an ID becomes uncertain; known acceptance plus reconciliation retains both facts',()=>{

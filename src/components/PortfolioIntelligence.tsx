@@ -746,6 +746,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       </section>}
       {tab === 'performance' && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
+      {tab === 'performance' && portfolioHistory.loading && <p role="status" className="text-sm text-white/75">Loading historical comparisons for this workspace…</p>}
       {portfolioError && <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/70">{portfolioError}. Persistent portfolio data could not be loaded; check the portfolio API and Supabase connection.</div>}
 
       {tab === 'performance' && (

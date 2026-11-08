@@ -67,7 +67,7 @@ export async function readAlertInboxPage({ config, query={}, nowMs=Date.now(), f
   const selected=rows.slice(0,PAGE_SIZE);
   const items=selected.map(row=>({
     id:'server:'+digest(config.key,scope+':row:'+row.id),episodeId:digest(config.key,scope+':episode:'+row.delivery_key),
-    origin:'reentry-server',symbol:row.symbol,severity:'info',title:row.symbol+' re-entry delivery record',ruleId:null,evidenceIds:[],
+    origin:'reentry-server',symbol:row.symbol,severity:null,title:row.symbol+' re-entry delivery record',ruleId:null,evidenceIds:[],
     observedAt:new Date(row.created_at).toISOString(),completedAt:timestamp(row.completed_at)?new Date(row.completed_at).toISOString():null,suppressionReason:null,...deliveryEvidence(row),
   }));
   const last=selected.at(-1);

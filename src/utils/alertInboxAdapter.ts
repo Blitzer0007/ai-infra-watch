@@ -2,7 +2,7 @@ import { ALERT_EVENTS_KEY } from './alertContracts';
 import { deliveryEvidence } from '../../shared/alertDeliveryEvidence.js';
 import { validCalendarInstant } from './catalystCalendar';
 export type InboxState = 'accepted'|'rejected'|'uncertain'|'sending'|'unknown';
-export type InboxItem = {id:string;episodeId:string|null;origin:'browser'|'reentry-server';symbol:string|null;severity:'info'|'medium'|'high'|'critical';title:string;explanation:string;observedAt:string;deliveryState:InboxState;providerMessageId:string|null;reconciliationRequired:boolean;source:string};
+export type InboxItem = {id:string;episodeId:string|null;origin:'browser'|'reentry-server';symbol:string|null;severity:'info'|'medium'|'high'|'critical'|null;title:string;explanation:string;observedAt:string;deliveryState:InboxState;providerMessageId:string|null;reconciliationRequired:boolean;source:string};
 export type BrowserInbox = {status:'available'|'partial'|'unavailable';items:InboxItem[];issue:string|null};
 export type ServerInbox = {items:InboxItem[];nextCursor:string|null;from:string;until:string};
 const object=(value:unknown):Record<string,unknown>=>value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
@@ -16,7 +16,7 @@ export function readBrowserInbox(storage:Pick<Storage,'getItem'>,nowMs:number):B
   const byId=new Map<string,InboxItem>();const conflicts=new Set<string>();
   for(const value of rows.slice(0,100)){
     const row=object(value);const id=safeText(row.id,256);const title=safeText(row.title);const time=typeof row.timestamp==='number'?row.timestamp:NaN;
-    if(!id||!title||!['price','large-move','catalyst'].includes(row.type as string)||!Number.isFinite(time)||time<=0||time>nowMs||!Number.isFinite(new Date(time).getTime())||row.simulated===true){invalid++;continue;}
+    if(!id||!title||!['price','large-move','catalyst'].includes(row.type as string)||!['info','medium','high','critical'].includes(row.severity as string)||!Number.isFinite(time)||time<=0||time>nowMs||!Number.isFinite(new Date(time).getTime())||row.simulated===true){invalid++;continue;}
     const item:InboxItem={id:'local:'+id,episodeId:null,origin:'browser',symbol:symbol(row.symbol),severity:['info','medium','high','critical'].includes(row.severity as string)?row.severity as InboxItem['severity']:'info',title,
       explanation:safeText(row.message,1000)||'A condition was detected in this browser.',observedAt:new Date(time).toISOString(),deliveryState:'unknown',providerMessageId:null,reconciliationRequired:false,source:safeText(row.source)||'Browser detection'};
     const previous=byId.get(item.id);if(previous&&JSON.stringify(previous)!==JSON.stringify(item))conflicts.add(item.id);else byId.set(item.id,item);
@@ -37,7 +37,7 @@ export function normalizeServerInbox(payload:unknown):ServerInbox {
     seen.add(row.id);
     const rawId=typeof row.providerMessageId==='string'&&/^\d{1,16}$/.test(row.providerMessageId)?Number(row.providerMessageId):null;
     const evidence=deliveryEvidence({status:row.deliveryState==='accepted'&&row.reconciliationRequired===true?'uncertain':row.deliveryState,telegram_message_id:rawId});
-    const item:InboxItem={id:row.id,episodeId:typeof row.episodeId==='string'&&/^[A-Za-z0-9_-]{43}$/.test(row.episodeId)?row.episodeId:null,origin:'reentry-server',symbol:symbol(row.symbol),severity:'info',title:row.symbol+' re-entry delivery record',observedAt:row.observedAt,...evidence,source:'Re-entry Telegram ledger'};
+    const item:InboxItem={id:row.id,episodeId:typeof row.episodeId==='string'&&/^[A-Za-z0-9_-]{43}$/.test(row.episodeId)?row.episodeId:null,origin:'reentry-server',symbol:symbol(row.symbol),severity:null,title:row.symbol+' re-entry delivery record',observedAt:row.observedAt,...evidence,source:'Re-entry Telegram ledger'};
     if(row.reconciliationRequired===true)item.reconciliationRequired=true;
     return item;
   });

@@ -78,6 +78,7 @@ def test_manual_server_read_is_scoped_separate_and_acceptance_is_not_a_read_rece
     assert inbox.get_by_test_id('inbox-record').get_by_text('Delivery unknown',exact=True).count()==1
     server_record=inbox.get_by_test_id('inbox-record').filter(has_text='Server delivery record').first
     server_record.locator('summary').click()
+    assert 'Trigger severity unavailable' in server_record.inner_text()
     assert 'not a read receipt' in server_record.inner_text()
     assert 'It has not been matched to a browser detection' in server_record.inner_text()
 
