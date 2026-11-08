@@ -42,6 +42,7 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'congress', kind: 'page', title: 'Congress Trades', subtitle: 'Disclosed congressional transactions', view: 'congress', aliases: ['politicians', 'trades'] },
   { id: 'macro', kind: 'page', title: 'Macro & Politics', subtitle: 'Macro risk and geopolitical signals', view: 'macro', aliases: ['politics', 'macro'] },
   { id: 'portfolio', kind: 'page', title: 'Portfolio Intelligence', subtitle: 'Holdings, exposure, attribution and stress', view: 'portfolio', aliases: ['holdings', 'positions'] },
+  { id: 'opportunities', kind: 'page', title: 'Opportunities', subtitle: 'Experimental snapshot research and coverage', view: 'opportunities', aliases: ['scanner', 'candidates'] },
   { id: 'watchlist', kind: 'page', title: 'Watchlist', subtitle: 'Price targets and earnings alerts', view: 'watchlist', aliases: ['alerts'] },
   { id: 'research', kind: 'page', title: 'AI Research', subtitle: 'Autonomous evidence-backed research', view: 'research', aliases: ['agents', 'research'] },
   { id: 'quality', kind: 'page', title: 'AI Quality Lab', subtitle: 'Model quality and evaluation signals', view: 'quality', aliases: ['quality', 'evaluation'] },

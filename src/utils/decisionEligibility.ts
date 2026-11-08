@@ -11,7 +11,7 @@ export type DataQualityResult = {
   eligibleForDecision: boolean; status: DataQualityStatus; checkedAt: string; reasons: string[];
   sourceCount: number; marketTime: string | null; retrievedAt: string | null; source?: string | null;
 };
-export function evaluateDecisionEligibility(quote: ValidatedQuote, requiredEvidenceComplete: boolean, accountingValid: boolean, nowMs = Date.now()): DataQualityResult {
+export function evaluateQuoteQuality(quote: ValidatedQuote, nowMs: number) {
   const reasons: string[] = [];
   const severity: Partial<Record<DataQualityStatus, number>> = { stale: 1, missing: 2, invalid: 3, conflicting: 4, simulated: 5 };
   let blockedStatus: DataQualityStatus | null = null;
@@ -45,13 +45,20 @@ export function evaluateDecisionEligibility(quote: ValidatedQuote, requiredEvide
   if (quote.status === 'last_close' && quote.isMarketSessionOpen === true) reject('invalid', 'Last close conflicts with an open market session.');
   if (severity[quote.status] != null) reject(quote.status, 'Provider quality status: ' + quote.status + '.');
   else if (!['valid', 'delayed', 'last_close'].includes(quote.status)) reject('invalid', 'Unrecognized provider quality status.');
-  if (!requiredEvidenceComplete) reasons.push('Required group, peer or supporting evidence is incomplete.');
-  if (!accountingValid) reasons.push('Portfolio accounting has not reconciled.');
   return {
-    eligibleForDecision: reasons.length === 0, status: blockedStatus ?? status,
+    eligible: reasons.length === 0, status: blockedStatus ?? status,
     checkedAt: new Date(nowMs).toISOString(), reasons, sourceCount: quote.provider.trim() ? 1 : 0,
     marketTime: quote.marketTime, retrievedAt: quote.retrievedAt, source: quote.provider || null,
   };
+}
+
+/** Holding decisions additionally require evidence and reconciled accounting. */
+export function evaluateDecisionEligibility(quote: ValidatedQuote, requiredEvidenceComplete: boolean, accountingValid: boolean, nowMs = Date.now()): DataQualityResult {
+  const { eligible, ...quality } = evaluateQuoteQuality(quote, nowMs);
+  const reasons = [...quality.reasons];
+  if (!requiredEvidenceComplete) reasons.push('Required group, peer or supporting evidence is incomplete.');
+  if (!accountingValid) reasons.push('Portfolio accounting has not reconciled.');
+  return { ...quality, reasons, eligibleForDecision: eligible && requiredEvidenceComplete && accountingValid };
 }
 
 export function normalizeDecisionQuote(symbol: string, input: Record<string, any> | undefined): ValidatedQuote {

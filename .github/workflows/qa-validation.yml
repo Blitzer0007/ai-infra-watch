@@ -80,7 +80,7 @@ jobs:
         env:
           QA_BASE_URL: http://127.0.0.1:3000
           QA_UI_MOCKS: "true"
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py
 
   safety:
     name: Offline CI safety regression tests

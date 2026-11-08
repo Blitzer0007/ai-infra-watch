@@ -1,3 +1,4 @@
+import OpportunityScanner from './components/opportunities/OpportunityScanner';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -13,9 +14,9 @@ import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
 import UniversalSearch from './components/UniversalSearch';
 
-const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
+const VIEW_IDS = new Set(['overview','opportunities','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
-  overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
+  opportunities: '/opportunities', overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
   portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', 'jev-lab': '/jev-lab', quality: '/quality', outlook: '/outlook',
   health: '/health', guide: '/guide', settings: '/settings'
 };
@@ -59,6 +60,8 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
+  const [portfolioSymbolsLoading, setPortfolioSymbolsLoading] = useState(true);
+  const [portfolioSymbolsAvailable, setPortfolioSymbolsAvailable] = useState(false);
 
   // Live Synthesis Data States
   const [liveData, setLiveData] = useState<{
@@ -108,12 +111,13 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const loadPortfolioSymbols = async () => {
+      if (!cancelled) setPortfolioSymbolsLoading(true);
       try {
         const rows = await fetchPortfolioHoldings();
-        if (!cancelled) setPortfolioSymbols(rows.map(row => row.symbol));
+        if (!cancelled) { setPortfolioSymbols(rows.map(row => row.symbol)); setPortfolioSymbolsAvailable(true); }
       } catch {
-        if (!cancelled) setPortfolioSymbols(PORTFOLIO_POSITIONS.map(position => position.symbol));
-      }
+        if (!cancelled) { setPortfolioSymbols(PORTFOLIO_POSITIONS.map(position => position.symbol)); setPortfolioSymbolsAvailable(false); }
+      } finally { if (!cancelled) setPortfolioSymbolsLoading(false); }
     };
     void loadPortfolioSymbols();
     const refresh = () => void loadPortfolioSymbols();
@@ -345,6 +349,7 @@ export default function App() {
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
+    { id: 'opportunities', label: 'Opportunities', index: 'R2', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
     { id: 'research', label: 'AI Research', index: '08', icon: Bot },
     { id: 'jev-lab', label: 'JEV Portfolio Lab', index: '09', icon: Bot },
@@ -586,6 +591,7 @@ export default function App() {
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
               {activeView === 'macro' && <MacroPolitics onNavigate={handleNavigate} liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} evidenceAvailability={liveData?.evidenceAvailability} />}
+              {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} loading={isLiveLoading || portfolioSymbolsLoading} holdingsAvailable={portfolioSymbolsAvailable} />}
               {activeView === 'watchlist' && <BuySellWatchlist />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
