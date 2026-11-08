@@ -1,6 +1,6 @@
 # AI Infra Watch — Release 2 engineering plan
 
-Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; remaining financial/provider work and later milestones are pending.
+Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; the [read-only inbox and focused Portfolio workspaces](release2-inbox-portfolio-review.md) implement the first R2.3 reader slice. Financial/provider work, notification-policy preview and evaluation extensions remain pending.
 Prepared: 8 November 2026, Asia/Kolkata.
 Inspected code baseline: `4c008237453d8e31944cb5fba00cac9726f49501`.
 Repository: `Blitzer0007/ai-infra-watch`.

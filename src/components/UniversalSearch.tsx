@@ -42,6 +42,7 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'congress', kind: 'page', title: 'Congress Trades', subtitle: 'Disclosed congressional transactions', view: 'congress', aliases: ['politicians', 'trades'] },
   { id: 'macro', kind: 'page', title: 'Macro & Politics', subtitle: 'Macro risk and geopolitical signals', view: 'macro', aliases: ['politics', 'macro'] },
   { id: 'portfolio', kind: 'page', title: 'Portfolio Intelligence', subtitle: 'Holdings, exposure, attribution and stress', view: 'portfolio', aliases: ['holdings', 'positions'] },
+  { id: 'alerts', kind: 'page', title: 'Alert Inbox', subtitle: 'Browser detections and read-only delivery evidence', view: 'alerts', aliases: ['notifications', 'delivery', 'inbox'] },
   { id: 'calendar', kind: 'page', title: 'Catalyst Calendar', subtitle: 'Loaded earnings dates, certainty, sources and revisions', view: 'calendar', aliases: ['events', 'earnings', 'catalysts'] },
   { id: 'opportunities', kind: 'page', title: 'Opportunities', subtitle: 'Experimental snapshot research and coverage', view: 'opportunities', aliases: ['scanner', 'candidates'] },
   { id: 'watchlist', kind: 'page', title: 'Watchlist', subtitle: 'Price targets and earnings alerts', view: 'watchlist', aliases: ['alerts'] },

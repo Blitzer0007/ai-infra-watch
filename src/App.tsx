@@ -1,3 +1,4 @@
+import AlertInbox from './components/alerts/AlertInbox';
 import OpportunityScanner from './components/opportunities/OpportunityScanner';
 import CatalystCalendar from './components/calendar/CatalystCalendar';
 import { unavailableCatalystSnapshot } from './utils/catalystCalendar';
@@ -16,9 +17,9 @@ import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
 import UniversalSearch from './components/UniversalSearch';
 
-const VIEW_IDS = new Set(['overview','opportunities','calendar','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
+const VIEW_IDS = new Set(['overview','opportunities','calendar','alerts','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
-  calendar: '/calendar', opportunities: '/opportunities', overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
+  alerts: '/alerts', calendar: '/calendar', opportunities: '/opportunities', overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
   portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', 'jev-lab': '/jev-lab', quality: '/quality', outlook: '/outlook',
   health: '/health', guide: '/guide', settings: '/settings'
 };
@@ -382,6 +383,7 @@ export default function App() {
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
     { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
     { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
+    { id: 'alerts', label: 'Alert Inbox', index: 'R2', icon: ShieldAlert },
     { id: 'calendar', label: 'Catalyst Calendar', index: 'R2', icon: Calendar },
     { id: 'opportunities', label: 'Opportunities', index: 'R2', icon: TrendingUp },
     { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
@@ -628,6 +630,7 @@ export default function App() {
               {activeView === 'macro' && <MacroPolitics onNavigate={handleNavigate} liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} evidenceAvailability={liveData?.evidenceAvailability} />}
               {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} loading={isLiveLoading || portfolioSymbolsLoading} holdingsAvailable={portfolioSymbolsAvailable} />}
               {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
+              {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} />}
               {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}

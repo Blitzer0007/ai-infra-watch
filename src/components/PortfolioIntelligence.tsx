@@ -1,3 +1,4 @@
+import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
 import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
 import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
@@ -37,7 +38,6 @@ type Price = {
   stale?: boolean;
   cached?: boolean;
 };
-type PortfolioTab = 'overview' | 'holdings' | 'performance' | 'evidence' | 'research' | 'watchlist' | 'events' | 'rotation' | 'network';
 type PortfolioHistoryPoint = { date: string; price: number };
 type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
 type HistoricalPriceState = {
@@ -69,10 +69,10 @@ const WATCHLIST = STOCK_UNIVERSE;
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
-  const [tab, setTab] = useState<PortfolioTab>(() => {
-    const value = new URLSearchParams(window.location.search).get('portfolio_tab');
-    return value === 'holdings' || value === 'performance' || value === 'evidence' || value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
-  });
+  const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
+  const [holdingsVisited, setHoldingsVisited] = useState(tab === 'holdings');
+  const sectionHeading = useRef<HTMLHeadingElement>(null);
+  const focusSection = useRef(false);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
@@ -103,7 +103,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [analystLoading, setAnalystLoading] = useState(false);
   const [analystError, setAnalystError] = useState('');
 
-  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
+  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; if(currency !== 'INR' || !['holdings','performance'].includes(tab)) return; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency, tab]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
 
   const historyCacheRef = useRef(new Map<string, { points: PortfolioHistoryPoint[]; fetchedAt: number }>());
@@ -132,8 +132,33 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   };
 
   const changeTab = (nextTab: PortfolioTab) => {
+    if (nextTab === tab) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('portfolio_tab', nextTab);
+    window.history.pushState(window.history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash);
+    focusSection.current = true;
     setTab(nextTab);
   };
+  useEffect(() => {
+    if (tab === 'holdings') setHoldingsVisited(true);
+    if (focusSection.current) {
+      sectionHeading.current?.focus({ preventScroll: true });
+      sectionHeading.current?.scrollIntoView({ block: 'start' });
+      focusSection.current = false;
+    }
+  }, [tab]);
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      focusSection.current = true;
+      setTab(portfolioTabFromValue(params.get('portfolio_tab')));
+      setQ(params.get('portfolio_q') || '');
+      setGroup(params.get('portfolio_group') || 'All');
+      setSelected(params.get('portfolio_symbol') || 'NVDA');
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
     localStorage.setItem('aiw-portfolio-view-mode', mode);
@@ -177,6 +202,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, []);
   useEffect(() => {
     let cancelled = false;
+    if (tab !== 'holdings') return;
     if (!selected) {
       setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
       return () => { cancelled = true; };
@@ -204,10 +230,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
       });
     return () => { cancelled = true; };
-  }, [selected]);
+  }, [selected, tab]);
 
   useEffect(() => {
     let cancelled = false;
+    if (!['performance','rotation','evidence'].includes(tab)) return;
     const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
     setPortfolioHistory({ loading: true, histories: {}, error: '' });
@@ -221,7 +248,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
     });
     return () => { cancelled = true; };
-  }, [holdings.map(item => item.symbol).join(',')]);
+  }, [holdings.map(item => item.symbol).join(','), tab]);
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
@@ -286,6 +313,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
+    if (!['holdings','evidence'].includes(tab)) return;
     if (!selectedAnalysis?.symbol) {
       setAnalystConsensus(null);
       return () => { cancelled = true; };
@@ -302,7 +330,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
       .finally(() => { if (!cancelled) setAnalystLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol]);
+  }, [selectedAnalysis?.symbol, tab]);
 
   useEffect(() => {
     if (!holdings.length) return;
@@ -311,6 +339,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
+    if (tab !== 'holdings') return;
     if (!selected) {
       setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
       return () => { cancelled = true; };
@@ -328,10 +357,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
       });
     return () => { cancelled = true; };
-  }, [selected, chartRange]);
+  }, [selected, chartRange, tab]);
 
   useEffect(() => {
     let cancelled = false;
+    if (tab !== 'performance') return;
     if (!analyses.length) {
       setPeerPortfolioComparisons([]);
       return () => { cancelled = true; };
@@ -366,10 +396,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)).map((item, index) => ({ ...item, holdingSymbol: analyses[index]?.symbol || '—' })) as Array<PeerCounterfactual & { holdingSymbol: string }>);
     });
     return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
 
   useEffect(() => {
     let cancelled = false;
+    if (tab !== 'holdings') return;
     if (!selectedAnalysis) {
       setPeerComparison(null);
       return () => { cancelled = true; };
@@ -408,7 +439,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -674,34 +705,50 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
-      <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
+      <div style={{ position: 'static' }} className="aiw-page-header top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>
-          <h1 className="text-2xl font-black mt-2">Portfolio Overview &amp; Decisions</h1>
-          <div className="text-xs text-white/45 mt-1">Your holdings · live prices · performance · risks · evidence · market comparisons</div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
-          <span className="px-2 py-1 rounded-full border border-white/10">LIVE PRICES {stressFreshCount}/{analyses.length}</span>
-          {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
-          <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">ADD OPPORTUNITIES {addReviews}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">RISK CHECKS {riskReviews}</span>
-          <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
-            <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
-            <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
-          </div>
+          <h1 className="text-2xl font-black mt-2">Portfolio Intelligence</h1>
+          <div className="text-xs text-white/45 mt-1">One workspace at a time: review, manage, measure, or investigate.</div>
         </div>
       </div>
-
+      <PortfolioNavigation tab={tab} onChange={changeTab} />
+      <div>
+        <h2 ref={sectionHeading} tabIndex={-1} style={{ scrollMarginTop: '8rem' }} className="text-xl font-semibold" data-testid="portfolio-section-heading">{PORTFOLIO_SECTIONS.find(item=>item.id===tab)?.label}</h2>
+        <p className="mt-1 text-sm text-white/70">{PORTFOLIO_SECTIONS.find(item=>item.id===tab)?.description}</p>
+      </div>
+      {['holdings','evidence','network'].includes(tab) && <FilterSelect label="Selected holding" value={selectedAnalysis?.symbol || ''} disabled={!analyses.length} onChange={event=>setSelected(event.target.value)}>
+        {!analyses.length && <option value="">No holdings available</option>}
+        {analyses.map(holding=><option key={holding.symbol} value={holding.symbol}>{holding.symbol} · {holding.name}</option>)}
+      </FilterSelect>}
+      {holdingsVisited && <div hidden={tab !== 'holdings'}>
+          <details className="rounded-xl border border-white/15 p-4" data-testid="portfolio-management">
+            <summary className="cursor-pointer text-sm font-semibold">Manage positions and purchases</summary>
+            <div className="mt-4"><PortfolioManager holdings={holdings} onChanged={setHoldings} /></div>
+          </details>
+      </div>}
+      {(tab === 'holdings' || tab === 'performance') && <div className="flex flex-wrap items-end gap-3">
+        <FilterSelect label="Portfolio totals currency" value={currency} onChange={event=>setCurrency(event.target.value as 'USD'|'INR')}><option value="USD">USD</option><option value="INR">INR</option></FilterSelect>
+        <p className="text-sm text-white/70">Quoted prices keep their source currency. INR totals need an available exchange rate; otherwise values remain marked in USD.</p>
+      </div>}
+      {tab === 'overview' && <div className="flex flex-wrap items-center gap-2 text-sm" aria-label="Portfolio explanation detail">
+        <span className="text-white/70">Explanation detail</span>
+        <button type="button" onClick={()=>changeViewMode('simple')} aria-pressed={viewMode==='simple'} className="rounded-lg border border-white/20 px-3 py-2">Simple</button>
+        <button type="button" onClick={()=>changeViewMode('detailed')} aria-pressed={viewMode==='detailed'} className="rounded-lg border border-white/20 px-3 py-2">Detailed</button>
+      </div>}
       {tab === 'overview' && <PortfolioCommandCenter explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'} summary={commandSummary} positions={decisionCards} catalysts={news.filter(item => item.confirmed === true && typeof item.date === 'string' && typeof item.source === 'string').map(item => ({ symbol: item.symbol, date: item.date, source: item.source, confirmed: true }))} loading={portfolioLoading} error={portfolioError}
         onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
         onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }} />}
 
-      <PortfolioManager holdings={holdings} onChanged={setHoldings} />
-      {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} />}
+
+      {tab === 'overview' && <section aria-label="Continue your portfolio review" className="grid gap-3 sm:grid-cols-3">
+        {([['holdings','Find or manage a holding'],['performance','Review returns and cash flows'],['evidence','Inspect evidence and risks']] as const).map(([id,label])=><button type="button" key={id} onClick={()=>changeTab(id)} className="rounded-xl border border-white/20 p-4 text-left text-sm font-semibold text-cyan-100 hover:bg-white/5">{label} →</button>)}
+      </section>}
+      {tab === 'performance' && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
       {portfolioError && <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/70">{portfolioError}. Persistent portfolio data could not be loaded; check the portfolio API and Supabase connection.</div>}
 
+      {tab === 'performance' && (
       <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 px-4 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -728,7 +775,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 mb-2"><span className="text-[10px] font-mono uppercase text-white/55">Display currency</span>{(['USD', 'INR'] as const).map(code => <button key={code} type="button" aria-pressed={currency === code} onClick={() => setCurrency(code)} className={"px-2 py-1 rounded border text-[10px] font-mono " + (currency === code ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-200" : "border-white/10 text-white/55")}>{code}</button>)}</div>
+
        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
           <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2">
             <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Up today</div>
@@ -750,8 +797,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           </div>
         </div>
       </section>
+      )}
 
-      {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && (
+      {tab === 'performance' && (
               <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
                 <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
                   <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio performance &amp; risk</div><h2 className="text-lg font-black mt-1">Risk, performance &amp; market comparison</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
@@ -824,7 +872,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <div className="mt-3 text-[8px] font-mono text-white/20">Risk pressure uses observed market moves and your portfolio mix; it is not a forecast. P&amp;L contribution shows what helped or hurt performance. Market comparisons use the same overlapping dates.</div>
               </section>
               )}
-      {tab === 'overview' && (
+      {tab === 'performance' && <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />}
+      {tab === 'performance' && (
               <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-7 gap-3" id="portfolio-investment-summary">
                 <Metric label="Open cost basis" value={formatPortfolioMoney(tradePerformance.openCostBasis ?? investedTotal)} suffix="Remaining share cost · trade-ledger basis" tone="neutral" icon={<WalletCards/>}/>
                 <Metric label="Holdings value" value={formatPortfolioMoney(liveCurrentTotal)} suffix={livePositions.length + '/' + analyses.length + ' fresh quotes'} tone="up" icon={<TrendingUp/>}/>
@@ -834,80 +883,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <Metric label="AI infrastructure strength" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        <span className="px-2 py-2 text-[9px] font-mono uppercase tracking-widest text-white/20">Explore</span>
-        {([['overview','Overview'],['holdings','My Holdings'],['performance','Performance'],['evidence','Evidence'],['watchlist','Watchlist'],['events','Events'],['rotation','Money Flow'],['network','Connections'],['research','Portfolio Research']] as const).map(x =>
-          <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
-            {x[1]}
-          </button>
-        )}
-      </div>
-
-
       {tab === 'research' && <PortfolioResearchPanel />}
 
       {tab === 'holdings' && (
         <div className="space-y-4">
-          <Panel title="Holdings" subtitle="Compact portfolio view. Select a row to open the holding context below.">
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full min-w-[760px] text-left">
-                <thead className="bg-black/20">
-                  <tr className="text-[9px] font-mono uppercase tracking-widest text-white/30">
-                    <th className="px-3 py-2.5">Stock</th>
-                    <th className="px-3 py-2.5">Weight</th>
-                    <th className="px-3 py-2.5">P&amp;L</th>
-                    <th className="px-3 py-2.5">Today</th>
-                    <th className="px-3 py-2.5">Rule</th>
-                    <th className="px-3 py-2.5">Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {filtered.map(h => (
-                    <tr key={h.symbol} className={selected === h.symbol ? 'bg-cyan-300/[.04]' : 'hover:bg-white/[.02]'}>
-                      <td className="px-3 py-3">
-                        <button type="button" onClick={() => setSelected(h.symbol)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
-                        <div className="text-[9px] text-white/30 mt-0.5">{h.name}</div>
-                      </td>
-                      <td className="px-3 py-3 font-mono text-[10px]">{((h.portfolioWeight || 0) * 100).toFixed(1)}%</td>
-                      <td className={'px-3 py-3 font-mono text-[10px] ' + (h.pnlPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}</td>
-                      <td className={'px-3 py-3 font-mono text-[10px] ' + (h.dailyChangePct == null ? 'text-white/35' : h.dailyChangePct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</td>
-                      <td className="px-3 py-3"><StatePill state={h.state}/></td>
-                      <td className="px-3 py-3 font-mono text-[10px]">{formatPortfolioMoney(h.currentValue ?? h.investedValue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!filtered.length && <div className="p-6 text-center text-[10px] text-white/30">No holdings match the current filters.</div>}
-            </div>
-          </Panel>
-          {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-          {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-          {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
-        </div>
-      )}
 
-      {tab === 'evidence' && (
-        <div className="space-y-4">
-          <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
-          <SignalScorecardPanel />
-          <PortfolioSignalFusion prices={livePrices} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} politicalSignals={politicalSignals} heldSymbols={analyses.map(item => item.symbol)} />
-          <UnifiedEventTimeline symbol={selected} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} politicalSignals={politicalSignals} purchaseDate={selectedAnalysis?.purchaseDate || null} />
-        </div>
-      )}
-
-      {tab === 'overview' && (
-        <>
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
-            <section className="min-w-0 space-y-3 self-start xl:sticky xl:top-4" aria-label="Portfolio decision context">
-              <JevDecisionPanel
-                kind="portfolio"
-                title="Portfolio decision context"
-                subtitle="Typed research triage and context from measured portfolio evidence; not a trade instruction."
-                state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }}
-              />
-              {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
-            </section>
-            <section className="min-w-0">
               <Panel title="Your holdings" subtitle="Your saved positions with live prices, returns, rules and review signals. Select a holding to see more.">
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
@@ -948,52 +928,60 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
               <div className="grid grid-cols-1 2xl:grid-cols-2 gap-2">{filtered.map(h => <PositionRow key={h.symbol} h={h} selected={selected === h.symbol} onSelect={() => setSelected(h.symbol)} />)}</div>
               </Panel>
-            </section>
-          </div>
+          <details className="rounded-xl border border-white/15 p-4"><summary className="cursor-pointer text-sm font-semibold">Holdings table</summary>
 
-          <div className="space-y-4">
-            {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-            {viewMode === 'detailed' && (
-              <>
-                <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
-                {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
-                {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-                <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />
-              </>
-            )}
-          </div>
+          <Panel title="Holdings" subtitle="Compact portfolio view. Select a row to open the holding context below.">
+            <div className="overflow-x-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[760px] text-left">
+                <thead className="bg-black/20">
+                  <tr className="text-[9px] font-mono uppercase tracking-widest text-white/30">
+                    <th className="px-3 py-2.5">Stock</th>
+                    <th className="px-3 py-2.5">Weight</th>
+                    <th className="px-3 py-2.5">P&amp;L</th>
+                    <th className="px-3 py-2.5">Today</th>
+                    <th className="px-3 py-2.5">Rule</th>
+                    <th className="px-3 py-2.5">Value</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filtered.map(h => (
+                    <tr key={h.symbol} className={selected === h.symbol ? 'bg-cyan-300/[.04]' : 'hover:bg-white/[.02]'}>
+                      <td className="px-3 py-3">
+                        <button type="button" onClick={() => setSelected(h.symbol)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
+                        <div className="text-[9px] text-white/30 mt-0.5">{h.name}</div>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-[10px]">{((h.portfolioWeight || 0) * 100).toFixed(1)}%</td>
+                      <td className={'px-3 py-3 font-mono text-[10px] ' + (h.pnlPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{h.livePrice == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'}</td>
+                      <td className={'px-3 py-3 font-mono text-[10px] ' + (h.dailyChangePct == null ? 'text-white/35' : h.dailyChangePct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}</td>
+                      <td className="px-3 py-3"><StatePill state={h.state}/></td>
+                      <td className="px-3 py-3 font-mono text-[10px]">{formatPortfolioMoney(h.currentValue ?? h.investedValue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!filtered.length && <div className="p-6 text-center text-[10px] text-white/30">No holdings match the current filters.</div>}
+            </div>
+          </Panel>
+          </details>
+          {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
+          <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary>
+            <div className="mt-4 space-y-4">
+          {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
+          {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+            </div>
+          </details>
+        </div>
+      )}
 
-          {viewMode === 'detailed' && (
-            <>
-              <div className="bg-[#15181E] border border-white/10 rounded-2xl px-4 py-3 text-[10px] text-white/45">
-                <span className="font-mono text-white/65 uppercase mr-2">PORTFOLIO DATA NOTE</span>
-                Broker order history is used for holding-period context and cash-flow-aware comparisons. Advanced evidence panels are available from the Evidence tab.
-              </div>
-
-              <SignalScorecardPanel />
-
-              <PortfolioSignalFusion
-                prices={livePrices}
-                contracts={contracts}
-                congressTrades={congressTrades}
-                macroRisks={macroRisks}
-                news={news}
-                politicalSignals={politicalSignals}
-                heldSymbols={analyses.map(item => item.symbol)}
-              />
-
-              <UnifiedEventTimeline
-                symbol={selected}
-                contracts={contracts}
-                congressTrades={congressTrades}
-                macroRisks={macroRisks}
-                news={news}
-                politicalSignals={politicalSignals}
-                purchaseDate={selectedAnalysis?.purchaseDate || null}
-              />
-            </>
-          )}
-        </>
+      {tab === 'evidence' && (
+        <div className="space-y-4">
+          <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
+          <JevDecisionPanel kind="portfolio" title="Portfolio decision context" subtitle="Research triage from portfolio evidence; not a trade instruction." state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }} />
+          {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}
+          <SignalScorecardPanel />
+          <PortfolioSignalFusion prices={livePrices} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} politicalSignals={politicalSignals} heldSymbols={analyses.map(item => item.symbol)} />
+          <UnifiedEventTimeline symbol={selected} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} politicalSignals={politicalSignals} purchaseDate={selectedAnalysis?.purchaseDate || null} />
+        </div>
       )}
 
       {tab === 'watchlist' && (

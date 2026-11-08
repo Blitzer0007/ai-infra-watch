@@ -127,10 +127,11 @@ def test_portfolio_search_is_functional(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
     search = portfolio.get_by_placeholder("Search ticker, company or theme")
     search.fill("NVDA")
     page.wait_for_timeout(500)
-    assert "Portfolio Overview & Decisions" in portfolio.inner_text()
+    assert "Portfolio Intelligence" in portfolio.inner_text()
 
 def test_autonomous_research_ui_without_calling_llm(page):
     mock_local_apis(page)
@@ -170,6 +171,8 @@ def test_portfolio_manager_create_flow(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_text("Manage positions and purchases", exact=True).click()
     page.get_by_test_id("portfolio-add-holding").click()
     page.get_by_test_id("portfolio-field-ticker").fill("AMD")
     page.get_by_test_id("portfolio-field-quantity").fill("2")
@@ -195,7 +198,8 @@ def test_analyst_expectations_panel(page):
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
     page.get_by_test_id("portfolio-intelligence").wait_for(state="attached", timeout=30000)
-    page.get_by_text("My Holdings", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     page.get_by_test_id("analyst-expectations").wait_for(state="visible", timeout=30000)
     assert "EXTERNAL ANALYST EXPECTATIONS" in page.get_by_test_id("analyst-expectations").inner_text().upper()
 
@@ -206,7 +210,7 @@ def test_event_study_uses_consolidated_api(page):
     page.on("request", lambda request: requests.append(request.url))
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Events", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("events")
     page.wait_for_timeout(1500)
     assert any("/api/company-scale?action=milestones" in url for url in requests)
     assert any("/api/company-scale?action=history" in url for url in requests)
@@ -228,7 +232,7 @@ def test_event_study_identifies_selected_ticker(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Events", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("events")
     page.get_by_text("SELECTED TICKER", exact=True).wait_for(state="visible", timeout=30000)
     assert page.get_by_text("NVDA", exact=True).count() >= 1
     assert page.get_by_text(
@@ -240,7 +244,7 @@ def test_money_rotation_semantic_colors_mount(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Money Flow", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("rotation")
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
     for label in ("Strengthening", "Weakening", "Mixed", "Insufficient"):
@@ -253,6 +257,7 @@ def test_exit_profit_scenarios_identify_selected_ticker(page):
     page.goto("/portfolio?portfolio_tab=holdings", wait_until="domcontentloaded")
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="visible", timeout=30000)
+    page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     page.get_by_text("What-if price scenarios", exact=True).wait_for(state="visible", timeout=30000)
     section = page.get_by_text("What-if price scenarios", exact=True).locator("..")
     assert "NVDA" in section.inner_text()
@@ -266,6 +271,7 @@ def test_held_portfolio_filters_and_sort_mount(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
     portfolio.get_by_label("Filter your holdings by status").wait_for(state="visible", timeout=30000)
     portfolio.get_by_label("Sort your holdings").wait_for(state="visible", timeout=30000)
 
@@ -318,6 +324,8 @@ def test_purchase_lot_sanity_check_mounts(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="visible", timeout=30000)
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_text("Manage positions and purchases", exact=True).click()
     portfolio.get_by_label("Purchase history for NVDA").click()
     portfolio.get_by_text("VERIFY LOT", exact=True).wait_for(state="visible", timeout=30000) if portfolio.get_by_text("VERIFY LOT", exact=True).count() else None
 
@@ -326,7 +334,7 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Events", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("events")
     page.get_by_test_id("portfolio-intelligence").get_by_text("SOXX", exact=True).first.wait_for(state="visible", timeout=30000)
     assert "Event" in page.get_by_test_id("portfolio-intelligence").inner_text()
 
@@ -345,7 +353,7 @@ def test_contract_event_study_shows_sector_benchmark_context(page):
     mock_local_apis(page)
     goto_app(page)
     page.get_by_test_id("nav-portfolio").click()
-    page.get_by_text("Events", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("events")
     benchmark = page.get_by_text("NVDA · 5D Beta-Adjusted vs SOXX", exact=True)
     benchmark.wait_for(state="visible", timeout=30000)
     assert "SOXX" in benchmark.locator("..").inner_text()
@@ -357,6 +365,8 @@ def test_purchase_lot_sanity_check_is_visible(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="visible", timeout=30000)
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_text("Manage positions and purchases", exact=True).click()
     portfolio.get_by_label("Purchase history for NVDA").click()
     portfolio.get_by_text("NO MARKET DATE", exact=True).wait_for(state="visible", timeout=30000)
 

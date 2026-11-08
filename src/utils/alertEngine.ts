@@ -1,22 +1,9 @@
 import { AppConfig } from '../utils';
 import { authFetch, getAccessToken } from './apiAuth';
 
-export type AlertSeverity = 'info' | 'medium' | 'high' | 'critical';
-export type AlertEventType = 'price' | 'large-move' | 'catalyst';
-
-export interface AlertEvent {
-  id: string;
-  type: AlertEventType;
-  severity: AlertSeverity;
-  symbol?: string;
-  title: string;
-  message: string;
-  timestamp: number;
-  value?: number;
-  source?: string;
-}
-
-export const ALERT_EVENTS_KEY = 'aiw_alert_events_v1';
+import { ALERT_EVENTS_KEY, type AlertEvent, type AlertEventType } from './alertContracts';
+export { ALERT_EVENTS_KEY } from './alertContracts';
+export type { AlertEvent, AlertEventType, AlertSeverity } from './alertContracts';
 export const ALERT_STATE_KEY = 'aiw_alert_state_v1';
 export const TELEGRAM_ENABLED_KEY = 'aiw_telegram_alerts_enabled_v1';
 const MAX_EVENTS = 100;

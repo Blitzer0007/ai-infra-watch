@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from test_ui import mock_local_apis
 
-ROUTES = ['overview','contracts','tracker','congress','macro','portfolio','calendar','opportunities','watchlist','research','jev-lab','quality','outlook','health','guide','settings']
+ROUTES = ['overview','contracts','tracker','congress','macro','portfolio','alerts','calendar','opportunities','watchlist','research','jev-lab','quality','outlook','health','guide','settings']
 
 AUDIT = r'''() => {
   const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none';
