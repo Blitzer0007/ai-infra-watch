@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/**"
       - "src/**"
+      - "scripts/forecast-evaluation-demo.mjs"
+      - "scripts/fixtures/forecast-evaluation-window.fictional.json"
       - "shared/**"
       - "api/**"
       - "server/**"
@@ -35,6 +37,8 @@ on:
       - "server/**"
       - "supabase/**"
       - "src/**"
+      - "scripts/forecast-evaluation-demo.mjs"
+      - "scripts/fixtures/forecast-evaluation-window.fictional.json"
       - "shared/**"
       - "api/**"
       - "package.json"

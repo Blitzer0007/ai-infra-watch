@@ -27,6 +27,8 @@ No verification/auto-track handler is edited or invoked, no old outcome is rewri
 - TypeScript, production build, source security, migration-manifest integrity and **25 offline workflow-safety cases** are checked. Existing bundle-size warnings remain. CI adds only these mocked browser cases/artifacts; live and deployment controls remain unchanged. Exact-head CI is recorded in draft PR #168.
 - Fictional screenshots: `/workspace/artifacts/forecast-summary-fix/forecast-summary-{360,768,1440}.png`. They show actual feature-branch rendering, not production evidence.
 
+Follow-up: the [offline session/history preflight](release2-forecast-session-preflight.md) now provides an isolated versioned contract and fictional characterization tests. Legacy writers and hosted history remain unchanged.
+
 ## Remaining forecast work
 
 Specify exchange-session entry/target mapping and versioned price-history/PIT guards before changing weekday targets, the freshness guard or stored outcomes. Review holiday closures, future/duplicate/missing bars, observation age, raw/adjusted basis, corporate actions and delistings with independent cases. Then freeze rolling-origin/purged cutoffs, matched benchmark/fee/entry assumptions and proper point/quantile/interval metrics with time-cluster uncertainty. Unify legacy analytics contracts separately and retain historical horizon identity.
