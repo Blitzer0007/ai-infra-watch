@@ -51,6 +51,8 @@ Subsequent increment: [missing-data analytics correction](release2-missing-data-
 
 Subsequent [loaded-ledger review](release2-loaded-ledger-review.md): preserve source accounting fields before display defaults, distinguish unavailable/empty history, validate loaded quantities/order/fees/units, and fix relative closure tolerance erasing small remaining positions in all three weighted-average paths. Full-history/corporate-action proof and remaining aggregate tolerances are still open.
 
+The subsequent [forecast-validation audit](release2-forecast-validation-audit.md) reproduces recent-window ordering, mixed-calibration labeling, numeric/date admission and session-mapping defects. It compares pinned Qlib/StatsForecast evaluation practices with actual REA/static evidence. Forecast fixes and a frozen evaluation protocol remain pending; this read-only report changes no historical outcome.
+
 ## Verification and safety
 
 Subsequent [data-source follow-up](release2-data-source-audit.md): corrected Vercel quote normalization, provenance/coverage and history-currency defaults, and disabled standalone model-generated/canned financial observations. Selected REA analysis is explicitly partial; manual review additionally found open Python timestamp/default-value and SEC budget/filing-label issues. Source availability, source suitability and numerical correctness remain separate gates. Comprehensive calculation sign-off is still open.

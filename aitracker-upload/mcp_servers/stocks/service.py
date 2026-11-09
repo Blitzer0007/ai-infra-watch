@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .providers import FinnhubProvider, FixtureProvider, QuoteError, QuoteProvider, _utc_now_iso
 from .schemas import Quote, QuoteBatch, ServerHealth, observation_time
+from mcp_servers.provider_budget import BUDGET_CODES
 
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "data" / "stock_watchlist.json"
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "quotes.json"
@@ -97,7 +98,7 @@ class StockService:
             try:
                 quotes.append(self.get_quote(sym))
             except QuoteError as exc:
-                errors[sym] = exc.code if exc.code in {"NO_KEY", "NO_DATA", "HTTP_ERROR", "RATE_LIMIT"} else "PROVIDER_ERROR"
+                errors[sym] = exc.code if exc.code in {"NO_KEY", "NO_DATA", "HTTP_ERROR", "RATE_LIMIT", *BUDGET_CODES} else "PROVIDER_ERROR"
         if requested and len(errors) == len(requested):
             raise QuoteError("NO_DATA", f"all {len(requested)} symbols failed")
         retrieved_at = self._clock()

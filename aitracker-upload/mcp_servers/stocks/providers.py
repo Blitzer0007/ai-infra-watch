@@ -7,7 +7,7 @@ Two implementations behind one Protocol:
     Market Agent and the whole pipeline run with zero network.
   * FinnhubProvider — real quotes from Finnhub's REST API, with the
     bounded retry/backoff discipline. Account quotas and exchange
-    entitlements require separate verification and a shared request budget.
+    entitlements require separate verification. Live requests share process-level admission.
 
 Both return the schemas in schemas.py, so callers never branch on
 which provider is active — only the `source` field differs.
@@ -25,6 +25,7 @@ from typing import Protocol
 import httpx
 from pydantic import ValidationError
 
+from mcp_servers.provider_budget import budgeted_json
 from .schemas import Quote
 
 
@@ -142,8 +143,8 @@ class FinnhubProvider:
 
     Mirrors js/core.js fetchQuote(): Finnhub returns c/h/l/o/pc, and an
     all-zero payload for an invalid symbol (not an HTTP error), which we
-    map to NO_DATA. Retries transient HTTP errors with exponential
-    backoff, same policy as the LLM client.
+    map to NO_DATA. Transient retries share process admission and an
+    operation deadline; 429 starts a shared cooldown without immediate retry.
     """
 
     source = "finnhub"
@@ -167,33 +168,10 @@ class FinnhubProvider:
         if not self.api_key:
             raise QuoteError("NO_KEY", "FINNHUB_API_KEY is not set")
         symbol = symbol.strip().upper()
-        url = f"{self.BASE}/quote"
-        params = {"symbol": symbol, "token": self.api_key}
-        for attempt in range(self.max_retries + 1):
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.get(url, params=params)
-                if resp.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit reached")
-                if resp.status_code >= 400:
-                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
-                try:
-                    data = resp.json()
-                except ValueError as exc:
-                    raise QuoteError("NO_DATA", "Finnhub returned invalid JSON") from exc
-                return self._normalize(symbol, data)
-            except httpx.HTTPError:
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        # HTTP exceptions can embed the request URL/token. Expose only a fixed error.
-        raise QuoteError("HTTP_ERROR", "Finnhub request failed") from None
+        data = budgeted_json("finnhub", f"{self.BASE}/quote", error_type=QuoteError,
+            params={"symbol": symbol, "token": self.api_key}, timeout=self.timeout,
+            max_retries=self.max_retries, base_delay=self.base_delay)
+        return self._normalize(symbol, data)
 
     def _normalize(self, symbol: str, data: dict) -> Quote:
         if not isinstance(data, dict) or _positive(data.get("c")) is None:

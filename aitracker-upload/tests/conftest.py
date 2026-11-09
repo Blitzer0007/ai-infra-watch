@@ -84,3 +84,19 @@ def sample_stock_data() -> list[dict]:
             "news": ["Digi Power X secured a data center deal."],
         },
     ]
+
+
+@pytest.fixture(autouse=True)
+def isolated_provider_budget(monkeypatch):
+    """Fresh shared state per test; real limits/pacing with a virtual clock."""
+    from mcp_servers import provider_budget
+    class Clock:
+        now = 0.0
+        def read(self):
+            return self.now
+        def advance(self, seconds):
+            self.now += seconds
+    clock = Clock()
+    budget = provider_budget.ProviderBudget(clock=clock.read, sleep=clock.advance, wall_clock=lambda: 1794225600 + clock.now)
+    monkeypatch.setattr(provider_budget, "_PROCESS_BUDGET", budget)
+    return budget, clock

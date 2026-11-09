@@ -31,6 +31,7 @@ from typing import Protocol
 import httpx
 
 from .providers import QuoteError, _http_retryable
+from mcp_servers.provider_budget import budgeted_json
 from .schemas import Candle, CandleSeries
 
 CANDLES_FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "candles.json"
@@ -260,59 +261,39 @@ class FinnhubCandleProvider:
             "to": now,
             "token": self.api_key,
         }
-        last_exc: Exception | None = None
-        for attempt in range(self.max_retries + 1):
+        data = budgeted_json("finnhub", "https://finnhub.io/api/v1/stock/candle", error_type=QuoteError,
+            params=params, timeout=self.timeout, max_retries=self.max_retries, base_delay=self.base_delay)
+        if data.get("s") != "ok":
+            raise QuoteError("NO_DATA", f"no candle data for {symbol}")
+        closes = data.get("c") or []
+        timestamps = data.get("t") or []
+        opens = data.get("o") or []
+        highs = data.get("h") or []
+        lows = data.get("l") or []
+        volumes = data.get("v") or []
+        candles: list[Candle] = []
+        for i, ts in enumerate(timestamps):
             try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.get("https://finnhub.io/api/v1/stock/candle", params=params)
-                if resp.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit (60/min free tier)")
-                if resp.status_code >= 400:
-                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
-                data = resp.json()
-                if data.get("s") != "ok":
-                    raise QuoteError("NO_DATA", f"no candle data for {symbol}")
-                closes = data.get("c") or []
-                timestamps = data.get("t") or []
-                opens = data.get("o") or []
-                highs = data.get("h") or []
-                lows = data.get("l") or []
-                volumes = data.get("v") or []
-                candles: list[Candle] = []
-                for i, ts in enumerate(timestamps):
-                    try:
-                        candles.append(
-                            Candle(
-                                symbol=symbol,
-                                date=time.strftime("%Y-%m-%d", time.gmtime(ts)),
-                                open=float(opens[i]),
-                                high=float(highs[i]),
-                                low=float(lows[i]),
-                                close=float(closes[i]),
-                                volume=float(volumes[i]) if i < len(volumes) else None,
-                                source=self.source,
-                            )
-                        )
-                    except (IndexError, TypeError, ValueError):
-                        continue
-                if not candles:
-                    raise QuoteError("NO_DATA", f"no parseable candle data for {symbol}")
-                candles.sort(key=lambda c: c.date)
-                if lookback > 0:
-                    candles = candles[-(lookback + 1):]
-                return CandleSeries(symbol=symbol, candles=candles, source=self.source)
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        raise QuoteError("HTTP_ERROR", f"Finnhub candle request failed: {last_exc}")
+                candles.append(
+                    Candle(
+                        symbol=symbol,
+                        date=time.strftime("%Y-%m-%d", time.gmtime(ts)),
+                        open=float(opens[i]),
+                        high=float(highs[i]),
+                        low=float(lows[i]),
+                        close=float(closes[i]),
+                        volume=float(volumes[i]) if i < len(volumes) else None,
+                        source=self.source,
+                    )
+                )
+            except (IndexError, TypeError, ValueError):
+                continue
+        if not candles:
+            raise QuoteError("NO_DATA", f"no parseable candle data for {symbol}")
+        candles.sort(key=lambda c: c.date)
+        if lookback > 0:
+            candles = candles[-(lookback + 1):]
+        return CandleSeries(symbol=symbol, candles=candles, source=self.source)
 
 
 # ----------------------------------------------------------------------

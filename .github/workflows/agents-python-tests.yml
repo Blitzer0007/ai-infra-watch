@@ -19,6 +19,7 @@ on:
       - "aitracker-upload/scripts/**"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
+      - "aitracker-upload/tests/conftest.py"
       - "aitracker-upload/tests/api/**"
       - ".github/workflows/agents-python-tests.yml"
   pull_request:
@@ -36,6 +37,7 @@ on:
       - "aitracker-upload/scripts/**"
       - "aitracker-upload/tests/agents/**"
       - "aitracker-upload/tests/mcp/**"
+      - "aitracker-upload/tests/conftest.py"
       - "aitracker-upload/tests/api/**"
       - ".github/workflows/agents-python-tests.yml"
 
@@ -98,6 +100,7 @@ jobs:
             aitracker-upload/tests/agents/test_source_quality.py \
             aitracker-upload/tests/agents/test_live_planner_contract.py \
             aitracker-upload/tests/mcp/test_quote_provenance.py \
+            aitracker-upload/tests/mcp/test_provider_budget.py \
             aitracker-upload/tests/mcp/test_portfolio_context.py \
             aitracker-upload/tests/mcp/test_stocks_providers.py \
             aitracker-upload/tests/mcp/test_stocks_service.py \

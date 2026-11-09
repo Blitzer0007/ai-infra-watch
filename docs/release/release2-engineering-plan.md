@@ -24,6 +24,8 @@ The [portfolio-context integrity increment](release2-portfolio-context-integrity
 
 The [loaded-ledger review increment](release2-loaded-ledger-review.md) adds manual Evidence diagnostics and fixes remaining-position cost erasure across three weighted-average paths. It does not establish full-history/corporate-action coverage or restore Python agent accounting totals.
 
+The [shared Python provider admission](release2-provider-budgets.md) now bounds integrated Finnhub/SEC transport attempts per process. The [comparative forecast audit](release2-forecast-validation-audit.md) reproduces rolling-order, calibration, input and session-mapping defects; forecast correction/protocol work is now a priority before validation promotion. The [experience concept](release2-experience-preview.md) is illustrative, not deployed functionality.
+
 ## 1. Release outcome
 
 The [first Source Quality Agent slice](release2-source-quality-agent.md) now implements a manual Cloud run over loaded quote metadata with strict scope, typed findings, comparison compatibility and budgets. No model/provider/hosted IO is connected. A separately discovered general-planner comment/escape defect is repaired with fake-model regression coverage; live model/resource acceptance remains pending. The subsequent [safe loaded-DTO mapping and manual development UI](release2-source-quality-ui.md) are implemented. Next: remaining consumer/source eligibility and financial provenance before provider enrichment or scheduled behavior.

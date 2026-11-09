@@ -33,6 +33,9 @@ The production decision-center GET handler may persist stage state; it is not us
 
 - [Loaded ledger review](release2-loaded-ledger-review.md): manual Evidence diagnostics over original stored fields, explicit unavailable/empty history and strict quantity/order/fee/unit gates. Reuse weighted-average accounting and preserve small remaining-position cost in three paths; no complete-accounting or decision-eligibility grant.
 
+- [Python provider admission](release2-provider-budgets.md): shared process windows/concurrency/pacing, bounded retries/deadlines, 429 cooldown and fixed errors. Account-wide/Node coordination remains open.
+- [Forecast validation audit](release2-forecast-validation-audit.md): pinned Qlib/StatsForecast comparison, actual bounded REA inspection and six pure-function/protocol counterexamples. Existing forecast code is not certified correct or modified by the report.
+
 ## Validation and limitations
 
 Validation passed in Codex Cloud: TypeScript, 379 unit tests, 78 mocked browser/workflow-safety tests, source security audit, migration-manifest verification, production build and whitespace checks. The five Release 2 browser cases additionally cover scan filters/direct route/mobile layout, zero scan requests/writes, development watchlist isolation, and unavailable versus empty holdings. Store only fictional screenshots in `/workspace/artifacts/release2-opportunities-*.png`.
