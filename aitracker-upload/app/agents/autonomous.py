@@ -1345,7 +1345,38 @@ class AutonomousMCPAgent:
                 return {"action": "final", "answer": "No unused MCP tool matches the question; the retrieved evidence can be finalized."}
             plan = plans[0]
             return {"action": "tool", "tool": plan.tool, "arguments": plan.arguments, "reason": "deterministic fallback router"}
-        # Keep ticker-focused investigations inside the explicitly named\n        # symbols. Broad relationship/rotation tools can otherwise query a\n        # default universe of many tickers and hit the Vercel timeout.\n        planning_tools = tools\n        symbols = extract_symbols(question)\n        if symbols:\n            lower_question = question.lower()\n            filing_terms = (\n                "sec", "filing", "filings", "10-k", "10-q", "8-k",\n                "contract", "contracts", "disclosure", "disclosures", "cik",\n            )\n            is_filing_question = any(term in lower_question for term in filing_terms)\n            ticker_tools = []\n            for tool in tools:\n                props = (tool.input_schema or {}).get("properties") or {}\n                if "symbol" not in props and "symbols" not in props:\n                    continue\n                if not is_filing_question and "milestone" in tool.qualified_name.lower():\n                    continue\n                ticker_tools.append(tool)\n            if ticker_tools:\n                planning_tools = ticker_tools\n\n        raw = self.client.generate(\n            _planner_prompt(question, planning_tools, history),\n            max_tokens=800,\n            temperature=0.0,\n        )\n        parsed = _extract_json_object(raw)\n        if not parsed:\n            raise ValueError("planner did not return a valid JSON object")\n        return parsed
+        # Keep ticker-focused investigations inside the explicitly named
+        # symbols. Broad relationship/rotation tools can otherwise query a
+        # default universe of many tickers and hit the Vercel timeout.
+        planning_tools = tools
+        symbols = extract_symbols(question)
+        if symbols:
+            lower_question = question.lower()
+            filing_terms = (
+                "sec", "filing", "filings", "10-k", "10-q", "8-k",
+                "contract", "contracts", "disclosure", "disclosures", "cik",
+            )
+            is_filing_question = any(term in lower_question for term in filing_terms)
+            ticker_tools = []
+            for tool in tools:
+                props = (tool.input_schema or {}).get("properties") or {}
+                if "symbol" not in props and "symbols" not in props:
+                    continue
+                if not is_filing_question and "milestone" in tool.qualified_name.lower():
+                    continue
+                ticker_tools.append(tool)
+            if ticker_tools:
+                planning_tools = ticker_tools
+
+        raw = self.client.generate(
+            _planner_prompt(question, planning_tools, history),
+            max_tokens=800,
+            temperature=0.0,
+        )
+        parsed = _extract_json_object(raw)
+        if not parsed:
+            raise ValueError("planner did not return a valid JSON object")
+        return parsed
 
     def _finalize(self, question: str, calls: list[ToolCallRecord], steps: list[Step], resolution: str = "completed") -> AutonomousResult:
         successful = [c for c in calls if c.ok]
@@ -1604,7 +1635,19 @@ class AutonomousMCPAgent:
                     else None
                 )
                 forced_plan = forced_portfolio if forced_portfolio is not None else forced_driver
-                plan = forced_plan if forced_plan is not None else self._plan(question, tools, history)
+                if forced_plan is not None:
+                    plan = forced_plan
+                else:
+                    try:
+                        plan = self._plan(question, tools, history)
+                    except Exception:
+                        # Provider exceptions can contain request URLs or private
+                        # bodies. Fail closed without another call or raw error.
+                        steps.append(tool_call("autonomous.planner", ok=False, note="planner unavailable or invalid output"))
+                        return AutonomousResult(
+                            question, "", calls, discovered, AgentTrajectory(steps=steps),
+                            error="planner unavailable or invalid output", resolution="error",
+                        )
                 steps.append(
                     Step(
                         node="plan",

@@ -45,6 +45,8 @@ Rollback is an application-code revert; no database rollback or message replay i
 
 ## Subsequent review increments
 
+- [Source Quality Agent](release2-source-quality-agent.md): first manual Cloud role over loaded quote metadata, two trusted local tools, strict inputs, explicit partial coverage and budgets, no source/eligibility upgrade and no provider/model IO. Separately repair the general non-stub planner branch and fail closed on invalid planner output; fake-model tests cover the changed path. UI/live adapters and scheduled behavior remain out of scope.
+
 - [Autonomous-agent comparison and Python source reliability](release2-autonomous-agents-review.md): actual bounded REA pyc inspection plus manual review of three pinned financial projects; nullable Python quote metadata, honest batch/feed time, corrected backoff, groundedness schema/claim splitting/ticker routing and stronger offline CI. The next source-quality/research/daily-review roles are specified, not activated; no investment-effectiveness claim is made.
 
 - [Page-by-page UI/UX audit and improvements](uiux-audit.md).

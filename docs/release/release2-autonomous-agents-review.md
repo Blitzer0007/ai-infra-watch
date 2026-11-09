@@ -8,7 +8,7 @@ Reuse the existing Python/LangGraph/MCP stack. Prioritize **source-quality inspe
 
 The repository already implements an `AutonomousMCPAgent`, tool discovery/routing, evidence checks, optional JEV routing, Market/Filings specialists, a supervisor, debate and trajectory/evaluation helpers. The autonomous loop defaults to six steps on Vercel or eight elsewhere, with up to two additional steps for its JEV evidence path. Those limits do not establish account-wide cost control, permission isolation or durable background execution. Current Cloud configuration has no credential bindings or custom provider hosts; tests use fictional sources and stub models. **No live autonomous investigation, always-on job or new notification policy was activated.**
 
-This increment improves the existing agents' reliability and their input contracts. The specialized workflow/role contracts below are the next implementation plan, not already-enabled jobs.
+This increment improves the existing agents' reliability and their input contracts. Subsequent [Source Quality Agent implementation](release2-source-quality-agent.md) adds the first manual, loaded-metadata workflow with enforced local tools and budgets, plus a separate general-planner repair. Company/catalyst and Daily Review roles remain planned. No always-on job is activated.
 
 ## What other projects implement
 
@@ -79,9 +79,9 @@ The quote wire contract now includes nullable numeric/time/currency fields and s
 
 Use deterministic code for calculations/limits, JEV for bounded typed evidence triage where it earns its cost, and an optional model for planning/explanation. NVIDIA baseline remains `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1`; availability, free entitlement, structured-output reliability, latency and quality have not been tested for this account. No paid model/provider migration is proposed. Secure development credentials and permitted hosts are prerequisites for any real model comparison.
 
-## Next implementation contract: Source Quality Agent
+## Source Quality Agent contract and subsequent implementation
 
-Build this as an explicit **development-only, read-only research run** using the existing agent/tool stack, first over fictional/loaded snapshots. Suggested contract, still to implement:
+The [first implemented slice](release2-source-quality-agent.md) is an explicit **development-only, read-only quote-metadata run**, with a manual Cloud CLI. It implements the bounded deterministic inspection/comparison subset below. Provider enrichment, JEV/model passes, UI integration and durable checkpoints remain separate work:
 
 ```text
 request: runId, taskKind, assessedAt, bounded selected symbols, input snapshot IDs
@@ -93,7 +93,7 @@ result: complete|partial|needs-data|failed, findings, observed/expected coverage
         tool/model usage, termination reason, contract/model/prompt versions
 ```
 
-Initial proposed limits: at most five symbols, twenty total allowlisted read calls, two model passes and two typed JEV assessments per run, with explicit token/time ceilings. These are proposed development limits, not measured optimal values or already-enforced account budgets. Cache verified facts by source identity/observation; deduplicate identical reads; never retry an unknown side effect. Reject oversized inputs rather than silently claiming complete coverage after truncation.
+The implemented loaded-quote slice enforces five symbols, fifteen observations, twenty maximum local calls and an explicit cooperative elapsed-time budget, with zero model/JEV/provider calls. Optional future enrichment originally proposed at most two model passes and two typed JEV assessments per run; those are not activated or measured optimal limits. Per-run bounds are not account-wide budgets. Future adapters should cache facts by source identity/observation, deduplicate reads and reject oversized inputs instead of silently claiming complete coverage after truncation.
 
 Use an explicit role allowlist covering only reviewed quote/issuer/filing/quality readers. Tool discovery must not widen it. Exclude notifications, claims/retries, transactions, settings, cron, database writes, arbitrary URL fetches, shell and code execution. Treat retrieved documents as evidence, never instructions. A provider failure remains a provider failure; an LLM cannot repair it with an estimated price. No new background behavior on page mount.
 
