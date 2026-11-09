@@ -211,3 +211,22 @@ test('committed fixture and Cloud CLI exercise the same evaluator without enviro
   const denied=spawnSync(process.execPath,['scripts/forecast-evaluation-demo.mjs','--input','private-file'],{env:{PATH:process.env.PATH},encoding:'utf8',timeout:5000});
   assert.equal(denied.status,2);assert.equal(denied.stdout,'');assert(!denied.stderr.includes('private-file'));
 });
+test('calendar availability one microsecond after decision cannot pass a truncated millisecond cutoff',()=>{
+  const input=fixture({decisionAt:'2026-07-02T20:10:00.000001Z'});
+  input.calendar.availableAt='2026-07-02T20:10:00.000002Z';blocked(input,'CALENDAR_UNAVAILABLE_AT_DECISION');
+});
+test('feature archive availability preserves microsecond ordering across timezone offsets',()=>{
+  const input=fixture({decisionAt:'2026-07-02T20:10:00.000001Z'});
+  input.featureHistory.snapshotAvailableAt='2026-07-03T01:40:00.000002+05:30';blocked(input,'HISTORY_UNAVAILABLE_AT_CUTOFF');
+});
+test('bar publication one microsecond after its archive snapshot is rejected',()=>{
+  const input=fixture();input.featureHistory.snapshotAvailableAt='2026-07-02T20:01:00.000001Z';
+  input.featureHistory.points[1].availableAt='2026-07-02T20:01:00.000002Z';blocked(input,'BAR_UNAVAILABLE_AT_CUTOFF');
+});
+test('entry planning preserves a session close strictly after decision by one microsecond',()=>{
+  const schedule=calendar();schedule.days[1].closeAt='2026-07-02T20:00:00.000002Z';
+  const input=fixture({calendar:schedule,decisionAt:'2026-07-02T20:00:00.000001Z'});
+  const result=evaluateForecastWindow(input);assert.equal(result.status,'conditional-outcome');
+  assert.equal(result.plan.entryDate,'2026-07-02');assert.equal(result.plan.featureThrough,'2026-07-01');
+  assert.doesNotThrow(()=>JSON.stringify(result));
+});

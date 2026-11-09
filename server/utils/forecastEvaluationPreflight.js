@@ -13,8 +13,18 @@ const record = value => value !== null && typeof value === 'object' && !Array.is
 const token = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/.test(value);
 const symbol = value => typeof value === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(value);
 const shape = (value, keys) => record(value) && Object.keys(value).every(key => keys.includes(key));
+// PostgreSQL/archives can carry microseconds. Date.parse truncates them, so retain
+// the residual explicitly for all cutoff/session comparisons. BigInts stay internal.
+const preciseInstant = value => {
+  const millis = forecastInstant(value);
+  if (millis === null) return null;
+  const fraction = value.match(/\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/)?.[1] || '';
+  const residual = fraction.padEnd(6, '0').slice(3);
+  return BigInt(millis) * 1000n + BigInt(residual);
+};
 const dayAt = instant => {
-  const parts = Object.fromEntries(dayFormatter.formatToParts(instant).map(part => [part.type, part.value]));
+  const millis = instant / 1000n - (instant < 0n && instant % 1000n !== 0n ? 1n : 0n);
+  const parts = Object.fromEntries(dayFormatter.formatToParts(Number(millis)).map(part => [part.type, part.value]));
   return parts.year + '-' + parts.month + '-' + parts.day;
 };
 const nextDay = day => new Date(Date.parse(day + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
@@ -44,7 +54,7 @@ function calendarSessions(calendar, venue, decision) {
   if (!shape(calendar, ['schemaVersion', 'venue', 'timeZone', 'sourceId', 'revisionId', 'availableAt', 'coverageStart', 'coverageEnd', 'days']) ||
     calendar.schemaVersion !== 'forecast-session-calendar-v1' || calendar.venue !== venue || calendar.timeZone !== TIME_ZONE ||
     !token(calendar.sourceId) || !token(calendar.revisionId)) stop('CALENDAR_METADATA_INVALID');
-  const available = forecastInstant(calendar.availableAt);
+  const available = preciseInstant(calendar.availableAt);
   if (available === null || available > decision) stop('CALENDAR_UNAVAILABLE_AT_DECISION');
   if (!forecastDay(calendar.coverageStart) || !forecastDay(calendar.coverageEnd) ||
     calendar.coverageStart > calendar.coverageEnd || !Array.isArray(calendar.days) ||
@@ -53,17 +63,17 @@ function calendarSessions(calendar, venue, decision) {
   if (decisionDay < calendar.coverageStart || decisionDay > calendar.coverageEnd) stop('DECISION_OUTSIDE_CALENDAR');
 
   let expected = calendar.coverageStart;
-  let previousClose = -Infinity;
+  let previousClose = null;
   const sessions = [];
   for (const day of calendar.days) {
     if (!record(day) || day.date !== expected || !forecastDay(day.date)) stop('CALENDAR_DAY_GAP_OR_DUPLICATE');
     if (day.status === 'closed') {
       if (!shape(day, ['date', 'status'])) stop('CALENDAR_CLOSED_DAY_INVALID');
     } else if (day.status === 'open') {
-      const open = forecastInstant(day.openAt), close = forecastInstant(day.closeAt);
+      const open = preciseInstant(day.openAt), close = preciseInstant(day.closeAt);
       const weekDay = new Date(day.date + 'T00:00:00Z').getUTCDay();
       if (!shape(day, ['date', 'status', 'openAt', 'closeAt']) || open === null || close === null ||
-        open >= close || open <= previousClose || dayAt(open) !== day.date || dayAt(close) !== day.date ||
+        open >= close || (previousClose !== null && open <= previousClose) || dayAt(open) !== day.date || dayAt(close) !== day.date ||
         weekDay === 0 || weekDay === 6) stop('CALENDAR_SESSION_INVALID');
       sessions.push({ date: day.date, openAt: day.openAt, closeAt: day.closeAt, open, close });
       previousClose = close;
@@ -77,7 +87,7 @@ function calendarSessions(calendar, venue, decision) {
 function prepare(input) {
   if (!shape(input, ['protocolVersion', 'symbol', 'venue', 'currency', 'horizonSessions', 'decisionAt', 'assessedAt', 'calendar', 'featureHistory', 'outcomeHistory']) ||
     input.protocolVersion !== FORECAST_EVALUATION_PROTOCOL) stop('PROTOCOL_UNSUPPORTED');
-  const decision = forecastInstant(input.decisionAt), assessed = forecastInstant(input.assessedAt);
+  const decision = preciseInstant(input.decisionAt), assessed = preciseInstant(input.assessedAt);
   if (decision === null || assessed === null || assessed < decision) stop('CUTOFF_INVALID');
   if (!symbol(input.symbol) || !['XNYS', 'XNAS'].includes(input.venue) || input.currency !== 'USD') stop('INSTRUMENT_UNSUPPORTED');
   const horizon = forecastHorizon(input.horizonSessions);
@@ -124,7 +134,7 @@ function historyRows(history, input, sessions, start, end, cutoff) {
     history.currency !== input.currency || !token(history.sourceId) || !token(history.vintageId)) stop('HISTORY_METADATA_INVALID');
   if (history.priceBasis !== BASIS) stop('HISTORY_BASIS_UNSUPPORTED');
   if (history.stale !== false) stop('HISTORY_STALE_OR_UNKNOWN');
-  const snapshotAvailable = forecastInstant(history.snapshotAvailableAt);
+  const snapshotAvailable = preciseInstant(history.snapshotAvailableAt);
   if (snapshotAvailable === null || snapshotAvailable > cutoff) stop('HISTORY_UNAVAILABLE_AT_CUTOFF');
   if (!forecastDay(start) || !forecastDay(history.coverageStart) || !forecastDay(history.coverageEnd) ||
     history.coverageStart !== start || history.coverageEnd !== end || start > end || start < input.calendar.coverageStart) stop('HISTORY_COVERAGE_MISMATCH');
@@ -143,7 +153,7 @@ function historyRows(history, input, sessions, start, end, cutoff) {
     if (point.date <= previous) stop('BAR_ORDER_INVALID');
     const session = byDay.get(point.date);
     if (!session) stop('BAR_OUTSIDE_REQUESTED_SESSIONS');
-    const available = forecastInstant(point.availableAt);
+    const available = preciseInstant(point.availableAt);
     if (available === null || available < session.close || available > snapshotAvailable || available > cutoff) stop('BAR_UNAVAILABLE_AT_CUTOFF');
     seen.add(point.date); recordIds.add(point.recordId); previous = point.date;
     normalized.push({ date: point.date, rawClose: raw, adjustedClose: adjusted });
