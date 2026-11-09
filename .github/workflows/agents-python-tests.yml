@@ -98,6 +98,7 @@ jobs:
             aitracker-upload/tests/agents/test_source_quality.py \
             aitracker-upload/tests/agents/test_live_planner_contract.py \
             aitracker-upload/tests/mcp/test_quote_provenance.py \
+            aitracker-upload/tests/mcp/test_portfolio_context.py \
             aitracker-upload/tests/mcp/test_stocks_providers.py \
             aitracker-upload/tests/mcp/test_stocks_service.py \
             aitracker-upload/tests/mcp/test_stocks_feed.py \

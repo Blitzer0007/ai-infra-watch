@@ -29,6 +29,8 @@ Scope: safety audit, snapshot/quality contracts and a research scanner using loa
 
 The production decision-center GET handler may persist stage state; it is not used as a development snapshot source. No production endpoint or secret was accessed. The remaining Release 1 risk-kernel/reconciliation specification is preserved; this scanner does not rely on those incomplete risk extensions.
 
+- [Portfolio context integrity](release2-portfolio-context-integrity.md): fix false freshness and lost zero moves in the Python research tool; withhold partial/unaligned USD marks and unsupported/unreconciled accounting totals, retain per-holding coverage and bound logical quote calls. Real source/model/hosted acceptance remains separate.
+
 ## Validation and limitations
 
 Validation passed in Codex Cloud: TypeScript, 379 unit tests, 78 mocked browser/workflow-safety tests, source security audit, migration-manifest verification, production build and whitespace checks. The five Release 2 browser cases additionally cover scan filters/direct route/mobile layout, zero scan requests/writes, development watchlist isolation, and unavailable versus empty holdings. Store only fictional screenshots in `/workspace/artifacts/release2-opportunities-*.png`.
