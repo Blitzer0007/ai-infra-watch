@@ -177,7 +177,8 @@ export function evaluateForecastWindow(input) {
     labels = historyRows(input.outcomeHistory, input, sessions, plan.entryDate, plan.targetDate, assessed);
   } catch (error) { return { ...failure(errorCode(error), plan), ...receipt }; }
   const entry = labels[0], targetBar = labels.at(-1);
-  const grossReturnPct = (targetBar.adjustedClose / entry.adjustedClose - 1) * 100;
+  // Equivalent return formula with less cancellation for small price changes.
+  const grossReturnPct = ((targetBar.adjustedClose - entry.adjustedClose) / entry.adjustedClose) * 100;
   if (!Number.isFinite(grossReturnPct)) return { ...failure('RETURN_NONFINITE', plan), ...receipt };
   return {
     protocolVersion: FORECAST_EVALUATION_PROTOCOL, status: 'conditional-outcome', code: 'DECLARED_INPUT_CHECKS_PASSED', plan,

@@ -83,6 +83,7 @@ function historyFromArchive(value, ref) {
 export function evaluateArchivedForecastWindow(args) {
   const receipt = { manifestPinMatched: false, inspectedArtifactCount: 0, inspectedBytes: 0,
     allRequiredArtifactsMatched: false,
+    snapshotAvailableAt: { features: null, outcomes: null },
     bindings: { calendar: 'not-checked', features: 'not-checked', outcomes: 'not-checked' } };
   const result = (status, code, assessment = null) => ({ schemaVersion: FORECAST_ARCHIVE_SCHEMA,
     status, code, receipt, assessment, ...authority() });
@@ -107,6 +108,9 @@ export function evaluateArchivedForecastWindow(args) {
       const value = parsedRecord(bytes);
       const normalized = role === 'calendar' ? calendarFromArchive(value, ref) : historyFromArchive(value, ref);
       receipt.bindings[role] = 'matched';
+      if (role !== 'calendar' && forecastInstantMicros(normalized.snapshotAvailableAt) !== null) {
+        receipt.snapshotAvailableAt[role] = normalized.snapshotAvailableAt;
+      }
       return normalized;
     };
     const input = { ...request, calendar: load('calendar') };
