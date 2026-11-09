@@ -10,7 +10,7 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 | R2.1 snapshots and opportunity scanner | 20% | 70% | Bounded loaded universe, deterministic research, explicit gaps/quality gates, manual JEV coverage review | Real issuer/financial enrichment, provider budgets and runtime normalized coverage |
 | R2.2 details, financial context and calendar | 20% | 45% | Calendar range/certainty/source handling, focused holdings dialog, REA-assisted reference analysis | Sectioned company dossier, normalized statements/periods/units, supported valuation inputs and source comparison |
 | R2.3 inbox and notification transparency | 20% | 65% | Local history plus re-entry ledger reader, delivery explanations, fictional policy preview, compact daily Telegram brief | Other server alert classes, scheduler/job-health integration, authoritative live policy adapters and separately approved activation |
-| R2.4 medium-term evaluation | 15% | 20% | Baseline/horizon inventory, summary corrections and versioned offline session/history preflight | Trusted archive/calendar adapter, rolling-origin/purged holdout protocol, model lookback/scoring, legacy/new horizon compatibility and matured real outcomes |
+| R2.4 medium-term evaluation | 15% | 20% | Baseline/horizon inventory, summary corrections, offline session/history preflight and retained-export binding | Trusted archive/calendar adapter, rolling-origin/purged holdout protocol, model lookback/scoring, legacy/new horizon compatibility and matured real outcomes |
 | R2.5 integrated release candidate | 15% | 45% | Incremental unit/browser/security/build/CI checks and rollback/review notes | Integrated acceptance across remaining features, complete resource/accessibility review, final release candidate and authorized production checks |
 
 ## Completed increments
@@ -33,6 +33,8 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 - [Forecast-validation comparison](release2-forecast-validation-audit.md): read-only REA/source review of Qlib/StatsForecast and six reproduced helper/protocol defects. [Summary corrections](release2-forecast-summary-corrections.md) address chronology, mixed coverage, strict scalar/calendar eligibility, read-side global counts and honest labels. Session mapping, history/PIT guards, legacy analytics and genuine predictive validation remain pending. [Desktop/mobile concepts](release2-experience-preview.md) illustrate proposed future flows.
 
 - [Offline session/history preflight](release2-forecast-session-preflight.md): versioned caller-declared session mapping, phase-specific availability and adjustment vintages, exact outcome windows and fixed fictional Cloud runner. No legacy writer integration or source/predictive certification.
+
+- [Retained forecast archive binding](release2-forecast-archive-binding.md): separately selected manifest pin, bounded calendar/price byte parsing, source/record/vintage bindings and direct field projection into the offline evaluator. This is integrity/retained-content evidence; real publisher and historical-availability verification remain open.
 
 ## Next implementation order
 

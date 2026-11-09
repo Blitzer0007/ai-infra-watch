@@ -55,6 +55,8 @@ The runner reads only its fixed committed fictional fixture and accepts no exter
 
 Local Cloud validation: **776 Node tests**, typecheck, production build, source security, migration-manifest integrity and **25 offline workflow-safety cases**. The existing bundle-size warning remains. Exact-head CI is recorded in draft PR #168. No UI/runtime path changes, so no new browser interaction is introduced; existing combined UI CI remains a regression check.
 
+Follow-up: the [retained archive adapter](release2-forecast-archive-binding.md) now checks selected file integrity, projects calendar/bar fields from pinned bytes and composes this evaluator. It keeps source authentication and production eligibility false; native vendor exports and independently supported availability remain open.
+
 ## Next integration work
 
 1. Add a separate trusted offline adapter that checks retained calendar/archive artifacts and source availability, reusing the existing artifact/hash review where applicable. Current live history DTOs lack this evidence; do not invent it from retrieval time or `adjusted:true`.

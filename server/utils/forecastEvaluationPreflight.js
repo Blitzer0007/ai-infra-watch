@@ -1,5 +1,5 @@
 // Experimental offline protocol. No IO, ambient clock, writer, model or promotion capability.
-import { forecastDay, forecastInstant, forecastHorizon, forecastNumber } from '../../src/utils/forecastInputs.js';
+import { forecastDay, forecastInstantMicros as preciseInstant, forecastHorizon, forecastNumber } from '../../src/utils/forecastInputs.js';
 
 export const FORECAST_EVALUATION_PROTOCOL = 'session-close-v1-experimental';
 const MAX_DAYS = 4000;
@@ -13,15 +13,6 @@ const record = value => value !== null && typeof value === 'object' && !Array.is
 const token = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/.test(value);
 const symbol = value => typeof value === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(value);
 const shape = (value, keys) => record(value) && Object.keys(value).every(key => keys.includes(key));
-// PostgreSQL/archives can carry microseconds. Date.parse truncates them, so retain
-// the residual explicitly for all cutoff/session comparisons. BigInts stay internal.
-const preciseInstant = value => {
-  const millis = forecastInstant(value);
-  if (millis === null) return null;
-  const fraction = value.match(/\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/)?.[1] || '';
-  const residual = fraction.padEnd(6, '0').slice(3);
-  return BigInt(millis) * 1000n + BigInt(residual);
-};
 const dayAt = instant => {
   const millis = instant / 1000n - (instant < 0n && instant % 1000n !== 0n ? 1n : 0n);
   const parts = Object.fromEntries(dayFormatter.formatToParts(Number(millis)).map(part => [part.type, part.value]));

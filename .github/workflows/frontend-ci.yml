@@ -7,6 +7,8 @@ on:
     paths:
       - "src/**"
       - "scripts/forecast-evaluation-demo.mjs"
+      - "scripts/forecast-archive-demo.mjs"
+      - "scripts/fixtures/forecast-archive/**"
       - "scripts/fixtures/forecast-evaluation-window.fictional.json"
       - "shared/**"
       - "api/**"
@@ -25,6 +27,8 @@ on:
       - "supabase/**"
       - "src/**"
       - "scripts/forecast-evaluation-demo.mjs"
+      - "scripts/forecast-archive-demo.mjs"
+      - "scripts/fixtures/forecast-archive/**"
       - "scripts/fixtures/forecast-evaluation-window.fictional.json"
       - "shared/**"
       - "api/**"
