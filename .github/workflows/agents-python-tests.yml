@@ -97,6 +97,8 @@ jobs:
           EVAL_CACHE_ENABLED: "false"
         run: |
           python -m pytest -q -m "not live" \
+            aitracker-upload/tests/agents/test_portfolio_council.py \
+            aitracker-upload/tests/api/test_council_endpoint.py \
             aitracker-upload/tests/agents/test_source_quality.py \
             aitracker-upload/tests/agents/test_live_planner_contract.py \
             aitracker-upload/tests/mcp/test_quote_provenance.py \

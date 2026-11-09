@@ -1,5 +1,6 @@
 import { requireAccess } from './_access-auth.js';
 import { sourceQualityDevelopmentEnabled, sourceQualityPayload, sourceQualityEnvelope, sourceQualityResponseText } from '../server/services/sourceQualityInput.js';
+import {councilDevelopmentProxy} from '../server/services/portfolioCouncilTransport.js';
 
 const DEFAULT_TIMEOUT_MS = 55000;
 const rateState = new Map();
@@ -47,6 +48,10 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 export default async function handler(req, res) {
   if(req.query?.task!=null)res.setHeader('Cache-Control','no-store');
   if (!requireAccess(req, res)) return;
+  if(req.query?.task==='council'){
+    if(rateLimited(req))return res.status(429).json({error:'Review request limit reached'});
+    return councilDevelopmentProxy(req,res,agentBackendToken());
+  }
   if(req.query?.task!=null){
     if(req.query.task!=='source-quality')return res.status(400).json({error:'Unknown research task'});
     if(!sourceQualityDevelopmentEnabled())return res.status(404).json({error:'Development review unavailable'});

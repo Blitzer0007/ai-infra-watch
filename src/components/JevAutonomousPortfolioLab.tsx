@@ -3,6 +3,7 @@ import { Activity, ShieldCheck, Clock3, CircleDollarSign, RefreshCw } from 'luci
 import { buildPaperRebalance, PAPER_LAB_DEFAULTS, runHistoricalPaperBacktest, type HistoricalBacktestResult, type HistoricalPrice, type PaperHolding } from '../utils/jevPortfolioLab';
 import { authFetch } from '../utils/apiAuth';
 import JevDecisionPanel from './JevDecisionPanel';
+import JevCouncilPanel from './JevCouncilPanel';
 import { forecastValidationGate } from '../utils/forecastValidation';
 import { describeJevEvidenceGap } from '../utils/jevEvidenceAlert';
 import { selectDynamicPeers } from '../utils/peerIntelligence';
@@ -386,6 +387,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       <p className="mt-2 max-w-3xl text-sm leading-6 text-white/65">Weekly US-stock research lab with SPY and QQQ benchmarks. Candidate research uses the existing evidence-gated agent. Historical metrics use aligned adjusted closes with weekly rebalancing, but remain exploratory until provider point-in-time availability is independently verified.</p>
       <div className="mt-4 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-white/15 px-3 py-1">PAPER ONLY</span><span className="rounded-full border border-white/15 px-3 py-1">MANUAL APPROVAL</span><span className="rounded-full border border-white/15 px-3 py-1">NO BROKER ORDERS</span></div>
     </header>
+    {(import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true') && <JevCouncilPanel symbols={selected} quotes={livePrices} financials={peerFundamentals}/>}
     <section className="grid gap-3 md:grid-cols-3">
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4"><Clock3 className="text-sky-300" size={20}/><p className="mt-3 text-xs text-white/50">Review cadence</p><p className="mt-1 font-semibold">Weekly</p><p className="text-xs text-white/40">Review timestamped evidence before proposing changes.</p></div>
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4"><ShieldCheck className="text-emerald-300" size={20}/><p className="mt-3 text-xs text-white/50">Risk guardrails</p><p className="mt-1 font-semibold">15% position · 35% sector</p><p className="text-xs text-white/40">Minimum 5% cash; invalid proposals are blocked.</p></div>

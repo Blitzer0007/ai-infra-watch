@@ -2,6 +2,7 @@
 import handler from '../api/agent-ask.js';
 import {requireAccess} from '../api/_access-auth.js';
 import {SOURCE_QUALITY_MAX_BYTES,sourceQualityDevelopmentEnabled} from './services/sourceQualityInput.js';
+import {councilDevelopmentEnabled,COUNCIL_MAX_BYTES} from '../shared/portfolioCouncilContract.js';
 
 export function developmentSourceQualityMiddleware() {
   return async(req,res,next)=>{
@@ -11,17 +12,19 @@ export function developmentSourceQualityMiddleware() {
     reply.setHeader('Cache-Control','no-store');
     const input={method:req.method,headers:req.headers,query:Object.fromEntries(url.searchParams),body:undefined};
     if(!requireAccess(input,reply))return;
-    if(!sourceQualityDevelopmentEnabled())return reply.status(404).json({error:'Development review unavailable'});
-    if(input.query.task!=='source-quality'||req.method!=='POST')return handler(input,reply);
+    const council=input.query.task==='council';
+    if(!(council?councilDevelopmentEnabled():sourceQualityDevelopmentEnabled()))return reply.status(404).json({error:'Development review unavailable'});
+    if(!['source-quality','council'].includes(input.query.task)||req.method!=='POST')return handler(input,reply);
     if(String(req.headers['content-type']||'').split(';')[0].trim().toLowerCase()!=='application/json')return reply.status(415).json({error:'JSON required'});
     try{
       if(req.body!==undefined)input.body=req.body;
       else{
         const chunks=[];let size=0;
-        for await(const chunk of req){const bytes=Buffer.from(chunk);size+=bytes.length;if(size>SOURCE_QUALITY_MAX_BYTES){req.resume?.();return reply.status(413).json({error:'Request too large'});}chunks.push(bytes);}
-        input.body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));
+        for await(const chunk of req){const bytes=Buffer.from(chunk);size+=bytes.length;if(size>(council?COUNCIL_MAX_BYTES:SOURCE_QUALITY_MAX_BYTES)){req.resume?.();return reply.status(413).json({error:'Request too large'});}chunks.push(bytes);}
+        const raw=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks));input.body=JSON.parse(raw);
+        if(council&&JSON.stringify(input.body)!==raw)throw Error();
       }
-    }catch{return reply.status(400).json({error:'Invalid source-quality request'});}
+    }catch{return reply.status(400).json({error:'Invalid development review request'});}
     try{return await handler(input,reply);}catch{return reply.status(503).json({error:'Development review unavailable'});}
   };
 }

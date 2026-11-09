@@ -15,6 +15,8 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 
 ## Completed increments
 
+- [Portfolio Lab research council](release2-portfolio-council.md): independent Bull/Bear openings, a cited evidence Judge, bounded model-selected loaded tools, manual development UI, optional typed TypeSafe coverage, actual REA reference investigation and offline end-to-end acceptance. Real model usefulness, complete financial/catalyst/risk provenance and future-outcome validation remain pending. This additional prototype does not change the core Release 2 weighted estimate.
+
 - Opportunity research over loaded holdings/watchlist snapshots with missing-data and simulation gates.
 - Page-by-page UI pass, task-based Portfolio navigation and retained editing context.
 - Catalyst calendar with range/coverage and confirmed/estimated/cancelled distinctions.

@@ -40,7 +40,11 @@ async def development_task_dispatch(request: Request, call_next):
     if "task" not in request.query_params:
         return await call_next(request)
     try:
-        response = await _source_quality_http(request)
+        if request.query_params.get("task") == "council":
+            from app.agents.council_http import council_http
+            response = await council_http(request, _require_auth, settings.AGENT_API_TOKEN)
+        else:
+            response = await _source_quality_http(request)
     except HTTPException as error:
         response = JSONResponse(status_code=error.status_code, content={"detail": error.detail}, headers=error.headers)
     response.headers["Cache-Control"] = "no-store"
