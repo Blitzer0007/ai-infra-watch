@@ -1,3 +1,4 @@
+import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 export type PortfolioAccountingHolding = {
   symbol: string;
   quantity: number;
@@ -135,7 +136,7 @@ export function calculatePortfolioTradingPerformance(
     } else {
       const proceeds = Number(row.amount) - brokerage;
       netSaleProceeds += proceeds;
-      const tolerance = Math.max(0.00001, Math.abs(holding.quantity) * 0.0001);
+      const tolerance = QUANTITY_EPSILON;
       if (holding.quantity + tolerance < quantity || holding.quantity <= 0) {
         invalidSequenceSymbols.add(symbol);
       } else {
@@ -144,7 +145,7 @@ export function calculatePortfolioTradingPerformance(
         realizedFromLedger += proceeds - soldCostBasis;
         holding.quantity -= quantity;
         holding.costBasis -= soldCostBasis;
-        if (holding.quantity <= tolerance) {
+        if (Math.abs(holding.quantity) < QUANTITY_EPSILON) {
           holding.quantity = 0;
           holding.costBasis = 0;
         }

@@ -31,6 +31,8 @@ The production decision-center GET handler may persist stage state; it is not us
 
 - [Portfolio context integrity](release2-portfolio-context-integrity.md): fix false freshness and lost zero moves in the Python research tool; withhold partial/unaligned USD marks and unsupported/unreconciled accounting totals, retain per-holding coverage and bound logical quote calls. Real source/model/hosted acceptance remains separate.
 
+- [Loaded ledger review](release2-loaded-ledger-review.md): manual Evidence diagnostics over original stored fields, explicit unavailable/empty history and strict quantity/order/fee/unit gates. Reuse weighted-average accounting and preserve small remaining-position cost in three paths; no complete-accounting or decision-eligibility grant.
+
 ## Validation and limitations
 
 Validation passed in Codex Cloud: TypeScript, 379 unit tests, 78 mocked browser/workflow-safety tests, source security audit, migration-manifest verification, production build and whitespace checks. The five Release 2 browser cases additionally cover scan filters/direct route/mobile layout, zero scan requests/writes, development watchlist isolation, and unavailable versus empty holdings. Store only fictional screenshots in `/workspace/artifacts/release2-opportunities-*.png`.

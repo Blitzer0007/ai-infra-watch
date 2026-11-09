@@ -1,3 +1,5 @@
+import LoadedLedgerReview from './portfolio/LoadedLedgerReview';
+import type { LedgerAvailability } from '../utils/loadedLedgerReview';
 import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
 import { HOLDING_FILTERS, HOLDING_SORTS, readHoldingNavigation, writeHoldingNavigation, type HoldingFilter, type HoldingSort } from '../utils/holdingDetailNavigation';
@@ -86,6 +88,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
+  const [transactionsAvailability,setTransactionsAvailability]=useState<LedgerAvailability>('loading');
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
@@ -221,16 +224,17 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     setPortfolioLoading(true);
     Promise.all([
       fetchPortfolioHoldings(),
-      fetchPortfolioTransactions().catch(() => []),
+      fetchPortfolioTransactions().then(rows=>({rows,availability:'ready' as const})).catch(()=>({rows:[],availability:'unavailable' as const})),
     ])
       .then(([rows, transactions]) => {
         if (!cancelled) {
           setHoldings(rows);
-          setPortfolioTransactions(transactions);
+          setPortfolioTransactions(transactions.rows);
+          setTransactionsAvailability(transactions.availability);
           setPortfolioError('');
         }
       })
-      .catch(error => { if (!cancelled) setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable'); })
+      .catch(error => { if (!cancelled) {setPortfolioError(error instanceof Error ? error.message : 'Portfolio service unavailable');setTransactionsAvailability('unavailable');} })
       .finally(() => { if (!cancelled) setPortfolioLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -1016,6 +1020,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'evidence' && (
         <div className="space-y-4">
+          <LoadedLedgerReview holdings={holdings} transactions={portfolioTransactions} holdingsAvailability={portfolioLoading?'loading':portfolioError?'unavailable':'ready'} transactionsAvailability={transactionsAvailability} />
           <PortfolioEvidenceCoverage analyses={analyses} contracts={contracts} congressTrades={congressTrades} macroRisks={macroRisks} news={news} analystConsensus={analystConsensus} analystLoading={analystLoading} analystError={analystError} selectedSymbol={selectedAnalysis?.symbol || null} />
           <JevDecisionPanel kind="portfolio" title="Portfolio decision context" subtitle="Research triage from portfolio evidence; not a trade instruction." state={{ ...decisionContext, analystConsensus: decisionContext.analystConsensus || { status: analystLoading ? 'loading' : analystError ? 'unavailable' : 'not_retrieved' } }} />
           {selectedAnalysis && <DecisionGateSummary h={selectedAnalysis} />}

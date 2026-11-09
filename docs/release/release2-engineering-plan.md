@@ -22,6 +22,8 @@ Development: Codex Cloud, fixture-backed services and disposable databases only.
 
 The [portfolio-context integrity increment](release2-portfolio-context-integrity.md) now guards the existing Python agent consumer with source/time/unit checks, complete/aligned mark coverage and explicit accounting abstention. The stored table has no cost-currency evidence; ledger reconciliation and shared provider quotas remain prerequisites for complete financial context.
 
+The [loaded-ledger review increment](release2-loaded-ledger-review.md) adds manual Evidence diagnostics and fixes remaining-position cost erasure across three weighted-average paths. It does not establish full-history/corporate-action coverage or restore Python agent accounting totals.
+
 ## 1. Release outcome
 
 The [first Source Quality Agent slice](release2-source-quality-agent.md) now implements a manual Cloud run over loaded quote metadata with strict scope, typed findings, comparison compatibility and budgets. No model/provider/hosted IO is connected. A separately discovered general-planner comment/escape defect is repaired with fake-model regression coverage; live model/resource acceptance remains pending. The subsequent [safe loaded-DTO mapping and manual development UI](release2-source-quality-ui.md) are implemented. Next: remaining consumer/source eligibility and financial provenance before provider enrichment or scheduled behavior.

@@ -1,3 +1,4 @@
+import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
 import { independentForecastCount } from '../utils/forecastIndependence.js';
@@ -140,7 +141,7 @@ export function calculateActualPortfolio(holdings, transactionRows, quotes, hist
       position.costBasis += netCash;
     } else {
       saleCash += netCash;
-      const tolerance = Math.max(0.00001, Math.abs(position.quantity) * 0.0001);
+      const tolerance = QUANTITY_EPSILON;
       if (position.quantity <= 0 || position.quantity + tolerance < quantity) {
         invalidSequenceSymbols.add(symbol);
       } else {
@@ -149,7 +150,7 @@ export function calculateActualPortfolio(holdings, transactionRows, quotes, hist
         realizedFromLedger += netCash - soldCostBasis;
         position.quantity -= quantity;
         position.costBasis -= soldCostBasis;
-        if (position.quantity <= tolerance) {
+        if (Math.abs(position.quantity) < QUANTITY_EPSILON) {
           position.quantity = 0;
           position.costBasis = 0;
         }

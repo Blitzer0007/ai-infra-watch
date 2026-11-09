@@ -16,6 +16,7 @@ export type RuleStage = {
 };
 
 export type StoredPortfolioHolding = {
+  accountingInputs?: {contractVersion:'stored-holding-inputs-v1';symbol:string|null;quantity:number|null};
   id: string;
   symbol: string;
   quantity: number;
@@ -45,6 +46,7 @@ export type StoredPortfolioHolding = {
 };
 
 export type PortfolioTransaction = {
+  accountingInputs?: import('./loadedLedgerReview').StoredLedgerInputs;
   id: string;
   symbol: string;
   transactionType: 'BUY' | 'SELL';

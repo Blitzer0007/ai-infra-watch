@@ -1,3 +1,4 @@
+import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 const THRESHOLDS = [25, 30];
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -152,7 +153,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
       position.quantity += quantity;
       position.costBasis += amount + brokerage;
     } else {
-      const tolerance = Math.max(0.00001, Math.abs(position.quantity) * 0.0001);
+      const tolerance = QUANTITY_EPSILON;
       if (position.quantity <= 0 || position.quantity + tolerance < quantity) {
         position.invalid = true;
       } else {
@@ -161,7 +162,7 @@ export function deriveHoldingLedgerCostBasis(transactionRows = [], holdings = []
         position.realizedPnl += proceeds - averageCost * quantity;
         position.quantity -= quantity;
         position.costBasis -= averageCost * quantity;
-        if (position.quantity <= tolerance) {
+        if (Math.abs(position.quantity) < QUANTITY_EPSILON) {
           position.quantity = 0;
           position.costBasis = 0;
         }

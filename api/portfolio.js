@@ -1,5 +1,6 @@
 import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
+import { storedLedgerInputs, storedHoldingInputs } from '../server/services/ledgerInputs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -147,11 +148,12 @@ function transactionQuality(row) {
   };
 }
 
-function normalizeTransaction(row) {
+export function normalizeTransaction(row) {
   const quality = transactionQuality(row);
   return {
     id: row.id,
     symbol: String(row.symbol).toUpperCase(),
+    accountingInputs: storedLedgerInputs(row),
     transactionType: row.transaction_type === 'SELL' ? 'SELL' : 'BUY',
     orderType: row.order_type || null,
     tradeDate: row.trade_date,
@@ -178,12 +180,13 @@ function normalizeCashFlow(row) {
     currency: String(row.currency || 'USD').toUpperCase(), fxToUsd: Number(row.fx_to_usd), notes: row.notes || '', createdAt: row.created_at };
 }
 
-function normalize(row) {
+export function normalize(row) {
   return {
     id: row.id,
     symbol: String(row.symbol).toUpperCase(),
     quantity: Number(row.quantity),
     averageCost: Number(row.average_cost),
+    accountingInputs: storedHoldingInputs(row),
     purchaseDate: row.purchase_date || null,
     notes: row.notes || '',
     createdAt: row.created_at,

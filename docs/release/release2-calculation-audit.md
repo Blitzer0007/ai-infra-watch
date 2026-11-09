@@ -49,6 +49,8 @@ This report does not mark every arithmetic-bearing file correct. Inventory, deta
 
 Subsequent increment: [missing-data analytics correction](release2-missing-data-analytics.md), with explicit coverage, no neutral ranking defaults, matched rotation date windows, honest horizon comparisons, nullable stress and quote parsing without fabricated zero moves. The shared rule/source contract, concentration/attribution fallback and calibration work remain open.
 
+Subsequent [loaded-ledger review](release2-loaded-ledger-review.md): preserve source accounting fields before display defaults, distinguish unavailable/empty history, validate loaded quantities/order/fees/units, and fix relative closure tolerance erasing small remaining positions in all three weighted-average paths. Full-history/corporate-action proof and remaining aggregate tolerances are still open.
+
 ## Verification and safety
 
 Subsequent [data-source follow-up](release2-data-source-audit.md): corrected Vercel quote normalization, provenance/coverage and history-currency defaults, and disabled standalone model-generated/canned financial observations. Selected REA analysis is explicitly partial; manual review additionally found open Python timestamp/default-value and SEC budget/filing-label issues. Source availability, source suitability and numerical correctness remain separate gates. Comprehensive calculation sign-off is still open.
