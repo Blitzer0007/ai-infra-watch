@@ -129,11 +129,14 @@ def _quality(packet):
             maximum_age = 900 if row.family == "market" else 550 * 86400 if row.family in ("financial", "risk") else 30 * 86400
             if not observed <= published <= retrieved <= now:
                 reasons.append("TIME_ORDER_INVALID")
-            if not 0 <= (now - published).total_seconds() <= maximum_age:
+            if not 0 <= (now - published).total_seconds() <= maximum_age or not 0 <= (now - observed).total_seconds() <= maximum_age:
                 reasons.append("SOURCE_STALE_OR_FUTURE")
         if row.family in ("financial", "risk"):
             if not row.period_start or not row.period_end or row.period_start > row.period_end or not row.published_at or row.period_end > row.published_at[:10]:
                 reasons.append("PERIOD_PROVENANCE_MISSING")
+            elif not 0 <= (now.date() - date.fromisoformat(row.period_end)).days <= 550:
+                if "SOURCE_STALE_OR_FUTURE" not in reasons:
+                    reasons.append("SOURCE_STALE_OR_FUTURE")
         if reasons:
             issues.append({"evidence_id": row.evidence_id, "codes": reasons})
         else:

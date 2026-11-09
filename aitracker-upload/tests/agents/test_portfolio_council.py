@@ -76,10 +76,12 @@ def test_directional_judge_must_inspect_winning_citation():
         return step
     assert PortfolioCouncil(Script(mutate)).run(packet(True))['disposition']=='provisional-bull'
 
-@pytest.mark.parametrize('change',['stale','missing','unknown','period','conflict','future','estimate'])
+@pytest.mark.parametrize('change',['stale','stale-observation','old-period','missing','unknown','period','conflict','future','estimate'])
 def test_quality_gates_cannot_be_overridden(change):
     value=packet(True).model_dump(mode='json');row=value['evidence'][1]
     if change=='stale':row.update(observed_at='2020-01-01T00:00:00Z',published_at='2020-01-01T00:00:00Z')
+    if change=='stale-observation':row['observed_at']='2020-01-01T00:00:00Z'
+    if change=='old-period':row.update(period_start='2020-01-01',period_end='2020-03-31')
     if change=='missing':row['retrieved_at']=None
     if change=='unknown':row['source_id']='unknown'
     if change=='period':row['period_start']=None
