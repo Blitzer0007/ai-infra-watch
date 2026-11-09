@@ -5,6 +5,14 @@ import { summarizeQuoteCoverage } from './marketDataValidation.js';
 import { summarizeMarketQuote } from '../api/market-data-health.js';
 const now=Date.parse('2026-11-06T19:05:00Z');
 const seconds=value=>Date.parse(value)/1000;
+
+test('reported identity and declared adapter mode are retained without borrowing requested symbols',()=>{
+  const observed=normalizeYahooQuote({meta:{symbol:'NVDA',regularMarketPrice:100}},now,'NVDA');
+  assert.equal(observed.returnedSymbol,'NVDA');assert.equal(observed.sourceMode,'live');
+  assert.equal(normalizeYahooQuote({meta:{regularMarketPrice:100}},now,'NVDA').returnedSymbol,null);
+  assert.equal(normalizeFinnhubQuote({c:100},now).returnedSymbol,null);
+  assert.equal(normalizeAlphaQuote({'05. price':'100'},now,'NVDA').returnedSymbol,null);
+});
 const yahoo=()=>({meta:{symbol:'NVDA',regularMarketPrice:110,regularMarketTime:seconds('2026-11-06T19:00:00Z'),currency:'USD',exchangeTimezoneName:'America/New_York',
   chartPreviousClose:90,currentTradingPeriod:{regular:{start:seconds('2026-11-06T14:30:00Z'),end:seconds('2026-11-06T21:00:00Z')}}},
   timestamp:['2026-11-04','2026-11-05','2026-11-06'].map(day=>seconds(day+'T14:30:00Z')),

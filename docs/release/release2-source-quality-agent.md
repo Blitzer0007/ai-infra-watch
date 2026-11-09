@@ -1,6 +1,6 @@
 # Source Quality Agent — loaded quote inspection
 
-Implemented 9 November 2026, Asia/Kolkata, on the Release 2 feature branch. Scope: an explicit **read-only Cloud development runner over loaded quote metadata**. No UI, HTTP route, MCP registration, scheduler, hosted storage or live provider/model connection is added.
+Implemented 9 November 2026, Asia/Kolkata, on the Release 2 feature branch. Scope: an explicit **read-only Cloud development runner over loaded quote metadata**. The original role baseline added no UI, HTTP route, MCP registration, scheduler, hosted storage or live provider/model connection. The subsequent [manual development UI integration](release2-source-quality-ui.md) now supplies reviewed loaded-quote mapping and private loopback transport; production and live providers remain disabled.
 
 ## Behavior and authority
 
@@ -82,7 +82,7 @@ To inspect a producer-supplied packet in the contract above:
 
 The CLI requires an explicit input or demo choice, reads at most the byte limit plus one, writes JSON to stdout and exits 2 on a failed request/file read. File errors do not echo private paths. No input/output file is overwritten by the runner. The executable example is development-only; it does not export a private portfolio or fetch a provider.
 
-Retained fictional result: `/workspace/artifacts/source-quality-agent-demo-result.json`. Request JSON schema is available through `QualityRequest.model_json_schema()`; a future adapter must map existing quote DTO names and missing identity/session/currency honestly. The current app is not silently mapped into this contract.
+Retained fictional result: `/workspace/artifacts/source-quality-agent-demo-result.json`. Request JSON schema is available through `QualityRequest.model_json_schema()`; the subsequent [reviewed adapter](release2-source-quality-ui.md) maps loaded quote DTOs and preserves missing identity/session/currency. Only an explicit development review submits the minimized packet.
 
 ## General autonomous planner repair found during this increment
 
@@ -98,7 +98,7 @@ Seventy-two source-role tests cover metadata/zero/precision/time/identity/source
 
 Remaining work:
 
-1. A reviewed adapter from loaded application quotes to this contract, preserving omitted fields and issuer/source evidence. Add an explicit manual review UI only after that mapping and its privacy/coverage tests.
+1. The [reviewed loaded-quote adapter and manual UI](release2-source-quality-ui.md) are now implemented with privacy/coverage tests. Next extend source provenance and eligibility into remaining consumers; provider/issuer truth is still unverified.
 2. Remaining portfolio/decision consumer eligibility, shared SEC/provider quotas, filing-date semantics and adjusted/point-in-time history integrity.
 3. Independent labeled source packets and model/JEV effectiveness comparisons. These deterministic regression cases are not an independently labeled financial benchmark or a claim of predictive accuracy.
 4. Company/catalyst research and Daily Review roles, then optional bounded model-written explanations over accepted facts. Live development credentials/hosts, model compatibility and resource acceptance remain separate prerequisites.

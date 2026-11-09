@@ -45,6 +45,8 @@ import DataHealth from './components/DataHealth';
 import AIQualityLab from './components/AIQualityLab';
 
 type LivePrice = {
+  returnedSymbol?:string|null; sourceMode?:'live'|'simulated'|'unknown'; adjustedBasis?:'raw'|'split_adjusted'|'total_return'|'unknown';
+  marketDate?:string|null; marketTimePrecision?:'instant'|'date-only'|'unknown';
   currency?: string | null; isMarketSessionOpen?: boolean | null; status?: string; simulated?: boolean; fallbackUsed?: boolean;
   price: number;
   changePct: number;
@@ -199,6 +201,7 @@ export default function App() {
           const res = await fetchLiveQuote(s, config?.finnhubKey || '', true);
           if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
             updated[s] = {
+              returnedSymbol:res.returnedSymbol,sourceMode:res.sourceMode,adjustedBasis:res.adjustedBasis,marketDate:res.marketDate,marketTimePrecision:res.marketTimePrecision,
               price: res.price,
               changePct: res.changePct,
               provider: res.provider,
@@ -294,6 +297,7 @@ export default function App() {
           const res = await fetchLiveQuote(s, loaded.finnhubKey, true);
           if (Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
             updated[s] = {
+              returnedSymbol:res.returnedSymbol,sourceMode:res.sourceMode,adjustedBasis:res.adjustedBasis,marketDate:res.marketDate,marketTimePrecision:res.marketTimePrecision,
               price: res.price,
               changePct: res.changePct,
               provider: res.provider,

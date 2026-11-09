@@ -65,7 +65,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install QA dependencies
-        run: python -m pip install -r qa/requirements.txt
+        run: python -m pip install -r qa/requirements.txt -r requirements.txt "uvicorn>=0.30,<1"
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Build private-access preview
@@ -92,7 +92,7 @@ jobs:
           QA_UI_MOCKS: "true"
           QA_LOGIN_BASE_URL: http://127.0.0.1:3001
           QA_ARTIFACT_DIR: /tmp/aiw-uiux
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py qa/test_holding_detail.py qa/test_missing_data_analytics.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py qa/test_holding_detail.py qa/test_missing_data_analytics.py qa/test_source_quality_ui.py
       - name: Upload fixture-only UI audit evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,6 +107,7 @@ jobs:
             /tmp/aiw-uiux/opportunity-jev-*.png
             /tmp/aiw-uiux/holding-detail-*.png
             /tmp/aiw-uiux/missing-analytics-*.png
+            /tmp/aiw-uiux/source-quality-*.png
           if-no-files-found: ignore
           retention-days: 7
 

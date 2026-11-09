@@ -1,0 +1,399 @@
+[
+  {
+    "kind": "covered",
+    "request": {
+      "run_id": "fixture-source-ui:covered",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "observations": [
+        {
+          "evidence_id": "loaded:NVDA:0",
+          "symbol": "NVDA",
+          "returned_symbol": "NVDA",
+          "provider": "yahoo",
+          "source_mode": "live",
+          "price": 100.0,
+          "change_pct": 0.0,
+          "currency": "USD",
+          "market_time": "2026-11-09T14:31:00Z",
+          "time_precision": "instant",
+          "retrieved_at": "2026-11-09T14:31:10Z",
+          "adjusted_basis": "raw",
+          "is_market_session_open": true,
+          "market_date": null,
+          "stale": false
+        }
+      ]
+    },
+    "result": {
+      "contract_version": "source-quality-v1",
+      "run_id": "fixture-source-ui:covered",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "policy": {
+        "max_quote_age_seconds": 900,
+        "max_time_difference_seconds": 60,
+        "discrepancy_pct": 2.0,
+        "expected_currency": null,
+        "max_tool_calls": 20,
+        "time_budget_ms": 1000
+      },
+      "status": "complete",
+      "inspection_complete": true,
+      "termination_reason": "completed",
+      "expected_symbols": [
+        "NVDA"
+      ],
+      "inspected_symbols": [
+        "NVDA"
+      ],
+      "uninspected_symbols": [],
+      "pending_comparison_symbols": [],
+      "inspections": [
+        {
+          "symbol": "NVDA",
+          "status": "metadata-covered",
+          "observed_count": 1,
+          "comparable_evidence_ids": [
+            "loaded:NVDA:0"
+          ],
+          "findings": [
+            {
+              "code": "NO_DISTINCT_PROVIDER_COMPARISON",
+              "severity": "attention",
+              "evidence_ids": [
+                "loaded:NVDA:0"
+              ]
+            }
+          ],
+          "comparisons": [],
+          "comparison_status": "not-assessed"
+        }
+      ],
+      "trace": [
+        {
+          "tool": "source_quality.inspect_quote",
+          "symbol": "NVDA",
+          "status": "ok"
+        }
+      ],
+      "tool_attempts": 1,
+      "tool_calls": 1,
+      "provided_observation_count": 1,
+      "inspected_observation_count": 1,
+      "metadata_covered_observation_count": 1,
+      "provider_requests": 0,
+      "model_calls": 0,
+      "jev_calls": 0,
+      "grants_decision_eligibility": false,
+      "verifies_provider_identity": false
+    }
+  },
+  {
+    "kind": "missing",
+    "request": {
+      "run_id": "fixture-source-ui:missing",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "observations": []
+    },
+    "result": {
+      "contract_version": "source-quality-v1",
+      "run_id": "fixture-source-ui:missing",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "policy": {
+        "max_quote_age_seconds": 900,
+        "max_time_difference_seconds": 60,
+        "discrepancy_pct": 2.0,
+        "expected_currency": null,
+        "max_tool_calls": 20,
+        "time_budget_ms": 1000
+      },
+      "status": "needs-data",
+      "inspection_complete": true,
+      "termination_reason": "completed",
+      "expected_symbols": [
+        "NVDA"
+      ],
+      "inspected_symbols": [
+        "NVDA"
+      ],
+      "uninspected_symbols": [],
+      "pending_comparison_symbols": [],
+      "inspections": [
+        {
+          "symbol": "NVDA",
+          "status": "needs-data",
+          "observed_count": 0,
+          "comparable_evidence_ids": [],
+          "findings": [
+            {
+              "code": "NO_OBSERVATION",
+              "severity": "blocker",
+              "evidence_ids": []
+            },
+            {
+              "code": "NO_DISTINCT_PROVIDER_COMPARISON",
+              "severity": "attention",
+              "evidence_ids": []
+            }
+          ],
+          "comparisons": [],
+          "comparison_status": "not-assessed"
+        }
+      ],
+      "trace": [
+        {
+          "tool": "source_quality.inspect_quote",
+          "symbol": "NVDA",
+          "status": "ok"
+        }
+      ],
+      "tool_attempts": 1,
+      "tool_calls": 1,
+      "provided_observation_count": 0,
+      "inspected_observation_count": 0,
+      "metadata_covered_observation_count": 0,
+      "provider_requests": 0,
+      "model_calls": 0,
+      "jev_calls": 0,
+      "grants_decision_eligibility": false,
+      "verifies_provider_identity": false
+    }
+  },
+  {
+    "kind": "conflict",
+    "request": {
+      "run_id": "fixture-source-ui:conflict",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "observations": [
+        {
+          "evidence_id": "loaded:NVDA:0",
+          "symbol": "NVDA",
+          "returned_symbol": "NVDA",
+          "provider": "yahoo",
+          "source_mode": "live",
+          "price": 100.0,
+          "change_pct": 0.0,
+          "currency": "USD",
+          "market_time": "2026-11-09T14:31:00Z",
+          "time_precision": "instant",
+          "retrieved_at": "2026-11-09T14:31:10Z",
+          "adjusted_basis": "raw",
+          "is_market_session_open": true,
+          "market_date": null,
+          "stale": false
+        },
+        {
+          "evidence_id": "loaded:NVDA:1",
+          "symbol": "NVDA",
+          "returned_symbol": "NVDA",
+          "provider": "finnhub",
+          "source_mode": "live",
+          "price": 110.0,
+          "change_pct": 0.0,
+          "currency": "USD",
+          "market_time": "2026-11-09T14:31:00Z",
+          "time_precision": "instant",
+          "retrieved_at": "2026-11-09T14:31:10Z",
+          "adjusted_basis": "raw",
+          "is_market_session_open": true,
+          "market_date": null,
+          "stale": false
+        }
+      ]
+    },
+    "result": {
+      "contract_version": "source-quality-v1",
+      "run_id": "fixture-source-ui:conflict",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "policy": {
+        "max_quote_age_seconds": 900,
+        "max_time_difference_seconds": 60,
+        "discrepancy_pct": 2.0,
+        "expected_currency": null,
+        "max_tool_calls": 20,
+        "time_budget_ms": 1000
+      },
+      "status": "needs-data",
+      "inspection_complete": true,
+      "termination_reason": "completed",
+      "expected_symbols": [
+        "NVDA"
+      ],
+      "inspected_symbols": [
+        "NVDA"
+      ],
+      "uninspected_symbols": [],
+      "pending_comparison_symbols": [],
+      "inspections": [
+        {
+          "symbol": "NVDA",
+          "status": "review",
+          "observed_count": 2,
+          "comparable_evidence_ids": [
+            "loaded:NVDA:0",
+            "loaded:NVDA:1"
+          ],
+          "findings": [
+            {
+              "code": "PRICE_DISCREPANCY",
+              "severity": "blocker",
+              "evidence_ids": [
+                "loaded:NVDA:0",
+                "loaded:NVDA:1"
+              ]
+            }
+          ],
+          "comparisons": [
+            {
+              "evidence_ids": [
+                "loaded:NVDA:0",
+                "loaded:NVDA:1"
+              ],
+              "discrepancy_pct": 10.0,
+              "exceeds_threshold": true
+            }
+          ],
+          "comparison_status": "compared"
+        }
+      ],
+      "trace": [
+        {
+          "tool": "source_quality.inspect_quote",
+          "symbol": "NVDA",
+          "status": "ok"
+        },
+        {
+          "tool": "source_quality.compare_quotes",
+          "symbol": "NVDA",
+          "status": "ok"
+        }
+      ],
+      "tool_attempts": 2,
+      "tool_calls": 2,
+      "provided_observation_count": 2,
+      "inspected_observation_count": 2,
+      "metadata_covered_observation_count": 2,
+      "provider_requests": 0,
+      "model_calls": 0,
+      "jev_calls": 0,
+      "grants_decision_eligibility": false,
+      "verifies_provider_identity": false
+    }
+  },
+  {
+    "kind": "budget",
+    "request": {
+      "run_id": "fixture-source-ui:budget",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "observations": [
+        {
+          "evidence_id": "loaded:NVDA:0",
+          "symbol": "NVDA",
+          "returned_symbol": "NVDA",
+          "provider": "yahoo",
+          "source_mode": "live",
+          "price": 100.0,
+          "change_pct": 0.0,
+          "currency": "USD",
+          "market_time": "2026-11-09T14:31:00Z",
+          "time_precision": "instant",
+          "retrieved_at": "2026-11-09T14:31:10Z",
+          "adjusted_basis": "raw",
+          "is_market_session_open": true,
+          "market_date": null,
+          "stale": false
+        },
+        {
+          "evidence_id": "loaded:NVDA:1",
+          "symbol": "NVDA",
+          "returned_symbol": "NVDA",
+          "provider": "finnhub",
+          "source_mode": "live",
+          "price": 110.0,
+          "change_pct": 0.0,
+          "currency": "USD",
+          "market_time": "2026-11-09T14:31:00Z",
+          "time_precision": "instant",
+          "retrieved_at": "2026-11-09T14:31:10Z",
+          "adjusted_basis": "raw",
+          "is_market_session_open": true,
+          "market_date": null,
+          "stale": false
+        }
+      ]
+    },
+    "result": {
+      "contract_version": "source-quality-v1",
+      "run_id": "fixture-source-ui:budget",
+      "assessed_at": "2026-11-09T14:32:00Z",
+      "policy": {
+        "max_quote_age_seconds": 900,
+        "max_time_difference_seconds": 60,
+        "discrepancy_pct": 2.0,
+        "expected_currency": null,
+        "max_tool_calls": 20,
+        "time_budget_ms": 1000
+      },
+      "status": "partial",
+      "inspection_complete": false,
+      "termination_reason": "time-budget",
+      "expected_symbols": [
+        "NVDA"
+      ],
+      "inspected_symbols": [
+        "NVDA"
+      ],
+      "uninspected_symbols": [],
+      "pending_comparison_symbols": [
+        "NVDA"
+      ],
+      "inspections": [
+        {
+          "symbol": "NVDA",
+          "status": "metadata-covered",
+          "observed_count": 2,
+          "comparable_evidence_ids": [
+            "loaded:NVDA:0",
+            "loaded:NVDA:1"
+          ],
+          "findings": [],
+          "comparisons": [],
+          "comparison_status": "not-assessed"
+        }
+      ],
+      "trace": [
+        {
+          "tool": "source_quality.inspect_quote",
+          "symbol": "NVDA",
+          "status": "ok"
+        },
+        {
+          "tool": "source_quality.compare_quotes",
+          "symbol": "NVDA",
+          "status": "budget"
+        }
+      ],
+      "tool_attempts": 2,
+      "tool_calls": 1,
+      "provided_observation_count": 2,
+      "inspected_observation_count": 2,
+      "metadata_covered_observation_count": 2,
+      "provider_requests": 0,
+      "model_calls": 0,
+      "jev_calls": 0,
+      "grants_decision_eligibility": false,
+      "verifies_provider_identity": false
+    }
+  }
+]

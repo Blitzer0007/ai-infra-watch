@@ -1,5 +1,6 @@
 import { WatchlistItem } from './types';
 import { parseQuoteObservation } from './utils/quoteObservation';
+import { quoteSourceMetadata, providerObservationInstant } from './utils/quoteSourceMetadata';
 
 export interface AppConfig {
   finnhubKey: string;
@@ -94,7 +95,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
   asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
-}> {
+} & ReturnType<typeof quoteSourceMetadata>> {
   if (!apiKey) {
     const res = await fetch(
       '/api/quote?symbol=' + encodeURIComponent(symbol) + (forceRefresh ? '&refresh=true' : ''),
@@ -105,6 +106,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     const observed = parseQuoteObservation(data, symbol);
     if (!observed) throw new Error('Server quote returned no usable price and daily move');
     return {
+      ...quoteSourceMetadata(data),
       ...observed,
       source: 'live',
       provider: data.provider,
@@ -133,12 +135,13 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     }
     
     return {
+      ...quoteSourceMetadata({sourceMode:'live',adjustedBasis:'raw'}),
       ...observed,
       source: 'live',
       provider: 'Finnhub',
       retrievedAt: new Date().toISOString(),
-      marketTime: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
-      asOf: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
+      marketTime: providerObservationInstant(data.t),
+      asOf: providerObservationInstant(data.t),
       stale: false,
       cached: false
     };
@@ -153,6 +156,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       const observed = parseQuoteObservation(data, symbol);
       if (!observed) throw new Error('No usable price and daily move available');
       return {
+        ...quoteSourceMetadata(data),
         ...observed,
         source: 'live',
         provider: data.provider,

@@ -43,7 +43,8 @@ export function normalizeYahooQuote(result, nowMs = Date.now(), expectedSymbol =
   const session = regularSessionMetadata(meta,nowMs);
   return { price:meta.regularMarketPrice,changePct:ratioChange(meta.regularMarketPrice,previous.price),prevClose:previous.price,
     dailyChangeSource:previous.source,...range(meta.regularMarketDayLow,meta.regularMarketDayHigh),
-    source:'Yahoo Finance',provider:'yahoo',currency:typeof meta.currency==='string'&&meta.currency.trim()?meta.currency:null,
+    source:'Yahoo Finance',provider:'yahoo',sourceMode:'live',returnedSymbol:typeof meta.symbol==='string'?meta.symbol.trim().toUpperCase():null,
+    currency:typeof meta.currency==='string'&&meta.currency.trim()?meta.currency:null,
     retrievedAt:new Date(nowMs).toISOString(),adjustedBasis:'raw',...session,asOf:session.marketTime,stale:false };
 }
 
@@ -55,7 +56,7 @@ export function normalizeFinnhubQuote(value, nowMs = Date.now()) {
   const marketTime = timestamp(value.t);
   return {price:value.c,changePct,prevClose:previous,...range(value.l,value.h),
     dailyChangeSource:finite(value.dp)?'provider-percent':derived!=null?'previous-close-ratio':null,
-    source:'Finnhub',provider:'finnhub',marketTime,asOf:marketTime,retrievedAt:new Date(nowMs).toISOString(),
+    source:'Finnhub',provider:'finnhub',sourceMode:'live',returnedSymbol:null,marketTime,asOf:marketTime,retrievedAt:new Date(nowMs).toISOString(),
     currency:null,isMarketSessionOpen:null,status:'missing',adjustedBasis:'raw',stale:false};
 }
 
@@ -72,7 +73,8 @@ export function normalizeAlphaQuote(value, nowMs = Date.now(), expectedSymbol = 
   const validDay = typeof day==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(day)&&Number.isFinite(Date.parse(day))&&new Date(day).toISOString().slice(0,10)===day;
   return {price,changePct:reported??derived,prevClose:previous,...range(numeric(value['04. low']),numeric(value['03. high'])),
     dailyChangeSource:reported!=null?'provider-percent':derived!=null?'previous-close-ratio':null,
-    source:'Alpha Vantage',provider:'alpha-vantage',marketTime:null,asOf:null,marketDate:validDay?day:null,
+    source:'Alpha Vantage',provider:'alpha-vantage',sourceMode:'live',returnedSymbol:typeof value['01. symbol']==='string'?value['01. symbol'].trim().toUpperCase():null,
+    marketTime:null,asOf:null,marketDate:validDay?day:null,
     marketTimePrecision:validDay?'date-only':'unknown',retrievedAt:new Date(nowMs).toISOString(),currency:null,
     isMarketSessionOpen:null,status:'missing',adjustedBasis:'raw',stale:false};
 }

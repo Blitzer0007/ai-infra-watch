@@ -81,7 +81,7 @@ Use deterministic code for calculations/limits, JEV for bounded typed evidence t
 
 ## Source Quality Agent contract and subsequent implementation
 
-The [first implemented slice](release2-source-quality-agent.md) is an explicit **development-only, read-only quote-metadata run**, with a manual Cloud CLI. It implements the bounded deterministic inspection/comparison subset below. Provider enrichment, JEV/model passes, UI integration and durable checkpoints remain separate work:
+The [first implemented slice](release2-source-quality-agent.md) is an explicit **development-only, read-only quote-metadata run**, with a manual Cloud CLI. It implements the bounded deterministic inspection/comparison subset below. The subsequent [manual development UI](release2-source-quality-ui.md) implements frozen/minimized DTO mapping and private loopback integration. Provider enrichment, JEV/model passes and durable checkpoints remain separate work:
 
 ```text
 request: runId, taskKind, assessedAt, bounded selected symbols, input snapshot IDs

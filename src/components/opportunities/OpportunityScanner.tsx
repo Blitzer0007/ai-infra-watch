@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { STOCK_UNIVERSE } from '../../utils/stockUniverse';
 import { captureResearchSnapshot, type ResearchSnapshot } from '../../utils/researchSnapshot';
 import { scanResearchSnapshot, type ResearchCandidate, type ResearchStatus } from '../../utils/opportunityResearch';
 import OpportunityCard, { researchLabels } from './OpportunityCard';
 import { formatReviewDate } from '../../utils/portfolioReview';
 import OpportunityJevReview from './OpportunityJevReview';
+import SourceQualityReview from './SourceQualityReview';
+import { captureSourceQualitySnapshot, type SourceQualitySnapshot } from '../../utils/sourceQualityReview';
 
 type Props = { holdings:readonly string[]; watchlist:readonly string[]; quotes:Record<string,Record<string,unknown>|undefined>; loading?:boolean; holdingsAvailable?:boolean };
 export default function OpportunityScanner({ holdings, watchlist, quotes, loading = false, holdingsAvailable = true }:Props) {
-  const [scan, setScan] = useState<{snapshot:ResearchSnapshot; candidates:ResearchCandidate[]}|null>(null);
+  const [scan, setScan] = useState<{snapshot:ResearchSnapshot; candidates:ResearchCandidate[]; source:SourceQualitySnapshot|null}|null>(null);
+  const sequence=useRef(0);
   const [error,setError] = useState('');
   const [query,setQuery] = useState('');
   const [status,setStatus] = useState<ResearchStatus|'all'>('all');
@@ -19,7 +22,8 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
       // Names are descriptive metadata; do not infer an asset class or listing from a ticker.
       const companies = Object.fromEntries(STOCK_UNIVERSE.map(item => [item.symbol,{name:item.name,assetClass:'unknown' as const}]));
       const snapshot = captureResearchSnapshot({id:'loaded-snapshot:'+now,nowMs:now,holdings,watchlist,quotes,companies,holdingsAvailable});
-      setScan({snapshot,candidates:scanResearchSnapshot(snapshot,now)}); setError(''); setLimit(20);
+      const source=(import.meta.env.DEV||import.meta.env.VITE_QA_MODE==='true')?captureSourceQualitySnapshot(snapshot.entries.map(row=>row.symbol),quotes,`source-snapshot:${now}:${++sequence.current}`,now):null;
+      setScan({snapshot,candidates:scanResearchSnapshot(snapshot,now),source}); setError(''); setLimit(20);
     } catch { setError('Snapshot could not be evaluated. Existing results have not been replaced; reload reliable inputs before retrying.'); }
   };
   const visible = (scan?.candidates ?? []).filter(item => (status === 'all' || item.status === status) && (item.symbol+' '+item.companyName).toLowerCase().includes(query.trim().toLowerCase()));
@@ -33,6 +37,7 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
       <p className="break-words text-sm">Captured {formatReviewDate(scan.snapshot.capturedAt)} · {scan.snapshot.universe.holdingsCoverage === 'unavailable' ? 'Holdings unavailable' : scan.snapshot.universe.holdings+' holdings'} · {scan.snapshot.universe.watchlistOnly} watchlist-only symbols</p>
       {scan.snapshot.universe.holdingsCoverage === 'unavailable' && <p role="status" className="text-amber-200">Holdings could not be loaded. This is watchlist coverage only, not a complete portfolio scan.</p>}
       <p className="text-sm text-white/70">Frozen evaluation, not a live forecast. Run again after inputs refresh. The universe is your current list, not the whole market or a historical sample.</p>
+      {scan.source&&<SourceQualityReview snapshot={scan.source} />}
       <OpportunityJevReview candidates={scan.candidates} />
       {(scan.snapshot.universe.omittedHoldings+scan.snapshot.universe.omittedWatchlist+scan.snapshot.universe.invalidSymbols)>0 && <p role="status" className="text-amber-200">Coverage limited: {scan.snapshot.universe.omittedHoldings} holdings, {scan.snapshot.universe.omittedWatchlist} watchlist symbols and {scan.snapshot.universe.invalidSymbols} invalid symbols omitted by input limits.</p>}
       {!scan.candidates.length ? <p role="status">No holdings or watchlist symbols are available in this snapshot.</p> : <>

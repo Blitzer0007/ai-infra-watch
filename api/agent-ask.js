@@ -1,4 +1,5 @@
 import { requireAccess } from './_access-auth.js';
+import { sourceQualityDevelopmentEnabled, sourceQualityPayload, sourceQualityEnvelope, sourceQualityResponseText } from '../server/services/sourceQualityInput.js';
 
 const DEFAULT_TIMEOUT_MS = 55000;
 const rateState = new Map();
@@ -44,7 +45,32 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 }
 
 export default async function handler(req, res) {
+  if(req.query?.task!=null)res.setHeader('Cache-Control','no-store');
   if (!requireAccess(req, res)) return;
+  if(req.query?.task!=null){
+    if(req.query.task!=='source-quality')return res.status(400).json({error:'Unknown research task'});
+    if(!sourceQualityDevelopmentEnabled())return res.status(404).json({error:'Development review unavailable'});
+    if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({error:'POST required'});}
+    if(rateLimited(req))return res.status(429).json({error:'Review request limit reached'});
+    const payload=sourceQualityPayload(req.body);
+    if(!payload)return res.status(400).json({error:'Invalid source-quality request'});
+    // The development-only role may contact only an explicitly configured
+    // loopback backend. Never derive this target from an incoming Host header.
+    const configured=String(process.env.AI_INFRA_AGENT_URL||'').trim();
+    let target;
+    try{
+      target=new URL(configured);
+      if(target.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.username||target.password||target.pathname!=='/'||target.search||target.hash)throw new Error();
+    }catch{return res.status(503).json({error:'Development review unavailable'});}
+    try{
+      const upstream=await fetch(new URL('/api/agent-python?task=source-quality',target),{method:'POST',headers:backendHeaders(),body:JSON.stringify(payload),signal:withTimeout(8000),redirect:'error'});
+      if(!upstream.ok)return res.status(upstream.status===429?429:503).json({error:'Source-quality review unavailable'});
+      const raw=await sourceQualityResponseText(upstream);
+      const data=JSON.parse(raw);
+      if(!sourceQualityEnvelope(data,payload.run_id))throw new Error();
+      return res.status(200).json(data);
+    }catch{return res.status(503).json({error:'Source-quality review unavailable'});}
+  }
   if (rateLimited(req)) {
     res.status(429).json({ ok: false, error: 'Too many autonomous research requests' });
     return;
