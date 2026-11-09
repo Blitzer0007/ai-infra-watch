@@ -12,6 +12,10 @@ def forbidden(*_a,**_k):raise RuntimeError('General planner forbidden in council
 module.get_toolbox=forbidden;module.AutonomousMCPAgent=forbidden
 class MockNvidia(FictionalCouncilModel):
     mode='nvidia'  # Exercises loaded/JEV UI; zero HTTP requests, never a live acceptance claim.
+    def complete(self,role,messages,**kwargs):
+        if any(key in '\n'.join(m['content'] for m in messages) for key in ['"accession"','"inputs"','"cik"']):
+            raise AssertionError('Original filing receipts must not enter model prompts')
+        return super().complete(role,messages,**kwargs)
 class MockJev:
     def evaluate(self,**_kwargs):return JevEvaluation(answers={'coverage':JevAnswer(type='choice',choice='reviewable'),'next_check':JevAnswer(type='choice',choice='wait_for_outcome')},input_tokens=123)
 real_assess=council.assess_council_summary

@@ -53,7 +53,7 @@ test('reported zero survives margin, cash-flow and balance-ratio calculations',(
 test('different values or accessions on the same filing day remain ambiguous; later restatement is explicit',()=>{
   const facts=fixture();rows(facts,'Revenues').push({...rows(facts,'Revenues')[0],val:999});
   assert.equal(observation(adapt(facts),'revenue_growth_pct'),undefined);assert.ok(adapt(facts).issues.includes('AMBIGUOUS_FACT'));
-  rows(facts,'Revenues').at(-1).filed='2026-03-01';rows(facts,'Revenues')[1].filed='2026-03-01';const r=observation(adapt(facts),'revenue_growth_pct');assert.equal(r.inputs[0].value,999);assert.equal(r.inputs[0].filed_on,'2026-03-01');
+  Object.assign(rows(facts,'Revenues').at(-1),{filed:'2026-03-01',accn:'0000000001-26-000002'});Object.assign(rows(facts,'Revenues')[1],{filed:'2026-03-01',accn:'0000000001-26-000002'});const r=observation(adapt(facts),'revenue_growth_pct');assert.equal(r.inputs[0].value,999);assert.equal(r.inputs[0].filed_on,'2026-03-01');
 });
 test('competing complete revenue tags cannot silently choose different values',()=>{
   const facts=fixture();facts.facts['us-gaap'].SalesRevenueNet={units:{USD:[{...rows(facts,'Revenues')[0],val:999}]}};

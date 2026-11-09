@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {authFetch} from '../utils/apiAuth';
-import {inspectCouncilSources, councilCoverageState, councilEnvelope, type CouncilResult} from '../utils/portfolioCouncil';
+import {inspectCouncilSources, councilCoverageState, councilEnvelope, type CouncilResult, type CouncilAdmission} from '../utils/portfolioCouncil';
+import {councilAdmissionEnvelope,councilV2Envelope,councilRequestDigest} from '../../shared/councilAdmission.js';
 import {councilJevEnvelope} from '../../shared/portfolioCouncilContract.js';
 import type {PeerFundamentalSnapshot} from '../utils/peerStrength';
 import type {CatalystSnapshot} from '../utils/catalystCalendar';
@@ -16,6 +17,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
   const [horizon,setHorizon]=useState<3|6|12>(3);
   const [result,setResult]=useState<CouncilResult|null>(null);
   const [sources,setSources]=useState<ReturnType<typeof inspectCouncilSources>|null>(null);
+  const [admission,setAdmission]=useState<CouncilAdmission|null>(null);
   const [jev,setJev]=useState<JevCoverage|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -25,7 +27,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
   const attemptCount=useRef(0);
   useEffect(()=>{
     version.current+=1;flight.current?.abort();flight.current=null;
-    setResult(null);setSources(null);setJev(null);setError('');setBusy(false);
+    setResult(null);setSources(null);setAdmission(null);setJev(null);setError('');setBusy(false);
     return ()=>{version.current+=1;flight.current?.abort();flight.current=null;};
   },[symbol,horizon]);
 
@@ -33,29 +35,30 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
     if(flight.current)return;
     try {
       setSources(inspectCouncilSources(symbol,quotes[symbol],financials.find(f=>f.symbol===symbol),'council:'+crypto.randomUUID(),Date.now(),horizon,calendar));
-      setResult(null);setJev(null);setError('');
+      setResult(null);setAdmission(null);setJev(null);setError('');
     }catch {setSources(null);setError('Loaded source inspection is unavailable. No model request occurred.');}
   }
 
-  async function run(mode:'demo'|'loaded'|'jev') {
-    if(flight.current||attemptCount.current>=5||(mode==='loaded'&&!sources)||(mode==='jev'&&(!result||result.mode!=='nvidia'||result.status!=='complete')))return;
+  async function run(mode:'demo'|'loaded-v2'|'admission-v2'|'jev') {
+    if(flight.current||attemptCount.current>=5||(['loaded-v2','admission-v2'].includes(mode)&&!sources)||(mode==='jev'&&(!result||result.mode!=='nvidia'||result.status!=='complete')))return;
     const controller=new AbortController();flight.current=controller;
     const current=version.current;
-    if(mode==='demo')setSources(null);
+    if(mode==='demo'){setSources(null);setAdmission(null);}
     attemptCount.current+=1;setAttempts(attemptCount.current);setBusy(true);setError('');
     const timeout=setTimeout(()=>controller.abort(),47000);
     try {
       const runId='council:'+crypto.randomUUID();
       const payload=mode==='jev'&&result?{mode,run_id:result.run_id,state:councilCoverageState(result)}:
         mode==='demo'?{mode,run_id:runId,assessed_at:new Date().toISOString()}:
-        {mode:'loaded',packet:sources!.packet};
-      if(mode==='loaded'&&(!('packet' in payload)||!payload.packet.evidence.length))throw Error();
+        {...sources!.request,mode};
+      if(mode==='loaded-v2'&&(!('packet' in payload)||!payload.packet.evidence.length))throw Error();
       const response=await authFetch('/api/agent-ask?task=council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
       const raw=await response.text();if(raw.length>65536)throw Error();
       const value=JSON.parse(raw);
-      if(!response.ok||!(mode==='jev'?councilJevEnvelope(value,payload):councilEnvelope(value,payload)))throw Error();
+      const valid=mode==='admission-v2'?councilAdmissionEnvelope(value,payload,await councilRequestDigest(payload)):mode==='loaded-v2'?councilV2Envelope(value,payload,await councilRequestDigest(payload)):mode==='jev'?councilJevEnvelope(value,payload):councilEnvelope(value,payload);
+      if(!response.ok||!valid)throw Error();
       if(current!==version.current)return;
-      if(mode==='jev')setJev(value);else {setResult(value);setJev(null);}
+      if(mode==='jev')setJev(value);else if(mode==='admission-v2')setAdmission(value);else {setResult(value);setAdmission(value.admission||null);setJev(null);}
     } catch {
       if(current===version.current)setError('Council review unavailable. Check the private development configuration or loaded evidence. No automatic retry occurred.');
     } finally {
@@ -73,8 +76,9 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
         <label className="text-sm">Research horizon<select aria-label="Council research horizon" value={horizon} onChange={e=>setHorizon(Number(e.target.value) as 3|6|12)} className={control+' mt-1 block'}>{[3,6,12].map(n=><option key={n} value={n}>{n} months</option>)}</select></label>
         <button className={control} disabled={disabled||!!result} onClick={()=>void run('demo')}>Run fictional council demo</button>
         <button className={control} disabled={busy||!symbol} onClick={inspect}>Inspect loaded sources</button>
-        <button className={control+' text-cyan-200'} disabled={disabled||!!result||!sources?.packet.evidence.length} onClick={()=>void run('loaded')}>Analyze loaded evidence</button>
-        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setSources(null);setJev(null);setError('');}}>Start a new review</button>}
+        <button className={control} disabled={disabled||!sources||!!admission} onClick={()=>void run('admission-v2')}>Validate research inputs</button>
+        <button className={control+' text-cyan-200'} disabled={disabled||!!result||!sources?.packet.evidence.length} onClick={()=>void run('loaded-v2')}>Analyze loaded evidence</button>
+        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setSources(null);setAdmission(null);setJev(null);setError('');}}>Start a new review</button>}
       </div>
       <p className="text-xs leading-5 text-slate-400">Manual only · Up to six model calls and three loaded-data tools per council · Five attempts per page session · No automatic retries. Loaded analysis requires a separately enabled NVIDIA development backend. TypeSafe is optional and runs only on a separate click.</p>
       {sources&&<details open data-testid="council-source-receipt" className="rounded-xl border border-white/15 p-3 text-sm">
@@ -83,7 +87,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           <p>Frozen at {sources.packet.assessed_at}. Inspection makes no request. Analysis will use this snapshot until you inspect again.</p>
           <p>SEC receipt: {human(sources.financialStatus)} · Calendar: {human(sources.calendar.status)} · Source authenticity remains unverified.</p>
           {sources.sec&&<p className="break-words">Declared issuer CIK: {sources.sec.cik} · Source retrieved: {sources.sec.retrieved_at}</p>}
-          <p>Derived ratios and cash flow are calculated from reported inputs, not directly reported metrics. Date-only filing publications stay date-only; no midnight observation or publication time is invented. These inputs cannot pass the current council admission gates.</p>
+          <p>Derived ratios and cash flow are calculated from reported inputs, not directly reported metrics. Date-only filing publications stay date-only; no midnight observation or publication time is invented. Filing references go only to the private validation backend, not model prompts. Conditional research admission is separate from source authentication or decision eligibility.</p>
           {sources.sec?.observations.map((o:any)=><div key={o.evidence.evidence_id} className="break-words rounded bg-black/20 p-3">
             <p className="font-medium text-white">{human(o.evidence.metric)}: {o.evidence.value.toLocaleString()} {o.evidence.unit}</p>
             <p>Calculation: {human(o.method)} · Period: {o.evidence.period_start||'point in time'} to {o.evidence.period_end}</p>
@@ -92,6 +96,18 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           {!!sources.sec?.issues.length&&<p>SEC gaps: {sources.sec.issues.map(human).join(' · ')}</p>}
           {sources.calendar.event&&<p>Selected event: {sources.calendar.event.date} · {sources.calendar.event.confirmation} · countdown uses elapsed UTC days, not trading sessions.</p>}
           <p>Calendar gaps: {sources.calendar.issues.map(human).join(' · ')||'none under configured checks'} · Original calendar coverage remains unknown.</p>
+        </div>
+      </details>}
+      {admission&&<details open data-testid="council-admission" className="rounded-xl border border-amber-300/25 p-3 text-sm">
+        <summary className="cursor-pointer font-medium">Research input checks · {human(admission.status)}</summary>
+        <div className="mt-3 space-y-3 text-xs text-slate-300">
+          <p>Rules: {admission.rule_version}. Conditional checks use declared inputs only. Source authenticity and forecast validity remain unverified; no decision eligibility was granted.</p>
+          <p>Missing conditional coverage: {admission.quality.missing_families.join(', ')||'none under these input checks'}. Validation itself makes no model or provider call.</p>
+          {admission.records.map(r=><div key={r.evidence_id} className="break-words rounded bg-black/20 p-2"><p>{r.evidence_id} · {human(r.kind)} · {r.eligible?'Conditionally usable for research':'Needs data'}</p>
+            {!!r.reason_codes.length&&<p>{r.reason_codes.map(human).join(' · ')}</p>}
+            {r.publication_window&&<p>Possible publication range: {r.publication_window.earliest} to before {r.publication_window.latest_exclusive}. Date-only, unknown-zone bounds; neither endpoint is the actual publication time.</p>}
+          </div>)}
+          <p>The legacy council protocol remains separate. V2 analysis independently rechecks the same frozen source declarations before using its conditional coverage.</p>
         </div>
       </details>}
       {busy&&<p role="status" className="text-sm text-cyan-200">Reviewing the frozen evidence snapshot…</p>}

@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import datetime,timezone
 import httpx
 from playwright.sync_api import expect
 import pytest
@@ -53,10 +54,10 @@ def council_gateway(tmp_path_factory):
                 except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
             sock.close()
 
-def setup(page,address,financial=None):
+def setup(page,address,financial=None,stamp_override=None):
     fictional_portfolio(page)
     page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-council-session")')
-    stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(time.time()-2))
+    stamp=stamp_override or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(time.time()-2))
     quotes={'MSFT':{'symbol':'MSFT','returnedSymbol':'MSFT','provider':'yahoo','sourceMode':'live','price':100,'changePct':0,'currency':'USD','marketTime':stamp,'retrievedAt':stamp,'notes':'fictional-private-notes','quantity':1000}}
     page.route('**/api/live-data*',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps({'stockPrices':quotes,'news':[],'contracts':[],'congressTrades':[],'macroRisks':[],'timestamp':int(time.time()*1000)})))
     if financial is not None:
@@ -101,7 +102,7 @@ def test_loaded_metadata_unknowns_stay_unknown_and_typesafe_is_separate_explicit
     expect(result).to_contain_text('insufficient evidence')
     assert len(calls)==1
     payload=calls[0].post_data_json
-    assert payload['mode']=='loaded' and payload['packet']['evidence'][1]['value']==0
+    assert payload['mode']=='loaded-v2' and payload['packet']['evidence'][1]['value']==0
     assert payload['packet']['evidence'][0]['published_at'] is None
     assert 'fictional-private' not in json.dumps(payload)
     panel.get_by_role('button',name='Check coverage with TypeSafe',exact=True).click()
@@ -159,7 +160,8 @@ def test_source_receipt_retains_filing_days_and_formulas_and_freezes_model_snaps
     assert next(e for e in evidence if e['metric']=='price')['value']==100
     financial=next(e for e in evidence if e['metric']=='revenue_growth_pct')
     assert financial['observed_at'] is None and financial['published_at'] is None and financial['period_start']=='2025-01-01'
-    assert 'accession' not in json.dumps(calls[0].post_data_json) and 'filed_on' not in json.dumps(calls[0].post_data_json)
+    assert calls[0].post_data_json['mode']=='loaded-v2'
+    assert calls[0].post_data_json['sources']['sec']['observations'][0]['inputs'][0]['filed_on']=='2026-02-20'
     panel.get_by_role('button',name='Inspect loaded sources',exact=True).click()
     expect(panel.get_by_test_id('council-result')).to_have_count(0)
     panel.get_by_role('button',name='Analyze loaded evidence',exact=True).click()
@@ -185,3 +187,46 @@ def test_loaded_calendar_date_only_is_inspectable_without_inventing_a_countdown_
     expect(panel.get_by_test_id('council-result')).to_be_visible()
     assert len(calls)==1 and all(e['family']!='catalyst' for e in calls[0].post_data_json['packet']['evidence'])
     assert len(manual)==1 and 'task=council' in manual[0] and errors==[]
+
+def test_model_free_admission_and_v2_model_run_bind_the_same_frozen_inputs(page,council_gateway):
+    page.clock.set_fixed_time(datetime(2026,11,9,12,0,tzinfo=timezone.utc))
+    source=json.loads((ROOT/'qa/fixtures/council-source-receipt.fictional.json').read_text())
+    panel,calls,errors=setup(page,council_gateway,source,'2026-11-09T11:59:00Z')
+    payload={'ok':True,'upcoming':[{'id':'fictional-confirmed','symbol':'MSFT','date':'2026-11-12T12:00:00Z','source':'Fictional issuer','sourceUrl':'https://example.com/results','confirmation':'confirmed','confirmationBasis':'issuer','publishedAt':'2026-11-01T12:00:00Z','retrievedAt':'2026-11-09T12:00:00Z'}]}
+    page.route('**/api/earnings-alerts*',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps(payload)))
+    with page.expect_response(lambda r:'/api/earnings-alerts?' in r.url and 'history=' not in r.url):page.get_by_test_id('nav-watchlist').click()
+    page.get_by_role('heading',name='Watchlist',exact=True).wait_for();page.wait_for_load_state('networkidle')
+    page.get_by_test_id('nav-jev-lab').click();page.wait_for_load_state('networkidle')
+    panel=page.get_by_test_id('portfolio-council')
+    if not panel.evaluate('(e)=>e.open'):panel.locator('summary').first.click()
+    panel.get_by_role('button',name='Inspect loaded sources',exact=True).click();assert calls==[]
+    panel.get_by_role('button',name='Validate research inputs',exact=True).dblclick()
+    report=panel.get_by_test_id('council-admission');expect(report).to_contain_text('Research input checks · conditional')
+    expect(report).to_contain_text('Conditionally usable for research');expect(report).to_contain_text('neither endpoint is the actual publication time')
+    assert len(calls)==1 and calls[0].post_data_json['mode']=='admission-v2'
+    assert panel.get_by_test_id('council-result').count()==0
+    ARTIFACTS.mkdir(parents=True,exist_ok=True)
+    for width in [360,768,1440]:
+        page.set_viewport_size({'width':width,'height':1000});assert report.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        report.screenshot(path=str(ARTIFACTS/f'portfolio-council-admission-fictional-{width}.png'))
+    panel.get_by_role('button',name='Analyze loaded evidence',exact=True).click()
+    expect(panel.get_by_test_id('council-result')).to_contain_text('No decision eligibility was granted')
+    assert len(calls)==2 and calls[1].post_data_json['mode']=='loaded-v2'
+    assert calls[0].post_data_json['packet']==calls[1].post_data_json['packet']
+    assert calls[0].post_data_json['sources']==calls[1].post_data_json['sources']
+    panel.get_by_role('combobox',name='Council research horizon',exact=True).select_option('6')
+    expect(report).to_have_count(0);assert len(calls)==2 and errors==[]
+
+def test_same_day_filing_cannot_gain_a_fabricated_precise_publication_time(page,council_gateway):
+    page.clock.set_fixed_time(datetime(2026,11,9,12,0,tzinfo=timezone.utc))
+    source=json.loads((ROOT/'qa/fixtures/council-source-receipt.fictional.json').read_text())
+    for o in source['observations']:
+        for f in o['inputs']:f['filed_on']='2026-11-09'
+    panel,calls,errors=setup(page,council_gateway,source,'2026-11-09T11:59:00Z')
+    panel.get_by_role('button',name='Inspect loaded sources',exact=True).click()
+    panel.get_by_role('button',name='Validate research inputs',exact=True).click()
+    report=panel.get_by_test_id('council-admission');expect(report).to_contain_text('PUBLICATION WINDOW UNCLOSED')
+    expect(report).to_contain_text('needs data')
+    assert len(calls)==1 and all(o['evidence']['published_at'] is None for o in calls[0].post_data_json['sources']['sec']['observations'])
+    assert panel.get_by_test_id('council-result').count()==0 and errors==[]

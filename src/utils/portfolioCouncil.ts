@@ -1,5 +1,6 @@
 import {councilEnvelope,councilPayload} from '../../shared/portfolioCouncilContract.js';
-import {forecastInstant} from './forecastInputs.js';
+import {forecastInstant,forecastInstantMicros} from './forecastInputs.js';
+import {councilAdmissionPayload} from '../../shared/councilAdmission.js';
 import {secCouncilReceipt} from '../../shared/councilSources.js';
 import {resolveCatalystRevisions, type CatalystSnapshot} from './catalystCalendar';
 export {councilEnvelope,councilPayload};
@@ -10,13 +11,15 @@ export type CouncilResult = {
   roles:Partial<Record<'bull'|'bear'|'judge',{summary:string;claims?:Array<{claim_id:string;evidence_id:string;stance:string;implication:string}>;limitations?:string[];preference?:string;winning_claim_ids?:string[]}>>;
   evidence:CouncilEvidence[];trace:Array<{role:string;action:string;status:string}>;
   usage:{model_calls:number;tool_calls:number;prompt_chars:number;provider_requests:number|null;jev_calls:number};
+  admission?:CouncilAdmission;
 };
+export type CouncilAdmission={contract_version:string;rule_version:string;run_id:string;request_sha256:string;status:'conditional'|'needs-data';quality:CouncilResult['quality'];records:Array<{evidence_id:string;kind:string;eligible:boolean;reason_codes:string[];publication_window:null|{earliest:string;latest_exclusive:string;precision:string;offset_policy:string}}>};
 const stamp=(value:unknown):string|null=>forecastInstant(value)!==null?value as string:null;
 const finite=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
 
 /** Public loaded facts only. No holding amounts, rule/thesis text or raw provider bodies. */
 export function buildCouncilPacket(symbol:string,quote:unknown,financial:unknown,runId:string,nowMs:number,horizon:3|6|12,calendar?:CatalystSnapshot) {
-  if(!/^[A-Z0-9.^=-]{1,20}$/.test(symbol)||!Number.isFinite(nowMs))throw Error('Invalid council input');
+  if(!/^[A-Z0-9.^=-]{1,20}$/.test(symbol)||!Number.isSafeInteger(nowMs))throw Error('Invalid council input');
   const evidence:CouncilEvidence[]=[];
   const q=quote&&typeof quote==='object'&&!Array.isArray(quote)?quote as Record<string,unknown>:null;
   if(q&&q.symbol===symbol&&q.returnedSymbol===symbol) {
@@ -47,10 +50,10 @@ export function buildCouncilPacket(symbol:string,quote:unknown,financial:unknown
 /** Date-only schedules cannot yield a precise countdown. No fetching or inferred issuer confirmation. */
 export function councilCatalyst(snapshot:CatalystSnapshot|undefined,symbol:string,nowMs:number) {
   const issues:string[]=[];
-  const receipt={status:snapshot?.status||'unavailable',issues,evidence:null as CouncilEvidence|null,event:null as null|{date:string;confirmation:string;publishedAt:string|null;retrievedAt:string|null;method:string}};
+  const receipt={status:snapshot?.status||'unavailable',issues,evidence:null as CouncilEvidence|null,event:null as null|{date:string;confirmation:string;publishedAt:string|null;retrievedAt:string|null;method:string},proof:null as null|{evidence_id:string;event_at:string;confirmation:string;confirmation_basis:'issuer'|'regulator'|null;published_at:string|null;retrieved_at:string|null}};
   if(!snapshot||snapshot.status==='unavailable') {issues.push('CALENDAR_UNAVAILABLE');return receipt;}
   if(!['available','partial'].includes(snapshot.status)){issues.push('CALENDAR_INVALID');return receipt;}
-  if(!Array.isArray(snapshot.events)||snapshot.events.length>500||!finite(nowMs)){issues.push('CALENDAR_INVALID');return receipt;}
+  if(!Array.isArray(snapshot.events)||snapshot.events.length>500||!Number.isSafeInteger(nowMs)){issues.push('CALENDAR_INVALID');return receipt;}
   const revisions=resolveCatalystRevisions(snapshot.events);
   if(revisions.some(r=>r.event.symbol===symbol&&r.lineageIssue)){issues.push('CALENDAR_REVISION_UNRESOLVED');return receipt;}
   const candidates=revisions.filter(r=>!r.supersededBy&&r.event.symbol===symbol&&r.event.confirmation!=='cancelled');
@@ -60,7 +63,10 @@ export function councilCatalyst(snapshot:CatalystSnapshot|undefined,symbol:strin
   const event=exact[0];
   receipt.event={date:event.date,confirmation:event.confirmation,publishedAt:stamp(event.publishedAt),retrievedAt:stamp(event.retrievedAt),method:'elapsed-UTC-days-until-event'};
   // Countdown is calculated, not a directly reported value; the v1 council cannot admit this basis.
-  receipt.evidence={evidence_id:'calendar:event-days',symbol,family:'catalyst',metric:'event_days_until',value:(Date.parse(event.date)-nowMs)/86400000,unit:'days',source_id:'loaded-calendar',observed_at:null,published_at:stamp(event.publishedAt),retrieved_at:stamp(event.retrievedAt),basis:event.confirmation==='estimated'?'estimate':'unknown',period_start:null,period_end:null,simulated:false};
+  const micros=forecastInstantMicros(event.date)-BigInt(nowMs)*1000n;
+  if(!Number.isSafeInteger(Number(micros))){issues.push('EVENT_INTERVAL_UNSUPPORTED');return receipt;}
+  receipt.evidence={evidence_id:'calendar:event-days',symbol,family:'catalyst',metric:'event_days_until',value:Number(micros)/86400000000,unit:'days',source_id:'loaded-calendar',observed_at:null,published_at:stamp(event.publishedAt),retrieved_at:stamp(event.retrievedAt),basis:event.confirmation==='estimated'?'estimate':'unknown',period_start:null,period_end:null,simulated:false};
+  receipt.proof={evidence_id:receipt.evidence.evidence_id,event_at:event.date,confirmation:event.confirmation,confirmation_basis:event.confirmationEvidence,published_at:receipt.evidence.published_at,retrieved_at:receipt.evidence.retrieved_at};
   issues.push('DERIVED_COUNTDOWN_NOT_REPORTED');
   return receipt;
 }
@@ -70,7 +76,10 @@ export function inspectCouncilSources(symbol:string,quote:unknown,financial:unkn
   const raw=financial&&typeof financial==='object'?financial as Record<string,any>:null;
   const sec=raw?.symbol===symbol&&secCouncilReceipt(raw.councilSource)&&raw.councilSource.symbol===symbol?structuredClone(raw.councilSource):null;
   const financialStatus=sec?sec.status:raw?.councilSource!==undefined?'invalid-source-receipt':'legacy-or-unavailable';
-  return {packet,financialStatus,sec,calendar:councilCatalyst(calendar,symbol,nowMs)};
+  const catalyst=councilCatalyst(calendar,symbol,nowMs);
+  const request={mode:'loaded-v2',packet,sources:{sec,catalyst:catalyst.proof}};
+  if(!councilAdmissionPayload(request))throw Error('Invalid conditional source packet');
+  return {packet,financialStatus,sec,calendar:catalyst,request};
 }
 
 export function councilCoverageState(result:CouncilResult) {

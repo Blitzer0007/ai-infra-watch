@@ -15,6 +15,8 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 
 ## Completed increments
 
+- [Versioned council input admission](release2-council-admission.md): manual model-free Python validation, family-specific rules, original calculation/filing proof checks, date-only uncertainty bounds, request-byte binding and v2 council integration. Conditional declared-input integrity remains separate from authenticated sources, predictive validity and decisions; labelled model-effectiveness evaluation is next. Core progress remains approximately 55%.
+
 - [Council source receipts](release2-council-source-adapters.md): development-only SEC input/formula/filing receipts, distinct liabilities/equity risk, date-precision preservation, loaded-calendar reuse and a manual frozen inspection before model analysis. Original source/time/derived-basis admission and real provider usefulness remain open; core progress stays approximately 55%.
 
 - [Portfolio Lab research council](release2-portfolio-council.md): independent Bull/Bear openings, a cited evidence Judge, bounded model-selected loaded tools, manual development UI, optional typed TypeSafe coverage, actual REA reference investigation and offline end-to-end acceptance. Real model usefulness, complete financial/catalyst/risk provenance and future-outcome validation remain pending. This additional prototype does not change the core Release 2 weighted estimate.

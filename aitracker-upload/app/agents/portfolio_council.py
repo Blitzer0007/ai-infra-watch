@@ -166,7 +166,19 @@ class PortfolioCouncil:
         self.model, self.clock = model, clock
 
     def run(self, packet: CouncilPacket):
-        quality = _quality(packet)
+        return self._run(packet, _quality(packet))
+
+    def run_admitted(self, raw: bytes):
+        from app.agents.council_admission import parse_request, evaluate
+        packet, _, _ = parse_request(raw)
+        admission = evaluate(raw)
+        result = self._run(packet, admission["quality"], source_admission=admission["records"])
+        result["contract_version"] = "portfolio-council-v2"
+        result["snapshot_id"] = admission["request_sha256"]
+        result["admission"] = admission
+        return result
+
+    def _run(self, packet, quality, *, source_admission=None):
         snapshot_id = hashlib.sha256(packet.model_dump_json().encode()).hexdigest()
         result = {"contract_version": VERSION, "run_id": packet.run_id, "snapshot_id": snapshot_id,
                   "symbol": packet.symbol, "horizon_months": packet.horizon_months, "assessed_at": packet.assessed_at,
@@ -186,6 +198,8 @@ class PortfolioCouncil:
             for role in ("bull", "bear", "judge"):
                 # Bull and Bear get identical independent contexts, never the opposing opening.
                 context = {"symbol": packet.symbol, "horizon_months": packet.horizon_months, "catalog": catalog}
+                if source_admission is not None:
+                    context["source_admission"] = {"rule_version": "family-provenance-v1", "scope": "Conditional declared-input checks only; no authenticated source or predictive authority.", "records": source_admission}
                 if role == "judge":
                     context["arguments"] = result["roles"].copy()
                 messages = [{"role": "system", "content": instruction(role)}, {"role": "user", "content": json.dumps(context, sort_keys=True)}]

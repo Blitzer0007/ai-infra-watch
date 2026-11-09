@@ -11,7 +11,7 @@ export function secCouncilReceipt(v) {
     typeof v.symbol!=='string'||!/^[A-Z0-9.^=-]{1,20}$/.test(v.symbol)||typeof v.cik!=='string'||!/^\d{10}$/.test(v.cik)||Number(v.cik)<=0||forecastInstant(v.retrieved_at)===null||
     !['partial','unavailable'].includes(v.status)||v.source_authenticity_verified!==false||!Array.isArray(v.issues)||v.issues.length>12||!v.issues.every(c=>SEC_COUNCIL_ISSUES.includes(c))||
     !Array.isArray(v.observations)||v.observations.length>4)return false;
-  const ids=new Set();
+  const ids=new Set(),facts=new Map(),filings=new Map();
   for(const o of v.observations) {
     if(!exact(o,['evidence','method','inputs'])||!SEC_COUNCIL_METHODS.includes(o.method)||!councilEvidence(o.evidence)||o.evidence.symbol!==v.symbol||
       o.evidence.source_id!=='sec-edgar-companyfacts'||o.evidence.basis!=='unknown'||o.evidence.simulated!==false||o.evidence.observed_at!==null||o.evidence.published_at!==null||o.evidence.retrieved_at!==v.retrieved_at||
@@ -20,6 +20,7 @@ export function secCouncilReceipt(v) {
     if(!o.inputs.every(f=>exact(f,['tag','accession','form','period_start','period_end','filed_on','value','unit'])&&tags.includes(f.tag)&&/^\d{10}-\d{2}-\d{6}$/.test(f.accession)&&['10-K','10-K/A'].includes(f.form)&&
       (f.period_start===null||forecastDay(f.period_start)&&f.period_start<=f.period_end)&&forecastDay(f.period_end)&&forecastDay(f.filed_on)&&f.period_end<=f.filed_on&&f.filed_on<=new Date(Date.parse(v.retrieved_at)).toISOString().slice(0,10)&&typeof f.value==='number'&&Number.isFinite(f.value)&&f.unit==='USD'))return false;
     const [a,b]=o.inputs, e=o.evidence;
+    for(const f of o.inputs){const filing=JSON.stringify([f.form,f.filed_on]);if(filings.has(f.accession)&&filings.get(f.accession)!==filing)return false;filings.set(f.accession,filing);const key=JSON.stringify([f.tag,f.accession,f.period_start,f.period_end,f.unit]);if(facts.has(key)&&facts.get(key)!==f.value)return false;facts.set(key,f.value);}
     if(o.inputs.some(f=>f.period_start!==null&&((Date.parse(f.period_end)-Date.parse(f.period_start))/86400000<300||(Date.parse(f.period_end)-Date.parse(f.period_start))/86400000>400)))return false;
     const samePeriod=a.period_start===b.period_start&&a.period_end===b.period_end&&a.accession===b.accession&&a.filed_on===b.filed_on;
     let expected,metric;

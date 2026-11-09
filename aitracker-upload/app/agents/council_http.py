@@ -45,6 +45,22 @@ async def council_http(request, require_auth, configured_token):
         value = decode(bytes(body))
         if not isinstance(value, dict):
             raise ValueError()
+        if value.get("mode") in ("admission-v2", "loaded-v2"):
+            from app.agents.council_admission import parse_request, evaluate
+            parse_request(bytes(body))
+            if not _slot.acquire(blocking=False):
+                raise HTTPException(status_code=429, detail="Council is busy")
+            try:
+                if value["mode"] == "admission-v2":
+                    result = await run_in_threadpool(evaluate, bytes(body))
+                else:
+                    model = loaded_model()
+                    if model is None:
+                        raise HTTPException(status_code=503, detail="Council development model is not configured")
+                    result = await run_in_threadpool(PortfolioCouncil(model).run_admitted, bytes(body))
+                return JSONResponse(result, headers={"Cache-Control": "no-store"})
+            finally:
+                _slot.release()
         if value.get("mode") == "jev" and set(value) == {"mode", "run_id", "state"}:
             from app.jev.council import valid_summary, assess_council_summary
             import re

@@ -2,6 +2,8 @@
 
 Implemented in Codex Cloud, 9 November 2026, on the Release 2 feature branch. This extends the [development-only council](release2-portfolio-council.md) with auditable financial/risk calculations and reuse of the already-loaded catalyst calendar. All source/provider/model verification uses fictional inputs or intercepted transports; no live SEC, financial, NVIDIA or TypeSafe request was made.
 
+Follow-up: [versioned conditional admission](release2-council-admission.md) now checks retained lineage independently in Python and handles date-only publications as uncertainty ranges. The v1 council gates described below remain unchanged; the new manual v2 path never rewrites original timestamps or authenticates a source.
+
 ## Resulting user flow
 
 Open JEV Portfolio Lab's research council, choose a company and horizon, then **Inspect loaded sources**. Inspection makes no request. It captures a minimized numeric packet plus a local source receipt showing declared issuer CIK, actual retrieval field, filing accessions, original filing dates, periods, calculation methods and input values. **Analyze loaded evidence** uses that frozen packet. Feed updates cannot change it; another explicit inspection captures new inputs. Company/horizon changes discard the old inspection/results. The fictional demo clears the unrelated loaded receipt.

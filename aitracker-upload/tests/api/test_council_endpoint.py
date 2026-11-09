@@ -1,6 +1,7 @@
 """Real private FastAPI route; provider/planner/database paths remain mocked or forbidden."""
 import importlib.util
 import json
+import hashlib
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -44,3 +45,36 @@ def test_loaded_model_disabled_and_single_concurrency_slot(client):
     assert council_http._slot.acquire(blocking=False)
     try:assert client.post('/api/agent-python?task=council',json=REQUEST,headers=HEADERS).status_code==429
     finally:council_http._slot.release()
+
+def admission_request():
+    value=json.loads((ROOT/'qa/fixtures/council-admission.fictional.json').read_text())['request']
+    value['mode']='admission-v2'
+    return value
+
+def test_admission_requires_no_model_configuration_or_factory_and_binds_actual_bytes(client,monkeypatch):
+    monkeypatch.setattr(council_http,'loaded_model',lambda:pytest.fail('Model factory forbidden for admission'))
+    response=client.post('/api/agent-python?task=council',json=admission_request(),headers=HEADERS)
+    assert response.status_code==200 and response.headers['cache-control']=='no-store'
+    assert response.json()['request_sha256']==hashlib.sha256(response.request.content).hexdigest()
+    assert response.json()['status']=='conditional' and response.json()['source_authenticity_verified'] is False
+
+def test_v2_validation_and_auth_precede_model_factory(client,monkeypatch):
+    monkeypatch.setattr(council_http,'loaded_model',lambda:pytest.fail('Invalid lineage reached model factory'))
+    value=admission_request();value['mode']='loaded-v2';value['sources']['sec']['observations'][0]['inputs'][0]['value']=999
+    assert client.post('/api/agent-python?task=council',json=value).status_code==401
+    response=client.post('/api/agent-python?task=council',json=value,headers=HEADERS)
+    assert response.status_code==400 and '999' not in response.text
+
+def test_v2_model_run_uses_actual_orchestrator_with_fake_model(client,monkeypatch):
+    from app.agents.portfolio_council import FictionalCouncilModel
+    monkeypatch.setattr(council_http,'loaded_model',FictionalCouncilModel)
+    value=admission_request();value['mode']='loaded-v2'
+    r=client.post('/api/agent-python?task=council',json=value,headers=HEADERS)
+    assert r.status_code==200 and r.json()['contract_version']=='portfolio-council-v2'
+    assert r.json()['admission']['status']=='conditional' and r.json()['disposition']=='insufficient-evidence'
+    assert r.json()['usage']['provider_requests']==0 and r.json()['usage']['model_calls']==6
+
+@pytest.mark.parametrize(('key','value'),[('COUNCIL_DEV_ENABLED','false'),('VERCEL','1'),('NODE_ENV','production'),('VERCEL_ENV','production')])
+def test_production_cannot_run_even_model_free_v2_admission(client,monkeypatch,key,value):
+    monkeypatch.setenv(key,value)
+    assert client.post('/api/agent-python?task=council',json=admission_request(),headers=HEADERS).status_code==404

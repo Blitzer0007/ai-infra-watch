@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "qa/fixtures/council-source-receipt.fictional.json"
+      - "qa/fixtures/council-admission.fictional.json"
       - "aitracker-upload/data/research/council-ui-case.json"
       - "agents/**"
       - "tests/test_agents.py"
@@ -27,6 +28,7 @@ on:
   pull_request:
     paths:
       - "qa/fixtures/council-source-receipt.fictional.json"
+      - "qa/fixtures/council-admission.fictional.json"
       - "aitracker-upload/data/research/council-ui-case.json"
       - "agents/**"
       - "tests/test_agents.py"
@@ -102,6 +104,7 @@ jobs:
         run: |
           python -m pytest -q -m "not live" \
             aitracker-upload/tests/agents/test_portfolio_council.py \
+            aitracker-upload/tests/agents/test_council_admission.py \
             aitracker-upload/tests/api/test_council_endpoint.py \
             aitracker-upload/tests/agents/test_source_quality.py \
             aitracker-upload/tests/agents/test_live_planner_contract.py \
