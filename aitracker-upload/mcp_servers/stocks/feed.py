@@ -1,13 +1,10 @@
 """Live feed poller for mcp-server-stocks.
 
-Real-time behavior, pragmatic transport: Finnhub's FREE tier is a REST
-API (60 calls/min), not a websocket, so a true WS subscription is a
-rate-limit trap. Instead this module implements the roadmap's
-"short-interval polling with backoff":
+REST snapshot polling with backoff. The interval limits batch frequency,
+not individual provider requests; it does not establish an account-wide quota:
 
   * polls the watchlist on an interval (default 15s)
-  * rate-limits itself under the free-tier budget (max 1 call/s,
-    with jitter so a fleet of clients doesn't sync-lock)
+  * respects a minimum batch interval; a shared request budget is still needed
   * on transient failure backs off exponentially (up to `max_backoff`)
   * dedupes unchanged quotes via a content hash — a new quote is only
     emitted when price/volume/ts actually change
@@ -40,7 +37,7 @@ class Feed:
     emit: Callable[[FeedMessage], None]
     interval: float = DEFAULT_INTERVAL
     max_backoff: float = DEFAULT_MAX_BACKOFF
-    rate_interval: float = 1.0  # max poll frequency (free-tier budget)
+    rate_interval: float = 1.0  # minimum batch interval, not a provider request limiter
 
     _stop: threading.Event = field(default_factory=threading.Event, init=False)
     _thread: threading.Thread | None = field(default=None, init=False)
@@ -62,13 +59,13 @@ class Feed:
 
     # ---- loop ----------------------------------------------------------
     def _run(self) -> None:
-        failures = 0
         self.emit(FeedMessage(kind="status", message="connected", as_of=_utc_now_iso()))
         while not self._stop.is_set():
             self._poll_once()
+            failures = self._consecutive_failures
             backoff = min(self.max_backoff, self.interval * (2 ** min(failures, 6)))
             sleep = self.interval if failures == 0 else backoff
-            # Backoff also respects the rate budget; jitter avoids sync-lock.
+            # This bounds batch frequency only; no jitter/shared quota is claimed.
             sleep = max(sleep, self.rate_interval)
             time.sleep(sleep)
 
@@ -85,7 +82,7 @@ class Feed:
             h = self._hash(q)
             if self._last_hashes.get(q.symbol) != h:
                 self._last_hashes[q.symbol] = h
-                self.emit(FeedMessage(kind="quote", symbol=q.symbol, quote=q, as_of=q.as_of))
+                self.emit(FeedMessage(kind="quote", symbol=q.symbol, quote=q, as_of=_utc_now_iso()))
                 changed = True
         if not changed:
             # Still surface a heartbeat so downstream dedupe/observability
@@ -97,13 +94,7 @@ class Feed:
     def _hash(q: Quote) -> str:
         return hashlib.sha256(
             json.dumps(
-                {
-                    "p": q.price,
-                    "v": q.volume,
-                    "c": q.change,
-                    "cp": q.change_pct,
-                    "ts": q.as_of,
-                },
+                q.model_dump(exclude={"retrieved_at"}),
                 sort_keys=True,
             ).encode("utf-8")
         ).hexdigest()

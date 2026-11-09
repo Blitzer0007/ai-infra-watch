@@ -275,9 +275,8 @@ def generate_agents(dry_run: bool = False) -> list[tuple[Path, str]]:
     prompt = build_prompt(rows)
     payload = {
         "date": "2026-08-03",
-        "summary": (
-            "NVDA, DGXX, MSFT, META and AVGO gained while NBIS slipped "
-            "during the session."
+        "summary": " ".join(
+            f"{row['symbol']} moved {row['change_pct']:+.1f}%." for row in rows
         ),
         "insights": _insights_from_data(rows),
         "risks": [],

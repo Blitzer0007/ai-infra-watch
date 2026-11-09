@@ -134,25 +134,28 @@ def extract_symbols(question: str, max_symbols: int = 10) -> list[str]:
         if sym and sym not in _COMMON_UPPERCASE_WORDS and sym not in symbols:
             symbols.append(sym)
 
-    # Common company-name aliases are checked before generic token extraction,
-    # so natural-language questions like "latest NVIDIA earnings" resolve to
-    # the actual market ticker NVDA instead of the literal word NVIDIA.
+    # Gather all mentions before deduplication so an alias later in the question
+    # cannot jump ahead of an explicit ticker earlier in it.
+    mentions: list[tuple[int, str]] = []
     for alias in sorted(_SYMBOL_ALIASES, key=len, reverse=True):
-        if re.search(rf"\b{re.escape(alias)}\b", question, flags=re.IGNORECASE):
-            add(alias)
+        for match in re.finditer(rf"\b{re.escape(alias)}\b", question, flags=re.IGNORECASE):
+            mentions.append((match.start(), alias))
 
     for match in re.finditer(r"\$([A-Z][A-Z0-9.-]{0,5})\b", question):
-        add(match.group(1))
+        mentions.append((match.start(), match.group(1)))
 
     for match in re.finditer(
         r"\b(?:ticker|symbol|stock)\s*[:#-]?\s*([A-Z][A-Z0-9.-]{0,5})\b",
         question,
         flags=re.IGNORECASE,
     ):
-        add(match.group(1))
+        mentions.append((match.start(1), match.group(1)))
 
-    for token in re.findall(r"\b[A-Z][A-Z0-9.-]{1,5}\b", question):
-        add(token.rstrip("."))
+    for match in re.finditer(r"\b[A-Z][A-Z0-9.-]{1,5}\b", question):
+        mentions.append((match.start(), match.group().rstrip(".")))
+
+    for _, raw in sorted(mentions, key=lambda mention: mention[0]):
+        add(raw)
 
     return symbols[:max_symbols]
 

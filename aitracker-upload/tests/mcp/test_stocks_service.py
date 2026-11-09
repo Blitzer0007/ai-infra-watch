@@ -32,7 +32,9 @@ def test_get_quote_returns_typed_quote(service):
     assert q.symbol == "NVDA"
     assert q.price == 182.4
     assert q.change_pct == 3.2
-    assert q.as_of == "2026-08-03T00:00:00Z"  # timestamp always present (guardrail)
+    assert q.as_of is None  # Undated simulated fixture; retrieval is not observation.
+    assert q.retrieved_at == "2026-08-03T00:00:00Z"
+    assert q.simulated is True
     assert q.source == "fixture"
 
 
@@ -97,5 +99,6 @@ def test_health_tracks_consecutive_errors(service):
 def test_one_line_includes_timestamp_and_source(service):
     line = service.get_quote("DGXX").one_line()
     assert "DGXX" in line
-    assert "2026-08-03T00:00:00Z" in line
+    assert "observation time unknown" in line
+    assert "simulated" in line
     assert "fixture" in line

@@ -88,6 +88,8 @@ The existing shared chain can make up to three sequential provider attempts with
 
 ## Next implementation and release gates
 
+Follow-up on 9 November: the [Python quote and autonomous-agent reliability increment](release2-autonomous-agents-review.md) implements nullable quote metadata, provider observation/retrieval separation, honest batch/feed times and core agent fixes. The original inventory above describes the inspected baseline. Remaining portfolio-context/decision consumers, shared budgets and historical eligibility still require review; Python end-to-end parity is not certified.
+
 1. **Unify quote/source contracts across Python and JavaScript.** Correct Python observation-time/default-zero/USD handling. Preserve separate observed, published, retrieved and market-date precision. Carry issuer/listing identity, currency, raw/adjusted basis, source mode, coverage and explicit failures through server decision consumers; price availability alone must not grant eligibility.
 2. **Bound upstream use and correct evidence semantics.** SEC concurrency/rate budgets, explicit unavailable versus successful empty coverage, and filing-date versus signing-date labels come first. Add issuer-original links/confirmation for news, political and disclosure evidence; distinguish static taxonomy from dated events.
 3. **Audit historical calculation inputs.** Preserve adjustment/currency metadata through portfolio, peer, benchmark, forecast and Python event-study paths. Require supported units, periods and point-in-time facts before adding dossier valuation/growth calculations. Current snapshots do not solve survivorship, delisting or restatement bias.

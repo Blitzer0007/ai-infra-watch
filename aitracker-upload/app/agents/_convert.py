@@ -6,9 +6,9 @@ module is the single implementation of that conversion so the two can never
 drift: the fixture script imports it, guaranteeing the prompt hash it commits
 is byte-identical to what the agent computes at runtime.
 
-Only price facts that are stable across runs go into the rows — the
-time-varying `as_of`/`source` fields are intentionally excluded, or the prompt
-(and thus the fixture key) would change every run.
+Preserve source/observation metadata. Retrieval time is excluded so polling
+the same observation does not change the prompt key. Simulated fixtures are
+explicit; missing moves are excluded instead of becoming flat-move claims.
 """
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ def quotes_to_stock_data(batch: QuoteBatch) -> list[dict[str, Any]]:
     """
     rows: list[dict[str, Any]] = []
     for q in batch.quotes:
+        if q.change_pct is None or (not q.simulated and q.as_of is None):
+            continue
         name = (getattr(q, "name", None) or "").strip() or q.symbol
         news = getattr(q, "news", None) or []
         rows.append(
@@ -34,6 +36,11 @@ def quotes_to_stock_data(batch: QuoteBatch) -> list[dict[str, Any]]:
                 "price": q.price,
                 "change_pct": q.change_pct,
                 "news": list(news),
+                "as_of": q.as_of,
+                "currency": q.currency,
+                "source": q.source,
+                "simulated": q.simulated,
+                "adjusted_basis": q.adjusted_basis,
             }
         )
     return rows

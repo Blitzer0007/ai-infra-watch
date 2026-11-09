@@ -36,6 +36,15 @@ def test_hallucination_audit_clear_when_claim_matches_sources():
     assert report["status"] == "CLEAR"
 
 
+def test_claim_split_preserves_decimals_and_handles_actual_newlines():
+    report = _hallucination_audit(
+        "The filing describes Item 1.01.\nThe announced contract is worth $99 billion.",
+        [SimpleNamespace(ok=True, output={"description": "The filing describes Item 1.01."})],
+    )
+    assert report["claimCount"] == 2
+    assert report["status"] == "REVIEW"
+
+
 
 def test_finalization_uses_private_hallucination_audit_helper():
     """Regression guard for the production NameError seen on finalization."""

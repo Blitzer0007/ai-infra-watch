@@ -45,6 +45,8 @@ Rollback is an application-code revert; no database rollback or message replay i
 
 ## Subsequent review increments
 
+- [Autonomous-agent comparison and Python source reliability](release2-autonomous-agents-review.md): actual bounded REA pyc inspection plus manual review of three pinned financial projects; nullable Python quote metadata, honest batch/feed time, corrected backoff, groundedness schema/claim splitting/ticker routing and stronger offline CI. The next source-quality/research/daily-review roles are specified, not activated; no investment-effectiveness claim is made.
+
 - [Page-by-page UI/UX audit and improvements](uiux-audit.md).
 - [Snapshot-backed catalyst calendar](release2-calendar-review.md), with source/coverage and correction limitations. This adds Calendar as the sixteenth application route; the private access screen is checked separately.
 

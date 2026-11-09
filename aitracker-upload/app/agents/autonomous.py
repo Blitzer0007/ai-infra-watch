@@ -83,7 +83,7 @@ def _hallucination_audit(summary: str, calls: list[ToolCallRecord]) -> dict[str,
     """Audit final claims against successful MCP outputs using shared grounding heuristics."""
     claims = [
         claim.strip()
-        for claim in re.split(r"(?<=[.!?])\\s+|\\n+", str(summary or ""))
+        for claim in re.split(r"(?<=[.!?])\s+|\n+", str(summary or ""))
         if len(claim.strip()) >= 18
     ]
     sources = []

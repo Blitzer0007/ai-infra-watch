@@ -87,6 +87,25 @@ jobs:
           EVAL_STUB: "true"
         run: python -m pytest -q aitracker-upload/tests/api/test_contracts_endpoint.py aitracker-upload/tests/api/test_autonomous_auth.py aitracker-upload/tests/api/test_agent_python_runtime.py
 
+      - name: Run offline quote provenance and specialist regressions
+        env:
+          PYTHONPATH: aitracker-upload
+          EVAL_STUB: "true"
+          LLM_PROVIDER: "stub"
+          EVAL_CACHE_ENABLED: "false"
+        run: |
+          python -m pytest -q -m "not live" \
+            aitracker-upload/tests/mcp/test_quote_provenance.py \
+            aitracker-upload/tests/mcp/test_stocks_providers.py \
+            aitracker-upload/tests/mcp/test_stocks_service.py \
+            aitracker-upload/tests/mcp/test_stocks_feed.py \
+            aitracker-upload/tests/mcp/test_inprocess.py \
+            aitracker-upload/tests/agents/test_market_agent.py \
+            aitracker-upload/tests/agents/test_filings_agent.py \
+            aitracker-upload/tests/agents/test_supervisor.py \
+            aitracker-upload/tests/agents/test_hallucination_audit.py \
+            aitracker-upload/tests/agents/test_symbol_extraction.py
+
       - name: Run evaluation harness tests
         env:
           PYTHONPATH: aitracker-upload

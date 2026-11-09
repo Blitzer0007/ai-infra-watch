@@ -6,8 +6,8 @@ Two implementations behind one Protocol:
     offline and deterministic; the default for tests and CI. Lets the
     Market Agent and the whole pipeline run with zero network.
   * FinnhubProvider — real quotes from Finnhub's REST API, with the
-    same retry/backoff discipline as app/llm/client.py. Free tier is
-    60 calls/min, so the poller (feed.py) rate-limits on top of this.
+    bounded retry/backoff discipline. Account quotas and exchange
+    entitlements require separate verification and a shared request budget.
 
 Both return the schemas in schemas.py, so callers never branch on
 which provider is active — only the `source` field differs.
@@ -15,14 +15,45 @@ which provider is active — only the `source` field differs.
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
 import httpx
+from pydantic import ValidationError
 
 from .schemas import Quote
+
+
+def _finite(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        return float(value) if math.isfinite(value) else None
+    except OverflowError:
+        return None
+
+
+def _positive(value) -> float | None:
+    value = _finite(value)
+    return value if value is not None and value > 0 else None
+
+
+def _provider_time(seconds, retrieved_at: str) -> str | None:
+    seconds = _positive(seconds)
+    if seconds is None:
+        return None
+    try:
+        instant = datetime.fromtimestamp(seconds, timezone.utc)
+        retrieved = datetime.fromisoformat(retrieved_at.replace("Z", "+00:00"))
+        if retrieved.tzinfo is None or (instant - retrieved).total_seconds() > 120:
+            return None
+        return instant.isoformat().replace("+00:00", "Z")
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 class QuoteError(RuntimeError):
@@ -60,9 +91,9 @@ class FixtureProvider:
                    "prev_close": 176.7, "volume": 41000000},
           ...
         }
-    Missing fields default per the Quote schema. `as_of` is stamped at
-    read time (overridable) so downstream timestamp guardrails have a
-    value without the fixture needing to hard-code one.
+    Missing fields stay unknown. Only a fixture-declared `as_of` is an
+    observation time; the injected clock supplies `retrieved_at` separately.
+    Fixture output is always explicitly simulated, never a live observation.
     """
 
     source = "fixture"
@@ -84,10 +115,19 @@ class FixtureProvider:
 
     def get_quote(self, symbol: str) -> Quote:
         symbol = symbol.strip().upper()
-        row = self._load().get(symbol)
-        if row is None:
+        data = self._load()
+        row = data.get(symbol) if isinstance(data, dict) else None
+        if not isinstance(row, dict):
             raise QuoteError("NO_DATA", f"no fixture quote for {symbol}")
-        return Quote(symbol=symbol, as_of=self._clock(), source=self.source, **row)
+        fields = {key: row[key] for key in (
+            "price", "change", "change_pct", "high", "low", "open",
+            "prev_close", "volume", "currency", "as_of",
+        ) if key in row}
+        try:
+            return Quote(symbol=symbol, retrieved_at=self._clock(), source=self.source,
+                         simulated=True, adjusted_basis="raw", **fields)
+        except ValidationError as exc:
+            raise QuoteError("NO_DATA", f"invalid fixture quote for {symbol}") from exc
 
 
 # ----------------------------------------------------------------------
@@ -129,7 +169,6 @@ class FinnhubProvider:
         symbol = symbol.strip().upper()
         url = f"{self.BASE}/quote"
         params = {"symbol": symbol, "token": self.api_key}
-        last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
                 with httpx.Client(timeout=self.timeout) as client:
@@ -138,42 +177,52 @@ class FinnhubProvider:
                     if attempt < self.max_retries:
                         time.sleep(self.base_delay * (2 ** attempt))
                         continue
-                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit (60/min free tier)")
+                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit reached")
                 if resp.status_code >= 400:
                     if _http_retryable(resp.status_code) and attempt < self.max_retries:
                         time.sleep(self.base_delay * (2 ** attempt))
                         continue
                     raise QuoteError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except ValueError as exc:
+                    raise QuoteError("NO_DATA", "Finnhub returned invalid JSON") from exc
                 return self._normalize(symbol, data)
-            except httpx.HTTPError as exc:
-                last_exc = exc
+            except httpx.HTTPError:
                 if attempt < self.max_retries:
                     time.sleep(self.base_delay * (2 ** attempt))
                     continue
-        raise QuoteError("HTTP_ERROR", f"Finnhub request failed: {last_exc}")
+        # HTTP exceptions can embed the request URL/token. Expose only a fixed error.
+        raise QuoteError("HTTP_ERROR", "Finnhub request failed") from None
 
     def _normalize(self, symbol: str, data: dict) -> Quote:
-        c, h, l, o, pc = (data.get(k, 0) for k in ("c", "h", "l", "o", "pc"))
-        # Finnhub sends all-zero for invalid symbols instead of an error.
-        if c == 0 and h == 0 and l == 0 and pc == 0:
+        if not isinstance(data, dict) or _positive(data.get("c")) is None:
             raise QuoteError("NO_DATA", f"no data for symbol {symbol}")
-        change = data.get("d")
-        change_pct = data.get("dp")
-        if change is None:
-            change = c - pc
-        if change_pct is None:
-            change_pct = (change / pc * 100.0) if pc else 0.0
+        c = _positive(data["c"])
+        pc = _positive(data.get("pc"))
+        high, low = _positive(data.get("h")), _positive(data.get("l"))
+        if high is not None and low is not None and high < low:
+            high = low = None
+        change, change_pct = _finite(data.get("d")), _finite(data.get("dp"))
+        if change is None and pc is not None:
+            change = _finite(c - pc)
+        if change_pct is None and pc is not None:
+            change_pct = _finite((c / pc - 1) * 100)
+        volume = _finite(data.get("v"))
+        retrieved_at = self._clock()
         return Quote(
             symbol=symbol,
-            price=float(c),
-            change=float(change),
-            change_pct=float(change_pct),
-            high=float(h),
-            low=float(l),
-            open=float(o),
-            prev_close=float(pc),
-            volume=data.get("v"),
-            as_of=self._clock(),
+            price=c,
+            change=change,
+            change_pct=change_pct,
+            high=high,
+            low=low,
+            open=_positive(data.get("o")),
+            prev_close=pc,
+            volume=volume if volume is not None and volume >= 0 else None,
+            currency=None,  # Finnhub /quote does not report currency/session.
+            as_of=_provider_time(data.get("t"), retrieved_at),
+            retrieved_at=retrieved_at,
+            adjusted_basis="raw",
             source=self.source,
         )

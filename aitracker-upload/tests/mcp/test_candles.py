@@ -116,7 +116,7 @@ def test_get_histories_empty_is_clean_noop(service):
 def test_from_env_defaults_to_fixture():
     assert CandleService.from_env("fixture").provider.source == "fixture"
     assert CandleService.from_env("nonsense").provider.source == "fixture"
-    assert CandleService.from_env("live").provider.source == "stooq"
+    assert CandleService.from_env("live").provider.source == "yahoo"
 
 
 # ----------------------------------------------------------------------

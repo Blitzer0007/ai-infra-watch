@@ -1,4 +1,4 @@
-from mcp_client.inprocess import InProcessMCPToolbox
+from app.mcp_client.inprocess import InProcessMCPToolbox
 
 def test_inprocess_tool_catalog_has_complementary_servers():
     toolbox = InProcessMCPToolbox(live=False)
@@ -23,9 +23,21 @@ def test_inprocess_stock_snapshot_is_usable():
     assert isinstance(result.get("quotes"), list)
 
 
-def test_inprocess_application_sources_are_hermetic_in_fixture_mode():
+def test_inprocess_application_sources_are_hermetic_in_fixture_mode(tmp_path):
+    import json
     toolbox = InProcessMCPToolbox(live=False)
+    # Portfolio snapshots are private/untracked. Supply an explicitly fictional
+    # test snapshot instead of depending on a developer's portfolio file.
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "portfolio_snapshot.json").write_text(json.dumps({
+        "asOf": "2026-08-03T00:00:00Z", "portfolio": {},
+        "positions": [{"symbol": "FICTIONAL", "quantity": 1}],
+    }))
+    original_root = toolbox._application._repo_root
+    toolbox._application._repo_root = tmp_path
     portfolio = toolbox.call("app.get_portfolio_context")
+    toolbox._application._repo_root = original_root
     assert portfolio["mode"] == "fixture"
     assert portfolio["holdings"]
     forecast = toolbox.call("app.get_forecast_context")
