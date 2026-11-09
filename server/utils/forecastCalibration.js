@@ -1,6 +1,7 @@
+import { forecastNumber, forecastCount } from '../../src/utils/forecastInputs.js';
 export function wilsonInterval(hits, total, z = 1.96) {
-  const n = Number(total);
-  const k = Number(hits);
+  const n = forecastNumber(total);
+  const k = forecastNumber(hits);
   if (!Number.isSafeInteger(n) || n <= 0 || !Number.isSafeInteger(k) || k < 0 || k > n || !Number.isFinite(z) || z <= 0) return null;
   const p = k / n;
   const z2 = z * z;
@@ -13,13 +14,16 @@ export function wilsonInterval(hits, total, z = 1.96) {
   };
 }
 
-function isPresentFiniteNumber(value) {
-  return (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
+function isPresentFiniteNumber(value) { return forecastNumber(value) !== null; }
+
+function orderedKnownQuantiles(row) {
+  const known=['p10','p25','p75','p90'].map(key=>forecastNumber(row?.[key])).filter(value=>value!==null);
+  return known.every((value,index)=>index===0||known[index-1]<=value);
 }
 
 export function coverageInterval(rows = [], lowerKey, upperKey) {
   const eligible = rows.filter(row =>
-    isPresentFiniteNumber(row?.actual_return) &&
+    orderedKnownQuantiles(row) && isPresentFiniteNumber(row?.actual_return) &&
     isPresentFiniteNumber(row?.[lowerKey]) &&
     isPresentFiniteNumber(row?.[upperKey]) && Number(row[lowerKey]) <= Number(row[upperKey]),
   );
@@ -38,20 +42,15 @@ export function coverageInterval(rows = [], lowerKey, upperKey) {
 }
 
 export function calibrationVerdict(p25p75Coverage, p10p90Coverage, count) {
-  const validCoverage = interval =>
-    Number(interval?.count) >= 50 &&
-    isPresentFiniteNumber(interval?.lowerPct) &&
-    isPresentFiniteNumber(interval?.upperPct);
-  if (
-    Number(count) < 50 ||
-    !validCoverage(p25p75Coverage) ||
-    !validCoverage(p10p90Coverage)
-  ) return 'insufficient';
-  const middleNarrow = p25p75Coverage.upperPct < 50;
-  const wideNarrow = p10p90Coverage.upperPct < 80;
-  const middleWide = p25p75Coverage.lowerPct > 50;
-  const wideWide = p10p90Coverage.lowerPct > 80;
-  if (middleNarrow && wideNarrow) return 'too narrow';
-  if (middleWide && wideWide) return 'too wide';
-  return 'well calibrated';
+  const validCoverage = interval => {
+    const n=forecastCount(interval?.count), lower=forecastNumber(interval?.lowerPct), upper=forecastNumber(interval?.upperPct);
+    return n>=50&&n<=forecastCount(count)&&lower!==null&&upper!==null&&lower>=0&&upper<=100&&lower<=upper;
+  };
+  if (forecastCount(count)<50||!validCoverage(p25p75Coverage)||!validCoverage(p10p90Coverage)) return 'insufficient';
+  const narrow=p25p75Coverage.upperPct<50||p10p90Coverage.upperPct<80;
+  const wide=p25p75Coverage.lowerPct>50||p10p90Coverage.lowerPct>80;
+  if(narrow&&wide)return 'mixed coverage';
+  if(narrow)return 'too narrow';
+  if(wide)return 'too wide';
+  return 'consistent with target coverage';
 }

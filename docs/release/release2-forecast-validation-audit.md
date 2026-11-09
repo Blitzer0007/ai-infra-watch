@@ -4,6 +4,8 @@ Assessed 9 November 2026, Asia/Kolkata. Baseline: `09a0276966e03936efcfd7a140219
 
 This is a read-only audit of forecast logic, selected public source and pure-function counterexamples. No forecast rule, threshold, table or verification handler is changed by this report. The production verifier can write due outcomes; it was not invoked. No hosted forecasts, market prices or model were queried.
 
+Follow-up: [forecast summary corrections](release2-forecast-summary-corrections.md) implement chronological loaded-window summaries, mixed-coverage diagnostics, strict scalar/calendar inputs, consistent read-side counts and clearer presentation. The baseline findings below remain historical audit evidence. Weekday/session alignment, the standalone history guard, legacy analytics and point-in-time/held-out validation remain open; this audit is not an all-clear.
+
 ## Reproduced findings
 
 | Priority | Finding | Evidence and consequence |

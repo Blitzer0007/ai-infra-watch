@@ -30,7 +30,7 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 - [Loaded ledger review](release2-loaded-ledger-review.md): manual Evidence diagnostics preserve original stored inputs, distinguish unavailable/empty history, check exact quantities and reuse weighted-average accounting. Shared precision fixes retain small positions after partial sales. Complete-history/corporate-action proof and agent accounting integration remain pending.
 
 - [Shared Python provider/SEC budgets](release2-provider-budgets.md): retries, pacing, rolling windows, concurrency and cooldown share process state across the integrated clients. Node/cross-worker/account-wide coordination and live quota acceptance remain pending.
-- [Forecast-validation comparison](release2-forecast-validation-audit.md): read-only REA/source review of Qlib/StatsForecast and six reproduced helper/protocol defects. Corrections and genuine predictive validation remain pending. [Desktop/mobile concepts](release2-experience-preview.md) illustrate proposed future flows.
+- [Forecast-validation comparison](release2-forecast-validation-audit.md): read-only REA/source review of Qlib/StatsForecast and six reproduced helper/protocol defects. [Summary corrections](release2-forecast-summary-corrections.md) address chronology, mixed coverage, strict scalar/calendar eligibility, read-side global counts and honest labels. Session mapping, history/PIT guards, legacy analytics and genuine predictive validation remain pending. [Desktop/mobile concepts](release2-experience-preview.md) illustrate proposed future flows.
 
 ## Next implementation order
 
