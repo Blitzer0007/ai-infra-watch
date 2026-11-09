@@ -22,11 +22,12 @@ export function buildCouncilPacket(symbol:string,quote:unknown,financial:unknown
   if(q&&q.symbol===symbol&&q.returnedSymbol===symbol) {
     const name=typeof q.provider==='string'?q.provider.toLowerCase():'';
     const source=['yahoo','finnhub','alpha-vantage'].includes(name)?name:/fixture|mock|^qa$/.test(name)?'fixture':'unknown';
-    const simulated=q.simulated===true||q.sourceMode==='simulated'||source==='fixture';
+    const simulated=q.simulated===true||q.sourceMode==='simulated'||q.status==='simulated'||source==='fixture';
+    const admissibleFlags=(q.stale===undefined||q.stale===false)&&(q.simulated===undefined||q.simulated===false)&&(q.status===undefined||['live','ok','success','fresh'].includes(q.status as string));
     for(const [metric,field,unit] of [['price','price','USD'],['daily_change_pct','changePct','percent']]) {
       const value=q[field];if(!finite(value)||(metric==='price'&&(q.currency!=='USD'||value<=0)))continue;
       evidence.push({evidence_id:'loaded:'+metric,symbol,family:'market',metric,value,unit,source_id:source,
-        observed_at:stamp(q.marketTime),published_at:stamp(q.publishedAt),retrieved_at:stamp(q.retrievedAt),basis:q.sourceMode==='live'?'reported':'unknown',period_start:null,period_end:null,simulated});
+        observed_at:stamp(q.marketTime),published_at:stamp(q.publishedAt),retrieved_at:stamp(q.retrievedAt),basis:q.sourceMode==='live'&&admissibleFlags?'reported':'unknown',period_start:null,period_end:null,simulated});
     }
   }
   const f=financial&&typeof financial==='object'&&!Array.isArray(financial)?financial as Record<string,any>:null;

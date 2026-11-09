@@ -74,3 +74,11 @@ test('all supported loaded families fit the eight-record bound without raw sourc
   assert.equal(councilPayload({mode:'loaded',packet:result.packet})!==null,true);
   assert.ok(!/https:|sourceUrl|entityName/.test(JSON.stringify(result.packet)));
 });
+test('explicit stale, conflicting and malformed simulation flags cannot become reported quote evidence',()=>{
+  const now=Date.parse('2026-11-09T12:00:00Z'),stamp=new Date(now).toISOString();
+  const quote={symbol:'MSFT',returnedSymbol:'MSFT',price:100,changePct:0,currency:'USD',sourceMode:'live',provider:'yahoo',marketTime:stamp,publishedAt:stamp,retrievedAt:stamp};
+  for(const patch of [{stale:true},{stale:'false'},{simulated:'false'},{status:'conflicted'}]) {
+    const p=buildCouncilPacket('MSFT',{...quote,...patch},null,'test',now,3);
+    assert.ok(p.evidence.every(e=>e.basis==='unknown'));
+  }
+});
