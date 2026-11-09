@@ -1,5 +1,6 @@
 """Offline council acceptance: bounded model choices, evidence and authority boundaries."""
 import json
+from pathlib import Path
 from types import SimpleNamespace
 import httpx
 import pytest
@@ -160,3 +161,25 @@ def test_typesafe_disabled_invalid_summary_and_typed_overrides(enabled,monkeypat
     assert set(json.loads(calls[0]['state']))==set(summary()) and len(calls[0]['questions'])==2
     bad=SimpleNamespace(evaluate=lambda **_:JevEvaluation(answers={'coverage':JevAnswer(type='score',choice='reviewable')}))
     assert assess_council_summary(summary(),'test',bad)['error_code']=='assessment-unavailable'
+
+def test_loaded_sec_metrics_preserve_unknown_time_basis_and_cannot_grant_a_result():
+    root=Path(__file__).resolve().parents[3]
+    receipt=json.loads((root/'qa/fixtures/council-source-receipt.fictional.json').read_text())
+    p=parse_packet(json.dumps({'run_id':'sec-fixture','symbol':'MSFT','horizon_months':3,'assessed_at':STAMP,'evidence':[o['evidence'] for o in receipt['observations']]}).encode())
+    result=PortfolioCouncil(Script()).run(p)
+    assert result['status']=='complete' and result['disposition']=='insufficient-evidence'
+    assert any(row['metric']=='liabilities_equity' for row in result['evidence'])
+    assert not result['quality']['usable_ids']
+    assert all('TIME_PROVENANCE_MISSING' in issue['codes'] and 'REPORTED_BASIS_MISSING' in issue['codes'] for issue in result['quality']['issues'])
+
+def test_retained_demo_fixture_matches_current_python_protocol():
+    root=Path(__file__).resolve().parents[3]
+    fixture=json.loads((root/'aitracker-upload/data/research/council-ui-case.json').read_text())
+    request=fixture['request']
+    assert PortfolioCouncil(FictionalCouncilModel(),clock=lambda:0).run(fictional_packet(request['run_id'],request['assessed_at']))==fixture['result']
+
+def test_point_in_time_risk_observation_needs_no_invented_duration_start():
+    value=packet(True).model_dump(mode='json');value['evidence'][3]['period_start']=None
+    result=PortfolioCouncil(Script()).run(parse_packet(json.dumps(value).encode()))
+    assert 'fixture:debt_equity' in result['quality']['usable_ids']
+    assert result['source_authenticity_verified'] is False

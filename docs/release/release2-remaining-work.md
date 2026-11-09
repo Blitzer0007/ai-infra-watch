@@ -78,6 +78,8 @@ Done when the complete protocol, authenticated input/prediction provenance and a
 
 ### 8. Beneficial AI roles, TypeSafe/JEV and NVIDIA — partly offline, partly external
 
+The [source-receipt follow-up](release2-council-source-adapters.md) adds tested SEC financial/risk calculations and loaded-calendar projection, with original filing references/precision and zero-request manual inspection. Versioned duration/instant/derived/date-precision admission, original source/acceptance evidence and independently labelled model evaluations remain pending. These adapters do not establish authentic source truth or directional eligibility.
+
 The [manual Portfolio Lab Bull/Bear/Judge council](release2-portfolio-council.md) is now implemented and tested with fake models through the actual private development transport. Its optional TypeSafe coverage action is separate, counts-only and unable to override quality gates. Six pinned TradingAgents files received actual REA static inspection plus manual review. No provider credits were spent. Complete provenance adapters, live usefulness/cost evaluation, outcome binding and account-wide budgets remain open; this prototype does not change the core engineering percentage.
 
 - Implement scoped Company/Catalyst Research and Daily Review roles with supported facts, explicit abstention, tool/prompt/time/token/cost budgets, checkpoint/failure receipts and privacy limits.

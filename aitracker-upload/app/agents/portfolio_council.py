@@ -20,6 +20,7 @@ METRICS = {
     "operating_margin_pct": ("financial", "percent", "margin"),
     "event_days_until": ("catalyst", "days", "event-timing"),
     "debt_equity": ("risk", "ratio", "leverage-risk"),
+    "liabilities_equity": ("risk", "ratio", "leverage-risk"),
 }
 MAX_INPUT_BYTES = 32768
 MAX_MODEL_CALLS = 6
@@ -132,7 +133,7 @@ def _quality(packet):
             if not 0 <= (now - published).total_seconds() <= maximum_age or not 0 <= (now - observed).total_seconds() <= maximum_age:
                 reasons.append("SOURCE_STALE_OR_FUTURE")
         if row.family in ("financial", "risk"):
-            if not row.period_start or not row.period_end or row.period_start > row.period_end or not row.published_at or row.period_end > row.published_at[:10]:
+            if not row.period_end or (row.family == "financial" and not row.period_start) or (row.period_start and row.period_start > row.period_end) or (row.published_at and row.period_end > row.published_at[:10]):
                 reasons.append("PERIOD_PROVENANCE_MISSING")
             elif not 0 <= (now.date() - date.fromisoformat(row.period_end)).days <= 550:
                 if "SOURCE_STALE_OR_FUTURE" not in reasons:
@@ -276,7 +277,7 @@ def instruction(role):
                          "Prefer insufficient when data is weak. A directional preference requires directly inspected winning claims.")
     return common + (f"Build a conditional {role} case, consider contrary evidence. "
                      'Final example: {"action":"conclude","summary":"The case remains conditional.","claims":[{"evidence_id":"inspected-id","stance":"support","implication":"growth"}],"limitations":["Independent confirmation is required."]}. Stance choices: support, challenge. '
-                     "Implications: price/daily_change_pct=market-move; revenue_growth_pct=growth; free_cash_flow_usd=cash-flow; operating_margin_pct=margin; event_days_until=event-timing; debt_equity=leverage-risk.")
+                     "Implications: price/daily_change_pct=market-move; revenue_growth_pct=growth; free_cash_flow_usd=cash-flow; operating_margin_pct=margin; event_days_until=event-timing; debt_equity/liabilities_equity=leverage-risk.")
 
 
 class FictionalCouncilModel:

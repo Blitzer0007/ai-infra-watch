@@ -1,4 +1,6 @@
 import { isProjectEventRelevant } from '../utils/projectEventRelevance.js';
+import {adaptSecCouncilFacts} from '../utils/councilSecAdapter.js';
+import {councilDevelopmentEnabled} from '../../shared/portfolioCouncilContract.js';
 import { history as routedHistory, providerSymbol, quote as routedQuote } from '../../api/_market-data.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
@@ -243,10 +245,12 @@ function factEvidence(row, value, unit) {
   };
 }
 
-async function getPeerFundamentalSnapshot(symbol, tickerMap) {
+export async function getPeerFundamentalSnapshot(symbol, tickerMap) {
   const company = tickerMap.get(symbol);
   if (!company) return { symbol, company: null, metrics: {}, status: 'not-found', error: 'Ticker not found in the SEC directory.' };
   const facts = await fetchSec('https://data.sec.gov/api/xbrl/companyfacts/CIK' + company.cik + '.json');
+  const retrievedAt = new Date().toISOString();
+  const councilSource = councilDevelopmentEnabled() ? adaptSecCouncilFacts({symbol, expectedCik:company.cik, facts, retrievedAt}) : undefined;
   facts.cik = company.cik;
   const revenue = annualFactRows(facts, [
     'RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet',
@@ -277,8 +281,9 @@ async function getPeerFundamentalSnapshot(symbol, tickerMap) {
     company: company.title,
     cik: company.cik,
     metrics,
+    ...(councilSource ? {councilSource} : {}),
     source: 'SEC EDGAR companyfacts',
-    retrievedAt: new Date().toISOString(),
+    retrievedAt,
     status: Object.keys(metrics).length ? 'partial' : 'insufficient-evidence',
     note: 'Annual SEC facts only. Metrics are omitted when comparable annual facts are unavailable; values may reflect the latest filed fiscal year rather than current-quarter conditions.',
   };

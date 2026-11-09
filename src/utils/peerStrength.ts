@@ -12,6 +12,7 @@ export type PeerMetricEvidence = {
 export type PeerFundamentalSnapshot = {
   symbol: string;
   metrics: Partial<Record<PeerMetricKey, PeerMetricEvidence>>;
+  councilSource?: unknown;
 };
 
 export type PeerStrengthResult = {

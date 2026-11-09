@@ -12,6 +12,7 @@ import { buildJevPaperAllocator } from '../utils/jevPaperAllocator';
 import { hasFreshEvidence, isJevEvidenceGateReady } from '../utils/jevEvidenceReadiness';
 import { scorePeerStrength, type PeerFundamentalSnapshot } from '../utils/peerStrength';
 import { fetchPortfolioHoldings, type StoredPortfolioHolding } from '../utils/portfolioApi';
+import type {CatalystSnapshot} from '../utils/catalystCalendar';
 
 const candidates = [
   { symbol: 'MSFT', sector: 'software', label: 'Microsoft' },
@@ -24,7 +25,7 @@ const candidates = [
 
 type JEVLivePrice = { price: number; changePct: number; stale?: boolean; retrievedAt?: string };
 
-export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePrices?: Record<string, JEVLivePrice> }) {
+export default function JevAutonomousPortfolioLab({ livePrices = {}, calendarSnapshot }: { livePrices?: Record<string, JEVLivePrice>; calendarSnapshot?:CatalystSnapshot }) {
   const [capital, setCapital] = useState(PAPER_LAB_DEFAULTS.initialCapital);
   const [costBps, setCostBps] = useState(PAPER_LAB_DEFAULTS.costBps);
   const [selected, setSelected] = useState<string[]>(['MSFT', 'META', 'NOW', 'NVDA']);
@@ -103,7 +104,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
         const body = await response.json().catch(() => ({}));
         if (!response.ok || !Array.isArray(body.results)) throw new Error(body.error || 'SEC peer fundamentals unavailable.');
         if (!cancelled) {
-          setPeerFundamentals(body.results.filter((row: any) => row && row.symbol && row.metrics).map((row: any) => ({ symbol: row.symbol, metrics: row.metrics })));
+          setPeerFundamentals(body.results.filter((row: any) => row && row.symbol && row.metrics).map((row: any) => ({ symbol: row.symbol, metrics: row.metrics, councilSource:row.councilSource })));
           setPeerFundamentalsStatus('loaded');
         }
       }).catch(() => {
@@ -387,7 +388,7 @@ export default function JevAutonomousPortfolioLab({ livePrices = {} }: { livePri
       <p className="mt-2 max-w-3xl text-sm leading-6 text-white/65">Weekly US-stock research lab with SPY and QQQ benchmarks. Candidate research uses the existing evidence-gated agent. Historical metrics use aligned adjusted closes with weekly rebalancing, but remain exploratory until provider point-in-time availability is independently verified.</p>
       <div className="mt-4 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-white/15 px-3 py-1">PAPER ONLY</span><span className="rounded-full border border-white/15 px-3 py-1">MANUAL APPROVAL</span><span className="rounded-full border border-white/15 px-3 py-1">NO BROKER ORDERS</span></div>
     </header>
-    {(import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true') && <JevCouncilPanel symbols={selected} quotes={livePrices} financials={peerFundamentals}/>}
+    {(import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true') && <JevCouncilPanel symbols={selected} quotes={livePrices} financials={peerFundamentals} calendar={calendarSnapshot}/>}
     <section className="grid gap-3 md:grid-cols-3">
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4"><Clock3 className="text-sky-300" size={20}/><p className="mt-3 text-xs text-white/50">Review cadence</p><p className="mt-1 font-semibold">Weekly</p><p className="text-xs text-white/40">Review timestamped evidence before proposing changes.</p></div>
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4"><ShieldCheck className="text-emerald-300" size={20}/><p className="mt-3 text-xs text-white/50">Risk guardrails</p><p className="mt-1 font-semibold">15% position · 35% sector</p><p className="text-xs text-white/40">Minimum 5% cash; invalid proposals are blocked.</p></div>

@@ -638,7 +638,7 @@ export default function App() {
               {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
-              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
+              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} calendarSnapshot={calendarSnapshot} />}
               {activeView === 'quality' && <AIQualityLab />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}

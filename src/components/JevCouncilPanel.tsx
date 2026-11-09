@@ -1,19 +1,21 @@
 import {useEffect, useRef, useState} from 'react';
 import {authFetch} from '../utils/apiAuth';
-import {buildCouncilPacket, councilCoverageState, councilEnvelope, type CouncilResult} from '../utils/portfolioCouncil';
+import {inspectCouncilSources, councilCoverageState, councilEnvelope, type CouncilResult} from '../utils/portfolioCouncil';
 import {councilJevEnvelope} from '../../shared/portfolioCouncilContract.js';
 import type {PeerFundamentalSnapshot} from '../utils/peerStrength';
+import type {CatalystSnapshot} from '../utils/catalystCalendar';
 
 type JevCoverage = {available:boolean;coverage:string|null;next_check:string|null;input_tokens:number|null};
 const control='rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300';
 const human=(s:string)=>s.replaceAll('_',' ').replaceAll('-',' ');
 
 /** Manual development research. No allocation, ledger, delivery, or discovery capabilities. */
-export default function JevCouncilPanel({symbols,quotes,financials}:{symbols:string[];quotes:Record<string,unknown>;financials:PeerFundamentalSnapshot[]}) {
+export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{symbols:string[];quotes:Record<string,unknown>;financials:PeerFundamentalSnapshot[];calendar?:CatalystSnapshot}) {
   const [chosen,setChosen]=useState(symbols[0]||'');
   const symbol=symbols.includes(chosen)?chosen:symbols[0]||'';
   const [horizon,setHorizon]=useState<3|6|12>(3);
   const [result,setResult]=useState<CouncilResult|null>(null);
+  const [sources,setSources]=useState<ReturnType<typeof inspectCouncilSources>|null>(null);
   const [jev,setJev]=useState<JevCoverage|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -23,21 +25,30 @@ export default function JevCouncilPanel({symbols,quotes,financials}:{symbols:str
   const attemptCount=useRef(0);
   useEffect(()=>{
     version.current+=1;flight.current?.abort();flight.current=null;
-    setResult(null);setJev(null);setError('');setBusy(false);
+    setResult(null);setSources(null);setJev(null);setError('');setBusy(false);
     return ()=>{version.current+=1;flight.current?.abort();flight.current=null;};
   },[symbol,horizon]);
 
+  function inspect() {
+    if(flight.current)return;
+    try {
+      setSources(inspectCouncilSources(symbol,quotes[symbol],financials.find(f=>f.symbol===symbol),'council:'+crypto.randomUUID(),Date.now(),horizon,calendar));
+      setResult(null);setJev(null);setError('');
+    }catch {setSources(null);setError('Loaded source inspection is unavailable. No model request occurred.');}
+  }
+
   async function run(mode:'demo'|'loaded'|'jev') {
-    if(flight.current||attemptCount.current>=5)return;
+    if(flight.current||attemptCount.current>=5||(mode==='loaded'&&!sources)||(mode==='jev'&&(!result||result.mode!=='nvidia'||result.status!=='complete')))return;
     const controller=new AbortController();flight.current=controller;
     const current=version.current;
+    if(mode==='demo')setSources(null);
     attemptCount.current+=1;setAttempts(attemptCount.current);setBusy(true);setError('');
     const timeout=setTimeout(()=>controller.abort(),47000);
     try {
       const runId='council:'+crypto.randomUUID();
       const payload=mode==='jev'&&result?{mode,run_id:result.run_id,state:councilCoverageState(result)}:
         mode==='demo'?{mode,run_id:runId,assessed_at:new Date().toISOString()}:
-        {mode:'loaded',packet:buildCouncilPacket(symbol,quotes[symbol],financials.find(f=>f.symbol===symbol),runId,Date.now(),horizon)};
+        {mode:'loaded',packet:sources!.packet};
       if(mode==='loaded'&&(!('packet' in payload)||!payload.packet.evidence.length))throw Error();
       const response=await authFetch('/api/agent-ask?task=council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
       const raw=await response.text();if(raw.length>65536)throw Error();
@@ -61,10 +72,28 @@ export default function JevCouncilPanel({symbols,quotes,financials}:{symbols:str
         <label className="text-sm">Council company<select aria-label="Council company" value={symbol} onChange={e=>setChosen(e.target.value)} className={control+' mt-1 block'}>{symbols.map(s=><option key={s}>{s}</option>)}</select></label>
         <label className="text-sm">Research horizon<select aria-label="Council research horizon" value={horizon} onChange={e=>setHorizon(Number(e.target.value) as 3|6|12)} className={control+' mt-1 block'}>{[3,6,12].map(n=><option key={n} value={n}>{n} months</option>)}</select></label>
         <button className={control} disabled={disabled||!!result} onClick={()=>void run('demo')}>Run fictional council demo</button>
-        <button className={control+' text-cyan-200'} disabled={disabled||!!result||!symbol} onClick={()=>void run('loaded')}>Analyze loaded evidence</button>
-        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setJev(null);setError('');}}>Start a new review</button>}
+        <button className={control} disabled={busy||!symbol} onClick={inspect}>Inspect loaded sources</button>
+        <button className={control+' text-cyan-200'} disabled={disabled||!!result||!sources?.packet.evidence.length} onClick={()=>void run('loaded')}>Analyze loaded evidence</button>
+        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setSources(null);setJev(null);setError('');}}>Start a new review</button>}
       </div>
       <p className="text-xs leading-5 text-slate-400">Manual only · Up to six model calls and three loaded-data tools per council · Five attempts per page session · No automatic retries. Loaded analysis requires a separately enabled NVIDIA development backend. TypeSafe is optional and runs only on a separate click.</p>
+      {sources&&<details open data-testid="council-source-receipt" className="rounded-xl border border-white/15 p-3 text-sm">
+        <summary className="cursor-pointer font-medium">Loaded source inspection · {sources.packet.symbol} · {sources.packet.evidence.length} observations</summary>
+        <div className="mt-3 space-y-3 text-xs text-slate-300">
+          <p>Frozen at {sources.packet.assessed_at}. Inspection makes no request. Analysis will use this snapshot until you inspect again.</p>
+          <p>SEC receipt: {human(sources.financialStatus)} · Calendar: {human(sources.calendar.status)} · Source authenticity remains unverified.</p>
+          {sources.sec&&<p className="break-words">Declared issuer CIK: {sources.sec.cik} · Source retrieved: {sources.sec.retrieved_at}</p>}
+          <p>Derived ratios and cash flow are calculated from reported inputs, not directly reported metrics. Date-only filing publications stay date-only; no midnight observation or publication time is invented. These inputs cannot pass the current council admission gates.</p>
+          {sources.sec?.observations.map((o:any)=><div key={o.evidence.evidence_id} className="break-words rounded bg-black/20 p-3">
+            <p className="font-medium text-white">{human(o.evidence.metric)}: {o.evidence.value.toLocaleString()} {o.evidence.unit}</p>
+            <p>Calculation: {human(o.method)} · Period: {o.evidence.period_start||'point in time'} to {o.evidence.period_end}</p>
+            {o.inputs.map((f:any,i:number)=><p key={i}>{f.tag} · {f.value.toLocaleString()} {f.unit} · {f.form} {f.accession} · Filed {f.filed_on} (date only)</p>)}
+          </div>)}
+          {!!sources.sec?.issues.length&&<p>SEC gaps: {sources.sec.issues.map(human).join(' · ')}</p>}
+          {sources.calendar.event&&<p>Selected event: {sources.calendar.event.date} · {sources.calendar.event.confirmation} · countdown uses elapsed UTC days, not trading sessions.</p>}
+          <p>Calendar gaps: {sources.calendar.issues.map(human).join(' · ')||'none under configured checks'} · Original calendar coverage remains unknown.</p>
+        </div>
+      </details>}
       {busy&&<p role="status" className="text-sm text-cyan-200">Reviewing the frozen evidence snapshot…</p>}
       {error&&<p role="alert" className="text-sm text-amber-200">{error}</p>}
       {attempts>=5&&<p className="text-sm text-amber-200">The session review limit is reached.</p>}

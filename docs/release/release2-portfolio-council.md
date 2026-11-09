@@ -2,6 +2,8 @@
 
 Implemented in Codex Cloud on the Release 2 feature branch, 9 November 2026. Development/QA preview only. This resumes the linked multi-agent design: NVIDIA handles bounded research roles; official TypeSafe JEV optionally checks typed coverage. Neither provider was contacted during implementation or verification.
 
+Follow-up: [source receipts and manual inspection](release2-council-source-adapters.md) now add SEC calculation inputs, point-in-time risk handling and reuse of the already-loaded calendar. Loaded analysis requires an explicit zero-request source inspection first; original date precision and derived basis remain unadmitted.
+
 ## User story and boundaries
 
 Open **JEV Portfolio Lab → Bull · Bear · Judge research council**, select one company and a 3/6/12-calendar-month research horizon, then explicitly run either the fictional demo or loaded-evidence analysis. The horizon labels research context; they neither create forecasts nor reinterpret the existing 5/20-session forecast rows.

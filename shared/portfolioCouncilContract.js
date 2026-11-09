@@ -11,7 +11,7 @@ const families = ['market', 'financial', 'catalyst', 'risk'];
 const roles = ['bull', 'bear', 'judge'];
 const implications = ['market-move', 'growth', 'cash-flow', 'margin', 'event-timing', 'leverage-risk'];
 const rowKeys = ['evidence_id','symbol','family','metric','value','unit','source_id','observed_at','published_at','retrieved_at','basis','period_start','period_end','simulated'];
-const metric = {price:['market','USD'],daily_change_pct:['market','percent'],revenue_growth_pct:['financial','percent'],free_cash_flow_usd:['financial','USD'],operating_margin_pct:['financial','percent'],event_days_until:['catalyst','days'],debt_equity:['risk','ratio']};
+const metric = {price:['market','USD'],daily_change_pct:['market','percent'],revenue_growth_pct:['financial','percent'],free_cash_flow_usd:['financial','USD'],operating_margin_pct:['financial','percent'],event_days_until:['catalyst','days'],debt_equity:['risk','ratio'],liabilities_equity:['risk','ratio']};
 const instant = v => forecastInstant(v) !== null;
 const interpretation = v => typeof v === 'string' && v.trim().length > 0 && v.length <= 400 && !/\d|[$%<>]|https?:\/\/|bearer|api.?key|password/i.test(v);
 const equal = (a,b) => {
