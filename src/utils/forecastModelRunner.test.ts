@@ -105,6 +105,14 @@ test('genuine zero and identical training labels produce valid zero-width quanti
   const v=input();for(const w of v.windows.filter(w=>w.id.startsWith('train')))changeArchive(w,'outcomes',a=>{for(const r of a.records){r.adjustedClose=100;r.rawClose=100;}});
   assert.deepEqual(fit(run(v),'validation-a').quantiles,[0,0,0,0,0]);
 });
+test('constant fractional labels stay constant and ordered in both model and matched baseline',()=>{
+  const v=input(),expected=((100.04-100)/100)*100;
+  for(const w of v.windows.filter(w=>w.id.startsWith('train')))changeArchive(w,'outcomes',a=>{a.records.at(-1).adjustedClose=100.04;a.records.at(-1).rawClose=100.04;});
+  const r=run(v);assert.deepEqual(fit(r,'validation-a').quantiles,[expected,expected,expected,expected,expected]);
+  const e=scored(v,r);assert.equal(e.evaluation.coverage.scored,5);
+  const validation=e.evaluation.summaries[0];assert.equal(validation.model.centralMeanWidthPP,0);assert.equal(validation.trainingDistribution.wideMeanWidthPP,0);
+  assert.equal(validation.modelMinusTrainingMaePP,0);
+});
 test('future origins and outside-protocol windows do not inspect their archives',()=>{
   const v=fictionalModelRunInput('2026-07-08T21:00:00Z');for(const w of v.windows.filter(w=>w.archive.request.decisionAt>v.assessedAt))w.archive.manifestBytes=Buffer.from('private future bytes');
   const r=run(v);assert.equal(row(r,'holdout-b').status,'pending');assert.equal(row(r,'holdout-b').prediction,null);assert(!JSON.stringify(r.artifact).includes('private future bytes'));

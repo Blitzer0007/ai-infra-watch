@@ -97,14 +97,21 @@ training-baseline MAE is zero by construction. These are fictional numerical
 goldens, not market performance. Genuine zero labels and zero-width distributions
 remain supported.
 
-Twenty-nine new cases cover independent quantile goldens, actual composition,
+Thirty new cases cover independent quantile goldens, actual composition,
 expanding/frozen cohorts, no held-out/purged byte reads, boundary/microsecond/gap
 rules, missing inputs, cross-instrument/horizon separation, deterministic pins,
 forgery/replay mismatch, output isolation, invalid/shared byte storage, resource
 limits and the credential-free CLI. The original 97 archive/walk-forward cases
 remain passing after the shared-selection extraction.
 
-Local Cloud verification passes 982 Node tests, TypeScript, production build,
+Interpolation now uses `low + (high - low) * weight` in both the reference model
+and its matched offline baseline. The former convex-sum expression could give a
+constant 0.04000000000000625% label a slightly larger p10 than p25 through rounding,
+causing a crossed prediction or negative baseline width. A retained regression
+checks exact constant quantiles and zero widths through generation and scoring.
+This numerical correction leaves stored outcomes and legacy writers untouched.
+
+Local Cloud verification passes 983 Node tests, TypeScript, production build,
 25 CI-safety cases, workflow syntax and whitespace. The full mocked-browser CI
 suite remains an integration regression check; this increment adds no UI flow.
 The existing large JavaScript bundle warning remains open.

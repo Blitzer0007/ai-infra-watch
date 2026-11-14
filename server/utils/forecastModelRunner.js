@@ -31,9 +31,9 @@ function quantiles(values) {
   const ordered=[...values].sort((a,b)=>a-b);
   const result=[.1,.25,.5,.75,.9].map(q=>{
     const at=(ordered.length-1)*q,lo=Math.floor(at),hi=Math.ceil(at),weight=at-lo;
-    return ordered[lo]*(1-weight)+ordered[hi]*weight;
+    return ordered[lo]+(ordered[hi]-ordered[lo])*weight;
   });
-  if(result.some(v=>!Number.isFinite(v)||v< -100)||!Number.isFinite(result[4]-result[0]))stop('RUN_MODEL_NUMERICS_INVALID');
+  if(result.some((v,i)=>!Number.isFinite(v)||v< -100||(i>0&&v<result[i-1]))||!Number.isFinite(result[4]-result[0]))stop('RUN_MODEL_NUMERICS_INVALID');
   return result;
 }
 const modelImplementationSha256=hash(Buffer.from(Function.prototype.toString.call(quantiles)));

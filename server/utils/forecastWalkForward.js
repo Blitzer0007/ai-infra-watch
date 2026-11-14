@@ -95,7 +95,7 @@ function empirical(values) {
   const sorted = [...values].sort((a, b) => a - b);
   return [.1, .25, .5, .75, .9].map(q => {
     const position = (sorted.length - 1) * q, lower = Math.floor(position), upper = Math.ceil(position), weight = position - lower;
-    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    return sorted[lower] + (sorted[upper] - sorted[lower]) * weight;
   });
 }
 
