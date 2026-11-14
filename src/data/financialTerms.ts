@@ -1,0 +1,36 @@
+export type FinancialTermDefinition = {
+  id: string; label: string; shortDefinition: string; detailedExplanation: string; example: string;
+  commonMisinterpretation: string; relevanceToMediumTermInvesting: string; relatedTermIds: string[];
+};
+const definitions: Array<[string, string, string, string, string, string]> = [
+  ['pe', 'P/E ratio', 'Share price divided by annual earnings per share.', 'Trailing P/E uses reported earnings. Loss-making companies may not have a meaningful positive P/E.', '$100 price / $5 annual EPS = 20 times earnings.', 'A lower P/E does not automatically mean a better investment.'],
+  ['forward-pe', 'Forward P/E', 'Price divided by expected future earnings per share.', 'Analyst estimates can change after results or guidance; use the estimate date and fiscal period.', '$100 / $4 expected EPS = 25 times forward earnings.', 'An estimate is not a reported result.'],
+  ['eps', 'EPS', 'Earnings per share: profit allocated to each share.', 'Diluted EPS includes potential dilution; adjusted EPS can exclude costs included under accounting standards.', '$10 million profit / 5 million shares = $2 EPS.', 'EPS growth can reflect buybacks rather than business growth.'],
+  ['revenue-growth', 'Revenue growth', 'How quickly sales increased compared with an earlier period.', 'Compare equivalent periods and check acquisitions, currency changes and organic growth.', '$110 sales versus $100 a year earlier means 10% growth.', 'Growing sales do not guarantee growing profit.'],
+  ['free-cash-flow', 'Free cash flow', 'Operating cash flow remaining after capital spending.', 'Definitions differ. Check capital expenditure and working-capital timing in company filings.', '$30 operating cash flow minus $10 capital spending leaves $20.', 'One strong quarter may reflect payment timing.'],
+  ['operating-margin', 'Operating margin', 'Operating profit as a percentage of revenue.', 'This indicates operating efficiency before financing costs and taxes; compare like accounting definitions.', '$15 operating profit / $100 revenue = 15%.', 'Different industries have different normal margins.'],
+  ['debt-equity', 'Debt-to-equity ratio', 'Debt relative to shareholder equity.', 'Debt definitions differ; negative equity or large buybacks can distort the ratio.', '$50 debt / $100 equity = 0.5.', 'A low ratio alone does not establish financial safety.'],
+  ['rsi', 'RSI', 'A momentum measure comparing recent gains and losses.', 'The relative strength index commonly uses 14 periods and ranges from 0 to 100.', 'RSI of 70 indicates strong recent upward momentum.', 'Overbought does not mean a price must fall immediately.'],
+  ['ma50', '50-day moving average', 'The average closing price over 50 trading sessions.', 'A rolling trend measure that responds with a lag; adjustment basis must be consistent.', 'A $100 average versus $105 current price places price above this average.', 'A crossover is not a reliable standalone forecast.'],
+  ['ma200', '200-day moving average', 'The average closing price over 200 trading sessions.', 'A longer-term trend measure that requires enough consistently adjusted history.', 'Price below a $100 average can indicate a weakening long trend.', 'It does not define a guaranteed price floor.'],
+  ['relative-strength', 'Relative strength', 'Performance compared with a benchmark or peer group.', 'State the comparison universe and time window. This is different from RSI.', 'A stock gaining 8% while its benchmark gains 5% leads by 3 percentage points.', 'One day of outperformance does not establish a lasting advantage.'],
+  ['drawdown', 'Drawdown', 'A decline from an earlier peak.', 'Peak-to-trough drawdown depends on the measurement window and adjusted price series.', '$100 peak falling to $80 is a 20% drawdown.', 'Drawdown is not the same as a loss from your purchase price.'],
+  ['volatility', 'Volatility', 'How widely returns vary over time.', 'Historical volatility measures variability, often annualized; it does not capture every risk.', 'Daily moves of 4% generally imply more variability than moves of 1%.', 'Low historical volatility does not guarantee future safety.'],
+  ['support-resistance', 'Support/resistance', 'Price areas where buying or selling previously clustered.', 'These are historical observations rather than fixed barriers; liquidity and new information can change them.', 'Repeated reversals near $100 may make that area worth monitoring.', 'Past support is not a guaranteed floor.'],
+  ['valuation-multiple', 'Valuation multiple', 'Price or enterprise value relative to a financial metric.', 'Choose comparable businesses and consistent metrics such as earnings, sales or cash flow.', '$500 enterprise value / $100 sales = 5 times sales.', 'A high multiple is neither proof of quality nor proof of overvaluation.'],
+  ['catalyst', 'Catalyst', 'An event that may change expectations about a company.', 'Separate confirmed dates from estimates and distinguish an event from its uncertain outcome.', 'A confirmed earnings date creates a scheduled review point.', 'A scheduled event does not imply a positive price move.'],
+  ['concentration', 'Portfolio concentration', 'How much portfolio value depends on a few positions or exposures.', 'Single-name weights can understate shared sector, geography or leveraged exposure.', 'Three holdings worth $60 of a $100 portfolio represent 60% concentration.', 'More tickers do not necessarily mean diversified risk.'],
+  ['cost-basis', 'Cost basis', 'The recorded acquisition cost of a position.', 'Fees, partial sales and the chosen accounting method affect reconciled remaining basis.', 'Two shares bought for $100 each start with $200 basis before fees.', 'Average purchase price alone is not the full transaction ledger.'],
+  ['unrealized-pnl', 'Unrealized P&L', 'The change in value of holdings that remain open.', 'Current value minus reconciled open cost basis; it excludes realized gains from closed shares.', '$220 current value minus $200 basis = $20 unrealized gain.', 'Unrealized P&L is not total account return.'],
+  ['risk-reward', 'Risk/reward ratio', 'Potential downside compared with a stated upside scenario.', 'Both sides depend on assumptions, horizon and scenario probabilities; they are not promises.', '$10 assumed downside against $30 assumed upside is 1:3.', 'A favorable ratio does not tell you the probability of either scenario.'],
+];
+export const financialTerms: FinancialTermDefinition[] = definitions.map(([id,label,shortDefinition,detailedExplanation,example,commonMisinterpretation]) => ({
+  id, label, shortDefinition, detailedExplanation, example, commonMisinterpretation,
+  relevanceToMediumTermInvesting: 'For a 2–12 month review, compare this measure with dated evidence, business conditions and your portfolio risk. It is context, not a standalone trade instruction.',
+  relatedTermIds: id === 'risk-reward' ? ['volatility', 'drawdown'] : ['risk-reward'],
+}));
+export function findFinancialTerm(id: string) { return financialTerms.find(term => term.id === id); }
+export function searchFinancialTerms(query: string) {
+  const term = query.trim().toLowerCase();
+  return financialTerms.filter(item => !term || [item.label, item.shortDefinition, item.id].some(value => value.toLowerCase().includes(term)));
+}

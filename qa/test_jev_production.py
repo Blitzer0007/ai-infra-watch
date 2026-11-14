@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 
+from safety import guard_request, qa_base_url
+
 
 def _has_auth_headers() -> bool:
     # The app's protected JEV APIs require an Authorization header. Browser
@@ -15,6 +17,8 @@ def _has_auth_headers() -> bool:
 
 
 def _headers() -> dict[str, str]:
+    if os.getenv("QA_ALLOW_LIVE") != "true":
+        return {}
     raw = os.getenv("QA_HEADERS_JSON", "").strip()
     if not raw:
         return {}
@@ -28,8 +32,8 @@ def _headers() -> dict[str, str]:
 @pytest.mark.skipif(not _has_auth_headers(), reason="authenticated JEV API smoke requires QA_HEADERS_JSON")
 def test_jev_read_only_api_contracts():
     """Exercise authenticated JEV read paths only; never create or mutate a paper proposal."""
-    base_url = (os.getenv("QA_BASE_URL") or "https://ai-infra-watch-theta.vercel.app").rstrip("/")
-    with httpx.Client(base_url=base_url, headers=_headers(), follow_redirects=True, timeout=30.0) as client:
+    base_url = qa_base_url()
+    with httpx.Client(base_url=base_url, headers=_headers(), follow_redirects=True, event_hooks={"request": [guard_request]}, timeout=30.0) as client:
         proposals = client.get("/api/jev-lab", params={"limit": 5})
         assert proposals.status_code == 200, f"/api/jev-lab returned HTTP {proposals.status_code}"
         proposal_body = proposals.json()

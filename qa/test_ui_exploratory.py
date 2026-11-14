@@ -363,6 +363,7 @@ def test_exploratory_data_health_summary_and_refresh(page):
     assert page.get_by_label("Data health summary").is_visible()
     assert page.get_by_label("Evidence channel health").is_visible()
     refresh = page.get_by_role("button", name="Refresh evidence data")
+    refresh.wait_for(state="visible", timeout=30000)
     assert refresh.is_visible()
 
 

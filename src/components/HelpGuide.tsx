@@ -1,3 +1,4 @@
+import FinancialGlossary from './education/FinancialGlossary';
 import { useMemo, useState } from 'react';
 import {
   ArrowRight, BookOpen, CheckCircle2, CircleHelp, FileSearch, Gauge,
@@ -197,6 +198,8 @@ export default function HelpGuide({ onNavigate }: Props) {
           Plain-English explanations of every major screen, score and evidence label. Use the examples to understand what the application is telling you — and what it is not telling you.
         </p>
       </div>
+
+      <FinancialGlossary />
 
       <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 md:p-5">
         <div className="flex items-start gap-3">

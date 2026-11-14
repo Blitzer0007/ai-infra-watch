@@ -4,6 +4,8 @@ import os
 import httpx
 import pytest
 
+from safety import guard_request, require_safe_target
+
 TABLES = {
     "portfolio_holdings": "symbol,quantity,average_cost,purchase_date",
     "forecast_snapshots": "ticker,horizon,status,median,actual_return",
@@ -13,11 +15,12 @@ TABLES = {
 
 @pytest.fixture(scope="module")
 def db_client():
-    url = (os.getenv("QA_SUPABASE_URL") or os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").rstrip("/")
-    key = (os.getenv("QA_SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    url = (os.getenv("QA_SUPABASE_URL") or "").rstrip("/")
+    key = (os.getenv("QA_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
-        pytest.skip("Supabase credentials not configured for DB validation.")
-    client = httpx.Client(base_url=url, headers={"apikey":key,"Authorization":"Bearer "+key,"Accept":"application/json"}, timeout=30.0)
+        pytest.fail("QA_SUPABASE_URL and QA_SUPABASE_SERVICE_ROLE_KEY are required; production fallbacks are disabled.")
+    require_safe_target(url)
+    client = httpx.Client(base_url=url, headers={"apikey":key,"Authorization":"Bearer "+key,"Accept":"application/json"}, event_hooks={"request": [guard_request]}, timeout=30.0)
     yield client
     client.close()
 
