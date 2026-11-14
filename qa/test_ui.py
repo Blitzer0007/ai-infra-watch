@@ -285,6 +285,7 @@ def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
     goto_app(page)
     center = page.get_by_test_id("decision-impact-center")
     center.wait_for(state="visible", timeout=30000)
+    center.get_by_role("heading", name="What matters for you now", exact=True).wait_for(state="visible", timeout=30000)
     assert "What matters for you now" in center.inner_text()
     assert "Same cash-flow benchmark" in center.inner_text()
     assert "verified" in center.inner_text()
