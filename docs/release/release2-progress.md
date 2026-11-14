@@ -23,6 +23,8 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
+- [Raw SEC statement adapters, stage 1](release2-sec-statement-adapters.md): bounded cash/debt-component/point-share/weighted-share/EPS projection, explicit periods/units, original filing-focus metadata and conservative newest-vintage checks. Total debt/EBITDA, broader statement coverage, independent admission, versioned dossier consumption and actual source integration remain pending; the rounded core estimate is unchanged.
+
 - [Sectioned read-only company dossier](release2-company-dossier-ui.md): local section navigation, collapsed holding entry with unconnected-data states, expandable source/calculation inputs and a separate development-only FICT preview. Broader statement adapters, authentic company/source evidence, real holding data and scanner integration remain pending; no activation or increase in the rounded core estimate is implied.
 
 - [Company financial observations, stage 1](release2-company-financial-observations.md): pure bounded projection of existing SEC receipt methods and supporting declarations, with units/periods/filing dates, explicit source failures and no source/decision authority. Broader statement coverage, authentic acquisition and dossier/scanner integration remain pending; the core estimate is unchanged.
