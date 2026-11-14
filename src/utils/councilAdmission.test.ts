@@ -45,3 +45,16 @@ test('changing mode or retained filing content changes the bound request digest'
   assert.notEqual(await councilRequestDigest({...f.request,mode:'admission-v2'}),before);
   f.request.sources.sec.cik='0000000002';assert.notEqual(await councilRequestDigest(f.request),before);
 });
+for(const mode of ['summary','limitations','missing-presentation','unknown-presentation','wrong-implication','duplicate-citation','claim-order','uncited-preference','duplicate-winning'])test('controlled v2 response rejects '+mode,async()=>{
+  const f=fixture(),v=f.result,digest=await councilRequestDigest(f.request);
+  if(mode==='summary')v.roles.bull.summary='Cash flow is positive.';
+  if(mode==='limitations')v.roles.bull.limitations=['Revenue grew ninety percent.'];
+  if(mode==='missing-presentation')delete v.presentation_version;
+  if(mode==='unknown-presentation')v.presentation_version='unreviewed';
+  if(mode==='wrong-implication')v.roles.bull.claims[0].implication='cash-flow';
+  if(mode==='duplicate-citation')v.roles.bull.claims.push({...v.roles.bull.claims[0],claim_id:'bull:1'});
+  if(mode==='claim-order')v.roles.bull.claims[0].claim_id='bull:2';
+  if(mode==='uncited-preference')v.roles.judge={summary:'The judge recorded a provisional bull preference. Future outcomes remain unknown.',preference:'bull',winning_claim_ids:[]};
+  if(mode==='duplicate-winning')v.roles.judge.winning_claim_ids=['bull:0','bull:0'];
+  assert.equal(councilV2Envelope(v,f.request,digest),false);
+});

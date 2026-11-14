@@ -1,5 +1,6 @@
 // Wire minimization/validation only. Python owns orchestration and quality checks.
 import { forecastInstant, forecastDay } from '../src/utils/forecastInputs.js';
+import {COUNCIL_PRESENTATION_VERSION,COUNCIL_LIMITATIONS,councilSummary} from './councilPresentation.js';
 export const COUNCIL_MAX_BYTES = 32768;
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const exact = (v, keys) => object(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
@@ -10,6 +11,7 @@ const array = (v, max, check) => Array.isArray(v) && v.length <= max && v.every(
 const families = ['market', 'financial', 'catalyst', 'risk'];
 const roles = ['bull', 'bear', 'judge'];
 const implications = ['market-move', 'growth', 'cash-flow', 'margin', 'event-timing', 'leverage-risk'];
+const metricImplication={price:'market-move',daily_change_pct:'market-move',revenue_growth_pct:'growth',free_cash_flow_usd:'cash-flow',operating_margin_pct:'margin',event_days_until:'event-timing',debt_equity:'leverage-risk',liabilities_equity:'leverage-risk'};
 const rowKeys = ['evidence_id','symbol','family','metric','value','unit','source_id','observed_at','published_at','retrieved_at','basis','period_start','period_end','simulated'];
 const metric = {price:['market','USD'],daily_change_pct:['market','percent'],revenue_growth_pct:['financial','percent'],free_cash_flow_usd:['financial','USD'],operating_margin_pct:['financial','percent'],event_days_until:['catalyst','days'],debt_equity:['risk','ratio'],liabilities_equity:['risk','ratio']};
 const instant = v => forecastInstant(v) !== null;
@@ -47,9 +49,9 @@ export function councilJevEnvelope(v,payload) {
     (v.input_tokens===null||integer(v.input_tokens,1000000))&&
     (v.available?(['needs_data','reviewable'].includes(v.coverage)&&['verify_sources','inspect_disagreement','wait_for_outcome'].includes(v.next_check)&&v.error_code===null):(v.coverage===null&&v.next_check===null&&['not-enabled','invalid-summary','assessment-unavailable'].includes(v.error_code)));
 }
-const resultKeys=['contract_version','run_id','snapshot_id','symbol','horizon_months','assessed_at','mode','status','termination_reason','disposition','quality','roles','trace','evidence','usage','policy','source_authenticity_verified','forecast_validity_established','grants_decision_eligibility','changes_allocation','sends_messages'];
+const resultKeys=['contract_version','presentation_version','run_id','snapshot_id','symbol','horizon_months','assessed_at','mode','status','termination_reason','disposition','quality','roles','trace','evidence','usage','policy','source_authenticity_verified','forecast_validity_established','grants_decision_eligibility','changes_allocation','sends_messages'];
 export function councilEnvelope(v, payload) {
-  if(!exact(v,resultKeys)||v.contract_version!=='portfolio-council-v1'||v.run_id!==(payload.mode==='demo'?payload.run_id:payload.packet.run_id)||
+  if(!exact(v,resultKeys)||v.contract_version!=='portfolio-council-v1'||v.presentation_version!==COUNCIL_PRESENTATION_VERSION||v.run_id!==(payload.mode==='demo'?payload.run_id:payload.packet.run_id)||
     !/^[a-f0-9]{64}$/.test(v.snapshot_id)||!['fixture','nvidia','unconfigured'].includes(v.mode)||
     !['complete','partial','failed','unavailable'].includes(v.status)||!['completed','budget','tool-budget','step-budget','model-or-contract-error','model-not-configured'].includes(v.termination_reason)||
     !['insufficient-evidence','provisional-bull','provisional-bear','balanced'].includes(v.disposition)||
@@ -64,9 +66,12 @@ export function councilEnvelope(v, payload) {
   for(const [role,r] of Object.entries(v.roles)) {
     if(role==='judge') {if(!exact(r,['summary','preference','winning_claim_ids'])||!interpretation(r.summary)||!['bull','bear','balanced','insufficient'].includes(r.preference)||!array(r.winning_claim_ids,4,id=>/^(bull|bear):[0-3]$/.test(id)))return false;}
     else if(!exact(r,['summary','claims','limitations'])||!interpretation(r.summary)||!array(r.limitations,4,interpretation)||!array(r.claims,4,c=>exact(c,['claim_id','evidence_id','stance','implication'])&&new RegExp('^'+role+':[0-3]$').test(c.claim_id)&&known(c.evidence_id)&&['support','challenge'].includes(c.stance)&&implications.includes(c.implication)))return false;
+    if(r.summary!==councilSummary(role,r)||(role!=='judge'&&!equal(r.limitations,COUNCIL_LIMITATIONS)))return false;
+    if(role!=='judge'&&(new Set(r.claims.map(c=>c.evidence_id)).size!==r.claims.length||r.claims.some((c,i)=>c.claim_id!==role+':'+i||c.implication!==metricImplication[v.evidence.find(e=>e.evidence_id===c.evidence_id).metric])))return false;
   }
   const claims=['bull','bear'].flatMap(role=>v.roles[role]?.claims||[]);
   if(v.roles.judge?.winning_claim_ids.some(id=>!claims.some(c=>c.claim_id===id)))return false;
+  if(v.roles.judge){const j=v.roles.judge;if(new Set(j.winning_claim_ids).size!==j.winning_claim_ids.length||(['bull','bear'].includes(j.preference)&&!j.winning_claim_ids.some(id=>id.startsWith(j.preference+':'))))return false;}
   if((v.mode==='fixture'||v.status!=='complete'||v.quality.missing_families.length||v.quality.conflicting_ids.length||!v.roles.bull?.claims.length||!v.roles.bear?.claims.length||claims.some(c=>!v.quality.usable_ids.includes(c.evidence_id)))&&v.disposition!=='insufficient-evidence')return false;
   if(!array(v.trace,6,t=>exact(t,['role','action','status'])&&roles.includes(t.role)&&['inspect','coverage','conclude','judge'].includes(t.action)&&t.status==='ok')||
     !exact(v.usage,['model_calls','tool_calls','prompt_chars','output_token_limit_per_call','provider_requests','jev_calls'])||!integer(v.usage.model_calls,6)||!integer(v.usage.tool_calls,3)||!integer(v.usage.prompt_chars,60000)||v.usage.output_token_limit_per_call!==600||v.usage.jev_calls!==0||(v.usage.provider_requests!==null&&!integer(v.usage.provider_requests,6))||

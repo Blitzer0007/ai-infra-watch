@@ -6,7 +6,7 @@ import {resolveCatalystRevisions, type CatalystSnapshot} from './catalystCalenda
 export {councilEnvelope,councilPayload};
 export type CouncilEvidence = { evidence_id:string;symbol:string;family:string;metric:string;value:number;unit:string;source_id:string;observed_at:string|null;published_at:string|null;retrieved_at:string|null;basis:'reported'|'estimate'|'unknown';period_start:string|null;period_end:string|null;simulated:boolean };
 export type CouncilResult = {
-  contract_version:string;run_id:string;snapshot_id:string;symbol:string;horizon_months:number;assessed_at:string;mode:'fixture'|'nvidia'|'unconfigured';status:string;termination_reason:string;disposition:string;
+  contract_version:string;presentation_version:string;run_id:string;snapshot_id:string;symbol:string;horizon_months:number;assessed_at:string;mode:'fixture'|'nvidia'|'unconfigured';status:string;termination_reason:string;disposition:string;
   quality:{usable_ids:string[];missing_families:string[];conflicting_ids:string[];issues:Array<{evidence_id:string;codes:string[]}>};
   roles:Partial<Record<'bull'|'bear'|'judge',{summary:string;claims?:Array<{claim_id:string;evidence_id:string;stance:string;implication:string}>;limitations?:string[];preference?:string;winning_claim_ids?:string[]}>>;
   evidence:CouncilEvidence[];trace:Array<{role:string;action:string;status:string}>;

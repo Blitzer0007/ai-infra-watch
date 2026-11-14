@@ -1,5 +1,6 @@
 """QA-only loopback server; actual council orchestration, fake model, no provider config."""
 import importlib.util
+import json
 from pathlib import Path
 from app.agents import council_http
 from app.agents.portfolio_council import FictionalCouncilModel
@@ -15,7 +16,12 @@ class MockNvidia(FictionalCouncilModel):
     def complete(self,role,messages,**kwargs):
         if any(key in '\n'.join(m['content'] for m in messages) for key in ['"accession"','"inputs"','"cik"']):
             raise AssertionError('Original filing receipts must not enter model prompts')
-        return super().complete(role,messages,**kwargs)
+        value=json.loads(super().complete(role,messages,**kwargs))
+        # Adversarial fixture prose exercises the real withholding boundary.
+        if value['action'] in ('conclude','judge'):
+            value['summary']={'bull':'Cash flow is positive.','bear':'Revenue grew ninety percent.','judge':'The bull case will certainly win.'}[role]
+            if role!='judge':value['limitations']=['A future winner is guaranteed.']
+        return json.dumps(value)
 class MockJev:
     def evaluate(self,**_kwargs):return JevEvaluation(answers={'coverage':JevAnswer(type='choice',choice='reviewable'),'next_check':JevAnswer(type='choice',choice='wait_for_outcome')},input_tokens=123)
 real_assess=council.assess_council_summary

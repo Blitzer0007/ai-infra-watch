@@ -409,6 +409,7 @@
   },
   "result": {
     "contract_version": "portfolio-council-v2",
+    "presentation_version": "council-evidence-summary-v1",
     "run_id": "fictional-admission",
     "snapshot_id": "c584af6fcf4b67e2e4e1763c573152523839695a8854363062737f74d475eb5a",
     "symbol": "MSFT",
@@ -434,7 +435,7 @@
     },
     "roles": {
       "bull": {
-        "summary": "Growth could support the upside case if sustained.",
+        "summary": "The bull case cites inspected observations for conditional research.",
         "claims": [
           {
             "claim_id": "bull:0",
@@ -444,18 +445,22 @@
           }
         ],
         "limitations": [
-          "This is a fictional demonstration, not verified company evidence."
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
         ]
       },
       "bear": {
-        "summary": "Leverage could weaken the downside resilience if conditions deteriorate.",
+        "summary": "No evidence claims were accepted for the bear case.",
         "claims": [],
         "limitations": [
-          "This is a fictional demonstration, not verified company evidence."
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
         ]
       },
       "judge": {
-        "summary": "The competing cases require independent source confirmation and future outcome review.",
+        "summary": "The judge recorded a balanced comparison. Future outcomes remain unknown.",
         "preference": "balanced",
         "winning_claim_ids": []
       }
@@ -609,7 +614,7 @@
     "usage": {
       "model_calls": 6,
       "tool_calls": 3,
-      "prompt_chars": 27943,
+      "prompt_chars": 29591,
       "output_token_limit_per_call": 600,
       "provider_requests": 0,
       "jev_calls": 0

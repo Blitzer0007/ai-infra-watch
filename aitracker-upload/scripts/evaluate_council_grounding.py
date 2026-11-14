@@ -18,7 +18,7 @@ def main() -> int:
     try:
         report = run_suite(args.cases)
     except (ValueError, OSError, KeyError, IndexError, TypeError):
-        print(json.dumps({"version": "council-grounding-eval-v1", "status": "invalid-evaluation-input"}))
+        print(json.dumps({"version": "council-grounding-eval-v2", "status": "invalid-evaluation-input"}))
         return 2
     print(json.dumps(report, indent=2, allow_nan=False))
     # Expected behavior includes documented semantic counterexamples. This exit

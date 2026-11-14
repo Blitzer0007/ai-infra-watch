@@ -83,6 +83,13 @@ def test_fictional_demo_actual_transport_keyboard_and_responsive_layout(page,cou
     panel.get_by_text('Evidence provenance and run trace',exact=True).click()
     expect(result).to_contain_text('Provider requests: 0')
     expect(result).to_contain_text('No decision eligibility was granted')
+    expect(result).to_contain_text('The bull case cites inspected observations for conditional research.')
+    expect(result).to_contain_text('The judge recorded a balanced comparison. Future outcomes remain unknown.')
+    expect(result).not_to_contain_text('Cash flow is positive.')
+    expect(result).not_to_contain_text('Revenue grew ninety percent.')
+    expect(result).not_to_contain_text('The bull case will certainly win.')
+    expect(result).not_to_contain_text('A future winner is guaranteed.')
+    expect(result).to_contain_text('Free-form model summaries and limitations are withheld.')
     ARTIFACTS.mkdir(parents=True,exist_ok=True)
     for width in [360,768,1440]:
         page.set_viewport_size({'width':width,'height':1000})
@@ -90,6 +97,24 @@ def test_fictional_demo_actual_transport_keyboard_and_responsive_layout(page,cou
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         panel.screenshot(path=str(ARTIFACTS/f'portfolio-council-{width}.png'))
     assert errors==[]
+
+
+@pytest.mark.parametrize('field',['summary','limitations','presentation-version'])
+def test_tampered_controlled_presentation_is_rejected_before_display(page,council_gateway,field):
+    panel,calls,errors=setup(page,council_gateway)
+    def tamper(route):
+        response=route.fetch()
+        value=response.json()
+        if field=='summary':value['roles']['bull']['summary']='Cash flow is positive.'
+        elif field=='limitations':value['roles']['bull']['limitations']=['A future winner is guaranteed.']
+        else:value['presentation_version']='unreviewed'
+        route.fulfill(response=response,json=value)
+    page.route('**/api/agent-ask?task=council',tamper)
+    panel.get_by_role('button',name='Run fictional council demo',exact=True).click()
+    expect(panel.get_by_role('alert')).to_contain_text('No automatic retry occurred')
+    expect(panel.get_by_test_id('council-result')).to_have_count(0)
+    assert 'Cash flow is positive.' not in panel.inner_text() and 'A future winner is guaranteed.' not in panel.inner_text()
+    assert len(calls)==1 and errors==[]
 
 def test_loaded_metadata_unknowns_stay_unknown_and_typesafe_is_separate_explicit_call(page,council_gateway):
     panel,calls,errors=setup(page,council_gateway)

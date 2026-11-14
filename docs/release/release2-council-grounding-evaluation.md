@@ -1,5 +1,11 @@
 # Offline council grounding evaluation
 
+Follow-up: [controlled presentation](release2-council-controlled-presentation.md)
+now withholds the three previously accepted unsupported sentences. The table below
+records the original behavior. The current CLI defaults to separately labelled
+v2 outputs over the same original proposals and input edits; the original fixture
+and v1 labels remain retained for comparison.
+
 Implemented 14 November 2026 in Codex Cloud. This adds a local evaluation harness
 and 14 frozen, developer-authored fictional cases to the existing council. It
 changes no application endpoint, financial rule, model configuration or sender.

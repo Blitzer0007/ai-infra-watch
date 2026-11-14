@@ -124,9 +124,10 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           const item=result.roles[role];
           return <article key={role} className="min-w-0 rounded-xl border border-white/15 p-4">
             <h3 className="font-semibold capitalize">{role}</h3>
-            <p className="mt-1 text-xs text-slate-400">Model interpretation{role==='judge'?' · evidence comparison':' · independent opening'}</p>
+            <p className="mt-1 text-xs text-slate-400">Research summary{role==='judge'?' · cited comparison':' · independent evidence selection'}</p>
             <p className="mt-3 break-words text-sm leading-6">{item?.summary||'No validated conclusion was returned.'}</p>
             {item?.preference&&<p className="mt-2 text-sm text-cyan-200">Judge preference: {human(item.preference)}</p>}
+            {!!item?.claims?.length&&<p className="mt-3 text-xs text-slate-400">Values below come from inspected observations. Support or challenge is a model interpretation.</p>}
             {!!item?.claims?.length&&<ul className="mt-3 space-y-2 text-xs">{item.claims.map(claim=>{
               const row=result.evidence.find(e=>e.evidence_id===claim.evidence_id)!;
               return <li key={claim.claim_id} className="break-words rounded bg-black/20 p-2">{claim.claim_id} · {human(claim.implication)} · {claim.stance}<br/>{human(row.metric)}: {row.value.toLocaleString()} {row.unit}<br/>Source: {row.source_id}{row.simulated?' · simulated':''}</li>;
@@ -139,6 +140,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           <div className="mt-3 space-y-3 text-xs">{result.evidence.map(row=><div key={row.evidence_id} className="break-words"><p>{row.evidence_id} · {row.source_id} · basis {row.basis}</p><p>Observed: {row.observed_at||'unknown'} · Published: {row.published_at||'unknown'} · Retrieved: {row.retrieved_at||'unknown'}</p><p>Period: {row.period_start||'unknown'} to {row.period_end||'unknown'}</p><p>{result.quality.issues.find(i=>i.evidence_id===row.evidence_id)?.codes.map(human).join(' · ')||'Configured metadata checks passed; source not independently verified.'}</p></div>)}
             <p>Model calls: {result.usage.model_calls}/6 · Tools: {result.usage.tool_calls}/3 · Prompt characters: {result.usage.prompt_chars} · Provider requests: {result.usage.provider_requests??'unreported'} · TypeSafe calls in council: {result.usage.jev_calls}</p>
             <p>Trace: {result.trace.map(t=>t.role+' '+t.action).join(' → ')} · Stop: {human(result.termination_reason)}</p>
+            <p>Free-form model summaries and limitations are withheld. Displayed summaries describe validated selections; source authenticity and future outcomes remain unverified.</p>
             <p className="break-all">Snapshot: {result.snapshot_id}</p>
           </div>
         </details>

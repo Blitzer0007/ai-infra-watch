@@ -15,7 +15,9 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
-- [Offline council grounding evaluation](release2-council-grounding-evaluation.md): 14 frozen developer-labelled cases, real council orchestration with scripted responses, separate citation/abstention/Judge-policy denominators, input-only baselines and reproducibility hashes. Three accepted unsupported-narrative examples are exposed, not certified safe. No live provider effectiveness or prediction correctness is claimed; core progress remains approximately 55%.
+- [Controlled council presentation](release2-council-controlled-presentation.md): free-form role prose is withheld before Judge context and wire/UI output. Versioned controlled summaries and fixed limitations are independently checked on the relay/client. The same 14 frozen proposals now echo zero of the three previously accepted unsupported sentences. This limits presentation; source truth, causal interpretations, live usefulness and forecast validity remain unverified. Core progress remains approximately 55%.
+
+- [Offline council grounding evaluation](release2-council-grounding-evaluation.md): 14 frozen developer-labelled cases, real council orchestration with scripted responses, separate citation/abstention/Judge-policy denominators, input-only baselines and reproducibility hashes. Three originally accepted unsupported sentences are now withheld by controlled presentation; the original cases remain retained. No live provider effectiveness or prediction correctness is claimed; core progress remains approximately 55%.
 
 - [Versioned council input admission](release2-council-admission.md): manual model-free Python validation, family-specific rules, original calculation/filing proof checks, date-only uncertainty bounds, request-byte binding and v2 council integration. Conditional declared-input integrity remains separate from authenticated sources, predictive validity and decisions. Offline grounding replays are now added; semantic controls and independently reviewed live-model evidence remain pending. Core progress remains approximately 55%.
 

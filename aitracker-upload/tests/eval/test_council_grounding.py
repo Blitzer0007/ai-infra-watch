@@ -47,14 +47,16 @@ def test_reference_precision_cannot_hide_proposals_rejected_before_acceptance(re
     assert unknown["completed_roles"] == [] and unknown["judge_policy_agreement"] is None
 
 
-def test_known_semantic_gaps_remain_visible_despite_perfect_reference_precision(report):
+def test_known_unsupported_proposals_are_withheld_despite_valid_references(report):
     assert report["unsupported_narrative_proposal_count"] == 4
-    assert report["unsupported_narratives_accepted"] == 3
+    assert report["unsupported_narratives_accepted"] == 0
+    assert report["unsupported_narratives_withheld"] == 3
     by_id = {row["case_id"]: row for row in report["cases"]}
     for case_id, role in [("unsupported-word-number", "bull"), ("inverted-cash-flow-sign", "bull"),
                           ("unsupported-future-certainty", "judge")]:
         assert by_id[case_id]["status"] == "complete"
-        assert by_id[case_id]["unsupported_narratives_accepted"] == [role]
+        assert by_id[case_id]["unsupported_narratives_accepted"] == []
+        assert by_id[case_id]["unsupported_narratives_withheld"] == [role]
     assert by_id["unsupported-numeral-blocked"]["unsupported_narratives_accepted"] == []
     assert by_id["unsupported-numeral-blocked"]["status"] == "failed"
     assert report["unlabelled_accepted_narrative_count"] == 0
@@ -88,6 +90,19 @@ def test_replays_are_deterministic_and_do_not_mutate_frozen_inputs():
     original = copy.deepcopy(base)
     evaluation.request_for(base, suite.cases[2])
     assert base == original
+
+
+def test_original_adversarial_proposals_and_input_edits_are_unchanged():
+    original = json.loads((evaluation.DEFAULT_SUITE.parent / 'council-grounding-v1.json').read_text())
+    current = payload()
+    assert current['base_fixture_sha256'] == original['base_fixture_sha256']
+    for old, new in zip(original['cases'], current['cases'], strict=True):
+        assert old['id'] == new['id'] and old['responses'] == new['responses'] and old['edits'] == new['edits']
+        assert old['labels']['narrative_supported'] == new['labels']['narrative_supported']
+        assert old['labels']['proposal_sha256'] == new['labels']['proposal_sha256']
+    # Historical labels expect the original proposal, so they do not silently
+    # certify a changed renderer. V2 explicitly annotates the controlled output.
+    assert evaluation.run_suite(evaluation.DEFAULT_SUITE.parent / 'council-grounding-v1.json')['expected_behavior']['rate'] < 1
 
 
 def test_evaluator_cannot_contact_a_provider_or_open_a_socket(monkeypatch):

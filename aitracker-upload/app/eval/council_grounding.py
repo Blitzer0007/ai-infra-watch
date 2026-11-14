@@ -16,9 +16,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.agents.portfolio_council import PortfolioCouncil
 
 ROOT = Path(__file__).resolve().parents[3]
-FIXTURE = ROOT / "qa/fixtures/council-admission.fictional.json"
-DEFAULT_SUITE = ROOT / "aitracker-upload/data/eval/council-grounding-v1.json"
-VERSION = "council-grounding-eval-v1"
+FIXTURE = ROOT / "aitracker-upload/data/eval/council-admission-v1-reference.json"
+DEFAULT_SUITE = ROOT / "aitracker-upload/data/eval/council-grounding-v2.json"
+VERSION = "council-grounding-eval-v2"
 MAX_BYTES = 262144
 ROLES = ("bull", "bear", "judge")
 FAMILIES = {"market", "financial", "catalyst", "risk"}
@@ -79,6 +79,9 @@ class Labels(Contract):
     expected_disposition: Literal["balanced", "insufficient-evidence", "provisional-bull", "provisional-bear"]
     acceptable_judge_preferences: list[Preference] = Field(min_length=1, max_length=4)
     narrative_supported: dict[Role, bool]
+    presentation_version: str | None = None
+    accepted_summaries: dict[Role, str] | None = None
+    accepted_limitations: list[str] | None = None
     rationale: str = Field(min_length=20, max_length=1200)
 
     @model_validator(mode="after")
@@ -111,7 +114,7 @@ class Case(Contract):
 
 
 class Suite(Contract):
-    version: Literal["council-grounding-cases-v1"]
+    version: Literal["council-grounding-cases-v1", "council-grounding-cases-v2"]
     label_origin: Literal["developer-authored-fictional-not-human-independent"]
     base_fixture_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     cases: list[Case] = Field(min_length=1, max_length=32)
@@ -120,6 +123,12 @@ class Suite(Contract):
     def unique_cases(self):
         if len({case.id for case in self.cases}) != len(self.cases):
             raise ValueError("Duplicate evaluation case")
+        if self.version == "council-grounding-cases-v2" and any(
+            case.labels.presentation_version != "council-evidence-summary-v1"
+            or set(case.labels.accepted_summaries or {}) != set(ROLES)
+            or not case.labels.accepted_limitations for case in self.cases
+        ):
+            raise ValueError("Controlled presentation needs complete frozen labels")
         return self
 
 
@@ -172,8 +181,14 @@ def _score(case: Case, result: dict, model: ScriptedModel, request: dict) -> dic
     unsupported_proposed = [role for role in proposed if not labels.narrative_supported[role]]
     unsupported_accepted = [role for role in unsupported_proposed if role in result["roles"]
                             and result["roles"][role]["summary"] == proposed[role]["reply"].get("summary")]
-    unlabelled_narratives = [role for role in result["roles"] if role not in proposed
-                            or result["roles"][role]["summary"] != proposed[role]["reply"].get("summary")]
+    expected_summaries = labels.accepted_summaries or {
+        role: call["reply"].get("summary") for role, call in proposed.items()}
+    unlabelled_narratives = [role for role in result["roles"]
+                            if result["roles"][role]["summary"] != expected_summaries.get(role)
+                            or (labels.accepted_limitations is not None and role != "judge"
+                                and result["roles"][role]["limitations"] != labels.accepted_limitations)]
+    unsupported_withheld = [role for role in unsupported_proposed if role in result["roles"]
+                            and role not in unsupported_accepted and role not in unlabelled_narratives]
     references, grounded_references = 0, 0
     proposed_references, inspected_proposals = 0, 0
     for role in ("bull", "bear"):
@@ -194,6 +209,7 @@ def _score(case: Case, result: dict, model: ScriptedModel, request: dict) -> dic
     abstained = result["disposition"] == "insufficient-evidence"
     authority_false = all(result.get(key) is False for key in AUTHORITY)
     expected_match = (admission_match and authority_false and not unlabelled_narratives
+                      and (labels.presentation_version is None or result.get("presentation_version") == labels.presentation_version)
                       and result["status"] == labels.expected_status
                       and result["disposition"] == labels.expected_disposition
                       and (not labels.must_abstain or abstained)
@@ -213,6 +229,7 @@ def _score(case: Case, result: dict, model: ScriptedModel, request: dict) -> dic
         "proposed_reference_precision": fraction(inspected_proposals, proposed_references),
         "unsupported_narrative_proposals": unsupported_proposed,
         "unsupported_narratives_accepted": unsupported_accepted,
+        "unsupported_narratives_withheld": unsupported_withheld,
         "unlabelled_accepted_narratives": unlabelled_narratives,
         "completed_roles": sorted(result["roles"]), "usage": result["usage"],
         "baselines": {"always_abstain": True,
@@ -266,6 +283,7 @@ def run_suite(path: Path = DEFAULT_SUITE) -> dict:
         "judge_missing_count": len(rows) - len(preferences),
         "unsupported_narrative_proposal_count": sum(len(row["unsupported_narrative_proposals"]) for row in rows),
         "unsupported_narratives_accepted": sum(len(row["unsupported_narratives_accepted"]) for row in rows),
+        "unsupported_narratives_withheld": sum(len(row["unsupported_narratives_withheld"]) for row in rows),
         "unlabelled_accepted_narrative_count": sum(len(row["unlabelled_accepted_narratives"]) for row in rows),
         "provider_requests": sum(row["usage"]["provider_requests"] for row in rows),
         "jev_calls": sum(row["usage"]["jev_calls"] for row in rows),
