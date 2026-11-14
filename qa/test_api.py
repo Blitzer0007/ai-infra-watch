@@ -7,7 +7,11 @@ import os
 import httpx
 import pytest
 
+from safety import guard_request, qa_base_url
+
 def _headers() -> dict[str, str]:
+    if os.getenv("QA_ALLOW_LIVE") != "true":
+        return {}
     raw = os.getenv("QA_HEADERS_JSON", "").strip()
     if not raw:
         return {}
@@ -19,8 +23,8 @@ def _headers() -> dict[str, str]:
 @pytest.fixture
 def client():
     with httpx.Client(
-        base_url=(os.getenv("QA_BASE_URL") or "https://ai-infra-watch-theta.vercel.app").rstrip("/"),
-        headers=_headers(), follow_redirects=True, timeout=30.0
+        base_url=qa_base_url(),
+        headers=_headers(), follow_redirects=True, event_hooks={"request": [guard_request]}, timeout=30.0
     ) as value:
         yield value
 

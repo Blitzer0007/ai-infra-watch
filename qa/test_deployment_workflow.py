@@ -8,7 +8,8 @@ def test_production_deploy_requires_explicit_opt_in():
     workflow = (ROOT / ".github" / "workflows" / "vercel-production-deploy.yml").read_text()
     assert "workflow_run:" not in workflow
     assert "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'" in workflow
-    assert "contains(github.event.head_commit.message, '[deploy]')" in workflow
+    assert "inputs.confirm_production_deploy == 'YES'" in workflow
+    assert "  push:" not in workflow
     assert "vercel deploy --prebuilt --archive=tgz --prod" in workflow
 
 
@@ -23,3 +24,16 @@ def test_live_production_ui_suite_requires_manual_dispatch():
     ui_job = workflow.split("  ui:\n", 1)[1].split("\n\n  telegram-outbox-migration-test:", 1)[0]
     assert "github.event_name == 'workflow_dispatch'" in ui_job
     assert "github.event_name != 'pull_request'" not in ui_job
+
+
+def test_production_checkout_uses_the_immutable_manual_dispatch_commit():
+    import yaml
+    workflow=yaml.safe_load((ROOT / ".github/workflows/vercel-production-deploy.yml").read_text())
+    checkout=next(s for s in workflow["jobs"]["deploy"]["steps"] if s.get("name")=="Checkout")
+    assert checkout["with"]["ref"]=="${{ github.sha }}"
+
+
+def test_production_deploy_cli_is_pinned():
+    workflow=(ROOT / ".github/workflows/vercel-production-deploy.yml").read_text()
+    assert "npm install --global vercel@65.16.0" in workflow
+    assert "vercel@latest" not in workflow

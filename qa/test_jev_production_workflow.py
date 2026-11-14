@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_jev_smoke_is_separate_from_manual_live_ui_suite():
     workflow = (ROOT / ".github" / "workflows" / "qa-validation.yml").read_text()
     assert "name: Authenticated production JEV smoke (read-only)" in workflow
-    assert "run -u -m pytest -vv -s -o faulthandler_timeout=120 qa/test_jev_production.py" in workflow
+    assert "python -u -m pytest -vv -s -o faulthandler_timeout=120 qa/test_jev_production.py" in workflow
 
     live_ui = workflow.split("  ui:\n", 1)[1].split("\n\n  jev-production-smoke:", 1)[0]
     assert "github.event_name == 'workflow_dispatch'" in live_ui
