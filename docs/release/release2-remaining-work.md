@@ -60,6 +60,8 @@ Done when risk explanations use one reviewed kernel and the Release 1 completion
 
 ### 6. Alert coverage and scheduler transparency — core; activation separate
 
+The [browser quote-admission safety follow-up](release2-browser-quote-alert-admission.md) is implemented: strict declared quote quality/identity/units/session/freshness, eligible baselines, rejection without state reset, chronology/deduplication and separate local receipts. Server scanner/relay admission, source authenticity, delivery acceptance and read-only suppression-coverage presentation remain pending. No activation is implied.
+
 - Extend the bounded read-only inbox beyond the implemented re-entry delivery reader/local history to remaining approved alert classes.
 - Add supported trigger reasons/severity and job/scheduler-health DTO integration without invoking scans, claims, retries or sends. Unknown health/coverage must remain unknown.
 - Map authoritative current policy/state into preview adapters and verify correlation, acceptance, deduplication and uncertain delivery semantics for each added class.

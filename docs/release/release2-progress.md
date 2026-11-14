@@ -1,5 +1,7 @@
 # Release 2 progress estimate
 
+The [browser quote-alert safety increment](release2-browser-quote-alert-admission.md) now gates automatic browser detection and preserves eligible baselines/deduplication under invalid or reordered samples. Independent server alert admission, backend-proxy restrictions and remaining valuation/accounting corrections are still pending. The core estimate below is unchanged.
+
 The newly requested [Event Risk Radar](release2-event-risk-radar-review.md) now has a fictional-only manual Portfolio UI, priority @aravind source profile, deterministic evidence/timing checks and offline replay. Authentic acquisition, real historical evaluation and any live monitoring/delivery remain pending. This added scope is tracked separately from the older weighted core estimate below.
 
 Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation against the [Release 2 plan](release2-engineering-plan.md), including fixture-backed acceptance and review preparation. Implemented generally means present on the feature branch/draft PR. The glossary/help slice alone shipped in PR #169 at `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`; the broader Release 1/2 features remain in draft PRs #167/#168.

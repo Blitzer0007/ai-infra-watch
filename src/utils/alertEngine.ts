@@ -2,6 +2,7 @@ import { AppConfig } from '../utils';
 import { authFetch, getAccessToken } from './apiAuth';
 
 import { ALERT_EVENTS_KEY, type AlertEvent, type AlertEventType } from './alertContracts';
+import { evaluateBrowserQuoteAlerts, QUOTE_ALERT_STATE_KEY } from './quoteAlertEvaluation';
 export { ALERT_EVENTS_KEY } from './alertContracts';
 export type { AlertEvent, AlertEventType, AlertSeverity } from './alertContracts';
 export const ALERT_STATE_KEY = 'aiw_alert_state_v1';
@@ -53,81 +54,26 @@ export function setTelegramEnabled(enabled: boolean): void {
   }
 }
 
-function eventId(type: AlertEventType, symbol: string, suffix: string): string {
-  return type + ':' + symbol + ':' + suffix;
-}
-
 export function evaluateQuoteAlerts(
   config: AppConfig,
-  quotes: Record<string, { price: number; changePct: number }>,
+  quotes: Record<string, unknown>,
   bootstrap = false,
+  nowMs = Date.now(),
 ): AlertEvent[] {
-  const state = loadAlertState();
-  const events: AlertEvent[] = [];
-  const now = Date.now();
-  const today = new Date(now).toISOString().slice(0, 10);
-
-  for (const alert of config.alerts) {
-    if (!alert.active) continue;
-    const quote = quotes[alert.symbol];
-    if (!quote || !Number.isFinite(quote.price)) continue;
-
-    const key = eventId('price', alert.symbol, alert.type + ':' + alert.targetPrice);
-    const condition = alert.type === 'above'
-      ? quote.price >= alert.targetPrice
-      : quote.price <= alert.targetPrice;
-
-    if (!condition) {
-      state[key] = false;
-      continue;
-    }
-
-    if (!state[key] && !bootstrap) {
-      events.push({
-        id: key + ':' + now,
-        type: 'price',
-        severity: 'high',
-        symbol: alert.symbol,
-        title: alert.symbol + ' price target reached',
-        message: alert.symbol + ' is ' + alert.type + ' $' + alert.targetPrice.toFixed(2) + ' at $' + quote.price.toFixed(2) + '.',
-        timestamp: now,
-        value: quote.price,
-        source: 'live quote'
-      });
-    }
-    state[key] = true;
+  // Separate versioned baseline; existing feed/catalyst state and alert history are retained.
+  try {
+    const raw = localStorage.getItem(QUOTE_ALERT_STATE_KEY);
+    let previous: unknown = null;
+    if (raw && raw.length <= 1_000_000) { try { previous = JSON.parse(raw); } catch { /* Rebaseline corrupt receipts. */ } }
+    const result = evaluateBrowserQuoteAlerts(config, quotes, previous, nowMs, bootstrap);
+    const encoded = JSON.stringify(result.state);
+    if (encoded !== raw) localStorage.setItem(QUOTE_ALERT_STATE_KEY, encoded);
+    if (result.events.length) saveAlertEvents([...result.events, ...loadAlertEvents()]);
+    return result.events;
+  } catch {
+    // Without durable local deduplication, do not return detections to either sender.
+    return [];
   }
-
-  if (config.largeMoveEnabled) {
-    const threshold = Math.max(0.1, Number(config.largeMovePct) || 5);
-    for (const [symbol, quote] of Object.entries(quotes)) {
-      if (!Number.isFinite(quote.changePct) || Math.abs(quote.changePct) < threshold) continue;
-      const direction = quote.changePct >= 0 ? 'up' : 'down';
-      const key = eventId('large-move', symbol, today + ':' + direction);
-      if (!state[key] && !bootstrap) {
-        events.push({
-          id: key + ':' + now,
-          type: 'large-move',
-          severity: Math.abs(quote.changePct) >= threshold * 2 ? 'critical' : 'high',
-          symbol,
-          title: symbol + ' large move detected',
-          message: symbol + ' is ' + (quote.changePct >= 0 ? 'up ' : 'down ') + Math.abs(quote.changePct).toFixed(2) + '% today at $' + quote.price.toFixed(2) + '.',
-          timestamp: now,
-          value: quote.changePct,
-          source: 'live quote'
-        });
-      }
-      state[key] = true;
-    }
-  }
-
-  saveAlertState(state);
-
-  if (events.length) {
-    saveAlertEvents([...events, ...loadAlertEvents()]);
-  }
-
-  return events;
 }
 
 export function requestBrowserNotifications(): Promise<NotificationPermission> {

@@ -118,7 +118,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       fallbackUsed: data.fallbackUsed,
       marketTime: data.marketTime,
       asOf: data.asOf,
-      stale: data.stale === true,
+      stale: data.stale,
       cached: data.cached === true
     };
   }
@@ -168,7 +168,7 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
         fallbackUsed: data.fallbackUsed,
         marketTime: data.marketTime,
         asOf: data.asOf,
-        stale: data.stale === true,
+        stale: data.stale,
         cached: data.cached === true
       };
     } catch {

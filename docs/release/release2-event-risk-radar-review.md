@@ -31,6 +31,8 @@ Price impact is always withheld: no quote/adjustment/return adapter is connected
 
 ## Financial Trust & Alert Safety baseline
 
+Follow-up: [browser quote-alert admission](release2-browser-quote-alert-admission.md) now addresses the browser detection part of the first concern with offline evidence. The table records the original Radar baseline; server alert paths and the remaining concerns still require review/fixes before live acceptance.
+
 Source inspection only. These existing paths are **not repaired or activated** by this increment.
 
 | Concern | Current evidence | Required before related live activation |

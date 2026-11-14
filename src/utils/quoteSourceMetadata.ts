@@ -9,5 +9,6 @@ export function quoteSourceMetadata(value:Record<string,unknown>) {
     adjustedBasis:['raw','split_adjusted','total_return'].includes(String(value.adjustedBasis))?value.adjustedBasis as 'raw'|'split_adjusted'|'total_return':undefined,
     marketDate:typeof value.marketDate==='string'?value.marketDate:null,
     marketTimePrecision:['instant','date-only','unknown'].includes(String(value.marketTimePrecision))?value.marketTimePrecision as 'instant'|'date-only'|'unknown':undefined,
+    independentObservations:value.independentObservations,
   };
 }
