@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { summarizeQuoteCoverage } from '../server/services/marketDataValidation.js';
+import { vercelDeploymentOrigin } from '../server/services/trustedBackendOrigin.js';
 
 function loadConfiguredSymbols() {
   try {
@@ -138,20 +139,18 @@ async function fetchSecContracts() {
   }
 }
 
-async function fetchCongressTrades(req) {
+export async function fetchCongressTrades({ env = process.env, fetcher = fetch } = {}) {
   try {
-    const host = req?.headers?.host;
-    const forwardedProto = req?.headers?.['x-forwarded-proto'];
-    const origin = host
-      ? (forwardedProto ? String(forwardedProto).split(',')[0].trim() : 'https') + '://' + host
-      : 'http://localhost';
+    const origin = vercelDeploymentOrigin(env);
+    if (!origin) throw new Error('Origin unavailable');
 
-    const response = await fetch(origin + '/api/congress-trades?symbol=ALL', {
+    const response = await fetcher(origin + '/api/congress-trades?symbol=ALL', {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(9000),
+      redirect: 'error',
     });
 
-    if (!response.ok) throw new Error('Congress API HTTP ' + response.status);
+    if (!response.ok || response.redirected) throw new Error('Congress response unavailable');
 
     const payload = await response.json();
     return {
@@ -160,12 +159,12 @@ async function fetchCongressTrades(req) {
       stale: Boolean(payload?.stale),
       upstreamError: payload?.upstreamError || null,
     };
-  } catch (error) {
+  } catch {
     return {
       items: [],
       source: 'Congress API unavailable',
       stale: true,
-      upstreamError: error?.message || 'Congress feed failed',
+      upstreamError: 'Congress feed unavailable or origin not configured',
     };
   }
 }
@@ -514,7 +513,7 @@ export default async function handler(req, res) {
   const [newsResult, contractsResult, congressResult, politicalResult] = await Promise.all([
     news(),
     fetchSecContracts(),
-    fetchCongressTrades(req),
+    fetchCongressTrades(),
     politicalSignals(),
   ]);
   const currentNews = newsResult?.items || [];

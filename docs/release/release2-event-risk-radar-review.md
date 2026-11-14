@@ -33,6 +33,8 @@ Price impact is always withheld: no quote/adjustment/return adapter is connected
 
 Follow-up: [browser quote-alert admission](release2-browser-quote-alert-admission.md) now addresses the browser detection part of the first concern with offline evidence. The table records the original Radar baseline; server alert paths and the remaining concerns still require review/fixes before live acceptance.
 
+The [proxy-origin follow-up](release2-proxy-origin-hardening.md) removes request-header destinations and blocks redirects in the generic agent and Congress self-proxy paths. Explicit configuration trust and hosted auth/protection acceptance remain pending; the table below remains the historical baseline.
+
 Source inspection only. These existing paths are **not repaired or activated** by this increment.
 
 | Concern | Current evidence | Required before related live activation |

@@ -34,7 +34,7 @@ Local verification passed **1,092 Node tests**, including 55 new cases; **one ac
 Pending before broader live acceptance:
 
 1. Extend reviewed admission to independent server price-alert scanners and validate every sender/relay's authentication, input/correlation, deduplication and uncertain-delivery semantics. Do not infer server safety from the browser patch.
-2. Remove/restrict header-derived backend origins and prove credentials cannot follow untrusted destinations/redirects. This increment changes no backend routing or credential handling.
+2. The subsequent [proxy hardening increment](release2-proxy-origin-hardening.md) removes header-derived destinations and tests redirect rejection. Hosted backend identity/configuration/protection acceptance and remaining transport/resource contracts are still pending.
 3. Preserve unavailable P&L, separate invested cost from current valuation/weight, and complete remaining consumer/valuation parity and authoritative accounting coverage.
 4. Present admitted/suppressed quote coverage in an appropriately scoped read-only UI. Existing source/decision disclosures are not a new browser-alert coverage dashboard.
 5. Separately authorize licensed Radar development acquisition, authentic account/issuer mapping and independently retained historical captures; live monitoring and any scheduling/Telegram activation remain disabled.

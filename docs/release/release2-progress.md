@@ -1,6 +1,8 @@
 # Release 2 progress estimate
 
-The [browser quote-alert safety increment](release2-browser-quote-alert-admission.md) now gates automatic browser detection and preserves eligible baselines/deduplication under invalid or reordered samples. Independent server alert admission, backend-proxy restrictions and remaining valuation/accounting corrections are still pending. The core estimate below is unchanged.
+The [proxy-origin safety follow-up](release2-proxy-origin-hardening.md) now removes request-header destinations and blocks redirect forwarding in the agent/Congress proxy paths, with offline and native-loopback controls. Hosted configuration/protection acceptance and remaining valuation/server-alert/resource work remain pending; the core estimate below is unchanged.
+
+The [browser quote-alert safety increment](release2-browser-quote-alert-admission.md) now gates automatic browser detection and preserves eligible baselines/deduplication under invalid or reordered samples. Independent server alert admission, hosted backend-proxy acceptance and remaining valuation/accounting corrections are still pending. The core estimate below is unchanged.
 
 The newly requested [Event Risk Radar](release2-event-risk-radar-review.md) now has a fictional-only manual Portfolio UI, priority @aravind source profile, deterministic evidence/timing checks and offline replay. Authentic acquisition, real historical evaluation and any live monitoring/delivery remain pending. This added scope is tracked separately from the older weighted core estimate below.
 

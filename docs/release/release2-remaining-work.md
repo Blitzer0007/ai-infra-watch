@@ -24,6 +24,8 @@ Done when all relevant consumers preserve those distinctions and independently s
 
 ### 2. Resource coordination — core
 
+The [proxy destination safety follow-up](release2-proxy-origin-hardening.md) removes header-derived agent/Congress origins, requires trusted current-deployment or explicit configuration, rejects redirects and sanitizes transport exceptions. Offline mocked and native-loopback evidence is implemented. Hosted configuration/identity/protection acceptance, generic response/body budgets and broader rate coordination remain open.
+
 - Extend process-local Python provider admission into remaining Node/Vercel paths, with reviewed cross-worker/account-wide coordination where required.
 - Add cross-tool cache reuse/deduplication, bounded response bodies, scoped usage attribution, partial-batch accounting and measured cold/request costs.
 - Measure real permitted latency/quotas/licensing using separately authorized development access. No vendor entitlement is inferred from conservative local defaults.

@@ -135,7 +135,7 @@ No Gemini key is required for the Python autonomous path.
 
 ## 3. Vercel autonomous-agent proxy
 
-The React dashboard includes a server-side `/api/agent-ask` proxy. In the current production architecture it calls the same deployment's native Python `/api/agent-python` function, so no separate backend URL is required.
+The React dashboard includes a server-side `/api/agent-ask` proxy. On a hosted Vercel runtime it selects the current deployment's native Python `/api/agent-python` function from platform-supplied `VERCEL_URL` with `VERCEL=1` and `VERCEL_ENV=preview|production`. No separate backend URL is required when this trusted metadata is available. It never derives a destination from incoming Host/Forwarded headers or falls back from a preview to a production alias. Missing/invalid metadata returns an unavailable result without making a request.
 
 Optional configuration:
 
@@ -149,6 +149,10 @@ The same token is used by the proxy and Python function when bearer authenticati
 AI_INFRA_AGENT_URL=https://your-python-backend.example.com
 AI_INFRA_AGENT_TOKEN=...
 ```
+
+`AI_INFRA_AGENT_URL` must be an HTTPS origin with a DNS hostname and the default HTTPS port. An optional trailing slash is accepted; userinfo, path prefixes, queries, fragments, IP literals and local/internal suffixes are rejected. An invalid explicit setting fails closed instead of falling back to another deployment. Plain HTTP loopback origins are supported only in non-production, non-Vercel development; the existing Source Quality / council roles remain separately development-only.
+
+Both generic GET and POST proxy requests reject redirects, forward only the selected backend token and content type, and return sanitized transport failures with `Cache-Control: no-store`. The Congress aggregate feed similarly uses only the current deployment's trusted URL, with no forwarded caller/backend credentials or request-header origin. Explicit backend ownership/DNS/TLS trust and current-deployment protection/auth behavior need separately authorized hosted verification before release. This documentation does not provision credentials or activate live monitoring. See [proxy hardening review](docs/release/release2-proxy-origin-hardening.md).
 
 ## 8. Scheduled earnings alerts
 
