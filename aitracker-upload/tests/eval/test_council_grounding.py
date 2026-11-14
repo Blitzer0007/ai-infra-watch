@@ -35,7 +35,7 @@ def test_actual_orchestration_matches_frozen_protocol_labels_without_live_claims
     assert report["label_origin"] == "developer-authored-fictional-not-human-independent"
     for key in ("source_authenticity_verified", "forecast_validity_established", "semantic_grounding_established", "live_model_effectiveness_established"):
         assert report[key] is False
-    assert set(report["implementation_sha256"]) == {"council", "admission", "evaluator"}
+    assert set(report["implementation_sha256"]) == {"council", "admission", "presentation", "evaluator"}
 
 
 def test_reference_precision_cannot_hide_proposals_rejected_before_acceptance(report):

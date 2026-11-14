@@ -219,6 +219,7 @@ def _score(case: Case, result: dict, model: ScriptedModel, request: dict) -> dic
     return {
         "case_id": case.id, "category": case.category, "case_sha256": digest(case.model_dump()),
         "request_sha256": result["snapshot_id"], "status": result["status"],
+        "presentation_version": result.get("presentation_version"),
         "disposition": result["disposition"], "expected_behavior_match": expected_match,
         "admission_label_match": admission_match, "authority_false": authority_false,
         "must_abstain": labels.must_abstain, "abstained": abstained,
@@ -269,6 +270,7 @@ def run_suite(path: Path = DEFAULT_SUITE) -> dict:
         "implementation_sha256": {name: hashlib.sha256(file.read_bytes()).hexdigest() for name, file in {
             "council": ROOT / "aitracker-upload/app/agents/portfolio_council.py",
             "admission": ROOT / "aitracker-upload/app/agents/council_admission.py",
+            "presentation": ROOT / "aitracker-upload/app/agents/council_presentation.py",
             "evaluator": Path(__file__),
         }.items()},
         "label_origin": suite.label_origin, "case_count": len(rows),
