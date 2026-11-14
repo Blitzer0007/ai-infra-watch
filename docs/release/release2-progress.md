@@ -1,8 +1,8 @@
 # Release 2 progress estimate
 
-Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation against the [Release 2 plan](release2-engineering-plan.md), including fixture-backed acceptance and review preparation. Implemented means present on the feature branch/draft PR, not merged or deployed.
+Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation against the [Release 2 plan](release2-engineering-plan.md), including fixture-backed acceptance and review preparation. Implemented generally means present on the feature branch/draft PR. The glossary/help slice alone shipped in PR #169 at `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`; the broader Release 1/2 features remain in draft PRs #167/#168.
 
-**Approximately 55% complete / 45% pending.** This is an engineering estimate rounded to the nearest five percentage points, not a measured readiness score, market-outcome result or percentage of passing tests. Weighted assessment below is 56.25%; weights reflect current development effort. Production rollout has not started and is excluded from this engineering percentage. External access, real coverage and matured outcomes cannot be established by fixtures.
+**Approximately 55% complete / 45% pending.** This is an engineering estimate rounded to the nearest five percentage points, not a measured readiness score, market-outcome result or percentage of passing tests. Weighted assessment below is 56.25%; weights reflect current development effort. The small glossary/help release is live; broader Release 2 production rollout is pending and excluded from this engineering percentage. External access, real coverage and matured outcomes cannot be established by fixtures.
 
 | Milestone | Weight | Estimated completion | Implemented | Remaining |
 | --- | ---: | ---: | --- | --- |
@@ -15,7 +15,9 @@ Assessment: 9 November 2026, Asia/Kolkata. Scope: engineering implementation aga
 
 ## Completed increments
 
-- [Versioned council input admission](release2-council-admission.md): manual model-free Python validation, family-specific rules, original calculation/filing proof checks, date-only uncertainty bounds, request-byte binding and v2 council integration. Conditional declared-input integrity remains separate from authenticated sources, predictive validity and decisions; labelled model-effectiveness evaluation is next. Core progress remains approximately 55%.
+- [Offline council grounding evaluation](release2-council-grounding-evaluation.md): 14 frozen developer-labelled cases, real council orchestration with scripted responses, separate citation/abstention/Judge-policy denominators, input-only baselines and reproducibility hashes. Three accepted unsupported-narrative examples are exposed, not certified safe. No live provider effectiveness or prediction correctness is claimed; core progress remains approximately 55%.
+
+- [Versioned council input admission](release2-council-admission.md): manual model-free Python validation, family-specific rules, original calculation/filing proof checks, date-only uncertainty bounds, request-byte binding and v2 council integration. Conditional declared-input integrity remains separate from authenticated sources, predictive validity and decisions. Offline grounding replays are now added; semantic controls and independently reviewed live-model evidence remain pending. Core progress remains approximately 55%.
 
 - [Council source receipts](release2-council-source-adapters.md): development-only SEC input/formula/filing receipts, distinct liabilities/equity risk, date-precision preservation, loaded-calendar reuse and a manual frozen inspection before model analysis. Original source/time/derived-basis admission and real provider usefulness remain open; core progress stays approximately 55%.
 
@@ -55,7 +57,7 @@ The [complete remaining-work register](release2-remaining-work.md) lists all cor
 
 NVIDIA baseline remains `openai/gpt-oss-20b` at NVIDIA's endpoint (no `:free` suffix). Live NVIDIA/JEV evaluations await a securely configured development credential and allowed host. REA remains a feature-mirroring investigation tool, outside the application's runtime.
 
-Production status: no merge/deployment, hosted database change, Telegram message or production secret/API access is included in these increments. Approval to develop is not approval to activate a new delivery policy or run live acceptance checks.
+Production status: the isolated glossary/help release was authorized and deployed separately; its assets/access gates and compiled Cloud build were checked. These broader feature-branch increments include no hosted database modification, Telegram send or live model call. Approval to develop is not approval to activate a new delivery policy or run live acceptance checks. Integrate the main-branch QA/deployment fixes into the stacked branches during the next release review.
 
 ## Expanded calculation-audit scope
 

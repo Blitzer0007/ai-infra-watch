@@ -1,12 +1,14 @@
 # Release 2 remaining-work register
 
-Assessed 9 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 55% engineering complete / 45% pending**, rounded to the nearest five points. The weighted estimate is 56.25%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. All implementation is on the feature branch/draft PR; production rollout has not started.
+Assessed 14 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 55% engineering complete / 45% pending**, rounded to the nearest five points. The weighted estimate is 56.25%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. The glossary/help slice shipped separately in PR #169; broader Release 1/2 implementation remains on feature branches/draft PRs, with its production rollout pending.
 
 ## Already implemented
 
 Cloud/feature-branch isolation and manual release controls; Command Center/glossary/decision and quote gates; loaded-snapshot Opportunities research; task-based Portfolio navigation and holding dialog; catalyst calendar coverage/certainty; local/re-entry read-only inbox; fictional notification-policy preview; compact Telegram presentation (mocked transport only); calculation/missing-data/source fixes; manual Source Quality role and development UI; strict Python portfolio context; loaded-ledger diagnostics and remaining-cost precision correction; shared Python provider budgets; forecast-summary corrections; offline session/history preflight; retained archive integrity/content binding; and the [new purged offline evaluation protocol](release2-forecast-walk-forward.md).
 
 These have fixture/offline regression evidence. They do not establish real issuer truth, account entitlements, complete historical ledgers, model usefulness, actual delivery or hosted acceptance.
+
+The [offline council grounding evaluator](release2-council-grounding-evaluation.md) now adds 14 frozen developer-labelled replays, separate reference/abstention/Judge-policy measurements and input-only baselines. Three accepted unsupported-narrative examples remain exposed limitations. Independently reviewed model outputs, semantic controls and real model/provider acceptance are still pending.
 
 ## Pending tracks and completion evidence
 
@@ -88,6 +90,7 @@ The [manual Portfolio Lab Bull/Bear/Judge council](release2-portfolio-council.md
 - Extend the existing Source Quality integration to remaining consumers; keep metadata checks distinct from issuer/source verification.
 - Configure development-only credentials/allowed hosts securely when authorized. Measure actual NVIDIA and official TypeSafe/JEV quality, grounding, latency, failures and credit usage against deterministic baselines.
 - Freeze provider/model versions, compare with independently labelled cases and retain limitations. Model output must not invent financial facts or grant eligibility.
+- Resolve the three reproduced semantic-grounding gaps before live council evaluation: word-number assertions, inverted fact signs and unsupported future certainty. The new fixture harness reports them but is not an automatic semantic evaluator for arbitrary prose.
 - Continue scoped REA reference mirroring when a chosen feature benefits from it, with pinned sources/licenses and explicit static/runtime coverage limits. REA is not an always-running application agent or a correctness/performance certificate.
 
 Done when the bounded roles provide measured useful results and fail safely. The current Cloud configuration reports no credential bindings; live model/provider effectiveness remains untested. Do not paste API keys into chat or borrow production credentials.
@@ -122,7 +125,8 @@ Cross-device inbox acknowledgement, larger universes, a full statement explorer,
 
 ## Recommended next sequence
 
-1. Finish the offline model/forecast-provenance runner and acceptance contract over the implemented purge/archive/scoring path.
-2. Resolve risk/accounting/source-contract dependencies; add financial observations and sectioned company research over supported inputs.
-3. Extend read-only alert/job-health coverage and bounded research/review roles; measure external effectiveness only with suitable authorized development access.
-4. Complete integrated user-story/resource/financial/accessibility review and release-candidate preparation before proposing any production action.
+1. Resolve the reproduced council narrative gaps with evidence-backed typed facts or withheld unsupported prose; keep model interpretation and future outcomes separate.
+2. Finish the offline model/forecast-provenance runner and acceptance contract over the implemented purge/archive/scoring path.
+3. Resolve risk/accounting/source-contract dependencies; add financial observations and sectioned company research over supported inputs.
+4. Extend read-only alert/job-health coverage and bounded research/review roles; measure external effectiveness only with suitable authorized development access.
+5. Complete integrated user-story/resource/financial/accessibility review and release-candidate preparation before proposing any broader production action.

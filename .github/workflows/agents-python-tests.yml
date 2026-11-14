@@ -6,6 +6,9 @@ on:
     paths:
       - "qa/fixtures/council-source-receipt.fictional.json"
       - "qa/fixtures/council-admission.fictional.json"
+      - "aitracker-upload/data/eval/council-grounding-v1.json"
+      - "aitracker-upload/app/eval/council_grounding.py"
+      - "aitracker-upload/tests/eval/test_council_grounding.py"
       - "aitracker-upload/data/research/council-ui-case.json"
       - "agents/**"
       - "tests/test_agents.py"
@@ -29,6 +32,9 @@ on:
     paths:
       - "qa/fixtures/council-source-receipt.fictional.json"
       - "qa/fixtures/council-admission.fictional.json"
+      - "aitracker-upload/data/eval/council-grounding-v1.json"
+      - "aitracker-upload/app/eval/council_grounding.py"
+      - "aitracker-upload/tests/eval/test_council_grounding.py"
       - "aitracker-upload/data/research/council-ui-case.json"
       - "agents/**"
       - "tests/test_agents.py"
