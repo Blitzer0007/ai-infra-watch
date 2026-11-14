@@ -132,3 +132,7 @@ Cross-device inbox acknowledgement, larger universes, a full statement explorer,
 3. Resolve risk/accounting/source-contract dependencies; add financial observations and sectioned company research over supported inputs.
 4. Extend read-only alert/job-health coverage and bounded research/review roles; measure external effectiveness only with suitable authorized development access.
 5. Complete integrated user-story/resource/financial/accessibility review and release-candidate preparation before proposing any broader production action.
+
+## Newly requested: NVDA Event Risk Radar / priority X account watch
+
+See [Event Risk Radar and @aravind Codex handoff](release2-event-risk-radar-aravind.md) for the new, user-prioritized **offline-first** feature. Monitor the public account `@aravind` as a **high-priority discovery source**, never an automatically trusted forecast or official NVIDIA source. The scope includes public X/news/issuer event tracking, controversy classification, timestamps and source verification, contradictory evidence, lookahead-safe historical replay, careful portfolio linkage, and a manual fixture-only UI before any approved live API or alert activation. Keep existing Financial Trust & Alert Safety work ahead of release. **No production changes, live monitoring, scheduled checks or sends are authorized.**
