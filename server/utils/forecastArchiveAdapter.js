@@ -83,6 +83,7 @@ function historyFromArchive(value, ref) {
 export function evaluateArchivedForecastWindow(args) {
   const receipt = { manifestPinMatched: false, inspectedArtifactCount: 0, inspectedBytes: 0,
     allRequiredArtifactsMatched: false,
+    artifactSha256: { calendar: null, features: null, outcomes: null },
     snapshotAvailableAt: { features: null, outcomes: null },
     bindings: { calendar: 'not-checked', features: 'not-checked', outcomes: 'not-checked' } };
   const result = (status, code, assessment = null) => ({ schemaVersion: FORECAST_ARCHIVE_SCHEMA,
@@ -105,6 +106,7 @@ export function evaluateArchivedForecastWindow(args) {
       const bytes = copiedBytes(original, MAX_ARTIFACT_BYTES);
       receipt.inspectedArtifactCount += 1; receipt.inspectedBytes += bytes.byteLength;
       if (bytes.byteLength !== ref.byteLength || sha256(bytes) !== ref.sha256) stop('ARTIFACT_PIN_MISMATCH');
+      receipt.artifactSha256[role] = ref.sha256;
       const value = parsedRecord(bytes);
       const normalized = role === 'calendar' ? calendarFromArchive(value, ref) : historyFromArchive(value, ref);
       receipt.bindings[role] = 'matched';

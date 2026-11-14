@@ -1,5 +1,11 @@
 # Purged offline forecast evaluation
 
+Follow-up: the [deterministic reference runner](release2-forecast-model-runner.md)
+now generates and pins empirical forecasts, verifies their replay and composes
+with this evaluator. The original precomputed interface remains available.
+Independent historical issuance/source authentication and predictive validation
+remain open.
+
 Protocol: `purged-expanding-origin-v1-experimental`. Implemented in Codex Cloud on 9 November 2026 on top of the [retained archive adapter](release2-forecast-archive-binding.md). This evaluates supplied forecasts and constructs logical fit receipts. It does not fit or select a model, authenticate when a forecast was issued, execute a strategy or change legacy tracking.
 
 ## Protocol and cohorts

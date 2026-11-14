@@ -19,13 +19,13 @@ const mean = values => {
   const scale = Math.max(...values.map(Math.abs));
   return scale === 0 ? 0 : values.reduce((sum, value) => sum + value / scale, 0) / values.length * scale;
 };
-const instrument = request => ({
+export const forecastInstrument = request => ({
   symbol: typeof request?.symbol === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(request.symbol) ? request.symbol : null,
   venue: ['XNYS', 'XNAS'].includes(request?.venue) ? request.venue : null,
   currency: request?.currency === 'USD' ? 'USD' : null,
 });
 
-function configured(args) {
+export function validateForecastWalkForwardInput(args) {
   if (!exact(args, ['protocolVersion', 'assessedAt', 'config', 'windows']) || args.protocolVersion !== FORECAST_WALK_FORWARD_PROTOCOL) stop('EVALUATION_PROTOCOL_INVALID');
   const config = args.config;
   if (!exact(config, ['trainStartAt', 'validationStartAt', 'holdoutStartAt', 'holdoutEndAt', 'modelFrozenAt', 'modelId', 'minimumTrainingRows', 'minimumFeatureSessions', 'gapMs']) ||
@@ -43,7 +43,7 @@ function configured(args) {
       (window.prediction !== null && !record(window.prediction))) stop('EVALUATION_WINDOW_INVALID');
     if (ids.has(window.id)) stop('EVALUATION_DUPLICATE_ID');
     ids.add(window.id);
-    const request = window.archive.request, identity = instrument(request);
+    const request = window.archive.request, identity = forecastInstrument(request);
     const decision = forecastInstantMicros(request?.decisionAt), horizon = forecastHorizon(request?.horizonSessions);
     if (identity.symbol && identity.venue && identity.currency && decision !== null && [5, 20].includes(horizon)) {
       const key = JSON.stringify([identity.symbol, identity.venue, identity.currency, horizon, decision.toString()]);
@@ -54,10 +54,28 @@ function configured(args) {
   return { config, times, assessed };
 }
 
-function partitionAt(time, times) {
+export function forecastPartitionAt(time, times) {
   if (time < times.trainStartAt || time >= times.holdoutEndAt) return 'outside';
   if (time < times.validationStartAt) return 'train';
   return time < times.holdoutStartAt ? 'validation' : 'holdout';
+}
+
+// Shared chronological selection; callers still own archive loading and phase cutoffs.
+export function selectForecastTraining(row, loaded, config, times) {
+  const fitCutoff = row.partition === 'holdout' ? times.modelFrozenAt : row.decision;
+  const candidates = loaded.filter(other => other.horizon === row.horizon && other.symbol === row.symbol && other.venue === row.venue && other.currency === row.currency &&
+    (other.partition === 'train' || (row.partition === 'holdout' && other.partition === 'validation')) &&
+    other.decision !== null && other.decision < fitCutoff);
+  const valid = candidates.filter(other => ['training-context', 'candidate'].includes(other.status));
+  const eligible = valid.filter(other => other.target + BigInt(config.gapMs) * 1000n < fitCutoff && other.labelAvailable !== null && other.labelAvailable <= fitCutoff);
+  return { fitCutoff, eligible, receipt: {
+    fitCutoffAt: row.partition === 'holdout' ? config.modelFrozenAt : row.window.archive.request.decisionAt,
+    eligibleIds: eligible.map(other => other.window.id),
+    purgedOverlapIds: valid.filter(other => other.target + BigInt(config.gapMs) * 1000n >= fitCutoff).map(other => other.window.id),
+    unavailableIds: candidates.filter(other => !valid.includes(other) ||
+      (other.target + BigInt(config.gapMs) * 1000n < fitCutoff && (other.labelAvailable === null || other.labelAvailable > fitCutoff))).map(other => other.window.id),
+    minimumRequired: config.minimumTrainingRows,
+  } };
 }
 
 function forecast(prediction, modelId, decision, fitCutoff, trainingIds) {
@@ -108,14 +126,14 @@ function aggregate(rows) {
  */
 export function evaluateWalkForwardForecasts(args) {
   try {
-    const { config, times, assessed } = configured(args);
+    const { config, times, assessed } = validateForecastWalkForwardInput(args);
     let inspectedBytes = 0;
     const loaded = args.windows.map(window => {
       const decision = forecastInstantMicros(window.archive?.request?.decisionAt);
       const horizon = forecastHorizon(window.archive?.request?.horizonSessions);
       if (decision === null) return { window, decision, horizon, partition: 'unassigned', status: 'needs-data', code: 'WINDOW_CUTOFF_INVALID' };
-      const partition = partitionAt(decision, times);
-      const common = { window, decision, horizon, partition, ...instrument(window.archive.request) };
+      const partition = forecastPartitionAt(decision, times);
+      const common = { window, decision, horizon, partition, ...forecastInstrument(window.archive.request) };
       if (partition === 'outside') return { ...common, status: 'excluded', code: 'OUTSIDE_PROTOCOL' };
       if (decision > assessed) return { ...common, status: 'pending', code: 'FUTURE_ORIGIN' };
       if (forecastInstantMicros(window.archive.request.assessedAt) !== assessed) return { ...common, status: 'needs-data', code: 'ASSESSMENT_CUTOFF_MISMATCH' };
@@ -137,18 +155,8 @@ export function evaluateWalkForwardForecasts(args) {
       const output = { id: row.window.id, partition: row.partition, horizonSessions: row.horizon,
         symbol: row.symbol || null, status: row.status, code: row.code, actualReturnPct: null, training: null };
       if (row.status !== 'candidate') return output;
-      const fitCutoff = row.partition === 'holdout' ? times.modelFrozenAt : row.decision;
-      const candidates = loaded.filter(other => other.horizon === row.horizon && other.symbol === row.symbol && other.venue === row.venue && other.currency === row.currency &&
-        (other.partition === 'train' || (row.partition === 'holdout' && other.partition === 'validation')) &&
-        other.decision !== null && other.decision < fitCutoff);
-      const valid = candidates.filter(other => ['training-context', 'candidate'].includes(other.status));
-      const eligible = valid.filter(other => other.target + BigInt(config.gapMs) * 1000n < fitCutoff && other.labelAvailable !== null && other.labelAvailable <= fitCutoff);
-      output.training = { fitCutoffAt: row.partition === 'holdout' ? config.modelFrozenAt : row.window.archive.request.decisionAt,
-        eligibleIds: eligible.map(other => other.window.id),
-        purgedOverlapIds: valid.filter(other => other.target + BigInt(config.gapMs) * 1000n >= fitCutoff).map(other => other.window.id),
-        unavailableIds: candidates.filter(other => !valid.includes(other) ||
-          (other.target + BigInt(config.gapMs) * 1000n < fitCutoff && (other.labelAvailable === null || other.labelAvailable > fitCutoff))).map(other => other.window.id),
-        minimumRequired: config.minimumTrainingRows };
+      const { fitCutoff, eligible, receipt } = selectForecastTraining(row, loaded, config, times);
+      output.training = receipt;
       if (eligible.length < config.minimumTrainingRows) return { ...output, status: 'needs-data', code: 'TRAINING_SAMPLE_INSUFFICIENT' };
       if (row.window.prediction === null) return { ...output, status: 'needs-data', code: 'PREDICTION_MISSING' };
       try {

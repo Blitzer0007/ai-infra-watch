@@ -1,6 +1,6 @@
 # Release 2 remaining-work register
 
-Assessed 14 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 55% engineering complete / 45% pending**, rounded to the nearest five points. The weighted estimate is 56.25%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. The glossary/help slice shipped separately in PR #169; broader Release 1/2 implementation remains on feature branches/draft PRs, with its production rollout pending.
+Assessed 14 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 60% engineering complete / 40% pending**, rounded to the nearest five points. The weighted estimate is 57.75%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. The glossary/help slice shipped separately in PR #169; broader Release 1/2 implementation remains on feature branches/draft PRs, with its production rollout pending.
 
 ## Already implemented
 
@@ -69,7 +69,9 @@ Done when each displayed status has scoped evidence and reads cannot activate a 
 
 ### 7. Forecast evaluation and legacy compatibility — core
 
-- Add a versioned deterministic model runner; freeze/pin prediction, feature/configuration and fitting receipts before evaluation rather than trusting backdated declarations.
+The [initial deterministic reference runner](release2-forecast-model-runner.md) is implemented: empirical fitting from eligible retained labels, separate feature-only origin checks, purged/frozen cohorts, generated artifacts and exact replay before matched scoring. This completes an initial engineering portion, not authenticated issuance or useful prediction.
+
+- Extend the implemented reference runner with independently retained pre-issuance artifacts and feature-based candidate models. Preserve actual fitting/configuration receipts; retrospective replay cannot authenticate backdated declarations.
 - Use authentic historical calendars/prices and actual matured outcomes. The offline preflight, retained-byte adapter and purged/precomputed-forecast scoring protocol are implemented; publisher truth and model/issuance provenance are not.
 - Review the legacy weekday/session mismatch and weak history guard before writer changes. Unify legacy analytics CI/count contracts and Forward Outlook chronology separately.
 - Define supported 1M/3M/6M or other medium-term horizons, entry/target/price/benchmark semantics and versioned persistence compatibility. Do not rename existing 5/20/60/120/252 rows as calendar months or rewrite old outcomes.
@@ -115,7 +117,7 @@ Done only after the relevant approvals and actual acceptance evidence. Developme
 
 ## Can continue now versus external prerequisites
 
-Offline work can continue on the model runner/protocol, risk-kernel/parity work, accounting/financial/source adapters, dossier UI using explicit fixtures, read-only class/health adapters, scoped agent tools and integrated regression/accessibility/resource work. This does not require Windows execution or production access.
+Offline work can continue on model-runner extensions and legacy/evaluation compatibility, risk-kernel/parity work, accounting/financial/source adapters, dossier UI using explicit fixtures, read-only class/health adapters, scoped agent tools and integrated regression/accessibility/resource work. This does not require Windows execution or production access.
 
 Authentic data/coverage, account quota/licensing, real NVIDIA/JEV usefulness and actual messages require suitable source evidence or separately authorized secure development access. Production merge/deploy/database/sender acceptance is a later controlled stage. Missing access should not stop unrelated offline implementations.
 
@@ -126,7 +128,7 @@ Cross-device inbox acknowledgement, larger universes, a full statement explorer,
 ## Recommended next sequence
 
 1. Keep the implemented controlled presentation and evaluate remaining claim/stance/preference usefulness using independently reviewed outputs and suitable authorized development access. Authentic input coverage and model effectiveness remain separate from presentation checks.
-2. Finish the offline model/forecast-provenance runner and acceptance contract over the implemented purge/archive/scoring path.
+2. Extend the implemented reference runner with pre-issuance retention and candidate-model/legacy compatibility contracts; acquire authentic source/outcome evidence before effectiveness claims.
 3. Resolve risk/accounting/source-contract dependencies; add financial observations and sectioned company research over supported inputs.
 4. Extend read-only alert/job-health coverage and bounded research/review roles; measure external effectiveness only with suitable authorized development access.
 5. Complete integrated user-story/resource/financial/accessibility review and release-candidate preparation before proposing any broader production action.
