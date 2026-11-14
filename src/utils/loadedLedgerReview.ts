@@ -2,6 +2,7 @@
 import { calculatePortfolioTradingPerformance, type PortfolioAccountingTransaction } from './portfolioAccounting';
 export type StoredLedgerInputs={contractVersion:'stored-ledger-inputs-v1';symbol:string|null;transactionType:'BUY'|'SELL'|null;quantity:number|null;amount:number|null;brokerage:number|null;currency:string|null;tradeDate:string|null;executedAt:string|null;quantityDerived:boolean|null;priceDerived:boolean|null};
 export type LedgerAvailability='loading'|'ready'|'unavailable';
+export type LoadedLedgerInput={holdings:readonly unknown[];transactions:readonly unknown[];holdingsAvailability:LedgerAvailability;transactionsAvailability:LedgerAvailability;assessedAt:string};
 export const ledgerIssueLabels={
   RECORDS_LOADING:'Records are still loading.',RECORDS_UNAVAILABLE:'The stored records could not be loaded.',
   RECORD_LIMIT:'The loaded packet exceeds this review’s limits.',INVALID_HOLDING:'A holding has an invalid or duplicate identity or quantity.',
@@ -32,7 +33,7 @@ function units(v:unknown):bigint|null{
   return BigInt(v.toFixed(8).replace('.',''));
 }
 const fields=['contractVersion','symbol','transactionType','quantity','amount','brokerage','currency','tradeDate','executedAt','quantityDerived','priceDerived'];
-export function reviewLoadedLedger(input:{holdings:readonly unknown[];transactions:readonly unknown[];holdingsAvailability:LedgerAvailability;transactionsAvailability:LedgerAvailability;assessedAt:string}):LoadedLedgerReview {
+export function reviewLoadedLedger(input:LoadedLedgerInput):LoadedLedgerReview {
   const result:LoadedLedgerReview={contractVersion:'loaded-ledger-review-v1',status:'needs-data',assessedAt:input.assessedAt,holdingCount:Array.isArray(input.holdings)?input.holdings.length:0,transactionCount:Array.isArray(input.transactions)?input.transactions.length:0,reviewedTransactionCount:0,issues:[],positions:[],totals:null,historyCoverage:'unverified',corporateActionCoverage:'unverified',accountingReconciled:false,grantsDecisionEligibility:false,verifiesSourceRecords:false};
   const issue=(code:LedgerIssueCode,s:string|null=null,id:string|null=null)=>{if(result.issues.length<100&&!result.issues.some(i=>i.code===code&&i.symbol===s&&i.recordId===id))result.issues.push({code,symbol:s,recordId:id});};
   const assessed=time(input.assessedAt);if(assessed===null){issue('TRADE_DATE_INVALID');return result;}

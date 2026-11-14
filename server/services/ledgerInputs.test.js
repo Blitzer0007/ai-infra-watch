@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {storedLedgerInputs} from './ledgerInputs.js';
-import {normalizeTransaction,normalize} from '../../api/portfolio.js';
+import {normalizeTransaction,normalize,normalizeCashFlow} from '../../api/portfolio.js';
 import {calculateActualPortfolio} from '../api/decision-center.js';
 import {deriveHoldingLedgerCostBasis} from '../api/portfolio-holding-return-alerts.js';
 test('actual DTO carries original accounting gaps alongside legacy display defaults',()=>{
@@ -29,3 +29,9 @@ test('both server ledgers flag an excessive sale even when relative position tol
 });
 
 test('holding provenance preserves an invalid raw quantity despite a legacy display coercion',()=>{const h=normalize({id:'fictional',symbol:'FICT',quantity:true,average_cost:100});assert.equal(h.quantity,1);assert.equal(h.accountingInputs.quantity,null);assert.equal(h.accountingInputs.symbol,'FICT');});
+
+test('cash-flow DTO preserves original unknown currency and invalid numeric fields without adding queries',()=>{
+  const r=normalizeCashFlow({id:'fictional-flow',event_date:'2026-01-01',flow_type:'deposit',amount:true,fx_to_usd:null});
+  assert.equal(r.currency,'USD');assert.equal(r.amount,1);assert.equal(r.fxToUsd,0);
+  assert.deepEqual(r.accountingInputs,{contractVersion:'stored-cash-flow-inputs-v1',eventDate:'2026-01-01',flowType:'deposit',amount:null,currency:null,fxToUsd:null});
+});

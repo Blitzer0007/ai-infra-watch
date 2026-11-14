@@ -27,3 +27,9 @@ export function storedHoldingValuationInputs(row) {
     symbol: storedHoldingInputs(row).symbol, quantity: numeric(row.quantity), averageCost: numeric(row.average_cost),
     currency: typeof row.currency === 'string' && /^[A-Za-z]{3}$/.test(row.currency) ? row.currency.toUpperCase() : null };
 }
+
+export function storedCashFlowInputs(row) {
+  return {contractVersion:'stored-cash-flow-inputs-v1',eventDate:typeof row.event_date==='string'?row.event_date:null,
+    flowType:['deposit','withdrawal','dividend','fee','reward'].includes(row.flow_type)?row.flow_type:null,
+    amount:numeric(row.amount),currency:typeof row.currency==='string'&&/^[A-Z]{3}$/.test(row.currency)?row.currency:null,fxToUsd:numeric(row.fx_to_usd)};
+}

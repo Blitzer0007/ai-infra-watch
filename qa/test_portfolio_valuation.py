@@ -25,12 +25,14 @@ def setup(page, missing=(), edits=None):
     mock_local_apis(page)
     control = {'missing': set(missing), 'edits': edits or {}, 'calls': 0}
     holdings = [{'id': 'fictional-'+s, 'symbol': s, 'quantity': 1, 'averageCost': 100, 'currency': 'USD', 'purchaseDate': '2026-01-02', 'targetAllocationPct': 30, 'maxAllocationPct': 40} for s in ['NVDA', 'AMD']]
+    for row in holdings:row['accountingInputs']={'contractVersion':'stored-holding-inputs-v1','symbol':row['symbol'],'quantity':row['quantity']}
     control['holdings'] = holdings
     trades = [{'id': 'fictional-trade-'+s, 'symbol': s, 'transactionType': 'BUY', 'quantity': 1, 'amount': 100, 'brokerage': 0, 'currency': 'USD', 'tradeDate': '2026-01-02', 'sourceRow': i+1} for i, s in enumerate(['NVDA', 'AMD'])]
+    for row in trades:row['dataQuality']='ok';row['accountingInputs']={'contractVersion':'stored-ledger-inputs-v1','symbol':row['symbol'],'transactionType':'BUY','quantity':1,'amount':100,'brokerage':0,'currency':'USD','tradeDate':'2026-01-02','executedAt':None,'quantityDerived':False,'priceDerived':False}
     def portfolio(route):
         query = parse_qs(urlparse(route.request.url).query)
         if 'includeTransactions' in query: payload = {'transactions': trades}
-        elif 'includeCashFlows' in query: payload = {'cashFlows': [{'id': 'fictional-deposit', 'eventDate': '2026-01-02', 'flowType': 'deposit', 'amount': 200, 'currency': 'USD', 'fxToUsd': 1, 'notes': ''}]}
+        elif 'includeCashFlows' in query: payload = {'cashFlows': [{'id': 'fictional-deposit', 'eventDate': '2026-01-02', 'flowType': 'deposit', 'amount': 200, 'currency': 'USD', 'fxToUsd': 1, 'notes': '', 'accountingInputs':{'contractVersion':'stored-cash-flow-inputs-v1','eventDate':'2026-01-02','flowType':'deposit','amount':200,'currency':'USD','fxToUsd':1}}]}
         elif 'holdingId' in query: payload = {'lots': []}
         else: payload = {'holdings': holdings}
         route.fulfill(status=200, content_type='application/json', body=json.dumps(payload))

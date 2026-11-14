@@ -1,26 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { addPortfolioCashFlow, deletePortfolioCashFlow, fetchPortfolioCashFlows, type PortfolioCashFlow, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
-import { calculateAccountCashFlowPerformance } from '../utils/portfolioCashFlowAccounting';
+import { calculateLoadedCashFlowPerformance } from '../utils/reviewedCashFlowAccounting';
+import type { LedgerAvailability } from '../utils/loadedLedgerReview';
 import { evaluateDeclaredQuote } from '../utils/quoteAdmission';
 import { mapStoredPortfolioHoldings } from '../utils/portfolioPositions';
 
-type Props = { holdings: StoredPortfolioHolding[]; transactions: PortfolioTransaction[]; livePrices: Record<string, { price: number; stale?: boolean; cached?: boolean }> };
+type Props = { holdings: StoredPortfolioHolding[]; transactions: PortfolioTransaction[]; livePrices: Record<string, { price: number; stale?: boolean; cached?: boolean }>;holdingsAvailability:LedgerAvailability;transactionsAvailability:LedgerAvailability };
 const emptyForm = { eventDate: new Date().toISOString().slice(0, 10), flowType: 'deposit' as PortfolioCashFlow['flowType'], amount: '', currency: 'USD', fxToUsd: '1', notes: '' };
-const formatUsd = (value: number | null) => value == null || !Number.isFinite(value) ? '—' : (value < 0 ? '-$' : '$') + Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatUsd = (value: number | null) => value == null || !Number.isFinite(value) ? '—' : value!==0&&Math.abs(value)<0.005 ? value.toExponential(4)+' USD' : (value < 0 ? '-$' : '$') + Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function PortfolioCashFlows({ holdings, transactions, livePrices }: Props) {
+export default function PortfolioCashFlows({ holdings, transactions, livePrices,holdingsAvailability,transactionsAvailability }: Props) {
   const [cashFlows, setCashFlows] = useState<PortfolioCashFlow[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
+  const [availability,setAvailability]=useState<LedgerAvailability>('loading');
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const load = async () => {
-    setLoading(true); setError('');
-    try { setCashFlows(await fetchPortfolioCashFlows()); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load cash-flow records. Apply the portfolio cash-flow database migration, then retry.'); }
+    setLoading(true); setError('');setAvailability('loading');
+    try { setCashFlows(await fetchPortfolioCashFlows());setAvailability('ready'); }
+    catch (e) { setAvailability('unavailable');setError(e instanceof Error ? e.message : 'Unable to load cash-flow records. Apply the portfolio cash-flow database migration, then retry.'); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
@@ -32,11 +34,8 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
       const quality = evaluateDeclaredQuote(holding.symbol.toUpperCase(), quote, nowMs);
       return { symbol: holding.symbol, quantity: holding.quantity, currentPrice: holding.quantitySupported ? quality.quote?.price ?? null : null };
     });
-    return calculateAccountCashFlowPerformance(mapped, transactions.map(row => ({
-      symbol: row.symbol, transactionType: row.transactionType, quantity: row.quantity, amount: row.amount, brokerage: row.brokerage, currency: row.currency || 'USD',
-    })), cashFlows.map(row => ({ flowType: row.flowType, amount: row.amount, currency: row.currency, fxToUsd: row.fxToUsd })),
-    mapped.every(row => Number(row.currentPrice) > 0));
-  }, [holdings, transactions, cashFlows, livePrices]);
+    return calculateLoadedCashFlowPerformance({holdings,transactions,holdingsAvailability,transactionsAvailability,assessedAt:new Date(nowMs).toISOString()},mapped,cashFlows,availability);
+  }, [holdings, transactions, cashFlows, livePrices,holdingsAvailability,transactionsAvailability,availability]);
 
   const save = async () => {
     const amount = Number(form.amount), fxToUsd = form.currency === 'USD' ? 1 : Number(form.fxToUsd);
@@ -57,7 +56,7 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
     finally { setRemovingId(null); }
   };
   const labels: Record<string, string> = {
-    complete: 'Calculated from reconciled records', 'quotes-incomplete': 'Waiting for fresh quotes',
+    'conditional-loaded-records': 'Loaded-record calculation · full history unverified', 'quotes-incomplete': 'Waiting for fresh quotes',
     'quantity-mismatch': 'Trade history does not match holdings', 'mixed-trade-currency': 'Non-USD trade history needs FX support',
     'external-flows-missing': 'Opening deposit / external flows missing', 'invalid-records': 'Review transaction records',
   };
@@ -77,7 +76,7 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
       <Metric label="Total account P&L" value={formatUsd(performance.totalPnlUsd)} />
       <Metric label="P&L / contributions" value={performance.pnlOnNetContributionsPct == null ? '—' : (performance.pnlOnNetContributionsPct >= 0 ? '+' : '') + performance.pnlOnNetContributionsPct.toFixed(2) + '%'} />
     </div>
-    <div className={'mt-3 rounded-lg border px-3 py-2 text-[10px] ' + (performance.status === 'complete' ? 'border-emerald-400/15 bg-emerald-400/[.03] text-emerald-200/70' : 'border-amber-400/15 bg-amber-400/[.03] text-amber-200/80')}>
+    <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/80">
       <div className="font-bold">{labels[performance.status] || 'Accounting status unavailable'}</div><div className="mt-1">{performance.note}</div>
       <div className="mt-1 text-white/40">The percentage shown is P&amp;L divided by net contributions, not time-weighted return. Record all cash movements from the account’s opening date for a meaningful result.</div>
     </div>
@@ -95,13 +94,21 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
     </div>
     {(error || success) && <div role="status" className={'mt-3 text-[10px] ' + (error ? 'text-rose-300' : 'text-emerald-200')}>{error || success}</div>}
     <div className="mt-4"><div className="text-[9px] font-mono uppercase tracking-widest text-white/40 mb-2">Recorded cash movements ({cashFlows.length})</div>
-      {!cashFlows.length && !loading && <div className="text-[10px] text-white/30">No cash flows recorded yet. Add the opening deposit first.</div>}
+      {!cashFlows.length && availability==='ready' && <div className="text-[10px] text-white/30">No cash flows recorded yet. Add the opening deposit first.</div>}
+      {availability==='unavailable'&&<p role="status" className="text-xs text-amber-200">The latest cash-flow retrieval failed. Retained rows, if any, are from an earlier load; empty history is not established.</p>}
       <div className="space-y-1.5">{cashFlows.map(row => <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-white/5 px-3 py-2">
-        <div><div className="text-[10px] font-bold uppercase">{row.flowType} · {row.eventDate}</div><div className="text-[9px] text-white/40 mt-0.5">{row.currency} {row.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} · FX {row.fxToUsd.toFixed(6)} USD/unit{row.notes ? ' · ' + row.notes : ''}</div></div>
+        <CashFlowDescription row={row}/>
         <button type="button" aria-label={'Delete cash flow on ' + row.eventDate} disabled={removingId === row.id} onClick={() => void remove(row)} className="p-1.5 rounded border border-white/10 text-rose-300/60 hover:text-rose-300 disabled:opacity-40"><Trash2 className="w-3 h-3" /></button>
       </div>)}</div>
     </div>
   </section>;
+}
+function CashFlowDescription({row}:{row:PortfolioCashFlow}) {
+  const v=row.accountingInputs?.contractVersion==='stored-cash-flow-inputs-v1'?row.accountingInputs:null;
+  const number=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>0?(value<0.00005?value.toExponential(4):value.toLocaleString('en-US',{maximumFractionDigits:8})):'unavailable';
+  const kind=v&&['deposit','withdrawal','dividend','fee','reward'].includes(v.flowType??'')?v.flowType:'Type unavailable';
+  const date=v?.eventDate&&/^\d{4}-\d{2}-\d{2}$/.test(v.eventDate)&&Number.isFinite(Date.parse(v.eventDate+'T00:00:00Z'))&&new Date(v.eventDate+'T00:00:00Z').toISOString().slice(0,10)===v.eventDate?v.eventDate:'Date unavailable';
+  return <div className="min-w-0 break-words"><div className="text-[10px] font-bold uppercase">{kind} · {date}</div><div className="mt-0.5 text-[9px] text-white/40">{v?.currency&&/^[A-Z]{3}$/.test(v.currency)?v.currency:'Currency unavailable'} {number(v?.amount)} · FX {number(v?.fxToUsd)} USD/unit{row.notes?' · '+row.notes:''}</div>{!v&&<p className="text-xs text-amber-200">Original cash-flow inputs unavailable</p>}</div>;
 }
 function Metric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2"><div className="text-[8px] font-mono uppercase tracking-widest text-white/30">{label}</div><div className="text-[11px] font-mono font-bold text-white/75 mt-1">{value}</div></div>;

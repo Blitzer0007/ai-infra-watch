@@ -1,6 +1,6 @@
 import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
-import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs } from '../server/services/ledgerInputs.js';
+import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs, storedCashFlowInputs } from '../server/services/ledgerInputs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -175,8 +175,8 @@ export function normalizeTransaction(row) {
   };
 }
 
-function normalizeCashFlow(row) {
-  return { id: row.id, eventDate: row.event_date, flowType: row.flow_type, amount: Number(row.amount),
+export function normalizeCashFlow(row) {
+  return { accountingInputs:storedCashFlowInputs(row), id: row.id, eventDate: row.event_date, flowType: row.flow_type, amount: Number(row.amount),
     currency: String(row.currency || 'USD').toUpperCase(), fxToUsd: Number(row.fx_to_usd), notes: row.notes || '', createdAt: row.created_at };
 }
 

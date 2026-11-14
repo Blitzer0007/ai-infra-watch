@@ -34,11 +34,11 @@ Done when effective limits cover every admitted attempt/retry/fallback in the re
 
 ### 3. Authoritative accounting and Python handoff — core
 
-The [loaded-position valuation integrity increment](release2-position-valuation-integrity.md) now preserves original holding quantity/cost/currency gaps, null P&L, strict declared quote admission and full-denominator current-value weights across the reviewed Portfolio views/helpers. This removes the documented cost-as-current-value and missing-as-zero substitutions in that scope. Complete account/transaction history, original trade-input consumption, corporate actions and backend/Python handoff remain pending.
+The [loaded-position valuation integrity increment](release2-position-valuation-integrity.md) preserves original holding quantity/cost/currency gaps, null P&L, strict declared quote admission and full-denominator current-value weights across the reviewed Portfolio views/helpers. The [original-input accounting and offline Python cross-check](release2-loaded-accounting-handoff.md) now gates the reviewed trading/cash-flow summaries on original inputs and exact loaded-ledger review, removes their holding-cost fallback, preserves original cash-flow currency/FX gaps and independently recomputes minimized fictional packets in Python Decimal. Results remain conditional; complete account/transaction history, broker semantics, corporate actions and authenticated live Python receipt integration remain pending.
 
 - Prove import/full-trade-history coverage and gross/fee/currency semantics; resolve inventory mismatches, derived inputs and ambiguous same-day ordering.
 - Establish corporate-action/dividend/split and cash-flow treatment before complete account-performance claims.
-- Finish cross-layer precision/tolerance/accounting-method parity and diagnostics, reusing the existing weighted-average calculators.
+- Extend the implemented offline weighted-average cross-check to remaining supported consumers and authoritative histories; resolve cross-layer precision/tolerance/accounting-method parity and diagnostics.
 - Pass a reviewed reconciled accounting receipt into Python/agent context; restore cost/P&L aggregates only when the required facts are supported.
 
 Done when quantities/costs/cash flows reconcile to authoritative evidence. The loaded-record review is conditional and does not establish this completeness.
