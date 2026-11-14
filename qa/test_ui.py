@@ -291,9 +291,38 @@ def test_autopilot_signals_panel_mounts_on_macro_page(page):
 
 def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
     mock_local_apis(page)
+    delayed_fixture = __import__('os').getenv('QA_UI_MOCKS') == 'true'
+    if delayed_fixture:
+        # The loading shell and ready card deliberately share the same test ID.
+        # Hold fictional responses (including StrictMode's remount) to exercise
+        # the transition without machine/network timing or an arbitrary sleep.
+        page.add_init_script("""(() => {
+          const originalFetch = window.fetch.bind(window); let released = false;
+          const pending = []; window.__decisionPendingCount = 0;
+          window.__releaseDecisionFixture = () => {
+            released = true;
+            return Promise.all(pending.splice(0).map(release => release()));
+          };
+          window.fetch = (...args) => {
+            const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+            if (!released && url.includes('/api/decision-center')) {
+              return new Promise((resolve, reject) => {
+                pending.push(() => originalFetch(...args).then(resolve, reject));
+                window.__decisionPendingCount = pending.length;
+              });
+            }
+            return originalFetch(...args);
+          };
+        })();""")
     goto_app(page)
     center = page.get_by_test_id("decision-impact-center")
     center.wait_for(state="visible", timeout=30000)
+    ready_heading = center.get_by_role('heading', name='What matters for you now', exact=True)
+    if delayed_fixture:
+        page.wait_for_function("window.__decisionPendingCount > 0")
+        assert ready_heading.count() == 0
+        page.evaluate('window.__releaseDecisionFixture()')
+    ready_heading.wait_for(state='visible', timeout=30000)
     assert "What matters for you now" in center.inner_text()
     assert "Same cash-flow benchmark" in center.inner_text()
     assert "verified" in center.inner_text()
