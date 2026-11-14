@@ -50,7 +50,7 @@ Done when dossier and research outputs trace each used fact to compatible eviden
 
 ### 5. Shared risk evaluation and Release 1 dependencies — core review prerequisite
 
-- Extract the complete rule-evaluation kernel from `decision-center.js` into a pure shared boundary with explicit time and compatibility wrappers; small math helpers and corrections already exist.
+- The [existing-rule kernel extraction](release2-shared-rule-kernel.md) is implemented with an explicit clock, legacy wrapper, shared math exports and tested browser adapter. Complete remaining configuration/coverage contracts and UI integration over that boundary.
 - Complete remaining rule/configuration-validation and client/server parity cases without changing business thresholds.
 - Add consolidated auditable risk evaluations and any explicitly local, unsaved what-if controls over that shared kernel, preserving decision/evidence/accounting gates.
 - Complete reconciliation/coverage explanations and sign off or explicitly defer remaining Release 1 acceptance items.

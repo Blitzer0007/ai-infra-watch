@@ -1,6 +1,9 @@
 # AI Infra Watch — Release 1 completion specification
 
 Status: proposed implementation plan; not release approval.
+Follow-up: the [shared kernel foundation](release2-shared-rule-kernel.md) is now
+implemented on the Release 2 draft branch. Consolidated risk UI, full configuration
+validation and the remaining acceptance contract are still pending.
 Prepared: 8 November 2026, Asia/Kolkata.
 Repository: `Blitzer0007/ai-infra-watch`.
 Inspected baseline: `4c008237453d8e31944cb5fba00cac9726f49501`, branch `feature/release1-portfolio-command-center`, draft PR #167.

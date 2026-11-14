@@ -70,7 +70,8 @@ testFn('ruleDistance: trailing stop is restored and evaluated from the purchase-
 });
 
 testFn('ruleDistance: time limit is restored and can breach independently', () => {
-  const purchaseDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const asOf = new Date('2026-11-14T12:00:00Z');
+  const purchaseDate = '2026-11-04';
   const result = ruleDistance(
     {
       symbol: 'TEST',
@@ -82,6 +83,7 @@ testFn('ruleDistance: time limit is restored and can breach independently', () =
     },
     { price: 100 },
     { points: [] },
+    asOf,
   );
 
   assert.equal(result.state, 'breached');

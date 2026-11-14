@@ -15,6 +15,8 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
+- [Shared existing-rule kernel](release2-shared-rule-kernel.md): legacy server rule calculations and pure math helpers now share a browser-safe, explicit-clock boundary with a narrow client adapter. Fourteen retained old outputs match exactly. No-stages state output is copied, and exact 3% near-boundary classification uses a stable equivalent comparison. The existing server persistence boundary remains separate. Consolidated UI/configuration/coverage work and financial sign-off remain pending; engineering remains approximately 60%.
+
 - [Deterministic forecast runner](release2-forecast-model-runner.md): actual empirical reference-model fitting over cutoff-eligible labels, feature-only origin checks, purge-before-label-read, frozen holdout fits, bounded generated artifacts and separately pinned deterministic replay into scoring. Pending targets can receive forecasts without invented outcomes. This advances the core evaluation track from 30% to 40%; weighted overall engineering is 57.75%, rounded to approximately 60%. Source/issuance authentication and predictive validity remain open.
 
 - [Controlled council presentation](release2-council-controlled-presentation.md): free-form role prose is withheld before Judge context and wire/UI output. Versioned controlled summaries and fixed limitations are independently checked on the relay/client. The same 14 frozen proposals now echo zero of the three previously accepted unsupported sentences. This limits presentation; source truth, causal interpretations, live usefulness and forecast validity remain unverified. These council additions remain outside core milestone credit.
