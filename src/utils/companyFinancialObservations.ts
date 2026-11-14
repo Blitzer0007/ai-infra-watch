@@ -19,20 +19,21 @@ const tags:Record<string,Metric>={RevenueFromContractWithCustomerExcludingAssess
 type Reference={cik:string;accession:string;form:'10-K'|'10-K/A';filedOn:string;publicationPrecision:'date-only';publishedAt:null;
   publicationWindow:NonNullable<ReturnType<typeof councilPublicationWindow>>;url:string;referenceKind:'constructed-accession-index';restatementStatus:'amendment-declared'|'not-established'};
 export type CompanyFinancialObservation={id:string;metric:Metric;label:string;value:number;unit:'USD'|'percent'|'ratio';currency:'USD'|null;inputCurrency:'USD';
+  sourceId:'sec-edgar-companyfacts';
   kind:'source-field-declaration'|'derived';reportingBasis:'declared-sec-input';period:{start:string|null;end:string;scope:'annual-duration'|'instant';fiscalYear:null;fiscalPeriod:null};
   retrievedAt:string;observedAt:null;publishedAt:null;adjustmentBasis:'unknown';simulated:false;method:string|null;inputs:Fact[];references:Reference[];
   sourceAuthenticityVerified:false;issuerMappingVerified:false;grantsDecisionEligibility:false};
 export type CompanyFinancialSnapshot={contractVersion:'company-financial-observations-v1';symbol:string;cik:string;assessedAt:string;status:'partial'|Failure|'invalid-payload';
   sourceStatus:'loaded'|Failure|'invalid-payload';observations:CompanyFinancialObservation[];issues:string[];
   unsupportedMetrics:readonly ['cash','interest-bearing-debt','shares','earnings-per-share','ebitda','price-earnings','enterprise-value-ebitda'];
-  sourceCoverage:'unverified';sourceAuthenticityVerified:false;issuerMappingVerified:false;grantsDecisionEligibility:false;usage:{providerCalls:0;modelCalls:0;databaseCalls:0}};
+  sourceCoverage:'unverified';sourceAuthenticityVerified:false;issuerMappingVerified:false;grantsDecisionEligibility:false;usageScope:'projection-only';usage:{providerCalls:0;modelCalls:0;databaseCalls:0}};
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const fatal=new Set(['ISSUER_MISMATCH','INVALID_SOURCE','SOURCE_LIMIT']);
 
 export function buildCompanyFinancialObservations(request:FinancialObservationRequest):CompanyFinancialSnapshot {
   if(!request||typeof request.symbol!=='string'||!/^[A-Z0-9.^=-]{1,20}$/.test(request.symbol)||typeof request.cik!=='string'||!/^\d{10}$/.test(request.cik)||Number(request.cik)<=0||forecastInstant(request.assessedAt)===null)throw Error('Invalid financial scope');
   const result:CompanyFinancialSnapshot={contractVersion:'company-financial-observations-v1',symbol:request.symbol,cik:request.cik,assessedAt:request.assessedAt,status:'invalid-payload',sourceStatus:'invalid-payload',observations:[],issues:[],
-    unsupportedMetrics:['cash','interest-bearing-debt','shares','earnings-per-share','ebitda','price-earnings','enterprise-value-ebitda'],sourceCoverage:'unverified',sourceAuthenticityVerified:false,issuerMappingVerified:false,grantsDecisionEligibility:false,usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
+    unsupportedMetrics:['cash','interest-bearing-debt','shares','earnings-per-share','ebitda','price-earnings','enterprise-value-ebitda'],sourceCoverage:'unverified',sourceAuthenticityVerified:false,issuerMappingVerified:false,grantsDecisionEligibility:false,usageScope:'projection-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
   const issue=(code:string)=>{if(!result.issues.includes(code))result.issues.push(code);};
   const source=request.source;
   if(!object(source))return result;
@@ -52,7 +53,7 @@ export function buildCompanyFinancialObservations(request:FinancialObservationRe
   const copyFact=(f:Fact):Fact=>({tag:f.tag,accession:f.accession,form:f.form,period_start:f.period_start,period_end:f.period_end,filed_on:f.filed_on,value:f.value,unit:'USD'});
   const reference=(f:Fact):Reference=>({cik:request.cik,accession:f.accession,form:f.form,filedOn:f.filed_on,publicationPrecision:'date-only',publishedAt:null,
     publicationWindow:{...councilPublicationWindow(f.filed_on)!},referenceKind:'constructed-accession-index',url:`https://www.sec.gov/Archives/edgar/data/${Number(request.cik)}/${f.accession.replaceAll('-','')}/${f.accession}-index.html`,restatementStatus:f.form==='10-K/A'?'amendment-declared':'not-established'});
-  const base=(f:Fact)=>({reportingBasis:'declared-sec-input' as const,inputCurrency:'USD' as const,period:{start:f.period_start,end:f.period_end,scope:f.period_start===null?'instant' as const:'annual-duration' as const,fiscalYear:null,fiscalPeriod:null},
+  const base=(f:Fact)=>({sourceId:'sec-edgar-companyfacts' as const,reportingBasis:'declared-sec-input' as const,inputCurrency:'USD' as const,period:{start:f.period_start,end:f.period_end,scope:f.period_start===null?'instant' as const:'annual-duration' as const,fiscalYear:null,fiscalPeriod:null},
     retrievedAt:receipt.retrieved_at,observedAt:null,publishedAt:null,adjustmentBasis:'unknown' as const,simulated:false as const,sourceAuthenticityVerified:false as const,issuerMappingVerified:false as const,grantsDecisionEligibility:false as const});
   for(const row of receipt.observations){
     // A filing day is not midnight UTC. Reuse the reviewed date-only envelope;

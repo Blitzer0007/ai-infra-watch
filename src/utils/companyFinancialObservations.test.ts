@@ -17,7 +17,7 @@ describe('company financial observations from loaded declarations',()=>{
       assert.equal(o.currency,unit==='USD'?'USD':null);assert.equal(o.inputCurrency,'USD');
     }
     assert.equal(find(r,'liabilities_equity')[0].label,'Total liabilities / stockholders’ equity');assert.equal(find(r,'debt_equity').length,0);
-    assert.deepEqual(r.usage,{providerCalls:0,modelCalls:0,databaseCalls:0});assert.equal(r.grantsDecisionEligibility,false);assert.equal(r.sourceAuthenticityVerified,false);assert.equal(r.issuerMappingVerified,false);assert.equal(r.sourceCoverage,'unverified');
+    assert.deepEqual(r.usage,{providerCalls:0,modelCalls:0,databaseCalls:0});assert.equal(r.usageScope,'projection-only');assert(r.observations.every(o=>o.sourceId==='sec-edgar-companyfacts'));assert.equal(r.grantsDecisionEligibility,false);assert.equal(r.sourceAuthenticityVerified,false);assert.equal(r.issuerMappingVerified,false);assert.equal(r.sourceCoverage,'unverified');
   });
   it('keeps duration and instant periods distinct without inventing fiscal metadata',()=>{
     const r=buildCompanyFinancialObservations(request());const flow=find(r,'free_cash_flow_usd')[0],balance=find(r,'liabilities')[0];

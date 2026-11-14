@@ -20,6 +20,7 @@ Each observation preserves:
 - USD inputs; USD money outputs versus percent/dimensionless ratio outputs. No FX, share-count, earnings or price substitution is performed.
 - Duration start/end versus an instant balance-sheet date. Fiscal year/period remain null because the input receipt did not retain those fields; a calendar end date cannot establish them.
 - Original accession, form, filed calendar day and retrieval instant. Exact publication and observation times remain null; adjustment basis remains unknown.
+- Explicit `sec-edgar-companyfacts` source identity. The zero-call usage receipt is scoped to this projection; acquisition usage/quotas are not measured or inferred from it.
 - `10-K/A` as a declared amendment. A `10-K` does not prove an absence of restatements, so its restatement status is `not-established`.
 - A **constructed accession-index reference**, explicitly labelled as reconstructed from supplied CIK/accession metadata. It is not a retained original source URL, fetched document, ownership check or authenticated filing.
 
