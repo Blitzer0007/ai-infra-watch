@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "sec-export-manifest-v1",
+  "bundleId": "fictional-sec-exports-v1",
+  "simulationStatus": "fictional",
+  "sources": {
+    "listings": {
+      "status": "loaded",
+      "artifactId": "listings",
+      "requestedUrl": "https://www.sec.gov/files/company_tickers_exchange.json",
+      "finalUrl": "https://www.sec.gov/files/company_tickers_exchange.json",
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "retrievedAt": "2026-11-09T12:00:00Z",
+      "byteLength": 255,
+      "sha256": "96289c39fdec1dd752c189e874484793404d99042621db5ba3a9b66d8bcf7289"
+    },
+    "companyfacts": {
+      "status": "loaded",
+      "artifactId": "companyfacts",
+      "requestedUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json",
+      "finalUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json",
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "retrievedAt": "2026-11-09T12:00:00Z",
+      "byteLength": 4262,
+      "sha256": "ae1ae650d34425df9dfa5e8c3810c4a7a7bd538c64655a5f34027f587fbfbd4f"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "fictional-research-snapshot",
+  "nowMs": 1793988000000,
+  "simulated": true,
+  "holdings": [
+    "FICT"
+  ],
+  "watchlist": [
+    "FICT",
+    "DEMO"
+  ],
+  "companies": {
+    "FICT": {
+      "name": "Fictional Infrastructure Co",
+      "assetClass": "equity",
+      "listingCountry": "US"
+    },
+    "DEMO": {
+      "name": "Demonstration Fund",
+      "assetClass": "leveraged-etf",
+      "listingCountry": "US"
+    }
+  },
+  "quotes": {
+    "FICT": {
+      "symbol": "FICT",
+      "price": 100,
+      "currency": "USD",
+      "provider": "fixture",
+      "marketTime": "2026-11-06T17:59:00Z",
+      "retrievedAt": "2026-11-06T18:00:00Z",
+      "isMarketSessionOpen": true,
+      "status": "simulated"
+    }
+  },
+  "financials": []
+}

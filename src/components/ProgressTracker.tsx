@@ -443,7 +443,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
       <div className="space-y-4 border-b border-white/10 pb-4">
         <div className="flex flex-col lg:flex-row lg:items-end gap-3">
           <div className="flex-1">
-            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">
+            <label htmlFor="tracker-ticker" className="text-xs font-mono text-white/70 block mb-1.5">
               Track any public ticker
             </label>
             <div className="flex gap-2">
@@ -457,6 +457,7 @@ export default function ProgressTracker({ livePrices }: ProgressTrackerProps) {
                       void resolveAndTrack();
                     }
                   }}
+                  id="tracker-ticker"
                   placeholder="e.g. AAPL, CRM, Salesforce, ONDAS"
                   className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono"
                 />

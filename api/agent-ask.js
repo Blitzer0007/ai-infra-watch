@@ -1,4 +1,7 @@
 import { requireAccess } from './_access-auth.js';
+import { sourceQualityDevelopmentEnabled, sourceQualityPayload, sourceQualityEnvelope, sourceQualityResponseText } from '../server/services/sourceQualityInput.js';
+import {councilDevelopmentProxy} from '../server/services/portfolioCouncilTransport.js';
+import { agentBackendOrigin } from '../server/services/trustedBackendOrigin.js';
 
 const DEFAULT_TIMEOUT_MS = 55000;
 const rateState = new Map();
@@ -15,14 +18,6 @@ function rateLimited(req) {
   }
   current.count += 1;
   return current.count > RATE_LIMIT;
-}
-
-function backendUrl(req) {
-  const configured = String(process.env.AI_INFRA_AGENT_URL || '').trim().replace(/\/+$/, '');
-  if (configured) return configured;
-  const host = String(req.headers?.host || '').trim();
-  const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  return host ? `${proto}://${host}` : '';
 }
 
 export function agentBackendToken(env = process.env) {
@@ -44,18 +39,51 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control','no-store');
   if (!requireAccess(req, res)) return;
+  if(req.query?.task==='council'){
+    if(rateLimited(req))return res.status(429).json({error:'Review request limit reached'});
+    return councilDevelopmentProxy(req,res,agentBackendToken());
+  }
+  if(req.query?.task!=null){
+    if(req.query.task!=='source-quality')return res.status(400).json({error:'Unknown research task'});
+    if(!sourceQualityDevelopmentEnabled())return res.status(404).json({error:'Development review unavailable'});
+    if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({error:'POST required'});}
+    if(rateLimited(req))return res.status(429).json({error:'Review request limit reached'});
+    const payload=sourceQualityPayload(req.body);
+    if(!payload)return res.status(400).json({error:'Invalid source-quality request'});
+    // The development-only role may contact only an explicitly configured
+    // loopback backend. Never derive this target from an incoming Host header.
+    const configured=String(process.env.AI_INFRA_AGENT_URL||'').trim();
+    let target;
+    try{
+      target=new URL(configured);
+      if(target.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.username||target.password||target.pathname!=='/'||target.search||target.hash)throw new Error();
+    }catch{return res.status(503).json({error:'Development review unavailable'});}
+    try{
+      const upstream=await fetch(new URL('/api/agent-python?task=source-quality',target),{method:'POST',headers:backendHeaders(),body:JSON.stringify(payload),signal:withTimeout(8000),redirect:'error'});
+      if(!upstream.ok)return res.status(upstream.status===429?429:503).json({error:'Source-quality review unavailable'});
+      const raw=await sourceQualityResponseText(upstream);
+      const data=JSON.parse(raw);
+      if(!sourceQualityEnvelope(data,payload.run_id))throw new Error();
+      return res.status(200).json(data);
+    }catch{return res.status(503).json({error:'Source-quality review unavailable'});}
+  }
+  if (!['GET', 'POST'].includes(req.method)) {
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  }
   if (rateLimited(req)) {
     res.status(429).json({ ok: false, error: 'Too many autonomous research requests' });
     return;
   }
-  const base = backendUrl(req);
+  const base = agentBackendOrigin();
 
   if (!base) {
     res.status(503).json({
       ok: false,
       error: 'Autonomous backend is not configured',
-      hint: 'Configure AI_INFRA_AGENT_URL only when using a separate backend; the production Vercel deployment can use its native /api/agent-python route automatically.',
+      hint: 'Use an explicit trusted AI_INFRA_AGENT_URL origin, or the current deployment VERCEL_URL supplied by Vercel. Request headers cannot configure a backend.',
     });
     return;
   }
@@ -70,22 +98,17 @@ export default async function handler(req, res) {
         method: 'GET',
         headers: backendHeaders(),
         signal: withTimeout(8000),
+        redirect: 'error',
       });
+      if (upstream.redirected || (upstream.status >= 300 && upstream.status < 400)) throw new Error('Redirect rejected');
       const body = await upstream.json().catch(() => ({}));
       res.status(upstream.status).json(body);
-    } catch (error) {
+    } catch {
       res.status(502).json({
         ok: false,
         error: 'Autonomous backend health check failed',
-        detail: error instanceof Error ? error.message : String(error),
       });
     }
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'GET, POST');
-    res.status(405).json({ ok: false, error: 'Method not allowed' });
     return;
   }
 
@@ -95,7 +118,9 @@ export default async function handler(req, res) {
       headers: backendHeaders(),
       body: JSON.stringify(req.body || {}),
       signal: withTimeout(),
+      redirect: 'error',
     });
+    if (upstream.redirected || (upstream.status >= 300 && upstream.status < 400)) throw new Error('Redirect rejected');
 
     const body = await upstream.json().catch(() => ({
       ok: false,
@@ -103,11 +128,10 @@ export default async function handler(req, res) {
     }));
 
     res.status(upstream.status).json(body);
-  } catch (error) {
+  } catch {
     res.status(502).json({
       ok: false,
       error: 'Autonomous backend request failed',
-      detail: error instanceof Error ? error.message : String(error),
     });
   }
 }

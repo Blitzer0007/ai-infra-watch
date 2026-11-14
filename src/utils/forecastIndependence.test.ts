@@ -87,7 +87,7 @@ describe('forecast independence and calibration', () => {
     );
     assert.equal(
       calibrationVerdict({ count: 50, lowerPct: 35, upperPct: 65 }, { count: 50, lowerPct: 70, upperPct: 90 }, 50),
-      'well calibrated',
+      'consistent with target coverage',
     );
   });
 });

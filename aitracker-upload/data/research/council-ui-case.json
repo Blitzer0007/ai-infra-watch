@@ -1,0 +1,212 @@
+{
+  "request": {
+    "mode": "demo",
+    "run_id": "fixture-council",
+    "assessed_at": "2026-11-09T12:00:00Z"
+  },
+  "result": {
+    "contract_version": "portfolio-council-v1",
+    "presentation_version": "council-evidence-summary-v1",
+    "run_id": "fixture-council",
+    "snapshot_id": "29ee1183d27d62a365253ffd52b7cff3ab9bee214700a838ebf153f989bd8940",
+    "symbol": "FICT",
+    "horizon_months": 3,
+    "assessed_at": "2026-11-09T12:00:00Z",
+    "mode": "fixture",
+    "status": "complete",
+    "termination_reason": "completed",
+    "disposition": "insufficient-evidence",
+    "quality": {
+      "usable_ids": [],
+      "issues": [
+        {
+          "evidence_id": "fixture:price",
+          "codes": [
+            "SIMULATED_OR_UNKNOWN_SOURCE"
+          ]
+        },
+        {
+          "evidence_id": "fixture:revenue_growth_pct",
+          "codes": [
+            "SIMULATED_OR_UNKNOWN_SOURCE"
+          ]
+        },
+        {
+          "evidence_id": "fixture:event_days_until",
+          "codes": [
+            "SIMULATED_OR_UNKNOWN_SOURCE"
+          ]
+        },
+        {
+          "evidence_id": "fixture:debt_equity",
+          "codes": [
+            "SIMULATED_OR_UNKNOWN_SOURCE"
+          ]
+        }
+      ],
+      "missing_families": [
+        "market",
+        "financial",
+        "catalyst",
+        "risk"
+      ],
+      "conflicting_ids": []
+    },
+    "roles": {
+      "bull": {
+        "summary": "The bull case cites inspected observations for conditional research.",
+        "claims": [
+          {
+            "claim_id": "bull:0",
+            "evidence_id": "fixture:revenue_growth_pct",
+            "stance": "support",
+            "implication": "growth"
+          }
+        ],
+        "limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      },
+      "bear": {
+        "summary": "The bear case cites inspected observations for conditional research.",
+        "claims": [
+          {
+            "claim_id": "bear:0",
+            "evidence_id": "fixture:debt_equity",
+            "stance": "support",
+            "implication": "leverage-risk"
+          }
+        ],
+        "limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      },
+      "judge": {
+        "summary": "The judge recorded a balanced comparison. Future outcomes remain unknown.",
+        "preference": "balanced",
+        "winning_claim_ids": []
+      }
+    },
+    "trace": [
+      {
+        "role": "bull",
+        "action": "inspect",
+        "status": "ok"
+      },
+      {
+        "role": "bull",
+        "action": "conclude",
+        "status": "ok"
+      },
+      {
+        "role": "bear",
+        "action": "inspect",
+        "status": "ok"
+      },
+      {
+        "role": "bear",
+        "action": "conclude",
+        "status": "ok"
+      },
+      {
+        "role": "judge",
+        "action": "coverage",
+        "status": "ok"
+      },
+      {
+        "role": "judge",
+        "action": "judge",
+        "status": "ok"
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "fixture:price",
+        "symbol": "FICT",
+        "family": "market",
+        "metric": "price",
+        "value": 100.0,
+        "unit": "USD",
+        "source_id": "fixture",
+        "observed_at": "2026-11-09T11:58:00+00:00",
+        "published_at": "2026-11-09T11:58:00+00:00",
+        "retrieved_at": "2026-11-09T11:58:00+00:00",
+        "basis": "reported",
+        "period_start": null,
+        "period_end": null,
+        "simulated": true
+      },
+      {
+        "evidence_id": "fixture:revenue_growth_pct",
+        "symbol": "FICT",
+        "family": "financial",
+        "metric": "revenue_growth_pct",
+        "value": 12.0,
+        "unit": "percent",
+        "source_id": "fixture",
+        "observed_at": "2026-11-09T11:58:00+00:00",
+        "published_at": "2026-11-09T11:58:00+00:00",
+        "retrieved_at": "2026-11-09T11:58:00+00:00",
+        "basis": "reported",
+        "period_start": "2026-01-01",
+        "period_end": "2026-03-31",
+        "simulated": true
+      },
+      {
+        "evidence_id": "fixture:event_days_until",
+        "symbol": "FICT",
+        "family": "catalyst",
+        "metric": "event_days_until",
+        "value": 14.0,
+        "unit": "days",
+        "source_id": "fixture",
+        "observed_at": "2026-11-09T11:58:00+00:00",
+        "published_at": "2026-11-09T11:58:00+00:00",
+        "retrieved_at": "2026-11-09T11:58:00+00:00",
+        "basis": "reported",
+        "period_start": null,
+        "period_end": null,
+        "simulated": true
+      },
+      {
+        "evidence_id": "fixture:debt_equity",
+        "symbol": "FICT",
+        "family": "risk",
+        "metric": "debt_equity",
+        "value": 2.0,
+        "unit": "ratio",
+        "source_id": "fixture",
+        "observed_at": "2026-11-09T11:58:00+00:00",
+        "published_at": "2026-11-09T11:58:00+00:00",
+        "retrieved_at": "2026-11-09T11:58:00+00:00",
+        "basis": "reported",
+        "period_start": "2026-01-01",
+        "period_end": "2026-03-31",
+        "simulated": true
+      }
+    ],
+    "usage": {
+      "model_calls": 6,
+      "tool_calls": 3,
+      "prompt_chars": 15984,
+      "output_token_limit_per_call": 600,
+      "provider_requests": 0,
+      "jev_calls": 0
+    },
+    "policy": {
+      "max_model_calls": 6,
+      "max_tool_calls": 3,
+      "max_seconds": 40.0,
+      "max_prompt_chars": 60000
+    },
+    "source_authenticity_verified": false,
+    "forecast_validity_established": false,
+    "grants_decision_eligibility": false,
+    "changes_allocation": false,
+    "sends_messages": false
+  }
+}

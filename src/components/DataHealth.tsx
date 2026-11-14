@@ -170,7 +170,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
       <div className="aiw-page-header flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / DATA HEALTH</div>
-          <div className="text-2xl font-black mt-2">Evidence Availability</div>
+          <h1 className="text-2xl font-black mt-2">Evidence Availability</h1>
           <div className="text-xs text-white/45 mt-1">What evidence is currently available to the research engine, and where fallbacks or gaps exist.</div>
         </div>
         <button aria-label="Refresh evidence data" onClick={onRefresh} disabled={isLoading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-mono uppercase text-white/60 hover:text-white disabled:opacity-40">

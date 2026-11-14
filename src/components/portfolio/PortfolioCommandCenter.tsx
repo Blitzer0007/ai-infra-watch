@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { loadReviewTimeZone, saveReviewTimeZone, type ReviewTimeZone } from '../../utils/reviewPreferences';
 import { selectConfirmedCatalysts, formatReviewDate, type ConfirmedCatalyst, type ExplanationLevel } from '../../utils/portfolioReview';
 import type { DecisionCardModel, PortfolioSummary } from '../../utils/decisionCardAdapter';
 import PortfolioReviewQueue from './PortfolioReviewQueue';
@@ -6,10 +7,7 @@ import FinancialTerm from '../education/FinancialTerm';
 export type { PortfolioSummary } from '../../utils/decisionCardAdapter';
 export type CommandCenterProps = { summary: PortfolioSummary; positions: DecisionCardModel[]; loading: boolean; error?: string | null; catalysts?: ConfirmedCatalyst[]; explanationLevel?: ExplanationLevel; onSelectPosition: (symbol: string) => void; onOpenEvidence: (symbol: string) => void };
 export default function PortfolioCommandCenter({ summary, positions, loading, error, catalysts = [], explanationLevel = 'simple', onSelectPosition, onOpenEvidence }: CommandCenterProps) {
-  const [zone, setZone] = useState(() => {
-    try { const saved = localStorage.getItem('aiw-review-timezone'); return ['UTC', 'Asia/Kolkata', 'America/New_York'].includes(saved ?? '') ? saved! : 'local'; }
-    catch { return 'local'; }
-  });
+  const [zone, setZone] = useState<ReviewTimeZone>(loadReviewTimeZone);
   const zoneId = useId();
   const timeZone = zone === 'local' ? undefined : zone;
   const confirmed = selectConfirmedCatalysts(catalysts, positions.map(item => item.symbol), Date.now(), timeZone);
@@ -17,8 +15,8 @@ export default function PortfolioCommandCenter({ summary, positions, loading, er
     <h2 className="text-2xl font-bold">Portfolio Command Center</h2><p className="text-sm text-white/75">Your prioritized review queue · research classifications, not trade orders.</p>
     <label htmlFor={zoneId} className="block text-sm">Review timezone
       <select id={zoneId} value={zone} onChange={event => {
-        const value = event.target.value; setZone(value);
-        try { localStorage.setItem('aiw-review-timezone', value); } catch { /* Remain usable when storage is unavailable. */ }
+        const value = event.target.value as ReviewTimeZone; setZone(value);
+        saveReviewTimeZone(value);
       }} className="ml-2 max-w-full rounded border border-white/25 bg-[#15181e] px-3 py-2 focus-visible:outline focus-visible:outline-cyan-300">
         <option value="local">Device local time</option><option value="Asia/Kolkata">India (Asia/Kolkata)</option><option value="America/New_York">US market (America/New_York)</option><option value="UTC">UTC</option>
       </select>

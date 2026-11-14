@@ -42,6 +42,9 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'congress', kind: 'page', title: 'Congress Trades', subtitle: 'Disclosed congressional transactions', view: 'congress', aliases: ['politicians', 'trades'] },
   { id: 'macro', kind: 'page', title: 'Macro & Politics', subtitle: 'Macro risk and geopolitical signals', view: 'macro', aliases: ['politics', 'macro'] },
   { id: 'portfolio', kind: 'page', title: 'Portfolio Intelligence', subtitle: 'Holdings, exposure, attribution and stress', view: 'portfolio', aliases: ['holdings', 'positions'] },
+  { id: 'alerts', kind: 'page', title: 'Alert Inbox', subtitle: 'Browser detections and read-only delivery evidence', view: 'alerts', aliases: ['notifications', 'delivery', 'inbox'] },
+  { id: 'calendar', kind: 'page', title: 'Catalyst Calendar', subtitle: 'Loaded earnings dates, certainty, sources and revisions', view: 'calendar', aliases: ['events', 'earnings', 'catalysts'] },
+  { id: 'opportunities', kind: 'page', title: 'Opportunities', subtitle: 'Experimental snapshot research and coverage', view: 'opportunities', aliases: ['scanner', 'candidates'] },
   { id: 'watchlist', kind: 'page', title: 'Watchlist', subtitle: 'Price targets and earnings alerts', view: 'watchlist', aliases: ['alerts'] },
   { id: 'research', kind: 'page', title: 'AI Research', subtitle: 'Autonomous evidence-backed research', view: 'research', aliases: ['agents', 'research'] },
   { id: 'quality', kind: 'page', title: 'AI Quality Lab', subtitle: 'Model quality and evaluation signals', view: 'quality', aliases: ['quality', 'evaluation'] },
@@ -57,6 +60,8 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
   const [query, setQuery] = useState('');
   const [shortcuts, setShortcuts] = useState<string[]>(() => loadTickerShortcuts(Object.keys(STOCK_METADATA)));
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const tickerItems = useMemo<SearchItem[]>(() => {
     const symbols = [...new Set([...STOCK_UNIVERSE_SYMBOLS, ...Object.keys(STOCK_METADATA), ...shortcuts])];
@@ -97,8 +102,18 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
   }, []);
 
   useEffect(() => {
-    if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
-    else setQuery('');
+    if (!open) { setQuery(''); return; }
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+    inputRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      triggerRef.current?.focus({ preventScroll: true });
+    };
   }, [open]);
 
   const openTicker = (symbol: string) => {
@@ -113,8 +128,10 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Open universal search"
+        aria-haspopup="dialog"
         onClick={() => setOpen(true)}
         className="w-full md:w-[360px] lg:w-[440px] h-10 rounded-xl border border-white/10 bg-white/[.03] hover:bg-white/[.06] text-left px-3 flex items-center justify-between gap-3 transition"
       >
@@ -128,7 +145,17 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm p-4 md:p-10" role="dialog" aria-modal="true" aria-label="Universal search">
+        <dialog ref={dialogRef} className="aiw-search-dialog p-4 md:p-10 text-white" aria-label="Universal search"
+          onCancel={event => { event.preventDefault(); setOpen(false); }}
+          onClick={event => { if (event.target === event.currentTarget) setOpen(false); }}
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const controls = (event.currentTarget as HTMLDialogElement).querySelectorAll<HTMLElement>('input,button');
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }}>
           <div className="max-w-2xl mx-auto mt-[8vh] overflow-hidden rounded-2xl border border-white/10 bg-[#15181E] shadow-2xl">
             <div className="flex items-center gap-3 border-b border-white/10 px-4">
               <Search className="w-5 h-5 text-emerald-400 shrink-0" />
@@ -139,6 +166,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
                 onKeyDown={event => {
                   if (event.key === 'Escape') setOpen(false);
                   if (event.key === 'Enter' && results[0]) {
+                    event.preventDefault();
                     if (results[0].kind === 'page') {
                       onNavigate(results[0].view || 'overview');
                       setOpen(false);
@@ -182,7 +210,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
               ))}
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

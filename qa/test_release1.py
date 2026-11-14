@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from playwright.sync_api import expect
 
 ARTIFACTS = Path(os.getenv("QA_ARTIFACT_DIR", "/tmp/aiw-release1"))
 from test_ui import goto_app, mock_local_apis
@@ -36,8 +37,8 @@ def test_glossary_keyboard_escape_and_mobile_layout(page):
     assert dialog.is_visible()
     assert '$100' in dialog.inner_text()
     page.keyboard.press('Escape')
-    assert page.get_by_role('dialog').count() == 0
-    assert button.evaluate('(element) => element === document.activeElement')
+    expect(page.get_by_role('dialog')).to_have_count(0)
+    expect(button).to_be_focused()
     page.set_viewport_size({'width':360,'height':800})
     button.click()
     assert page.get_by_role('dialog').is_visible()
@@ -116,7 +117,7 @@ def test_glossary_search_related_terms_and_focus_containment(page):
         page.keyboard.press('Tab')
         assert dialog.evaluate('(element) => element.contains(document.activeElement)')
     page.keyboard.press('Escape')
-    assert original.evaluate('(element) => element === document.activeElement')
+    expect(original).to_be_focused()
     original.click()
     dialog.get_by_role('heading', name='P/E ratio', exact=True).wait_for()
 

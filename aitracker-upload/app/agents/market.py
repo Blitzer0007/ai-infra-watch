@@ -45,7 +45,7 @@ def build_market_graph(service: StockService, client: LLMClient):
             return {"stock_data": [], "error": f"{exc.code}: {exc.message}", "steps": [step]}
         rows = quotes_to_stock_data(batch)
         step = tool_call("stocks.get_quotes", {"symbols": symbols}, note=f"{len(rows)} quotes")
-        return {"stock_data": rows, "steps": [step]}
+        return {"stock_data": rows, "error": "" if rows else "NO_DATA: no dated or explicitly simulated quote with an observed daily move", "steps": [step]}
 
     @traced_node("build_data")
     def build_data(state: MarketState) -> dict:

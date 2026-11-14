@@ -9,6 +9,27 @@ from .client import JevClient, JevEvaluation
 
 
 ASSESSMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    "opportunities": {
+        "next_check": {
+            "type": "choice",
+            "instructions": "Suggest the next manual evidence check from this supplied coverage summary only. You have not inspected documents or retrieved data. Never infer investment suitability or predict returns.",
+            "criteria": {
+                "gather_evidence": "Required dated financial, listing or quote inputs are missing; obtain independent evidence before a research conclusion.",
+                "resolve_conflicts": "The deterministic summary reports conflicting inputs; resolve discrepancies first.",
+                "inspect_sources": "The supplied coverage permits a bounded manual inspection of existing sources, without claiming their contents are verified here.",
+                "monitor": "Required inputs are supplied and no specific additional coverage check is indicated; this does not recommend a trade."
+            },
+        },
+        "context": {
+            "type": "choice",
+            "instructions": "Characterize supplied evidence coverage only. Deterministic missing/conflict flags are authoritative. No probability of profit, eligibility upgrade, source verification or trade decision is permitted.",
+            "criteria": {
+                "insufficient": "Inputs are missing, incomplete or lack usable source references.",
+                "conflicting": "The summary explicitly reports conflicting evidence.",
+                "bounded_review": "Supplied coverage permits a bounded manual review; this does not establish a validated signal."
+            },
+        },
+    },
     "research": {
         "sufficiency": {
             "type": "choice",
@@ -253,16 +274,60 @@ def measured_evidence_quality(state: Any) -> dict[str, Any] | None:
 
 
 
+def _valid_opportunity_summary(state: Any) -> bool:
+    """Bounded public metadata only. Reject arbitrary context before any billable call."""
+    import re
+    from datetime import datetime, timezone
+    keys = {"schemaVersion", "symbol", "ruleVersion", "dataEligibility", "status", "asOf", "missingInputCount", "evidenceReferenceCount", "supportingReasonCount", "adverseReasonCount"}
+    if not isinstance(state, dict) or set(state) != keys:
+        return False
+    if type(state["schemaVersion"]) is not int or state["schemaVersion"] != 1 or not isinstance(state["symbol"], str) or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", state["symbol"]):
+        return False
+    if state["ruleVersion"] != "reported-growth-cash-flow-v1-experimental" or state["dataEligibility"] not in ("eligible", "insufficient", "conflicting") or state["status"] not in ("research-candidate", "monitor", "needs-data"):
+        return False
+    for key in ("missingInputCount", "evidenceReferenceCount", "supportingReasonCount", "adverseReasonCount"):
+        if type(state[key]) is not int or not 0 <= state[key] <= 100:
+            return False
+    if state["dataEligibility"] == "eligible" and (state["missingInputCount"] or state["status"] == "needs-data" or state["asOf"] is None):
+        return False
+    if state["dataEligibility"] != "eligible" and state["status"] != "needs-data":
+        return False
+    if state["asOf"] is not None:
+        if not isinstance(state["asOf"], str) or not 20 <= len(state["asOf"]) <= 40:
+            return False
+        try:
+            instant = datetime.fromisoformat(state["asOf"].replace("Z", "+00:00"))
+            if instant.tzinfo is None or instant > datetime.now(timezone.utc):
+                return False
+        except (ValueError, TypeError, AttributeError):
+            return False
+    return True
+
+
 def assess(kind: str, state: Any, client: JevClient | None = None) -> JevEvaluation:
     key = kind.strip().lower()
     questions = ASSESSMENTS.get(key)
     if questions is None:
         return JevEvaluation(error=f"Unknown Jev assessment kind: {key!r}")
+    if key == "opportunities" and not _valid_opportunity_summary(state):
+        return JevEvaluation(error="Invalid opportunity coverage summary; no provider request was made.")
     evaluation = (client or JevClient()).evaluate(
         state=_compact_state(state),
         questions=questions,
     )
     measured = measured_evidence_quality(state)
+    if key == "opportunities" and evaluation.usable:
+        context = evaluation.answers.get("context")
+        next_check = evaluation.answers.get("next_check")
+        if not context or context.type != "choice" or context.choice not in questions["context"]["criteria"] or not next_check or next_check.type != "choice" or next_check.choice not in questions["next_check"]["criteria"]:
+            return JevEvaluation(error="Opportunity assessment returned invalid typed answers.")
+        if state["dataEligibility"] == "conflicting":
+            context.choice = "conflicting"
+            next_check.choice = "resolve_conflicts"
+        elif state["dataEligibility"] != "eligible" or state["evidenceReferenceCount"] == 0:
+            context.choice = "insufficient"
+            if next_check.choice == "monitor":
+                next_check.choice = "gather_evidence"
     if evaluation.usable:
         for answer in evaluation.answers.values():
             if answer.confidence is None:

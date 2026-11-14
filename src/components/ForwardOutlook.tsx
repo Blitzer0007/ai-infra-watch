@@ -1213,11 +1213,11 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         <div className="xl:col-span-2 bg-[#15181E] border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
           <div className="flex flex-col md:flex-row md:items-end gap-3">
             <div className="flex-1">
-              <label className="text-[11px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">Search for a stock ticker</label>
+              <label htmlFor="outlook-ticker" className="text-[11px] font-mono uppercase tracking-widest text-white/40 block mb-1.5">Search for a stock ticker</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-white/30 absolute left-3 top-2.5" />
-                  <input value={tickerInput} onChange={e => setTickerInput(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && runTicker()} placeholder="Enter ticker, e.g. NVDA or MSFT" className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono" />
+                  <input id="outlook-ticker" value={tickerInput} onChange={e => setTickerInput(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && runTicker()} placeholder="Enter ticker, e.g. NVDA or MSFT" className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-emerald-400/50 placeholder-white/20 font-mono" />
                 </div>
                 <button onClick={runTicker} className="px-4 py-2.5 bg-emerald-500 text-black rounded text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer">Analyze</button>
               </div>

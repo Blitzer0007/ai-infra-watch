@@ -1,0 +1,702 @@
+{
+  "version": "portfolio-rule-parity-v1",
+  "sourceCommit": "6221a7ad967c4ea9f185a763a59e410395baaf87",
+  "fictional": true,
+  "cases": [
+    {
+      "id": "clear",
+      "holding": {
+        "symbol": "FICT",
+        "average_cost": 100,
+        "loss_limit_pct": 20,
+        "broker_alert_prices": [
+          80,
+          120
+        ]
+      },
+      "quote": {
+        "price": 100
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "clear",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 25,
+            "breached": false
+          },
+          {
+            "type": "broker downside alert",
+            "target": 80,
+            "direction": "below",
+            "label": "stop (inferred)",
+            "distancePct": 25,
+            "breached": false
+          },
+          {
+            "type": "broker upside alert",
+            "target": 120,
+            "direction": "above",
+            "label": "target (inferred)",
+            "distancePct": 19.999999999999996,
+            "breached": false
+          }
+        ],
+        "nearest": {
+          "type": "broker upside alert",
+          "target": 120,
+          "direction": "above",
+          "label": "target (inferred)",
+          "distancePct": 19.999999999999996,
+          "breached": false
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "downside-breach",
+      "holding": {
+        "symbol": "FICT",
+        "average_cost": 100,
+        "loss_limit_pct": 20,
+        "broker_alert_prices": [
+          80,
+          120
+        ]
+      },
+      "quote": {
+        "price": 79
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 80,
+            "direction": "below",
+            "distancePct": -1.2499999999999956,
+            "breached": true
+          },
+          {
+            "type": "broker downside alert",
+            "target": 80,
+            "direction": "below",
+            "label": "stop (inferred)",
+            "distancePct": -1.2499999999999956,
+            "breached": true
+          },
+          {
+            "type": "broker upside alert",
+            "target": 120,
+            "direction": "above",
+            "label": "target (inferred)",
+            "distancePct": 51.8987341772152,
+            "breached": false
+          }
+        ],
+        "nearest": {
+          "type": "loss limit",
+          "target": 80,
+          "direction": "below",
+          "distancePct": -1.2499999999999956,
+          "breached": true
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "near-stop",
+      "holding": {
+        "symbol": "FICT",
+        "average_cost": 100,
+        "loss_limit_pct": 20,
+        "broker_alert_prices": [
+          80,
+          120
+        ]
+      },
+      "quote": {
+        "price": 82
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "near",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 2.499999999999991,
+            "breached": false
+          },
+          {
+            "type": "broker downside alert",
+            "target": 80,
+            "direction": "below",
+            "label": "stop (inferred)",
+            "distancePct": 2.499999999999991,
+            "breached": false
+          },
+          {
+            "type": "broker upside alert",
+            "target": 120,
+            "direction": "above",
+            "label": "target (inferred)",
+            "distancePct": 46.34146341463414,
+            "breached": false
+          }
+        ],
+        "nearest": {
+          "type": "loss limit",
+          "target": 80,
+          "direction": "below",
+          "distancePct": 2.499999999999991,
+          "breached": false
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "target-reached",
+      "holding": {
+        "symbol": "FICT",
+        "average_cost": 100,
+        "loss_limit_pct": 20,
+        "broker_alert_prices": [
+          80,
+          120
+        ]
+      },
+      "quote": {
+        "price": 120
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "target-reached",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 50,
+            "breached": false
+          },
+          {
+            "type": "broker downside alert",
+            "target": 80,
+            "direction": "below",
+            "label": "stop (inferred)",
+            "distancePct": 50,
+            "breached": false
+          },
+          {
+            "type": "broker upside alert",
+            "target": 120,
+            "direction": "above",
+            "label": "target (inferred)",
+            "distancePct": 0,
+            "breached": true
+          }
+        ],
+        "nearest": {
+          "type": "broker upside alert",
+          "target": 120,
+          "direction": "above",
+          "label": "target (inferred)",
+          "distancePct": 0,
+          "breached": true
+        },
+        "targetReached": {
+          "type": "broker upside alert",
+          "target": 120,
+          "direction": "above",
+          "label": "target (inferred)",
+          "distancePct": 0,
+          "breached": true
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "loss-stop-boundary",
+      "holding": {
+        "average_cost": 100,
+        "loss_limit_pct": 20
+      },
+      "quote": {
+        "price": 80
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 0,
+            "breached": true
+          }
+        ],
+        "nearest": {
+          "type": "loss limit",
+          "target": 80,
+          "direction": "below",
+          "distancePct": 0,
+          "breached": true
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "legacy-trailing",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "exit_rule_type": "trailing-stop",
+        "exit_rule_value": 15
+      },
+      "quote": {
+        "price": 118
+      },
+      "history": {
+        "points": [
+          {
+            "date": "2026-11-01",
+            "price": 100
+          },
+          {
+            "date": "2026-11-02",
+            "price": 121
+          },
+          {
+            "date": "2026-11-03",
+            "price": 140
+          },
+          {
+            "date": "2026-11-04",
+            "price": 118
+          }
+        ]
+      },
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "trailing stop",
+            "target": 119,
+            "direction": "below",
+            "distancePct": -0.8403361344537785,
+            "breached": true
+          }
+        ],
+        "nearest": {
+          "type": "trailing stop",
+          "target": 119,
+          "direction": "below",
+          "distancePct": -0.8403361344537785,
+          "breached": true
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "legacy-time",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "exit_rule_type": "time-limit",
+        "exit_rule_value": 10
+      },
+      "quote": {
+        "price": 100
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "time limit",
+            "target": 10,
+            "distancePct": -3,
+            "breached": true,
+            "unit": "days"
+          }
+        ],
+        "nearest": {
+          "type": "time limit",
+          "target": 10,
+          "distancePct": -3,
+          "breached": true,
+          "unit": "days"
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "no-rule",
+      "holding": {
+        "average_cost": 100,
+        "broker_alert_prices": []
+      },
+      "quote": {
+        "price": 100
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "no-rule",
+        "rules": [],
+        "nearest": null,
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "invalid-price",
+      "holding": {
+        "symbol": "FICT",
+        "average_cost": 100,
+        "loss_limit_pct": 20,
+        "broker_alert_prices": [
+          80,
+          120
+        ]
+      },
+      "quote": {
+        "price": null
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": null
+    },
+    {
+      "id": "staged-before-target",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "rule_stages": [
+          {
+            "type": "stop",
+            "pct": 20
+          },
+          {
+            "type": "take_profit",
+            "pct": 20,
+            "action": "sell_fraction",
+            "fraction": 0.5
+          },
+          {
+            "type": "trailing",
+            "pct": 15,
+            "activates_after": "take_profit"
+          }
+        ]
+      },
+      "quote": {
+        "price": 100
+      },
+      "history": {
+        "points": [
+          {
+            "date": "2026-11-01",
+            "price": 100
+          }
+        ]
+      },
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "clear",
+        "rules": [
+          {
+            "type": "staged stop",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 25,
+            "breached": false,
+            "stageIndex": 0
+          },
+          {
+            "type": "take profit",
+            "target": 120,
+            "direction": "above",
+            "distancePct": 19.999999999999996,
+            "breached": false,
+            "fraction": 0.5,
+            "stageIndex": 1
+          }
+        ],
+        "nearest": {
+          "type": "take profit",
+          "target": 120,
+          "direction": "above",
+          "distancePct": 19.999999999999996,
+          "breached": false,
+          "fraction": 0.5,
+          "stageIndex": 1
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "staged-active-trailing",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "rule_stages": [
+          {
+            "type": "stop",
+            "pct": 20
+          },
+          {
+            "type": "take_profit",
+            "pct": 20,
+            "action": "sell_fraction",
+            "fraction": 0.5
+          },
+          {
+            "type": "trailing",
+            "pct": 15,
+            "activates_after": "take_profit"
+          }
+        ]
+      },
+      "quote": {
+        "price": 118
+      },
+      "history": {
+        "points": [
+          {
+            "date": "2026-11-01",
+            "price": 100
+          },
+          {
+            "date": "2026-11-02",
+            "price": 121
+          },
+          {
+            "date": "2026-11-03",
+            "price": 140
+          },
+          {
+            "date": "2026-11-04",
+            "price": 118
+          }
+        ]
+      },
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "staged stop",
+            "target": 80,
+            "direction": "below",
+            "distancePct": 47.50000000000001,
+            "breached": false,
+            "stageIndex": 0
+          },
+          {
+            "type": "take profit",
+            "target": 120,
+            "direction": "above",
+            "distancePct": 1.6949152542372836,
+            "breached": false,
+            "fraction": 0.5,
+            "stageIndex": 1
+          },
+          {
+            "type": "trailing stop",
+            "target": 119,
+            "direction": "below",
+            "distancePct": -0.8403361344537785,
+            "breached": true,
+            "stageIndex": 2,
+            "active": true,
+            "activatedDate": "2026-11-02"
+          }
+        ],
+        "nearest": {
+          "type": "trailing stop",
+          "target": 119,
+          "direction": "below",
+          "distancePct": -0.8403361344537785,
+          "breached": true,
+          "stageIndex": 2,
+          "active": true,
+          "activatedDate": "2026-11-02"
+        },
+        "stageState": {
+          "stage_1": {
+            "type": "take_profit",
+            "hitDate": "2026-11-02",
+            "hitPrice": 121,
+            "target": 120
+          },
+          "stage_2": {
+            "type": "trailing",
+            "activatesAfter": "take_profit",
+            "activatedDate": "2026-11-02",
+            "peak": 140,
+            "target": 119
+          }
+        },
+        "stageStateDirty": true
+      }
+    },
+    {
+      "id": "time-precedence",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "exit_rule_type": "time-limit",
+        "exit_rule_value": 10,
+        "broker_alerts": [
+          {
+            "price": 100,
+            "direction": "above",
+            "label": "target"
+          }
+        ]
+      },
+      "quote": {
+        "price": 120
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "broker upside alert",
+            "target": 100,
+            "direction": "above",
+            "label": "target",
+            "distancePct": -16.666666666666664,
+            "breached": true
+          },
+          {
+            "type": "time limit",
+            "target": 10,
+            "distancePct": -3,
+            "breached": true,
+            "unit": "days"
+          }
+        ],
+        "nearest": {
+          "type": "time limit",
+          "target": 10,
+          "distancePct": -3,
+          "breached": true,
+          "unit": "days"
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "invalid-staged-stop-fallback",
+      "holding": {
+        "average_cost": 100,
+        "loss_limit_pct": 10,
+        "rule_stages": [
+          {
+            "type": "stop",
+            "pct": 100
+          }
+        ]
+      },
+      "quote": {
+        "price": 80
+      },
+      "history": {},
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "breached",
+        "rules": [
+          {
+            "type": "loss limit",
+            "target": 90,
+            "direction": "below",
+            "distancePct": -11.111111111111116,
+            "breached": true
+          }
+        ],
+        "nearest": {
+          "type": "loss limit",
+          "target": 90,
+          "direction": "below",
+          "distancePct": -11.111111111111116,
+          "breached": true
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    },
+    {
+      "id": "future-history-excluded",
+      "holding": {
+        "average_cost": 100,
+        "purchase_date": "2026-11-01",
+        "exit_rule_type": "trailing-stop",
+        "exit_rule_value": 10
+      },
+      "quote": {
+        "price": 100
+      },
+      "history": {
+        "points": [
+          {
+            "date": "2026-11-01",
+            "price": 100
+          },
+          {
+            "date": "2026-11-15",
+            "price": 200
+          }
+        ]
+      },
+      "nowMs": 1794657600000,
+      "expected": {
+        "state": "clear",
+        "rules": [
+          {
+            "type": "trailing stop",
+            "target": 90,
+            "direction": "below",
+            "distancePct": 11.111111111111116,
+            "breached": false
+          }
+        ],
+        "nearest": {
+          "type": "trailing stop",
+          "target": 90,
+          "direction": "below",
+          "distancePct": 11.111111111111116,
+          "breached": false
+        },
+        "stageState": {},
+        "stageStateDirty": false
+      }
+    }
+  ]
+}

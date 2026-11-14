@@ -1,0 +1,174 @@
+{
+  "cik": 1,
+  "entityName": "Fictional Components Ltd",
+  "facts": {
+    "us-gaap": {
+      "CashAndCashEquivalentsAtCarryingValue": {
+        "units": {
+          "USD": [
+            {
+              "val": 25,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      },
+      "LongTermDebtCurrent": {
+        "units": {
+          "USD": [
+            {
+              "val": 5,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      },
+      "LongTermDebtNoncurrent": {
+        "units": {
+          "USD": [
+            {
+              "val": 20,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      },
+      "ShortTermBorrowings": {
+        "units": {
+          "USD": [
+            {
+              "val": 0,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      },
+      "CommonStockSharesOutstanding": {
+        "units": {
+          "shares": [
+            {
+              "val": 10,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      },
+      "WeightedAverageNumberOfSharesOutstandingBasic": {
+        "units": {
+          "shares": [
+            {
+              "val": 8,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "start": "2025-01-01",
+              "frame": "CY2025"
+            }
+          ]
+        }
+      },
+      "WeightedAverageNumberOfDilutedSharesOutstanding": {
+        "units": {
+          "shares": [
+            {
+              "val": 9,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "start": "2025-01-01",
+              "frame": "CY2025"
+            }
+          ]
+        }
+      },
+      "EarningsPerShareBasic": {
+        "units": {
+          "USD/shares": [
+            {
+              "val": 2,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "start": "2025-01-01",
+              "frame": "CY2025"
+            }
+          ]
+        }
+      },
+      "EarningsPerShareDiluted": {
+        "units": {
+          "USD/shares": [
+            {
+              "val": 1.78,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "start": "2025-01-01",
+              "frame": "CY2025"
+            }
+          ]
+        }
+      }
+    },
+    "dei": {
+      "EntityCommonStockSharesOutstanding": {
+        "units": {
+          "shares": [
+            {
+              "val": 11,
+              "end": "2026-02-10",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2026Q1I"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

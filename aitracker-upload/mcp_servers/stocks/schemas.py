@@ -5,49 +5,78 @@ These are the CONTRACT between the stocks MCP server and any client
 these models; contract tests assert the server's tool schemas match
 them, so an agent can type-check against a stable shape.
 
-Design: prices are floats in the quote currency (USD for the tracked
-universe). `as_of` is an ISO-8601 UTC timestamp string — we keep it a
-string (not datetime) so the wire form is stable and JSON-native, and
-so the timestamp is explicit in every claim (a guardrail requirement:
-"every claim cites its source and timestamp").
+Quote currency and observation time are nullable when the source does not
+provide them. Retrieval/message times never substitute for observation time.
 """
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+
+from pydantic import BaseModel, Field, field_validator
+
+
+def observation_time(value: str | None) -> str | None:
+    """Canonical UTC instant, requiring an explicit time and timezone."""
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except (ValueError, OverflowError):
+        return None
 
 
 class Quote(BaseModel):
     """A single point-in-time quote for one symbol."""
 
     symbol: str = Field(description="Ticker symbol, upper-case, e.g. NVDA")
-    price: float = Field(description="Last/current price in quote currency")
-    change: float = Field(default=0.0, description="Absolute change vs previous close")
-    change_pct: float = Field(default=0.0, description="Percent change vs previous close")
-    high: float = Field(default=0.0, description="Session high")
-    low: float = Field(default=0.0, description="Session low")
-    open: float = Field(default=0.0, description="Session open")
-    prev_close: float = Field(default=0.0, description="Previous session close")
-    volume: float | None = Field(default=None, description="Session volume if available")
-    currency: str = Field(default="USD")
-    as_of: str = Field(description="ISO-8601 UTC timestamp the quote was observed")
-    source: str = Field(default="finnhub", description="Data source id (finnhub|fixture)")
+    price: float = Field(gt=0, allow_inf_nan=False, strict=True, description="Provider current price")
+    change: float | None = Field(default=None, allow_inf_nan=False, strict=True)
+    change_pct: float | None = Field(default=None, allow_inf_nan=False, strict=True)
+    high: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)
+    low: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)
+    open: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)
+    prev_close: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)
+    volume: float | None = Field(default=None, ge=0, allow_inf_nan=False, strict=True)
+    currency: str | None = None
+    as_of: str | None = Field(default=None, description="Provider observation instant; unknown is null")
+    retrieved_at: str | None = Field(default=None, description="Retrieval instant, not observation time")
+    source: str = Field(default="unknown", description="Data source id")
+    simulated: bool = False
+    adjusted_basis: Literal["raw", "unknown"] = "unknown"
+    is_market_session_open: bool | None = None
+
+    @field_validator("as_of", "retrieved_at")
+    @classmethod
+    def validate_instant(cls, value: str | None) -> str | None:
+        if value is not None and observation_time(value) is None:
+            raise ValueError("An explicit timestamp with timezone is required")
+        return observation_time(value)
 
     def one_line(self) -> str:
-        """Human/agent-readable single line with the mandatory timestamp."""
+        """Human/agent-readable quote with explicit unavailable metadata."""
+        move = f"{self.change_pct:+.2f}%" if self.change_pct is not None else "move unavailable"
         return (
-            f"{self.symbol} {self.price:.2f} {self.currency} "
-            f"({self.change_pct:+.2f}%) as of {self.as_of} [{self.source}]"
+            f"{self.symbol} {self.price:.2f} {self.currency or 'currency unknown'} "
+            f"({move}) as of {self.as_of or 'observation time unknown'} "
+            f"[{self.source}{'; simulated' if self.simulated else ''}]"
         )
 
 
 class QuoteBatch(BaseModel):
-    """Quotes for several symbols observed together."""
+    """Best-effort batch; as_of is oldest observation only for complete time coverage."""
 
     quotes: list[Quote] = Field(default_factory=list)
-    as_of: str = Field(description="ISO-8601 UTC timestamp of the batch")
-    source: str = Field(default="finnhub")
+    as_of: str | None = None
+    retrieved_at: str | None = None
+    source: str = "unknown"
+    requested_symbols: list[str] = Field(default_factory=list)
+    missing_symbols: list[str] = Field(default_factory=list)
+    errors: dict[str, str] = Field(default_factory=dict, description="Symbol to safe error code")
 
     def symbols(self) -> list[str]:
         return [q.symbol for q in self.quotes]

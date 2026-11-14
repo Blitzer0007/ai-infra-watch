@@ -20,16 +20,15 @@ def _assert_sort_control(table, label: str):
     )
     if has_button:
         button = header.locator("button").first
-        before = button.get_attribute("aria-sort")
+        before = header.get_attribute("aria-sort")
         assert before in ("none", "ascending", "descending")
-        assert header.get_attribute("aria-sort") == before
+        assert button.get_attribute("aria-sort") is None
         button.click()
-        after = button.get_attribute("aria-sort")
+        after = header.get_attribute("aria-sort")
         expected = "ascending" if before in ("none", "descending") else "descending"
         assert after == expected
-        assert header.get_attribute("aria-sort") == after
         button.click()
-        assert button.get_attribute("aria-sort") == before
+        assert header.get_attribute("aria-sort") == before
 
 
 
@@ -287,7 +286,9 @@ def test_exploratory_sorting_portfolio_scenarios(page):
     goto_app(page)
     page.goto("/portfolio", wait_until="domcontentloaded")
     page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
-    page.get_by_text("My Holdings", exact=True).click()
+    page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+    page.get_by_role("button",name="Open selected holding",exact=True).click()
+    page.get_by_text("Company, valuation and analyst detail", exact=True).click()
     _assert_sort_control(_table_with_header(page, "Reference"), "Reference")
 
 
@@ -349,7 +350,9 @@ def test_exploratory_global_table_accessibility(page):
         }[nav_id], wait_until="domcontentloaded")
         if nav_id == "portfolio":
             page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
-            page.get_by_text("My Holdings", exact=True).click()
+            page.get_by_label("Portfolio section", exact=True).select_option("holdings")
+            page.get_by_role("button",name="Open selected holding",exact=True).click()
+            page.get_by_text("Company, valuation and analyst detail", exact=True).click()
         table = _table_with_header(page, label)
         assert table.locator("thead").count() == 1
         assert table.locator("tbody").count() == 1

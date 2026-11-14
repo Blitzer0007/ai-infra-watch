@@ -482,22 +482,22 @@ export default function CongressTrades({ liveTrades = [], livePrices = {} }: Con
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
           <FilterBlock icon={<Search className="h-3.5 w-3.5 text-white/45" />} label="Ticker / Search">
             <div className="relative">
-              <FilterInput type="text" placeholder="Search ticker, company, or member..." value={search} onChange={(e) => setSearch(e.target.value)} label="Search Congress trades by politician, company, symbol, type, amount, or date" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white placeholder:text-white/25" />
+              <FilterInput hideLabel type="text" placeholder="Search ticker, company, or member..." value={search} onChange={(e) => setSearch(e.target.value)} label="Search Congress trades by politician, company, symbol, type, amount, or date" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white placeholder:text-white/25" />
               {search.trim() && globalLoading && <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-cyan-300" aria-label="Searching Congress trades" />}
             </div>
           </FilterBlock>
           <FilterBlock icon={<Building2 className="h-3.5 w-3.5 text-white/45" />} label="Chamber">
-            <FilterSelect value={chamberFilter} onChange={(e) => setChamberFilter(e.target.value as 'all' | 'Senate' | 'House')} label="Filter Congress trades by chamber" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+            <FilterSelect hideLabel value={chamberFilter} onChange={(e) => setChamberFilter(e.target.value as 'all' | 'Senate' | 'House')} label="Filter Congress trades by chamber" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
               <option value="all">All Chambers</option><option value="Senate">Senate</option><option value="House">House</option>
             </FilterSelect>
           </FilterBlock>
           <FilterBlock icon={<SlidersHorizontal className="h-3.5 w-3.5 text-white/45" />} label="Trade Type">
-            <FilterSelect value={transactionFilter} onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')} label="Filter Congress trades by transaction type" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+            <FilterSelect hideLabel value={transactionFilter} onChange={(e) => setTransactionFilter(e.target.value as 'all' | 'buy' | 'sell')} label="Filter Congress trades by transaction type" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
               <option value="all">All Types</option><option value="buy">Buy only</option><option value="sell">Sell only</option>
             </FilterSelect>
           </FilterBlock>
           <FilterBlock icon={<CalendarDays className="h-3.5 w-3.5 text-white/45" />} label="Date Range">
-            <FilterSelect value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')} label="Filter Congress trades by transaction age" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
+            <FilterSelect hideLabel value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | '30' | '90' | '365')} label="Filter Congress trades by transaction age" className="w-full rounded-xl border-white/10 bg-[#0a0f14] px-3.5 py-3 font-sans text-sm text-white">
               <option value="all">All Dates</option><option value="30">Last 30 Days</option><option value="90">Last 90 Days</option><option value="365">Last 365 Days</option>
             </FilterSelect>
           </FilterBlock>

@@ -11,3 +11,7 @@ def test_extract_symbols_normalizes_company_names_to_tickers():
 
 def test_extract_symbols_keeps_explicit_tickers():
     assert extract_symbols("What is $NVDA doing versus AMD?") == ["NVDA", "AMD"]
+
+
+def test_aliases_and_tickers_keep_question_order_without_duplicates():
+    assert extract_symbols("Compare Meta to Microsoft, then $META and NVIDIA") == ["META", "MSFT", "NVDA"]

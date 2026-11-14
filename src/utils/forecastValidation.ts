@@ -1,3 +1,4 @@
+import { forecastCount } from './forecastInputs.js';
 export const FORECAST_VALIDATION_MINIMUM = 50;
 
 export type ForecastSampleStatus =
@@ -8,7 +9,7 @@ export type ForecastSampleStatus =
   | 'established';
 
 export function forecastSampleStatus(count: number): ForecastSampleStatus {
-  const n = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const n = forecastCount(count);
   if (n < 10) return 'insufficient';
   if (n < 25) return 'early';
   if (n < FORECAST_VALIDATION_MINIMUM) return 'developing';
@@ -17,7 +18,7 @@ export function forecastSampleStatus(count: number): ForecastSampleStatus {
 }
 
 export function forecastValidationGate(count: number) {
-  const verifiedCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const verifiedCount = forecastCount(count);
   return {
     minimumRequired: FORECAST_VALIDATION_MINIMUM,
     verifiedCount,

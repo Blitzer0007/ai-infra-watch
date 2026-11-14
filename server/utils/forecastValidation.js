@@ -1,3 +1,5 @@
+import { forecastNumber, forecastCount, forecastHorizon, forecastInstant } from '../../src/utils/forecastInputs.js';
+import { forecastWindow } from '../../src/utils/forecastIndependence.js';
 import { independentForecastRows } from './forecastIndependence.js';
 import { coverageInterval, calibrationVerdict } from './forecastCalibration.js';
 
@@ -5,7 +7,7 @@ const FORECAST_VALIDATION_MINIMUM = 50;
 const DEFAULT_FORECAST_HORIZON = 20;
 
 function mean(values) {
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  return values.length ? values.reduce((sum, value) => sum + value / values.length, 0) : 0;
 }
 
 function percentile(values, p) {
@@ -19,6 +21,7 @@ function percentile(values, p) {
 }
 
 export function forecastSampleStatus(count) {
+  count = forecastCount(count);
   if (count < 10) return 'insufficient';
   if (count < 25) return 'early';
   if (count < FORECAST_VALIDATION_MINIMUM) return 'developing';
@@ -62,11 +65,16 @@ function summarizeSubset(rows) {
 
   return {
     count: rows.length,
+    directionalSampleCount: eligible(rows).length,
+    scoreSampleCount: eligible(rows).length,
+    neutralOrZeroCount: rows.length - eligible(rows).length,
     directionRightPct: directionRightPct(rows),
     predictionMatchPct: predictionMatchPct(rows),
     typicalMiss: typicalMiss(rows),
     medianAbsoluteError: typicalMiss(rows),
     meanSignedErrorPct: signedErrors.length ? Number(mean(signedErrors).toFixed(2)) : null,
+    p25p75CoverageCount: middleCoverage.count,
+    p10p90CoverageCount: wideCoverage.count,
     p25p75CoveragePct: middleCoverage.coveragePct,
     p25p75CoverageCiPct: middleCoverage.lowerPct == null ? null : {
       lower: middleCoverage.lowerPct,
@@ -81,16 +89,24 @@ function summarizeSubset(rows) {
   };
 }
 
-export function summarizeForecastRows(rows = []) {
-  const verified = rows.filter(row => {
-    const actualRaw = row?.actual_return;
-    const medianRaw = row?.median;
-    return String(row?.status || 'verified') === 'verified' &&
-      actualRaw !== null && actualRaw !== undefined && actualRaw !== '' &&
-      medianRaw !== null && medianRaw !== undefined && medianRaw !== '' &&
-      Number.isFinite(Number(actualRaw)) &&
-      Number.isFinite(Number(medianRaw));
+function eligibleMetricRows(rows) {
+  return rows.filter(row=>{
+    const actual=forecastNumber(row?.actual_return), median=forecastNumber(row?.median);
+    const ticker=typeof row?.ticker==='string'?row.ticker.trim().toUpperCase():'';
+    return row?.status==='verified'&&/^[A-Z0-9.^=-]{1,20}$/.test(ticker)&&forecastHorizon(row?.horizon)!==null&&forecastWindow(row)!==null&&
+      actual!==null&&median!==null&&Number.isFinite(actual-median);
   });
+}
+function selectionReceipt(rows, verified, independent) {
+  const declared=rows.filter(row=>row?.status==='verified').length;
+  return {inputRowCount:rows.length,verifiedRowCount:declared,eligibleRowCount:verified.length,
+    invalidVerifiedRowCount:declared-verified.length,unverifiedRowCount:rows.length-declared,
+    retainedRowCount:independent.length,overlapExcludedRowCount:verified.length-independent.length,
+    chronology:'target-date',scope:'per-ticker-horizon-non-overlap',statisticalIndependenceEstablished:false};
+}
+
+export function summarizeForecastRows(rows = []) {
+  const verified = eligibleMetricRows(rows);
 
   const independent = independentForecastRows(verified);
   const signedErrors = independent
@@ -105,13 +121,22 @@ export function summarizeForecastRows(rows = []) {
       count: summary.count,
       directionRightPct: summary.directionRightPct,
       predictionMatchPct: summary.predictionMatchPct,
+      scoreSampleCount: summary.scoreSampleCount,
+      directionalSampleCount: summary.directionalSampleCount,
+      neutralOrZeroCount: summary.neutralOrZeroCount,
     };
   };
 
   return {
     count: verified.length,
+    selection: selectionReceipt(rows, verified, independent),
     independentCount: independent.length,
     predictionMatchPct: base.predictionMatchPct,
+    scoreSampleCount: base.scoreSampleCount,
+    directionalSampleCount: base.directionalSampleCount,
+    neutralOrZeroCount: base.neutralOrZeroCount,
+    p25p75CoverageCount: base.p25p75CoverageCount,
+    p10p90CoverageCount: base.p10p90CoverageCount,
     rolling: {
       last10: rolling(10),
       last25: rolling(25),
@@ -124,13 +149,13 @@ export function summarizeForecastRows(rows = []) {
     p25p75CoveragePct: base.p25p75CoveragePct,
     p10p90CoveragePct: base.p10p90CoveragePct,
     calibrationVerdict: base.calibrationVerdict,
-    oldestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort()[0] || null,
-    newestVerifiedAt: independent.map(row => row.verified_at).filter(Boolean).sort().at(-1) || null,
+    oldestVerifiedAt: independent.map(row => row.verified_at).filter(value=>forecastInstant(value)!==null).sort((a,b)=>Date.parse(a)-Date.parse(b))[0] || null,
+    newestVerifiedAt: independent.map(row => row.verified_at).filter(value=>forecastInstant(value)!==null).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1) || null,
   };
 }
 
 export function buildForecastLearningSummary(rows = []) {
-  const verified = rows.filter(row => String(row?.status || 'verified') === 'verified');
+  const verified = eligibleMetricRows(rows);
   const independent = independentForecastRows(verified);
   const score = subset => ({
     count: subset.length,
@@ -164,7 +189,7 @@ export function buildForecastLearningSummary(rows = []) {
   const channelCount = row => {
     const snapshot = row?.evidence_snapshot && typeof row.evidence_snapshot === 'object' ? row.evidence_snapshot : {};
     const counts = snapshot.counts || {};
-    return ['news', 'contracts', 'political', 'macro'].filter(key => Number(counts[key]) > 0).length +
+    return ['news', 'contracts', 'political', 'macro'].filter(key => forecastCount(counts[key]) > 0).length +
       (snapshot.analystConsensus?.status === 'available' ? 1 : 0);
   };
   const multi = independent.filter(row => channelCount(row) >= 2);
@@ -189,6 +214,7 @@ export function buildForecastLearningSummary(rows = []) {
   };
 
   return {
+    selection: selectionReceipt(rows, verified, independent),
     sampleSize: verified.length,
     independentSampleSize: independent.length,
     model: {
@@ -220,7 +246,7 @@ export function buildForecastLearningSummary(rows = []) {
 }
 
 export function forecastValidationGate(count) {
-  const verifiedCount = Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : 0;
+  const verifiedCount = forecastCount(count);
   return {
     minimumRequired: FORECAST_VALIDATION_MINIMUM,
     verifiedCount,
@@ -231,7 +257,7 @@ export function forecastValidationGate(count) {
 
 export function buildForecastValidationSummary(rows = []) {
   const overall = summarizeForecastRows(rows);
-  const independent = independentForecastRows(rows);
+  const independent = independentForecastRows(eligibleMetricRows(rows));
   const groups = new Map();
 
   for (const row of independent) {
@@ -284,9 +310,9 @@ export function getTickerValidationContext(rows = [], ticker, horizon = DEFAULT_
   const subset = rows.filter(row =>
     String(row?.ticker || '').trim().toUpperCase() === symbol &&
     Number(row?.horizon) === targetHorizon &&
-    String(row?.status || 'verified') === 'verified'
+    row?.status === 'verified'
   );
-  if (!subset.length) return null;
+  if (!eligibleMetricRows(subset).length) return null;
 
   const summary = summarizeForecastRows(subset);
   return {

@@ -1,3 +1,4 @@
+import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 export type PortfolioAccountingHolding = {
   symbol: string;
   quantity: number;
@@ -25,7 +26,8 @@ export type PortfolioAccountingStatus =
   | 'quotes-incomplete'
   | 'transaction-ledger-unavailable'
   | 'quantity-mismatch'
-  | 'mixed-currency';
+  | 'mixed-currency'
+  | 'unsupported-currency';
 
 export type PortfolioTradingPerformance = {
   status: PortfolioAccountingStatus;
@@ -90,6 +92,7 @@ export function calculatePortfolioTradingPerformance(
 
   const currencies = [...new Set(transactions.map(row => String(row.currency || 'USD').trim().toUpperCase()))];
   if (currencies.length !== 1) return { ...base, status: 'mixed-currency' };
+  if (currencies[0] !== 'USD') return { ...base, status: 'unsupported-currency' };
 
   const hasInvalidTransactions = transactions.some(row =>
     !String(row.symbol || '').trim() ||
@@ -131,9 +134,9 @@ export function calculatePortfolioTradingPerformance(
       holding.quantity += quantity;
       holding.costBasis += buyCost;
     } else {
-      const proceeds = Math.max(0, Number(row.amount) - brokerage);
+      const proceeds = Number(row.amount) - brokerage;
       netSaleProceeds += proceeds;
-      const tolerance = Math.max(0.00001, Math.abs(holding.quantity) * 0.0001);
+      const tolerance = QUANTITY_EPSILON;
       if (holding.quantity + tolerance < quantity || holding.quantity <= 0) {
         invalidSequenceSymbols.add(symbol);
       } else {
@@ -142,7 +145,7 @@ export function calculatePortfolioTradingPerformance(
         realizedFromLedger += proceeds - soldCostBasis;
         holding.quantity -= quantity;
         holding.costBasis -= soldCostBasis;
-        if (holding.quantity <= tolerance) {
+        if (Math.abs(holding.quantity) < QUANTITY_EPSILON) {
           holding.quantity = 0;
           holding.costBasis = 0;
         }

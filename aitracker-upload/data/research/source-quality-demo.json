@@ -1,0 +1,16 @@
+{
+  "run_id": "fictional-source-quality-demo",
+  "assessed_at": "2026-11-09T00:05:00Z",
+  "symbols": ["FICTIONAL", "MISSING"],
+  "observations": [
+    {
+      "evidence_id": "fictional-quote-1",
+      "symbol": "FICTIONAL",
+      "provider": "fixture",
+      "source_mode": "simulated",
+      "price": 100.0,
+      "change_pct": 0.0,
+      "retrieved_at": "2026-11-09T00:04:00Z"
+    }
+  ]
+}

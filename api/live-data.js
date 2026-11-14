@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { summarizeQuoteCoverage } from '../server/services/marketDataValidation.js';
+import { vercelDeploymentOrigin } from '../server/services/trustedBackendOrigin.js';
 
 function loadConfiguredSymbols() {
   try {
@@ -137,20 +139,18 @@ async function fetchSecContracts() {
   }
 }
 
-async function fetchCongressTrades(req) {
+export async function fetchCongressTrades({ env = process.env, fetcher = fetch } = {}) {
   try {
-    const host = req?.headers?.host;
-    const forwardedProto = req?.headers?.['x-forwarded-proto'];
-    const origin = host
-      ? (forwardedProto ? String(forwardedProto).split(',')[0].trim() : 'https') + '://' + host
-      : 'http://localhost';
+    const origin = vercelDeploymentOrigin(env);
+    if (!origin) throw new Error('Origin unavailable');
 
-    const response = await fetch(origin + '/api/congress-trades?symbol=ALL', {
+    const response = await fetcher(origin + '/api/congress-trades?symbol=ALL', {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(9000),
+      redirect: 'error',
     });
 
-    if (!response.ok) throw new Error('Congress API HTTP ' + response.status);
+    if (!response.ok || response.redirected) throw new Error('Congress response unavailable');
 
     const payload = await response.json();
     return {
@@ -159,12 +159,12 @@ async function fetchCongressTrades(req) {
       stale: Boolean(payload?.stale),
       upstreamError: payload?.upstreamError || null,
     };
-  } catch (error) {
+  } catch {
     return {
       items: [],
       source: 'Congress API unavailable',
       stale: true,
-      upstreamError: error?.message || 'Congress feed failed',
+      upstreamError: 'Congress feed unavailable or origin not configured',
     };
   }
 }
@@ -513,7 +513,7 @@ export default async function handler(req, res) {
   const [newsResult, contractsResult, congressResult, politicalResult] = await Promise.all([
     news(),
     fetchSecContracts(),
-    fetchCongressTrades(req),
+    fetchCongressTrades(),
     politicalSignals(),
   ]);
   const currentNews = newsResult?.items || [];
@@ -542,15 +542,15 @@ export default async function handler(req, res) {
   evidenceAvailability.political = { status: politicalSignalsResult.length ? 'AVAILABLE' : 'NOT_FOUND', count: politicalSignalsResult.length, source: 'GDELT + White House primary coverage', retrievedAt: feedRetrievedAt, latestAt: politicalLatestAt, refreshIntervalSeconds: 300, fallback: Boolean(politicalResult?.upstreamError), upstreamError: politicalResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: politicalLatestAt, fallback: Boolean(politicalResult?.upstreamError), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }), feedHealth: feedHealth(politicalResult), conflictStatus: politicalConflicts.length ? 'CONFLICT' : 'CLEAR', conflicts: politicalConflicts };
   evidenceAvailability.congress = { status: congressTrades.length ? 'AVAILABLE' : 'NOT_FOUND', count: congressTrades.length, source: congressResult?.source || 'Congress API', retrievedAt: feedRetrievedAt, latestAt: congressLatestAt, refreshIntervalSeconds: 300, stale: Boolean(congressResult?.stale), upstreamError: congressResult?.upstreamError || null, freshness: sourceFreshness({ latestAt: congressLatestAt, stale: Boolean(congressResult?.stale), healthyMinutes: 720, agingMinutes: 2880, staleMinutes: 10080 }), feedHealth: feedHealth(congressResult) };
   evidenceAvailability.macro = { ...evidenceAvailability.macro, retrievedAt: feedRetrievedAt, refreshIntervalSeconds: 300 };
-  const latestMarketQuote = Object.values(stockPrices).reduce((latest, item) => {
-    if (!latest || String(item?.marketTime || item?.retrievedAt || item?.asOf || '') > String(latest.marketTime || latest.retrievedAt || latest.asOf || '')) return item;
-    return latest;
-  }, null);
+  const marketCoverage = summarizeQuoteCoverage(stockPrices, SYMBOLS);
   evidenceAvailability.market = {
     ...evidenceAvailability.market,
-    retrievedAt: latestMarketQuote?.retrievedAt || latestMarketQuote?.asOf || null,
-    marketTime: latestMarketQuote?.marketTime || latestMarketQuote?.asOf || null,
-    asOf: latestMarketQuote?.asOf || latestMarketQuote?.marketTime || null,
+    coverage: marketCoverage,
+    provider: marketCoverage.providers.length===1?marketCoverage.providers[0]:marketCoverage.providers.length?'multiple':null,
+    source: marketCoverage.providers.length>1?'Multiple market providers':evidenceAvailability.market.source,
+    retrievedAt: feedRetrievedAt,
+    marketTime: marketCoverage.asOf,
+    asOf: marketCoverage.asOf,
     refreshIntervalSeconds: 60,
   };
 

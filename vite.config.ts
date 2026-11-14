@@ -2,10 +2,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {developmentSourceQualityMiddleware} from './server/developmentSourceQuality.js';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), {name:'development-source-quality',configureServer(server){server.middlewares.use(developmentSourceQualityMiddleware());}}],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

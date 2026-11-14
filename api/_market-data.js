@@ -1,4 +1,4 @@
-import { regularSessionMetadata } from '../server/services/marketDataValidation.js';
+import { normalizeYahooQuote, normalizeFinnhubQuote, normalizeAlphaQuote } from '../server/services/quoteNormalization.js';
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
   SOXL: 'SOXL',
@@ -68,24 +68,7 @@ async function yahooQuote(symbol) {
     encodeURIComponent(providerSymbol(symbol)) + '?range=5d&interval=1d';
   const j = await fetchJson(url, { headers: { 'User-Agent': 'ai-infra-watch/1.0' } });
   const result = j?.chart?.result?.[0];
-  const meta = result?.meta;
-  const closes = result?.indicators?.quote?.[0]?.close || [];
-  const valid = closes.filter(Number.isFinite);
-  const price = Number.isFinite(meta?.regularMarketPrice) ? meta.regularMarketPrice : valid.at(-1);
-  const previous = valid.length > 1 ? valid.at(-2) : meta?.previousClose;
-  if (!Number.isFinite(price)) throw new Error('No price');
-  return {
-    price,
-    changePct: Number.isFinite(previous) && previous !== 0 ? ((price / previous) - 1) * 100 : 0,
-    source: 'Yahoo Finance',
-    provider: 'yahoo',
-    currency: typeof meta?.currency === 'string' ? meta.currency : null,
-    retrievedAt: new Date().toISOString(),
-    adjustedBasis: 'raw',
-    ...regularSessionMetadata(meta),
-    asOf: Number.isFinite(Number(meta?.regularMarketTime)) ? new Date(Number(meta.regularMarketTime) * 1000).toISOString() : new Date().toISOString(),
-    stale: false
-  };
+  return normalizeYahooQuote(result, Date.now(), providerSymbol(symbol));
 }
 
 async function finnhubQuote(symbol) {
@@ -95,20 +78,7 @@ async function finnhubQuote(symbol) {
     'https://finnhub.io/api/v1/quote?symbol=' + encodeURIComponent(normalizedSymbol(symbol)) + '&token=' + encodeURIComponent(key),
     { headers: { Accept: 'application/json' } }
   );
-  if (!Number.isFinite(j?.c) || j.c <= 0) throw new Error('Finnhub returned no price');
-  return {
-    price: j.c,
-    changePct: Number.isFinite(j.dp) ? j.dp : 0,
-    source: 'Finnhub',
-    provider: 'finnhub',
-    marketTime: Number.isFinite(j.t) && j.t > 0 ? new Date(j.t * 1000).toISOString() : null,
-    retrievedAt: new Date().toISOString(),
-    currency: null,
-    isMarketSessionOpen: null,
-    adjustedBasis: 'raw',
-    asOf: j.t ? new Date(j.t * 1000).toISOString() : new Date().toISOString(),
-    stale: false
-  };
+  return normalizeFinnhubQuote(j);
 }
 
 async function alphaQuote(symbol) {
@@ -120,27 +90,14 @@ async function alphaQuote(symbol) {
     { headers: { Accept: 'application/json' } }
   );
   const q = j?.['Global Quote'];
-  const price = Number(q?.['05. price']);
-  if (!Number.isFinite(price) || price <= 0) throw new Error(j?.['Note'] || j?.['Information'] || 'Alpha Vantage returned no price');
-  return {
-    price,
-    changePct: Number(q?.['10. change percent']?.replace('%', '')) || 0,
-    source: 'Alpha Vantage',
-    provider: 'alpha-vantage',
-    marketTime: null,
-    retrievedAt: new Date().toISOString(),
-    currency: null,
-    isMarketSessionOpen: null,
-    adjustedBasis: 'raw',
-    asOf: q?.['07. latest trading day'] ? q['07. latest trading day'] + 'T00:00:00.000Z' : new Date().toISOString(),
-    stale: false
-  };
+  if (j?.['Note'] || j?.['Information']) throw new Error(j['Note'] || j['Information']);
+  return normalizeAlphaQuote(q, Date.now(), normalizedSymbol(symbol));
 }
 
-export async function quote(symbol) {
+export async function quote(symbol, { forceRefresh = false } = {}) {
   const key = cacheKey('quote', symbol);
   const cacheEntry = memoryCache.get(key);
-  if (cacheEntry && Date.now() - cacheEntry.at < CACHE_MS) {
+  if (!forceRefresh && cacheEntry && Date.now() - cacheEntry.at < CACHE_MS) {
     return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
   }
 
@@ -199,7 +156,7 @@ async function yahooHistory(symbol, range) {
     adjusted: Number.isFinite(adjustedCloses[i]),
   })).filter(p => Number.isFinite(p.price));
   if (!points.length) throw new Error('No Yahoo history points');
-  return { points, currency: result.meta?.currency || 'USD', exchange: result.meta?.exchangeName || null };
+  return { points, currency: typeof result.meta?.currency === 'string' && result.meta.currency.trim() ? result.meta.currency : null, exchange: result.meta?.exchangeName || null };
 }
 
 function rangeDays(range) {
@@ -223,7 +180,7 @@ async function finnhubHistory(symbol, range) {
     adjusted: false,
   })).filter(p => Number.isFinite(p.price));
   if (!points.length) throw new Error('No Finnhub history points');
-  return { points, currency: 'USD', exchange: null };
+  return { points, currency: null, exchange: null };
 }
 
 async function alphaHistory(symbol, range) {
@@ -243,7 +200,7 @@ async function alphaHistory(symbol, range) {
     .filter(p => Number.isFinite(p.price))
     .sort((a,b) => a.date.localeCompare(b.date));
   if (!points.length) throw new Error('No Alpha Vantage history points');
-  return { points, currency: 'USD', exchange: null };
+  return { points, currency: null, exchange: null };
 }
 
 /**

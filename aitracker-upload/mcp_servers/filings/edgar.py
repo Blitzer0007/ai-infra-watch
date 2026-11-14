@@ -38,6 +38,7 @@ from typing import Iterable, Protocol
 import httpx
 
 from mcp_servers.filings.schemas import EdgarError, FilingRef
+from mcp_servers.provider_budget import budgeted_get
 
 # Committed sample EDGAR payloads (offline) live next to the corpus fixtures.
 FIXTURE_EDGAR_DIR = Path(__file__).resolve().parent / "fixtures" / "edgar"
@@ -267,8 +268,8 @@ class LiveEdgarClient:
     """Real EDGAR access. Mirrors FinnhubProvider's retry/backoff policy.
 
     No API key; a descriptive User-Agent is mandatory (SEC blocks blank
-    UA). A conservative inter-request sleep keeps us under EDGAR's ~10
-    req/s ceiling without a separate rate-limiter.
+    UA). Every attempt uses shared process admission, pacing and cooldown.
+    This is not a cross-worker or account-wide SEC quota.
     """
 
     source = "live"
@@ -294,16 +295,9 @@ class LiveEdgarClient:
         self.gateway_url = os.getenv("EDGAR_GATEWAY_URL", "").strip()
         self.gateway_token = os.getenv("EDGAR_GATEWAY_TOKEN", "").strip()
         self._tickers: dict[str, str] | None = None
-        self._last_call = 0.0
 
     def _headers(self) -> dict[str, str]:
         return {"User-Agent": self.user_agent, "Accept-Encoding": "gzip, deflate"}
-
-    def _throttle(self) -> None:
-        elapsed = time.monotonic() - self._last_call
-        if elapsed < self.min_interval:
-            time.sleep(self.min_interval - elapsed)
-        self._last_call = time.monotonic()
 
     def _gateway_target(self, url: str) -> str | None:
         """Translate supported SEC URLs to the optional Vercel SEC gateway."""
@@ -331,36 +325,13 @@ class LiveEdgarClient:
     def _get(self, url: str) -> httpx.Response:
         if not self.user_agent:
             raise EdgarError("NO_UA", "EDGAR requires a descriptive User-Agent")
-        last_exc: Exception | None = None
         request_url = self._gateway_target(url) or url
         request_headers = self._headers()
         if request_url != url and self.gateway_token:
             request_headers["Authorization"] = "Bearer " + self.gateway_token
-
-        for attempt in range(self.max_retries + 1):
-            self._throttle()
-            try:
-                with httpx.Client(timeout=self.timeout, headers=request_headers) as client:
-                    resp = client.get(request_url)
-                if resp.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise EdgarError("RATE_LIMIT", "EDGAR rate limit (~10 req/s)")
-                if resp.status_code >= 400:
-                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    detail = (resp.text or "").strip().replace("\n", " ")[:240]
-                    suffix = f" ({detail})" if detail else ""
-                    raise EdgarError("HTTP_ERROR", f"EDGAR returned {resp.status_code} for {url}{suffix}")
-                return resp
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        raise EdgarError("HTTP_ERROR", f"EDGAR request failed: {last_exc}")
+        return budgeted_get("sec", request_url, error_type=EdgarError, headers=request_headers,
+            timeout=self.timeout, max_retries=self.max_retries, base_delay=self.base_delay,
+            min_interval=self.min_interval)
 
     def _load_tickers(self) -> dict[str, str]:
         if self._tickers is None:
