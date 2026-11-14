@@ -160,3 +160,22 @@ def test_fictional_preview_is_absent_from_production_build():
     scripts=list((ROOT/'dist/assets').glob('*.js'));assert scripts
     bundle='\n'.join(path.read_text() for path in scripts)
     assert 'Open fictional dossier' not in bundle and 'Fictional Components Ltd' not in bundle
+
+
+def test_failed_code_download_stays_inside_the_holding_disclosure(page):
+    script="""
+import {build} from 'esbuild';
+const contents=`import React from 'react';import {createRoot} from 'react-dom/client';import HoldingCompanyDossier from './src/components/portfolio/HoldingCompanyDossier';createRoot(document.getElementById('root')).render(<><p>Retained holding context</p><HoldingCompanyDossier symbol='FICT'/><button>Continue holding review</button></>);`;
+const result=await build({stdin:{contents,resolveDir:process.cwd(),loader:'tsx'},bundle:true,jsx:'automatic',platform:'browser',format:'iife',define:{'process.env.NODE_ENV':'"production"'},write:false,plugins:[{name:'failed-view',setup(build){build.onResolve({filter:/^\\.\\/CompanyDossier$/},args=>args.kind==='dynamic-import'?{path:'failed-view',namespace:'fictional-failure'}:null);build.onLoad({filter:/.*/,namespace:'fictional-failure'},()=>({contents:"throw Error('Fictional static view load failure');export default null;",loader:'js'}));}}]});
+process.stdout.write(result.outputFiles[0].text);
+"""
+    bundle=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT,text=True,env={'PATH':os.environ.get('PATH','')})
+    errors=[];requests=[]
+    page.on('pageerror',lambda error:errors.append(str(error)));page.on('request',lambda request:requests.append(request.url))
+    page.set_content('<div id="root"></div>');page.add_script_tag(content=bundle)
+    panel=page.get_by_test_id('holding-company-dossier');panel.get_by_text('Company dossier',exact=True).click()
+    expect(panel.get_by_role('alert')).to_contain_text('Your holding review remains available')
+    expect(page.get_by_text('Retained holding context',exact=True)).to_be_visible()
+    expect(page.get_by_role('button',name='Continue holding review',exact=True)).to_be_visible()
+    panel.get_by_text('Company dossier',exact=True).click();expect(panel.get_by_role('alert')).not_to_be_visible()
+    assert errors==[] and requests==[]
