@@ -14,6 +14,8 @@ The [offline council grounding evaluator](release2-council-grounding-evaluation.
 
 ### 1. Source truth and shared consumer contracts — core
 
+The [retained SEC native-export review](release2-sec-retained-exports.md) now binds supplied original JSON bytes and exact ticker/exchange/CIK declarations to the independent statement path, with separate pins, bounded parsing, explicit failures and a fixed fictional demo. It is offline integrity/consistency evidence only; actual publisher/transport, issuer/security-class and historical acquisition truth remain unverified.
+
 - Carry original identity, publication/observation/retrieval times, date precision, currency, price/adjustment basis, simulation, coverage and explicit failures into remaining decision/history/agent consumers.
 - Establish issuer/listing provenance and source-original references for financial, news, contract/political/disclosure evidence. Correct/report filing-versus-signing and event-versus-taxonomy semantics.
 - Distinguish unavailable/malformed/partial retrieval from a successful complete empty result throughout the remaining paths.
