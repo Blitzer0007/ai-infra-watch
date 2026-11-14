@@ -45,6 +45,8 @@ Done when quantities/costs/cash flows reconcile to authoritative evidence. The l
 
 ### 4. Financial observations and company dossier — core
 
+The [initial company financial-observation contract](release2-company-financial-observations.md) now projects existing validated SEC receipt methods and supporting input declarations into explicit unit/period/filing/retrieval/derivation records. It retains source failures, date-only uncertainty, unknown fiscal/restatement/adjustment fields and false source/decision authority. This is offline contract work only: dedicated broader statement adapters, authentic source evidence and live/UI/scanner integration remain pending.
+
 - Implement bounded normalized adapters for reported revenue/growth, margins, cash flow, debt/cash/shares and supported valuation inputs, reusing existing SEC/fundamental/peer paths.
 - Preserve fiscal periods, publication/availability, reported-versus-estimated definitions, units/currency, adjustment basis and revisions/restatements. Withhold incompatible or negative/unknown valuation denominators.
 - Build sectioned business, growth, financial health, valuation, catalysts, risks and sources views with explicit missing inputs and navigation from holdings/opportunities.
