@@ -1,15 +1,19 @@
 import {useId,useState} from 'react';
 import type {CompanyFinancialObservation,FinancialObservationRequest} from '../../utils/companyFinancialObservations';
 import {DOSSIER_SECTIONS,dossierFinancials,dossierObservations,dossierStatusLabels,dossierIssueLabels,formatDossierValue,type DossierSection} from '../../utils/companyDossier';
+import {admitDossierStatements,statementRows} from '../../utils/dossierStatements';
+import {DossierStatementCards,DossierStatementSources} from './DossierStatementInputs';
 
 const control='min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold';
-type Props={symbol:string;configuredName?:string;request:FinancialObservationRequest|null;fictional?:boolean;key?:string};
+type Props={symbol:string;configuredName?:string;request:FinancialObservationRequest|null;statements?:unknown;fictional?:boolean;key?:string};
 
-export default function CompanyDossier({symbol,configuredName,request,fictional=false}:Props){
+export default function CompanyDossier({symbol,configuredName,request,statements=null,fictional=false}:Props){
   const [section,setSection]=useState<DossierSection>('Overview');
   const id=useId(),panel=id+'-panel',heading=id+'-heading';
   const {snapshot,status}=dossierFinancials(symbol,request);
   const rows=dossierObservations(snapshot,section);
+  const statementAdmission=admitDossierStatements(symbol,request,statements);
+  const balanceInputs=statementRows(statementAdmission,'Financial health'),valuationInputs=statementRows(statementAdmission,'Valuation');
   const references=[...new Map((snapshot?.observations??[]).flatMap(o=>o.references.map(ref=>[ref.accession,ref] as const))).values()];
   return <section aria-label={symbol+' company dossier'} data-testid="company-dossier" className="min-w-0 space-y-4 rounded-xl border border-cyan-200/25 p-4 text-sm text-white/80">
     <header className="space-y-2">
@@ -18,6 +22,7 @@ export default function CompanyDossier({symbol,configuredName,request,fictional=
       <p role="status" data-testid="dossier-source-status">{dossierStatusLabels[status]}. Source coverage and issuer verification remain unverified.</p>
       {fictional&&<p className="rounded-lg border border-amber-200/30 p-3 font-semibold text-amber-100">Fictional data only. These are invented financial statements, not a real issuer or your holdings. Every populated figure below is a demonstration.</p>}
       <p>Read-only research · no accounting reconciliation or decision eligibility is granted.</p>
+      {statementAdmission.status!=='not-connected'&&<p role={statementAdmission.status==='invalid'?'alert':'status'} data-testid="dossier-statement-status">{statementAdmission.status==='conditional'?'Additional statement inputs: partial, bound declarations.':statementAdmission.status==='invalid'?'Additional statement inputs withheld.':'Additional statement inputs need data.'} {statementAdmission.reason}</p>}
     </header>
     <nav aria-label={symbol+' dossier sections'} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {DOSSIER_SECTIONS.map(label=><button key={label} type="button" aria-pressed={section===label} aria-controls={panel} onClick={()=>setSection(label)} className={control+(section===label?' border-cyan-200/60 bg-cyan-200/10 text-cyan-100':' border-white/25 text-white/80')}>{label}</button>)}
@@ -28,17 +33,19 @@ export default function CompanyDossier({symbol,configuredName,request,fictional=
         <p>Business description unavailable. No verified business model, customer mix or issuer profile is connected to this dossier.</p>
         <dl className="grid gap-2 sm:grid-cols-2"><dt>Supported loaded observations</dt><dd>{snapshot?.observations.length??0} · {snapshot?.observations.length?'partial coverage':'coverage not established'}</dd><dt>Financial source</dt><dd>{dossierStatusLabels[status]}</dd><dt>Issuer / source verification</dt><dd>Unverified</dd><dt>Trading or allocation decision</dt><dd>Withheld</dd></dl>
         <p>Choose a section to inspect supported observations and missing inputs. Holding returns, analyst targets and model opinions are not substitutes for company financial statements.</p>
+        {statementAdmission.status==='conditional'&&<p>Additional statement observations: {statementAdmission.snapshots.reduce((n,s)=>n+s.observations.length,0)}. Values retain their own dates, units and share bases; no totals or multiples are calculated.</p>}
       </>}
       {(section==='Growth'||section==='Financial health')&&<>
         <p>{section==='Growth'?'Annual-duration declarations and their supported comparisons; no growth forecast is supplied.':'Declared cash flows and point-in-time balances; no overall financial-health rating is inferred.'}</p>
         {!rows.length&&<p>No supported observations loaded for this section. This does not mean zero revenue, zero cash flow or a healthy balance sheet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><Observation key={row.id} row={row} fictional={fictional}/>)}</div>
-        {section==='Financial health'&&<p>Cash and interest-bearing debt are unavailable. Total liabilities / equity is a different measure from debt / equity.</p>}
+        {section==='Financial health'&&<><DossierStatementCards rows={balanceInputs} fictional={fictional}/><p>{balanceInputs.length?'Cash and individual borrowing declarations are shown where supported. Total interest-bearing debt, lease scope and component overlap remain unverified; components are not summed.':'Cash and interest-bearing debt are unavailable.'} Total liabilities / equity is a different measure from debt / equity.</p></>}
       </>}
       {section==='Valuation'&&<>
-        <p>Valuation multiples unavailable. No compatible price, shares, earnings or EBITDA contract is connected here.</p>
+        <p>Valuation multiples unavailable. {statementAdmission.status==='conditional'?(valuationInputs.length?'Some share/EPS declarations are loaded below; compatible price, adjustment evidence, complete debt scope and EBITDA remain unavailable.':'Some statement declarations are loaded; supported share/EPS coverage, compatible price, adjustment evidence, complete debt scope and EBITDA remain incomplete.'):'No compatible price, shares, earnings or EBITDA contract is connected here.'}</p>
         <ul className="list-disc space-y-2 pl-5"><li>P/E needs supported earnings per share and a compatible price basis.</li><li>EV/EBITDA needs compatible cash, interest-bearing debt, shares, price and EBITDA inputs.</li><li>Missing or nonpositive denominators cannot establish that a company is cheap.</li></ul>
-        <p>Unsupported inputs: cash, interest-bearing debt, shares, EPS and EBITDA. No zero values or multiples are inferred.</p>
+        <p>{statementAdmission.status==='conditional'?'Valuation remains withheld until the missing compatibility and coverage evidence is supplied.':'Unsupported inputs: cash, interest-bearing debt, shares, EPS and EBITDA. No zero values or multiples are inferred.'}</p>
+        <DossierStatementCards rows={valuationInputs} fictional={fictional}/>
       </>}
       {section==='Catalysts'&&<><p>No company event feed is connected to this dossier. Upcoming-event coverage is unknown; this is not a claim that no events exist.</p><p>Confirmed, estimated, cancelled and date-only events require their own source evidence before they can appear here.</p></>}
       {section==='Risks'&&<><p>No evidence-backed company risk assessment is connected. Financial gaps and unverified sources cannot establish a low-risk result.</p><ul className="list-disc space-y-2 pl-5"><li>Source authenticity and ticker-to-issuer mapping remain unverified.</li><li>Full statement coverage, fiscal labels and adjustment basis are incomplete.</li><li>Amendments and restatements need original filing evidence.</li><li>These declarations do not authorize trades or reconcile account history.</li></ul></>}
@@ -55,6 +62,7 @@ export default function CompanyDossier({symbol,configuredName,request,fictional=
           {fictional?<p className="break-all">{ref.url} · demonstration reference only</p>:<a className="inline-block min-h-11 break-all py-2 text-cyan-100 underline" href={ref.url} target="_blank" rel="noopener noreferrer">Open constructed SEC reference ↗</a>}
           <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Publication uncertainty bounds</summary><p className="break-words">Earliest bound: {ref.publicationWindow.earliest}. Exclusive latest bound: {ref.publicationWindow.latest_exclusive}. These are conservative date-policy bounds, not known publication timestamps or proof of historical availability.</p></details>
         </article>)}
+        <DossierStatementSources admission={statementAdmission}/>
       </>}
     </section>
   </section>;

@@ -23,6 +23,8 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
+- [Independent statement admission and dossier v2](release2-statement-admission-dossier.md): a separate original-row checker, atomic period/issuer-bound consumer and manual fictional cash/debt/share/EPS inspection with explicit bases and no valuation authority. Actual acquisition/issuer evidence, broader statement/valuation scope and real holding data remain pending; the rounded core estimate is unchanged.
+
 - [Raw SEC statement adapters, stage 1](release2-sec-statement-adapters.md): bounded cash/debt-component/point-share/weighted-share/EPS projection, explicit periods/units, original filing-focus metadata and conservative newest-vintage checks. Total debt/EBITDA, broader statement coverage, independent admission, versioned dossier consumption and actual source integration remain pending; the rounded core estimate is unchanged.
 
 - [Sectioned read-only company dossier](release2-company-dossier-ui.md): local section navigation, collapsed holding entry with unconnected-data states, expandable source/calculation inputs and a separate development-only FICT preview. Broader statement adapters, authentic company/source evidence, real holding data and scanner integration remain pending; no activation or increase in the rounded core estimate is implied.
