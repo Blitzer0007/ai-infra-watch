@@ -6,6 +6,7 @@ export const PORTFOLIO_SECTIONS = [
   {id:'evidence',label:'Evidence',description:'Inspect data coverage, decision context, and signal evidence.'},
   {id:'watchlist',label:'Watchlist',description:'Explore the configured research universe.'},
   {id:'events',label:'Events',description:'Study dated events for a selected holding.'},
+  {id:'radar',label:'Event Risk Radar',description:'Review fictional emerging concerns, priority sources and counter-evidence. Live monitoring is not configured.'},
   {id:'rotation',label:'Money Flow',description:'Compare group-level rotation and market context.'},
   {id:'network',label:'Connections',description:'Inspect peer relationships for a selected holding.'},
   {id:'research',label:'Portfolio Research',description:'Open the dedicated portfolio research tools.'},

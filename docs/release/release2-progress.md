@@ -1,5 +1,7 @@
 # Release 2 progress estimate
 
+The newly requested [Event Risk Radar](release2-event-risk-radar-review.md) now has a fictional-only manual Portfolio UI, priority @aravind source profile, deterministic evidence/timing checks and offline replay. Authentic acquisition, real historical evaluation and any live monitoring/delivery remain pending. This added scope is tracked separately from the older weighted core estimate below.
+
 Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation against the [Release 2 plan](release2-engineering-plan.md), including fixture-backed acceptance and review preparation. Implemented generally means present on the feature branch/draft PR. The glossary/help slice alone shipped in PR #169 at `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`; the broader Release 1/2 features remain in draft PRs #167/#168.
 
 **Approximately 60% complete / 40% pending.** This is an engineering estimate rounded to the nearest five percentage points, not a measured readiness score, market-outcome result or percentage of passing tests. Weighted assessment below is 57.75%; weights reflect current development effort. The small glossary/help release is live; broader Release 2 production rollout is pending and excluded from this engineering percentage. External access, real coverage and matured outcomes cannot be established by fixtures.

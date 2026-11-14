@@ -124,7 +124,7 @@ jobs:
           QA_UI_MOCKS: "true"
           QA_LOGIN_BASE_URL: http://127.0.0.1:3001
           QA_ARTIFACT_DIR: /tmp/aiw-uiux
-        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py qa/test_holding_detail.py qa/test_missing_data_analytics.py qa/test_source_quality_ui.py qa/test_loaded_ledger_review.py qa/test_forecast_summary_ui.py qa/test_portfolio_council_ui.py qa/test_portfolio_rule_kernel.py
+        run: python -m pytest -q qa/test_ui.py qa/test_ui_exploratory.py qa/test_release1.py qa/test_release2.py qa/test_uiux.py qa/test_uiux_audit.py qa/test_access_gate.py qa/test_catalyst_calendar.py qa/test_alert_inbox.py qa/test_portfolio_navigation.py qa/test_notification_policy_preview.py qa/test_opportunity_jev_review.py qa/test_holding_detail.py qa/test_missing_data_analytics.py qa/test_source_quality_ui.py qa/test_loaded_ledger_review.py qa/test_forecast_summary_ui.py qa/test_portfolio_council_ui.py qa/test_portfolio_rule_kernel.py qa/test_event_risk_radar.py
       - name: Upload fixture-only UI audit evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,6 +134,7 @@ jobs:
             /tmp/aiw-uiux/uiux-audit
             /tmp/aiw-uiux/release2-calendar-*.png
             /tmp/aiw-uiux/alert-inbox-*.png
+            /tmp/aiw-uiux/event-risk-radar-*.png
             /tmp/aiw-uiux/portfolio-focused-*.png
             /tmp/aiw-uiux/notification-policy-*.png
             /tmp/aiw-uiux/opportunity-jev-*.png

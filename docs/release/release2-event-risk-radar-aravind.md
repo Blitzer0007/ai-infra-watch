@@ -1,6 +1,6 @@
 # Release 2 proposal — Event Risk Radar with priority monitoring of @aravind
 
-**Status:** New user-requested backlog and Codex resumption handoff; **not implemented, not deployed, and not approved for live activation**.
+**Status:** Initial fictional-only contracts, manual UI and offline replay implemented on the feature branch. **Not deployed or approved for live activation.** See [implementation review, safety blockers and live prerequisites](release2-event-risk-radar-review.md). The proposal below remains the scope reference; authentic source acquisition and real-history evaluation are pending.
 **Date:** 14 November 2026.
 **Repository / working stack:** `Blitzer0007/ai-infra-watch`, draft PR #168 (`feature/release2-opportunity-research`) stacked on draft PR #167.
 **User goal:** For held US stocks, especially **NVDA**, discover material controversies and breaking risk narratives early; pay **particular attention to public X posts by `@aravind`** (`https://x.com/aravind`) because the user considers some prior comments unusually timely. Evaluate this hypothesis carefully rather than treating its predictive track record as established.
