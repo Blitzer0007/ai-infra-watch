@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { addPortfolioCashFlow, deletePortfolioCashFlow, fetchPortfolioCashFlows, type PortfolioCashFlow, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import { calculateAccountCashFlowPerformance } from '../utils/portfolioCashFlowAccounting';
+import { evaluateDeclaredQuote } from '../utils/quoteAdmission';
+import { mapStoredPortfolioHoldings } from '../utils/portfolioPositions';
 
 type Props = { holdings: StoredPortfolioHolding[]; transactions: PortfolioTransaction[]; livePrices: Record<string, { price: number; stale?: boolean; cached?: boolean }> };
 const emptyForm = { eventDate: new Date().toISOString().slice(0, 10), flowType: 'deposit' as PortfolioCashFlow['flowType'], amount: '', currency: 'USD', fxToUsd: '1', notes: '' };
@@ -24,9 +26,11 @@ export default function PortfolioCashFlows({ holdings, transactions, livePrices 
   useEffect(() => { void load(); }, []);
 
   const performance = useMemo(() => {
-    const mapped = holdings.map(holding => {
+    const nowMs = Date.now();
+    const mapped = mapStoredPortfolioHoldings(holdings).map(holding => {
       const quote = livePrices[holding.symbol.toUpperCase()];
-      return { symbol: holding.symbol, quantity: holding.quantity, currentPrice: quote && !quote.stale && !quote.cached && Number(quote.price) > 0 ? Number(quote.price) : null };
+      const quality = evaluateDeclaredQuote(holding.symbol.toUpperCase(), quote, nowMs);
+      return { symbol: holding.symbol, quantity: holding.quantity, currentPrice: holding.quantitySupported ? quality.quote?.price ?? null : null };
     });
     return calculateAccountCashFlowPerformance(mapped, transactions.map(row => ({
       symbol: row.symbol, transactionType: row.transactionType, quantity: row.quantity, amount: row.amount, brokerage: row.brokerage, currency: row.currency || 'USD',

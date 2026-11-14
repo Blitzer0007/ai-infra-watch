@@ -1,6 +1,6 @@
 import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
-import { storedLedgerInputs, storedHoldingInputs } from '../server/services/ledgerInputs.js';
+import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs } from '../server/services/ledgerInputs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -187,6 +187,7 @@ export function normalize(row) {
     quantity: Number(row.quantity),
     averageCost: Number(row.average_cost),
     accountingInputs: storedHoldingInputs(row),
+    valuationInputs: storedHoldingValuationInputs(row),
     purchaseDate: row.purchase_date || null,
     notes: row.notes || '',
     createdAt: row.created_at,

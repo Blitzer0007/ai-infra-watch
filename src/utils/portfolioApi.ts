@@ -16,6 +16,8 @@ export type RuleStage = {
 };
 
 export type StoredPortfolioHolding = {
+  valuationInputs?: {contractVersion:'stored-holding-valuation-v1';symbol:string|null;quantity:number|null;averageCost:number|null;currency:string|null};
+  currency?: string;
   accountingInputs?: {contractVersion:'stored-holding-inputs-v1';symbol:string|null;quantity:number|null};
   id: string;
   symbol: string;

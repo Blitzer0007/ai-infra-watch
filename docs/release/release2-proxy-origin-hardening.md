@@ -43,7 +43,7 @@ Local verification passed **1,161 Node tests** (including 71 proxy-related cases
 
 ## Remaining safe sequence
 
-1. Correct unavailable P&L and invested-cost/current-valuation/weight distinctions, then complete remaining valuation consumer parity and authoritative accounting coverage.
+1. The [loaded-position valuation increment](release2-position-valuation-integrity.md) now corrects missing P&L and cost/current-value/weight substitution in the reviewed Portfolio paths. Next complete authoritative account/transaction coverage, remaining valuation consumers and the Python accounting handoff.
 2. Extend reviewed quote admission to independent server alert scanners/relays and expose scoped read-only admission/coverage explanations. The [browser gate](release2-browser-quote-alert-admission.md) does not prove server sender safety.
 3. Resolve remaining response/resource/source contracts and perform separately authorized hosted auth/configuration/provider acceptance.
 4. Only then propose licensed Radar development acquisition with verified account/issuer mapping and independently retained historical evidence. Live polling, schedules and Telegram activation remain separate approval decisions.

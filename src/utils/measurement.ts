@@ -1,9 +1,9 @@
 export type PortfolioMetricInput = {
   symbol: string;
-  investedValue: number;
+  investedValue: number | null;
   currentValue: number | null;
-  pnl: number;
-  pnlPct: number;
+  pnl: number | null;
+  pnlPct: number | null;
   dailyChangePct: number | null;
   group: string;
 };
@@ -16,16 +16,19 @@ export type PortfolioWeight = {
 };
 
 export type PortfolioAttribution = PortfolioMetricInput & {
-  weight: number;
-  pnlContribution: number;
+  weight: number | null;
+  pnlContribution: number | null;
   pnlContributionPct: number | null;
 };
 
 export type PortfolioConcentration = {
-  totalValue: number;
+  totalValue: number | null;
+  coverage: 'complete' | 'partial' | 'unavailable';
+  observedCount: number;
+  expectedCount: number;
   weights: PortfolioWeight[];
   topHolding: PortfolioWeight | null;
-  top3Weight: number;
+  top3Weight: number | null;
   groupWeights: Array<{ group: string; value: number; weight: number }>;
   hhi: number | null;
   effectiveHoldings: number | null;
@@ -163,16 +166,16 @@ export function calculatePortfolioConcentration(inputs: PortfolioMetricInput[]):
   const values = inputs
     .map(item => ({
       symbol: item.symbol,
-      value: Number.isFinite(item.currentValue ?? NaN) && (item.currentValue ?? 0) > 0
-        ? item.currentValue as number
-        : Math.max(0, item.investedValue),
+      value: item.currentValue,
       group: item.group || 'Unclassified',
     }))
-    .filter(item => item.value > 0);
-  const totalValue = values.reduce((sum, item) => sum + item.value, 0);
-  const weights = totalValue
+    .filter(item => typeof item.value === 'number' && Number.isFinite(item.value) && item.value >= 0);
+  const sum = values.reduce((total, item) => total + item.value!, 0);
+  const complete = inputs.length > 0 && values.length === inputs.length && new Set(inputs.map(row => row.symbol)).size === inputs.length && Number.isFinite(sum);
+  const totalValue = complete ? sum : null;
+  const weights: PortfolioWeight[] = totalValue != null && totalValue > 0
     ? values
-        .map(item => ({ ...item, weight: item.value / totalValue }))
+        .map(item => ({ ...item, value: item.value!, weight: item.value! / totalValue }))
         .sort((a, b) => b.weight - a.weight)
     : [];
   const groupMap = new Map<string, number>();
@@ -183,9 +186,12 @@ export function calculatePortfolioConcentration(inputs: PortfolioMetricInput[]):
   const hhi = weights.length ? weights.reduce((sum, item) => sum + item.weight ** 2, 0) : null;
   return {
     totalValue,
+    coverage: complete ? 'complete' : values.length ? 'partial' : 'unavailable',
+    observedCount: values.length,
+    expectedCount: inputs.length,
     weights,
     topHolding: weights[0] ?? null,
-    top3Weight: weights.slice(0, 3).reduce((sum, item) => sum + item.weight, 0),
+    top3Weight: weights.length ? weights.slice(0, 3).reduce((sum, item) => sum + item.weight, 0) : null,
     groupWeights,
     hhi,
     effectiveHoldings: hhi && hhi > 0 ? 1 / hhi : null,
@@ -193,24 +199,19 @@ export function calculatePortfolioConcentration(inputs: PortfolioMetricInput[]):
 }
 
 export function calculatePortfolioAttribution(inputs: PortfolioMetricInput[]): PortfolioAttribution[] {
-  const values = inputs
+  const concentration = calculatePortfolioConcentration(inputs);
+  const weights = new Map(concentration.weights.map(row => [row.symbol, row.weight]));
+  const observedPnl = (item: PortfolioMetricInput) => typeof item.currentValue === 'number' && Number.isFinite(item.currentValue) && item.currentValue >= 0 && typeof item.pnl === 'number' && Number.isFinite(item.pnl) ? item.pnl : null;
+  const completePnl = inputs.length > 0 && inputs.every(item => observedPnl(item) !== null);
+  const totalPnl = completePnl ? inputs.reduce((sum, item) => sum + item.pnl!, 0) : null;
+  return inputs
     .map(item => ({
       ...item,
-      value: Number.isFinite(item.currentValue ?? NaN) && (item.currentValue ?? 0) > 0
-        ? item.currentValue as number
-        : Math.max(0, item.investedValue),
+      weight: weights.get(item.symbol) ?? null,
+      pnlContribution: observedPnl(item),
+      pnlContributionPct: totalPnl != null && Number.isFinite(totalPnl) && totalPnl !== 0 && concentration.coverage === 'complete' && Number.isFinite(item.pnl! / totalPnl * 100) ? item.pnl! / totalPnl * 100 : null,
     }))
-    .filter(item => item.value > 0);
-  const total = values.reduce((sum, item) => sum + item.value, 0);
-  const totalPnl = inputs.reduce((sum, item) => sum + (Number.isFinite(item.pnl) ? item.pnl : 0), 0);
-  return values
-    .map(item => ({
-      ...item,
-      weight: total ? item.value / total : 0,
-      pnlContribution: Number.isFinite(item.pnl) ? item.pnl : 0,
-      pnlContributionPct: totalPnl !== 0 ? (item.pnl / totalPnl) * 100 : null,
-    }))
-    .sort((a, b) => Math.abs(b.pnlContribution) - Math.abs(a.pnlContribution));
+    .sort((a, b) => (b.pnlContribution == null ? -Infinity : Math.abs(b.pnlContribution)) - (a.pnlContribution == null ? -Infinity : Math.abs(a.pnlContribution)));
 }
 
 function toPriceMap(history: HistoricalPricePoint[] = []): Map<string, number> {

@@ -35,6 +35,8 @@ Follow-up: [browser quote-alert admission](release2-browser-quote-alert-admissio
 
 The [proxy-origin follow-up](release2-proxy-origin-hardening.md) removes request-header destinations and blocks redirects in the generic agent and Congress self-proxy paths. Explicit configuration trust and hosted auth/protection acceptance remain pending; the table below remains the historical baseline.
 
+The [loaded-position valuation follow-up](release2-position-valuation-integrity.md) addresses missing P&L defaults, cost/current-value substitution, original holding-input gaps and the reviewed browser valuation consumers. Other accounting/source/server-consumer and hosted acceptance items remain open.
+
 Source inspection only. These existing paths are **not repaired or activated** by this increment.
 
 | Concern | Current evidence | Required before related live activation |

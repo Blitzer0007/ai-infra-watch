@@ -20,7 +20,8 @@ export type PortfolioSummary = {
 };
 export function adaptDecisionCard(position: PositionAnalysis, quote: ValidatedQuote, accountingValid: boolean, nowMs: number, supportingEvidenceValidated = false, supportingQuotes: ValidatedQuote[] = []): DecisionCardModel {
   const evidenceComplete = supportingEvidenceValidated && [position.groupScore, position.groupBreadth, position.relativeToUniverse, position.vsPeers].every(x => typeof x === 'number' && Number.isFinite(x));
-  const reconciled = accountingValid && Number.isFinite(position.quantity) && position.quantity > 0 && Number.isFinite(position.averageCost) && position.averageCost > 0;
+  const reconciled = accountingValid && position.quantitySupported !== false && position.costBasisSupported !== false && position.pnl != null && position.pnlPct != null
+    && Number.isFinite(position.quantity) && position.quantity > 0 && Number.isFinite(position.averageCost) && position.averageCost > 0;
   const quality = evaluateDecisionEligibility(quote, evidenceComplete, reconciled, nowMs);
   const sameObservation = position.symbol === quote.symbol && position.livePrice === quote.price;
   if (!sameObservation) {
@@ -36,7 +37,7 @@ export function adaptDecisionCard(position: PositionAnalysis, quote: ValidatedQu
   if (evidenceComplete) evidence.push({ id: 'metrics', label: 'Group score ' + position.groupScore + ', breadth ' + position.groupBreadth + ', relative strength ' + position.relativeToUniverse + ', peer gap ' + position.vsPeers, source: 'buildIntelligence / portfolioPositions (source quote quality checked)', observedAt: null });
   const priceQuality = evaluateDecisionEligibility(quote, true, true, nowMs);
   return { symbol: position.symbol, companyName: position.name, state, horizonMonths: { min: 2, max: 12 },
-    priceUsd: priceQuality.eligibleForDecision ? quote.price : null,
+    priceUsd: priceQuality.eligibleForDecision && sameObservation && position.currentValue != null && Number.isFinite(position.currentValue) ? quote.price : null,
     positionReturnPct: quality.eligibleForDecision && Number.isFinite(position.pnlPct) ? position.pnlPct : null,
     reasons: [{ code: 'portfolioPositions.' + position.state, title: quality.eligibleForDecision ? position.rationale : 'Assessment withheld',
       explanation: quality.eligibleForDecision ? position.strategyContext : quality.reasons.join(' '), direction: state === 'RISK REVIEW' ? 'risk' : state === 'ADD REVIEW' ? 'supporting' : 'neutral', evidenceIds: evidence.map(e => e.id) },

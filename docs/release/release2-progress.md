@@ -1,5 +1,7 @@
 # Release 2 progress estimate
 
+The [position valuation safety increment](release2-position-valuation-integrity.md) preserves missing P&L/current values and original holding-input gaps, separates cost from current weights, and adds read-only coverage/attribution explanations. Authoritative accounting, remaining consumer parity and hosted acceptance remain pending; the older core estimate below is unchanged.
+
 The [proxy-origin safety follow-up](release2-proxy-origin-hardening.md) now removes request-header destinations and blocks redirect forwarding in the agent/Congress proxy paths, with offline and native-loopback controls. Hosted configuration/protection acceptance and remaining valuation/server-alert/resource work remain pending; the core estimate below is unchanged.
 
 The [browser quote-alert safety increment](release2-browser-quote-alert-admission.md) now gates automatic browser detection and preserves eligible baselines/deduplication under invalid or reordered samples. Independent server alert admission, hosted backend-proxy acceptance and remaining valuation/accounting corrections are still pending. The core estimate below is unchanged.

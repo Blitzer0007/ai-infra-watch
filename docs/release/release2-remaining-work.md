@@ -34,6 +34,8 @@ Done when effective limits cover every admitted attempt/retry/fallback in the re
 
 ### 3. Authoritative accounting and Python handoff — core
 
+The [loaded-position valuation integrity increment](release2-position-valuation-integrity.md) now preserves original holding quantity/cost/currency gaps, null P&L, strict declared quote admission and full-denominator current-value weights across the reviewed Portfolio views/helpers. This removes the documented cost-as-current-value and missing-as-zero substitutions in that scope. Complete account/transaction history, original trade-input consumption, corporate actions and backend/Python handoff remain pending.
+
 - Prove import/full-trade-history coverage and gross/fee/currency semantics; resolve inventory mismatches, derived inputs and ambiguous same-day ordering.
 - Establish corporate-action/dividend/split and cash-flow treatment before complete account-performance claims.
 - Finish cross-layer precision/tolerance/accounting-method parity and diagnostics, reusing the existing weighted-average calculators.

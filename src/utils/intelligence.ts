@@ -7,6 +7,15 @@ export type PricePoint = {
   retrievedAt?: string;
   stale?: boolean;
   cached?: boolean;
+  returnedSymbol?: string | null;
+  sourceMode?: 'live' | 'simulated' | 'unknown';
+  currency?: string | null;
+  adjustedBasis?: 'raw' | 'split_adjusted' | 'total_return' | 'unknown';
+  marketTimePrecision?: 'instant' | 'date-only' | 'unknown';
+  marketTime?: string | null;
+  isMarketSessionOpen?: boolean | null;
+  simulated?: boolean;
+  status?: string;
 };
 export type IntelligenceGroup = {
   name: string;

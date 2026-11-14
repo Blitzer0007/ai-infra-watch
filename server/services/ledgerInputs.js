@@ -21,3 +21,9 @@ export function storedHoldingInputs(row) {
   const symbol=typeof row.symbol==='string'?row.symbol.trim().toUpperCase():'';
   return {contractVersion:'stored-holding-inputs-v1',symbol:/^[A-Z0-9.^=-]{1,20}$/.test(symbol)?symbol:null,quantity:numeric(row.quantity)};
 }
+
+export function storedHoldingValuationInputs(row) {
+  return { contractVersion: 'stored-holding-valuation-v1',
+    symbol: storedHoldingInputs(row).symbol, quantity: numeric(row.quantity), averageCost: numeric(row.average_cost),
+    currency: typeof row.currency === 'string' && /^[A-Za-z]{3}$/.test(row.currency) ? row.currency.toUpperCase() : null };
+}

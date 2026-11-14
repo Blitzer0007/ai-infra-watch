@@ -40,14 +40,16 @@ test('stale, malformed price and non-finite move observations never manufacture 
 test('position review needs complete group and peer observations while price-only value stays observable', () => {
   const group=buildIntelligence({}).groups.find(group=>group.members.includes('NVDA'))!;
   const prices=Object.fromEntries(group.members.map(symbol=>[symbol,point(1)]));prices.NVDA=point(2);prices.AMD=point(1);
-  const position:PortfolioPosition={symbol:'NVDA',name:'Example',group:group.name,theme:'Test',peers:['AMD'],geo:'US',quantity:1,averageCost:100,investedValue:100,snapshotCurrentValue:100};
-  const complete=buildPositionAnalyses(prices,buildIntelligence(prices),[position])[0];
+  const valuationNow=Date.parse('2026-11-06T18:00:00Z');
+  prices.NVDA={...prices.NVDA,returnedSymbol:'NVDA',sourceMode:'live',adjustedBasis:'raw',currency:'USD',provider:'declared-source',marketTimePrecision:'instant',marketTime:'2026-11-06T17:59:00Z',retrievedAt:'2026-11-06T18:00:00Z',isMarketSessionOpen:true};
+  const position:PortfolioPosition={symbol:'NVDA',name:'Example',group:group.name,theme:'Test',peers:['AMD'],geo:'US',quantity:1,averageCost:100,investedValue:100,snapshotCurrentValue:100,currency:'USD'};
+  const complete=buildPositionAnalyses(prices,buildIntelligence(prices),[position],valuationNow)[0];
   assert.equal(complete.state,'ADD REVIEW');
   const missing={...prices};delete missing[group.members.find(symbol=>!['NVDA','AMD'].includes(symbol))!];
-  const partial=buildPositionAnalyses(missing,buildIntelligence(missing),[position])[0];
+  const partial=buildPositionAnalyses(missing,buildIntelligence(missing),[position],valuationNow)[0];
   assert.equal(partial.state,'INSUFFICIENT DATA');assert.equal(partial.currentValue,100);
-  const noMove={...prices,NVDA:{price:100,changePct:NaN}};
-  const absent=buildPositionAnalyses(noMove,buildIntelligence(noMove),[position])[0];
+  const noMove={...prices,NVDA:{...prices.NVDA,changePct:NaN}};
+  const absent=buildPositionAnalyses(noMove,buildIntelligence(noMove),[position],valuationNow)[0];
   assert.equal(absent.dailyChangePct,null);assert.equal(absent.currentValue,100);assert.equal(absent.state,'INSUFFICIENT DATA');
 });
 

@@ -1,12 +1,13 @@
 """Offline browser → intercepted API → missing/observed analytics regression."""
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import pytest
 from playwright.sync_api import expect
 from test_ui import mock_local_apis
+VALUATION_NOW=datetime(2026,11,13,18,0,tzinfo=timezone.utc)
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +21,7 @@ def no_errors_or_writes(page):
 
 
 def setup(page,symbols=('NVDA','AMD'),observed=('NVDA',),histories=None):
+    page.clock.set_fixed_time(VALUATION_NOW)
     mock_local_apis(page)
     control={'stale':False,'quotes':0}
     rows=[{'id':'fictional-'+symbol,'symbol':symbol,'quantity':1,'averageCost':100,'purchaseDate':'2026-01-01'} for symbol in symbols]
@@ -30,7 +32,8 @@ def setup(page,symbols=('NVDA','AMD'),observed=('NVDA',),histories=None):
         if symbol not in observed:
             route.fulfill(status=503,content_type='application/json',body='{"error":"fictional unavailable"}');return
         control['quotes']+=1
-        route.fulfill(status=200,content_type='application/json',body=json.dumps({'symbol':symbol,'price':100,'changePct':0,'stale':control['stale'],'provider':'qa'}))
+        instant=VALUATION_NOW.isoformat()
+        route.fulfill(status=200,content_type='application/json',body=json.dumps({'symbol':symbol,'returnedSymbol':symbol,'price':100,'changePct':0,'stale':control['stale'],'provider':'declared-source','sourceMode':'live','currency':'USD','adjustedBasis':'raw','marketTimePrecision':'instant','marketTime':instant,'retrievedAt':instant,'isMarketSessionOpen':True}))
     page.route('**/api/quote**',quote)
     def company(route):
         query=parse_qs(urlparse(route.request.url).query)

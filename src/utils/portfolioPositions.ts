@@ -1,6 +1,9 @@
 import { usablePricePoint, type IntelligenceSnapshot, type PricePoint } from './intelligence';
 import type { PortfolioPurchaseLot, StoredPortfolioHolding, BrokerAlert, RuleStage } from './portfolioApi';
 import { STOCK_UNIVERSE } from './stockUniverse';
+import { evaluateDeclaredQuote } from './quoteAdmission';
+import type { DataQualityStatus } from './decisionEligibility';
+import { calculatePortfolioConcentration } from './measurement';
 
 export type PortfolioPosition = {
   symbol: string;
@@ -11,8 +14,11 @@ export type PortfolioPosition = {
   geo: string;
   quantity: number;
   averageCost: number;
-  investedValue: number;
-  snapshotCurrentValue: number;
+  investedValue: number | null;
+  snapshotCurrentValue: number | null;
+  currency: string | null;
+  quantitySupported?: boolean;
+  costBasisSupported?: boolean;
   notes?: string;
   decisionThesis?: string;
   lossLimitPct?: number | null;
@@ -45,8 +51,10 @@ export type PositionAnalysis = PortfolioPosition & {
   liveProvider: string | null;
   liveStale: boolean;
   currentValue: number | null;
-  pnl: number;
-  pnlPct: number;
+  pnl: number | null;
+  pnlPct: number | null;
+  valuationStatus: DataQualityStatus;
+  valuationIssues: string[];
   dailyChangePct: number | null;
   groupScore: number | null;
   groupBreadth: number | null;
@@ -63,8 +71,8 @@ export type PositionAnalysis = PortfolioPosition & {
   averageInAlert: boolean;
   recoveryAlert: boolean;
   strategyContext: string;
-  portfolioWeight?: number;
-  minorPosition?: boolean;
+  portfolioWeight?: number | null;
+  minorPosition?: boolean | null;
 };
 
 export const PORTFOLIO_SNAPSHOT = null;
@@ -82,7 +90,16 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
   const holdingPeriodDays = firstPurchaseDate
     ? Math.max(0, Math.floor((Date.now() - new Date(firstPurchaseDate + 'T00:00:00Z').getTime()) / 86400000))
     : null;
-  const investedValue = holding.quantity * holding.averageCost;
+  const original = holding.valuationInputs;
+  const hasOriginal = original !== undefined;
+  const bound = original?.contractVersion === 'stored-holding-valuation-v1' && original.symbol === holding.symbol;
+  const quantitySupported = typeof holding.quantity === 'number' && Number.isFinite(holding.quantity) && holding.quantity >= 0
+    && (!hasOriginal || (bound && original.quantity !== null && original.quantity === holding.quantity));
+  const costBasisSupported = quantitySupported && typeof holding.averageCost === 'number' && Number.isFinite(holding.averageCost) && holding.averageCost >= 0
+    && holding.currency === 'USD'
+    && (!hasOriginal || (bound && original.averageCost !== null && original.averageCost === holding.averageCost && original.currency === 'USD'));
+  const cost = holding.quantity * holding.averageCost;
+  const investedValue = costBasisSupported && Number.isFinite(cost) ? cost : null;
   return {
     id: holding.id,
     symbol: holding.symbol,
@@ -94,7 +111,10 @@ function enrichHolding(holding: StoredPortfolioHolding): PortfolioPosition {
     quantity: holding.quantity,
     averageCost: holding.averageCost,
     investedValue,
-    snapshotCurrentValue: investedValue,
+    snapshotCurrentValue: null,
+    currency: holding.currency ?? null,
+    quantitySupported,
+    costBasisSupported,
     notes: holding.notes,
     decisionThesis: holding.decisionThesis || holding.notes || '',
     lossLimitPct: holding.lossLimitPct ?? null,
@@ -133,14 +153,22 @@ export function buildPositionAnalyses(
   prices: Record<string, PricePoint>,
   intelligence: IntelligenceSnapshot,
   positions: PortfolioPosition[] = PORTFOLIO_POSITIONS,
+  nowMs = Date.now(),
 ): PositionAnalysis[] {
   return positions.map((position) => {
     const quote = prices[position.symbol];
-    const livePrice = quote && Number.isFinite(quote.price) && quote.price > 0 ? quote.price : null;
-    const liveIsFresh = livePrice != null && quote?.stale !== true;
-    const currentValue = liveIsFresh ? livePrice * position.quantity : null;
-    const pnl = liveIsFresh ? (currentValue ?? 0) - position.investedValue : 0;
-    const pnlPct = liveIsFresh && position.investedValue ? (pnl / position.investedValue) * 100 : 0;
+    const quality = evaluateDeclaredQuote(position.symbol, quote, nowMs);
+    const livePrice = quality.quote?.price ?? null;
+    const liveIsFresh = quality.eligible;
+    const quantityValid = position.quantitySupported !== false && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0;
+    const value = livePrice == null || !quantityValid ? null : livePrice * position.quantity;
+    const currentValue = value != null && Number.isFinite(value) ? value : null;
+    const costValid = recordedCostSupported(position);
+    const difference = currentValue != null && costValid ? currentValue - position.investedValue! : null;
+    const pnl = difference != null && Number.isFinite(difference) ? difference : null;
+    const percent = pnl != null && position.investedValue! > 0 ? pnl / position.investedValue! * 100 : null;
+    const pnlPct = percent != null && Number.isFinite(percent) ? percent : null;
+    const valuationIssues = [...quality.reasons, ...(!quantityValid || (value != null && currentValue == null) ? ['Quantity or position-value arithmetic is unsupported.'] : []), ...(!costValid ? ['Loaded cost basis or USD cost currency is unavailable or invalid; P&L is withheld.'] : [])];
     const group = intelligence.groups.find((item) => item.name === position.group) ?? null;
 
     const peerReturns = position.peers
@@ -149,7 +177,7 @@ export function buildPositionAnalyses(
       .map((peer) => peer.changePct)
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const peerAverageChange = avg(peerReturns);
-    const dailyChangePct = usablePricePoint(quote) ? quote.changePct : null;
+    const dailyChangePct = liveIsFresh && usablePricePoint(quote) ? quote.changePct : null;
     const vsPeers = dailyChangePct != null && peerAverageChange != null
       ? dailyChangePct - peerAverageChange
       : null;
@@ -168,12 +196,12 @@ export function buildPositionAnalyses(
       vsPeers != null && vsPeers >= 0;
 
     const riskEligible = groupScore != null && (
-      (groupScore <= (isLeveraged ? 45 : 38) && pnlPct <= -10) ||
+      (groupScore <= (isLeveraged ? 45 : 38) && pnlPct != null && pnlPct <= -10) ||
       (vsPeers != null && vsPeers <= (isLeveraged ? -1.5 : -1.0) && groupBreadth != null && groupBreadth < 0.50)
     );
 
     let state: PositionAnalysis['state'] = 'INSUFFICIENT DATA';
-    const supportingMetricsAvailable = group?.coverage.status === 'complete' && position.peers.length > 0 &&
+    const supportingMetricsAvailable = pnlPct != null && currentValue != null && group?.coverage.status === 'complete' && position.peers.length > 0 &&
       peerReturns.length === position.peers.length && groupScore != null && groupBreadth != null && relativeToUniverse != null && vsPeers != null;
     if (liveIsFresh && supportingMetricsAvailable && riskEligible) state = 'RISK REVIEW';
     else if (liveIsFresh && supportingMetricsAvailable && addEligible) state = 'ADD REVIEW';
@@ -194,7 +222,7 @@ export function buildPositionAnalyses(
       : 'Reassess exposure when group score ≤38 with a ≥10% position drawdown, or when the position trails tracked peers by ≥1.0 point with group breadth below 50%.';
 
     const averageInAlert = liveIsFresh &&
-      pnlPct < 0 &&
+      pnlPct != null && pnlPct < 0 &&
       groupScore != null &&
       groupBreadth != null &&
       relativeToUniverse != null &&
@@ -205,7 +233,7 @@ export function buildPositionAnalyses(
       vsPeers >= 0;
 
     const recoveryAlert = liveIsFresh &&
-      pnlPct < 0 &&
+      pnlPct != null && pnlPct < 0 &&
       dailyChangePct != null &&
       dailyChangePct < 0 &&
       groupScore != null &&
@@ -219,10 +247,15 @@ export function buildPositionAnalyses(
 
     return {
       ...position,
+      quantitySupported: quantityValid,
+      costBasisSupported: costValid,
+      investedValue: costValid ? position.investedValue : null,
       livePrice,
       liveRetrievedAt: quote?.retrievedAt ?? null,
       liveProvider: quote?.provider ?? null,
-      liveStale: quote?.stale === true,
+      liveStale: quote?.stale === true || quality.status === 'stale',
+      valuationStatus: quality.status,
+      valuationIssues,
       currentValue,
       pnl,
       pnlPct,
@@ -236,8 +269,8 @@ export function buildPositionAnalyses(
       rationale,
       addTrigger,
       riskTrigger,
-      whatIfProfitAt10Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.10 - position.averageCost) * position.quantity,
-      whatIfProfitAt20Pct: livePrice == null || !liveIsFresh ? null : (livePrice * 1.20 - position.averageCost) * position.quantity,
+      whatIfProfitAt10Pct: livePrice == null ? null : calculatePositionScenario(position, livePrice * 1.10).pnl,
+      whatIfProfitAt20Pct: livePrice == null ? null : calculatePositionScenario(position, livePrice * 1.20).pnl,
       potentialUpsideSignal: !liveIsFresh || !supportingMetricsAvailable || groupScore == null || groupBreadth == null
         ? 'INSUFFICIENT DATA'
         : groupScore >= 62 && groupBreadth >= 0.5
@@ -260,4 +293,29 @@ export function buildPositionAnalyses(
               : 'Continue monitoring the holding against its purchase thesis, group strength, peers, catalysts and risk signals before changing exposure.',
     };
   });
+}
+
+type LoadedCostInput = Pick<PortfolioPosition, 'quantity' | 'averageCost' | 'investedValue' | 'currency' | 'quantitySupported' | 'costBasisSupported'>;
+function recordedCostSupported(position: LoadedCostInput) {
+  return position.currency === 'USD' && position.quantitySupported !== false && position.costBasisSupported !== false && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0
+    && typeof position.averageCost === 'number' && Number.isFinite(position.averageCost) && position.averageCost >= 0
+    && typeof position.investedValue === 'number' && Number.isFinite(position.investedValue) && position.investedValue >= 0
+    && position.investedValue === position.quantity * position.averageCost;
+}
+
+/** Hypothetical target math only. It does not supply a current observation or a forecast. */
+export function calculatePositionScenario(position: LoadedCostInput, price: number) {
+  const value = position.quantitySupported !== false && typeof price === 'number' && Number.isFinite(price) && price > 0 && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0 ? price * position.quantity : null;
+  const saleValue = value != null && Number.isFinite(value) ? value : null;
+  const profit = saleValue != null && recordedCostSupported(position) ? saleValue - position.investedValue! : null;
+  const pnl = profit != null && Number.isFinite(profit) ? profit : null;
+  const percent = pnl != null && position.investedValue! > 0 ? pnl / position.investedValue! * 100 : null;
+  return { saleValue, pnl, returnPct: percent != null && Number.isFinite(percent) ? percent : null };
+}
+
+export function withCurrentPortfolioWeights(positions: PositionAnalysis[]): PositionAnalysis[] {
+  const concentration = calculatePortfolioConcentration(positions);
+  const weights = new Map(concentration.weights.map(row => [row.symbol, row.weight]));
+  return positions.map(row => ({ ...row, portfolioWeight: weights.get(row.symbol) ?? null,
+    minorPosition: weights.has(row.symbol) ? weights.get(row.symbol)! < 0.02 : null }));
 }

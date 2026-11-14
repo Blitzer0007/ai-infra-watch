@@ -1,8 +1,7 @@
 /** Browser detection only. Pure source admission and transitions; no transport or storage. */
 import type { AppConfig } from '../utils';
 import type { AlertEvent } from './alertContracts';
-import { evaluateQuoteQuality, normalizeDecisionQuote } from './decisionEligibility';
-import { validCalendarInstant } from './catalystCalendar';
+import { evaluateDeclaredQuote } from './quoteAdmission';
 
 export const QUOTE_ALERT_STATE_KEY = 'aiw_quote_alert_admission_v1';
 export const QUOTE_ALERT_MAX_AGE_MS = 15 * 60_000;
@@ -42,30 +41,11 @@ export function readQuoteAlertState(value: unknown): QuoteAlertState {
 }
 
 export function admitBrowserAlertQuote(symbol: string, value: unknown, nowMs: number) {
-  const reasons: string[] = [];
-  if (!validClock(nowMs) || !validSymbol(symbol) || !object(value)) return { eligible: false, reasons: ['Invalid clock, symbol or quote packet.'], quote: null };
-  const q = value;
-  if (typeof q.returnedSymbol !== 'string' || q.returnedSymbol.trim().toUpperCase() !== symbol || (q.symbol != null && q.symbol !== symbol)) reasons.push('Provider-returned identity is missing or mismatched.');
-  if (q.sourceMode !== 'live') reasons.push('A declared live source mode is required.');
-  if (q.adjustedBasis !== 'raw') reasons.push('Absolute price alerts require raw USD quote units.');
-  for (const flag of ['stale', 'simulated', 'fallbackUsed']) if (q[flag] != null && typeof q[flag] !== 'boolean') reasons.push('Malformed quality marker: ' + flag + '.');
-  if (q.simulated === true || q.stale === true) reasons.push('Simulated or stale quotes cannot trigger browser alerts.');
-  if (q.marketTimePrecision !== 'instant' || !validCalendarInstant(q.marketTime) || !validCalendarInstant(q.retrievedAt)) reasons.push('Exact market and retrieval instants are required.');
-  if (q.isMarketSessionOpen !== true) reasons.push('Automatic browser alerts require an explicitly open regular session.');
-  if (q.independentObservations != null && !Array.isArray(q.independentObservations)) reasons.push('Malformed independent-observation collection.');
-  if (Array.isArray(q.independentObservations) && (q.independentObservations.length > 32 || q.independentObservations.some(row =>
-    !object(row) || row.symbol !== symbol || typeof row.provider !== 'string' || !row.provider.trim() || row.provider.length > 80
-      || !finite(row.price) || row.price <= 0 || row.currency !== 'USD' || row.adjustedBasis !== 'raw'
-      || !validCalendarInstant(row.marketTime)))) reasons.push('Independent price-comparison metadata is incomplete or incompatible.');
-  if (typeof q.provider !== 'string' || !q.provider.trim() || q.provider.length > 80 || /[\u0000-\u001f\u007f]/.test(q.provider)) reasons.push('A bounded provider label is required.');
-  if (reasons.length) return { eligible: false, reasons, quote: null };
-  const quote = normalizeDecisionQuote(symbol, q);
-  const quality = evaluateQuoteQuality(quote, nowMs);
-  reasons.push(...quality.reasons);
-  if (nowMs - Date.parse(quote.marketTime!) > QUOTE_ALERT_MAX_AGE_MS || nowMs - Date.parse(quote.retrievedAt!) > QUOTE_ALERT_MAX_AGE_MS) reasons.push('Market observation and retrieval must be at most 15 minutes old for automatic browser alerts.');
-  return { eligible: reasons.length === 0, reasons, quote: reasons.length ? null : {
+  const result = evaluateDeclaredQuote(symbol, value, nowMs, { requireOpenSession: true, maxAgeMs: QUOTE_ALERT_MAX_AGE_MS });
+  const quote = result.quote;
+  return { eligible: result.eligible, reasons: result.reasons, quote: !quote ? null : {
     price: quote.price!, marketMs: Date.parse(quote.marketTime!), provider: quote.provider,
-    changePct: finite(q.changePct) ? q.changePct : null,
+    changePct: object(value) && finite(value.changePct) ? value.changePct : null,
   } };
 }
 
