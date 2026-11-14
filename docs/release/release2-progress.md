@@ -23,6 +23,8 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
+- [Sectioned read-only company dossier](release2-company-dossier-ui.md): local section navigation, collapsed holding entry with unconnected-data states, expandable source/calculation inputs and a separate development-only FICT preview. Broader statement adapters, authentic company/source evidence, real holding data and scanner integration remain pending; no activation or increase in the rounded core estimate is implied.
+
 - [Company financial observations, stage 1](release2-company-financial-observations.md): pure bounded projection of existing SEC receipt methods and supporting declarations, with units/periods/filing dates, explicit source failures and no source/decision authority. Broader statement coverage, authentic acquisition and dossier/scanner integration remain pending; the core estimate is unchanged.
 
 - [Shared existing-rule kernel](release2-shared-rule-kernel.md): legacy server rule calculations and pure math helpers now share a browser-safe, explicit-clock boundary with a narrow client adapter. Fourteen retained old outputs match exactly. No-stages state output is copied, and exact 3% near-boundary classification uses a stable equivalent comparison. The existing server persistence boundary remains separate. Consolidated UI/configuration/coverage work and financial sign-off remain pending; engineering remains approximately 60%.

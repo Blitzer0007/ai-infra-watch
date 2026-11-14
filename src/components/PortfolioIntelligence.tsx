@@ -2,6 +2,8 @@ import LoadedLedgerReview from './portfolio/LoadedLedgerReview';
 import type { LedgerAvailability } from '../utils/loadedLedgerReview';
 import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
+import HoldingCompanyDossier from './portfolio/HoldingCompanyDossier';
+import CompanyDossierPreview from './portfolio/CompanyDossierPreview';
 import EventRiskRadar from './portfolio/EventRiskRadar';
 import PortfolioValuationCoverage from './portfolio/PortfolioValuationCoverage';
 import PortfolioAttributionRows from './portfolio/PortfolioAttributionRows';
@@ -915,7 +917,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <Metric label="AI infrastructure strength" value={infraScore == null ? 'Unavailable' : Math.round(infraScore).toString()} suffix={infraScore == null ? '' : '/100'} tone={infraScore == null ? 'warn' : infraScore >= 50 ? 'up' : 'down'} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      {tab === 'research' && <PortfolioResearchPanel />}
+      {tab === 'research' && <div className="space-y-4">{import.meta.env.DEV&&<CompanyDossierPreview/>}<PortfolioResearchPanel /></div>}
 
       {tab === 'holdings' && (
         <div className="space-y-4">
@@ -1004,6 +1006,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button><button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button></div>
           <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />
           <button type="button" onClick={()=>changeTab('radar')} className="min-h-11 rounded-lg border border-cyan-200/40 px-3 py-2 text-sm text-cyan-100">Open Event Risk Radar · fictional preview</button>
+          <HoldingCompanyDossier key={detailSymbol} symbol={detailSymbol} configuredName={detailAnalysis.name}/>
           <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary><div className="mt-4 space-y-4"><PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/><PeerCounterfactualPanel h={detailAnalysis} comparison={peerComparison} loading={peerLoading}/></div></details>
         </>}
       </HoldingDetailDialog>}
