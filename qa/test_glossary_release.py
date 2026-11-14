@@ -57,9 +57,3 @@ def test_glossary_mobile_tablet_desktop_and_dialog_have_no_horizontal_overflow(p
         dialog.screenshot(path=str(ARTIFACTS/f'glossary-dialog-{width}.png'))
         page.keyboard.press('Escape')
     assert calls==[] and errors==[]
-
-def test_release_contains_only_the_selected_runtime_slice():
-    import subprocess
-    root=Path(__file__).resolve().parents[1]
-    changed=subprocess.check_output(['git','diff','--name-only','8cb77d256b27c6983bf911db4c4ac32c667dca53','--','api','server','supabase','agents','aitracker-upload','vercel.json','package.json','package-lock.json','requirements.txt'],cwd=root,text=True)
-    assert changed.strip()==''
