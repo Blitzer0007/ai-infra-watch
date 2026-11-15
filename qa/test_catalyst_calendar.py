@@ -71,7 +71,7 @@ def test_loaded_legacy_estimates_and_calendar_controls_make_no_requests_or_write
     card.locator('summary').click()
     assert 'Issuer confirmation has not been supplied.' in card.inner_text()
     assert 'A public event source link is unavailable.' in card.inner_text()
-    assert card.get_by_role('link').count()==0
+    assert card.get_by_role('link',name='Open event source',exact=False).count()==0
     assert calls==[]
     assert writes==[]
     assert 'Source-confirmed coverage: unknown' in calendar.inner_text()
@@ -90,7 +90,7 @@ def test_corrections_cancellations_and_range_history(page):
     card.locator('summary').click()
     card.get_by_text('Earlier reported versions',exact=True).wait_for()
     assert card.get_by_text('Superseded',exact=False).count()==2
-    assert card.get_by_role('link').count()==3
+    assert card.get_by_role('link',name='Open event source',exact=False).count()==3
     calendar.get_by_role('searchbox',name='Search calendar').fill('no-match')
     assert card.count()==0
     calendar.get_by_role('button',name='Clear filters').click()

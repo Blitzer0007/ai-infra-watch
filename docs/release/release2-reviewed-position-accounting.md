@@ -30,4 +30,4 @@ Tests use invented receipts and intercepted transports only. The existing main b
 
 ## Remaining work
 
-Milestone 2 still requires integrated calendar/inbox/company research context, retained reading/filter state, source/conflict explanations, loading/error cases and keyboard/mobile acceptance. Authoritative ledger history, broker semantics, corporate actions, issuer/source acquisition, FX/history consumers elsewhere and live provider acceptance remain open. No production changes, polling, messages or second release are implied. Production releases remain **1/5**.
+The subsequent [Calendar/Inbox round-trip increment](release2-review-workspace-navigation.md) retains bounded filters and reading context. Milestone 2 still requires exact opened-record company context, broader source/conflict explanations, editing-state integration and complete loading/error/keyboard/mobile acceptance. Authoritative ledger history, broker semantics, corporate actions, issuer/source acquisition, FX/history consumers elsewhere and live provider acceptance remain open. No production changes, polling, messages or second release are implied. Production releases remain **1/5**.

@@ -1,3 +1,4 @@
+import {reviewCompanyHref} from '../../utils/reviewWorkspaceNavigation';
 import type { CalendarRevision, CatalystEvent } from '../../utils/catalystCalendar';
 import { formatReviewDate } from '../../utils/portfolioReview';
 
@@ -12,8 +13,10 @@ export function CatalystEvidence({ event, timeZone }: { event: CatalystEvent; ti
   </div>;
 }
 
-export default function CatalystEventCard({ row, revisions, timeZone }: { row: CalendarRevision; revisions: CalendarRevision[]; timeZone?: string }) {
+export default function CatalystEventCard({ row, revisions, timeZone,viewParams,onOpenResearch,expanded,onExpanded,rememberOrigin }: { row: CalendarRevision; revisions: CalendarRevision[]; timeZone?: string;viewParams:URLSearchParams;onOpenResearch:(href:string)=>void;expanded:Set<string>;onExpanded:(key:string,open:boolean)=>void;rememberOrigin:(key:string)=>void }) {
   const event = row.event;
+  const key=JSON.stringify([event.source,event.id]);
+  const researchHref=reviewCompanyHref(event.symbol,'calendar',viewParams);
   const history: CalendarRevision[] = [];
   let previousId = row.lineageIssue ? null : event.supersedesId;
   const seen = new Set<string>();
@@ -37,7 +40,8 @@ export default function CatalystEventCard({ row, revisions, timeZone }: { row: C
     <p className="text-base font-semibold"><time dateTime={event.date}>{formatReviewDate(event.date, undefined, timeZone)}</time></p>
     {event.confirmation === 'cancelled' && <p className="text-sm text-rose-100">This event is reported cancelled. It is retained for context and is not an upcoming confirmed catalyst.</p>}
     {row.lineageIssue && <p className="text-sm text-amber-100">{row.lineageIssue}</p>}
-    <details className="rounded-xl border border-white/10 p-3">
+    {researchHref&&<a data-review-focus={key} className="inline-flex min-h-11 items-center rounded-lg border border-cyan-200/30 px-3 py-2 text-sm text-cyan-100" href={researchHref} onClick={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();rememberOrigin(key);onOpenResearch(researchHref);}}>Research {row.event.symbol}</a>}
+    <details open={expanded.has(key)} onToggle={event=>onExpanded(key,event.currentTarget.open)} className="rounded-xl border border-white/10 p-3">
       <summary className="cursor-pointer text-sm font-semibold">Source evidence and revisions for {event.symbol}</summary>
       <div className="mt-3"><CatalystEvidence event={event} timeZone={timeZone} /></div>
       {!!history.length && <div className="mt-4 space-y-3">

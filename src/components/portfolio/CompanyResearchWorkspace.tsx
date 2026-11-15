@@ -1,3 +1,4 @@
+import {reviewReturnHref} from '../../utils/reviewWorkspaceNavigation';
 import {useEffect,useId,useState} from 'react';
 import {STOCK_UNIVERSE} from '../../utils/stockUniverse';
 import {validHoldingSymbol} from '../../utils/holdingDetailNavigation';
@@ -5,11 +6,12 @@ import {opportunityReturnHref,readResearchSelection} from '../../utils/companyRe
 import type {LedgerAvailability} from '../../utils/loadedLedgerReview';
 import HoldingCompanyDossier from './HoldingCompanyDossier';
 
-type Props={holdings:readonly string[];watchlist:readonly string[];holdingsStatus:LedgerAvailability};
+type Props={onOpenReviewHref?:(href:string)=>void;holdings:readonly string[];watchlist:readonly string[];holdingsStatus:LedgerAvailability};
 /** Company selection is independent of the selected position. This view has no data transport. */
-export default function CompanyResearchWorkspace({holdings,watchlist,holdingsStatus}:Props){
+export default function CompanyResearchWorkspace({holdings,watchlist,holdingsStatus,onOpenReviewHref}:Props){
   const [selection,setSelection]=useState(()=>readResearchSelection(new URLSearchParams(window.location.search)));
-  const [returnHref,setReturnHref]=useState(()=>opportunityReturnHref(new URLSearchParams(window.location.search)));
+  const readReturn=()=>{const p=new URLSearchParams(window.location.search);return reviewReturnHref(p)??{href:opportunityReturnHref(p),label:'Return to Opportunities'};};
+  const [returnLink,setReturnLink]=useState(readReturn);
   const controlId=useId();
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
@@ -20,7 +22,7 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
     }
   },[selection.symbol]);
   useEffect(()=>{
-    const restore=()=>{const params=new URLSearchParams(window.location.search);setSelection(readResearchSelection(params));setReturnHref(opportunityReturnHref(params));};
+    const restore=()=>{const params=new URLSearchParams(window.location.search);setSelection(readResearchSelection(params));setReturnLink(reviewReturnHref(params)??{href:opportunityReturnHref(params),label:'Return to Opportunities'});};
     window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);
   },[]);
   const symbols=[...new Set([...holdings.filter(validHoldingSymbol).slice(0,150),...watchlist.filter(validHoldingSymbol).slice(0,50)])].sort();
@@ -46,7 +48,7 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
       <p data-testid="research-position-context" className="text-sm text-amber-200">{holdingsStatus!=='ready'?'Holding membership is unavailable. This research view does not establish a position.':holdings.includes(active)?'In loaded holdings · accounting and financial evidence remain subject to their own review.':'Watchlist company · no loaded position. Returns, sizing and position actions are not inferred.'}</p>
       <HoldingCompanyDossier key={active} symbol={active} configuredName={name}/>
     </>}
-    <a className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-3 py-2 text-sm text-cyan-100" href={returnHref}>Return to Opportunities</a>
-    <p className="text-xs text-white/60">Return links retain search, status and display limits. A lost frozen snapshot is not restored; run the loaded-data scan explicitly when needed.</p>
+    <a className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-3 py-2 text-sm text-cyan-100" href={returnLink.href} onClick={event=>{if(returnLink.label==='Return to Opportunities'||!onOpenReviewHref||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();onOpenReviewHref(returnLink.href);}}>{returnLink.label}</a>
+    <p className="text-xs text-white/60">{returnLink.label==='Return to Opportunities'?'Return links retain search, status and display limits. A lost frozen snapshot is not restored; run the loaded-data scan explicitly when needed.':'Return links retain view options. Searches, expanded explanations and loaded records stay in this app session; a reload loses loaded source records and does not fetch replacements.'}</p>
   </section>;
 }

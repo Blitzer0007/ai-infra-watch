@@ -1,3 +1,4 @@
+import {createReviewReadingSession,canonicalReviewHref,type ReviewWorkspace} from './utils/reviewWorkspaceNavigation';
 import AlertInbox from './components/alerts/AlertInbox';
 import OpportunityScanner from './components/opportunities/OpportunityScanner';
 import CatalystCalendar from './components/calendar/CatalystCalendar';
@@ -60,6 +61,8 @@ type LivePrice = {
 };
 
 export default function App() {
+  const [reviewSessions]=useState(()=>({calendar:createReviewReadingSession(),alerts:createReviewReadingSession()}));
+  const [portfolioQuoteTab,setPortfolioQuoteTab]=useState(()=>new URLSearchParams(window.location.search).get('portfolio_tab')||'summary');
   const [calendarSnapshot, setCalendarSnapshot] = useState(unavailableCatalystSnapshot);
   const [activeView, setActiveView] = useState<string>(() => viewFromPath(window.location.pathname));
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -191,13 +194,14 @@ export default function App() {
   }, [config, tickerPrices]);
 
   useEffect(() => {
-    if (activeView !== 'portfolio') return;
+    if (activeView !== 'portfolio'||portfolioQuoteTab==='research') return;
     let cancelled = false;
     let timer: number | undefined;
 
     async function updateWatchlistQuotes() {
       const updated: Record<string, LivePrice> = {};
       for (const s of watchlistSymbols) {
+        if(cancelled)break;
         try {
           const res = await fetchLiveQuote(s, config?.finnhubKey || '', true);
           if (!cancelled && Number.isFinite(res.price) && Number.isFinite(res.changePct)) {
@@ -235,7 +239,7 @@ export default function App() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [activeView, config, portfolioSymbols]);
+  }, [activeView, config, portfolioSymbols, portfolioQuoteTab]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
     setIsLiveLoading(true);
@@ -345,19 +349,36 @@ export default function App() {
     };
   }, []);
 
+  const rememberReviewDeparture=()=>{
+    if(activeView==='calendar'||activeView==='alerts')reviewSessions[activeView].restore=Boolean(reviewSessions[activeView].focusKey);
+  };
+  const handleReviewHref=(href:string)=>{
+    const safe=canonicalReviewHref(href);if(!safe)return;
+    rememberReviewDeparture();
+    const nextView=viewFromPath(safe.split('?')[0]);
+    if(nextView==='portfolio')setPortfolioQuoteTab('research');
+    pendingNavigation.current=nextView!==activeView;
+    window.history.pushState({view:nextView},'',safe);
+    setActiveView(nextView);setIsMobileMenuOpen(false);
+  };
   const handleNavigate = (view: string) => {
+    rememberReviewDeparture();
     const nextView = VIEW_IDS.has(view) ? view : 'overview';
     pendingNavigation.current = nextView !== activeView;
+    if(nextView==='portfolio'&&activeView!=='portfolio')setPortfolioQuoteTab('summary');
     setActiveView(nextView);
     setIsMobileMenuOpen(false);
-    const nextPath = VIEW_PATHS[nextView] || '/overview';
-    if (window.location.pathname !== nextPath) window.history.pushState({ view: nextView }, '', nextPath);
+    const nextPath = (nextView==='calendar'||nextView==='alerts')&&reviewSessions[nextView].href?reviewSessions[nextView].href:VIEW_PATHS[nextView] || '/overview';
+    const targetChanged=(nextView==='calendar'||nextView==='alerts')?window.location.pathname+window.location.search!==nextPath:window.location.pathname!==nextPath;
+    if (targetChanged) window.history.pushState({ view: nextView }, '', nextPath);
   };
 
   useEffect(() => {
     const onPopState = () => {
       const nextView = viewFromPath(window.location.pathname);
+      if(nextView==='portfolio')setPortfolioQuoteTab(new URLSearchParams(window.location.search).get('portfolio_tab')||'summary');
       if (nextView !== activeView) {
+        rememberReviewDeparture();
         pendingNavigation.current = true;
         setIsMobileMenuOpen(false);
         setActiveView(nextView);
@@ -619,6 +640,13 @@ export default function App() {
                   const isCurrentPage = heading?.closest('[data-view]')?.getAttribute('data-view') === viewFromPath(window.location.pathname);
                   if (heading && isCurrentPage) document.title = heading.textContent + ' · AI Infra Watch';
                   if (pendingNavigation.current && heading && isCurrentPage) {
+                    const workspace=viewFromPath(window.location.pathname);
+                    const session=(workspace==='calendar'||workspace==='alerts')?reviewSessions[workspace as ReviewWorkspace]:null;
+                    const origin=session?.restore?Array.from(document.querySelectorAll<HTMLElement>('[data-review-focus]')).find(node=>node.getAttribute('data-review-focus')===session.focusKey):null;
+                    if(session?.restore){
+                      session.restore=false;
+                      if(origin){origin.focus({preventScroll:true});window.scrollTo(0,session.scrollY);pendingNavigation.current=false;return;}
+                    }
                     heading.tabIndex = -1;
                     heading.focus({ preventScroll: true });
                     heading.scrollIntoView({ block: 'start' });
@@ -635,9 +663,9 @@ export default function App() {
               {activeView === 'macro' && <MacroPolitics onNavigate={handleNavigate} liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} evidenceAvailability={liveData?.evidenceAvailability} />}
               {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} loading={isLiveLoading || portfolioSymbolsLoading} holdingsAvailable={portfolioSymbolsAvailable} />}
               {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
-              {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} />}
-              {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} />}
-              {activeView === 'portfolio' && <PortfolioIntelligence researchWatchlist={config.watchlist} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
+              {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} session={reviewSessions.alerts} onOpenResearch={handleReviewHref} />}
+              {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} session={reviewSessions.calendar} onOpenResearch={handleReviewHref} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence onSectionChange={setPortfolioQuoteTab} onOpenReviewHref={handleReviewHref} researchWatchlist={config.watchlist} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} calendarSnapshot={calendarSnapshot} />}
               {activeView === 'quality' && <AIQualityLab />}

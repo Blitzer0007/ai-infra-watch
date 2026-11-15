@@ -6,6 +6,8 @@ Milestone 2 development has started with [company research navigation](release2-
 
 The next [reviewed holding-accounting increment](release2-reviewed-position-accounting.md) reconciles per-position cost/P&L and scenarios with original loaded ledger inputs, preserves quote valuation and complete-denominator weights, and withholds unsupported historical portfolio/peer/exit-target results. It preserves the newer navigation and remains unreleased; full-history/source evidence is still pending.
 
+The [Calendar/Inbox research round-trip increment](release2-review-workspace-navigation.md) adds bounded view restoration, private local search state, source-preserving issuer/return navigation and session-only delivery/reading context. It adds no automatic history read or source acquisition. An exact opened-record context panel and broader integration acceptance remain pending.
+
 Rollout plan: [five milestone production releases](release2-five-deployments.md). Remaining source/accounting truth and live-activation boundaries remain open independently of code-release progress. Existing percentage estimates below are historical and have not been re-certified by this increment.
 
 15 November increment: [risk and release foundation](release2-risk-release-foundation.md) adds strict rule admission, visible configuration/coverage gaps, removal of inferred stage writes from Decision Center reads, Server Smart Alert quote/auth safeguards and tested manual release controls. This was part of the subsequently shipped Milestone 1. Authoritative accounting/source evidence and future hosted-control setup remain pending; the overall engineering percentage has not been re-certified.
