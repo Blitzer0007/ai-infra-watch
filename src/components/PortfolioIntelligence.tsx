@@ -4,6 +4,7 @@ import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type Po
 import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
 import HoldingCompanyDossier from './portfolio/HoldingCompanyDossier';
 import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
+import type {ReviewRecordContext} from '../utils/reviewRecordContext';
 import CompanyDossierPreview from './portfolio/CompanyDossierPreview';
 import EventRiskRadar from './portfolio/EventRiskRadar';
 import PortfolioValuationCoverage from './portfolio/PortfolioValuationCoverage';
@@ -61,7 +62,8 @@ type SelectedChartState = {
 
 type Props = {
   onSectionChange?:(tab:PortfolioTab)=>void;
-  onOpenReviewHref?:(href:string)=>void;
+  onOpenReviewHref?:(href:string,record?:ReviewRecordContext)=>void;
+  reviewRecord?:ReviewRecordContext|null;
   researchWatchlist?: readonly string[];
   livePrices?: Record<string, Price>;
   contracts?: any[];
@@ -75,7 +77,7 @@ const WATCHLIST = STOCK_UNIVERSE;
 const formatUsdPrice = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? '$' + formatPrice(value) : '—';
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
-export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHref, researchWatchlist = [], livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
+export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHref, reviewRecord = null, researchWatchlist = [], livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
   useEffect(()=>{onSectionChange?.(tab);},[tab,onSectionChange]);
   const [holdingsVisited, setHoldingsVisited] = useState(tab === 'holdings');
@@ -752,7 +754,7 @@ export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHre
                 <Metric label="AI infrastructure strength" value={infraScore == null ? 'Unavailable' : Math.round(infraScore).toString()} suffix={infraScore == null ? '' : '/100'} tone={infraScore == null ? 'warn' : infraScore >= 50 ? 'up' : 'down'} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      {tab === 'research' && <div className="space-y-4"><CompanyResearchWorkspace onOpenReviewHref={onOpenReviewHref} holdings={holdings.map(item=>item.symbol)} watchlist={researchWatchlist} holdingsStatus={portfolioLoading?'loading':portfolioError?'unavailable':'ready'} />{import.meta.env.DEV&&<CompanyDossierPreview/>}<PortfolioResearchPanel /></div>}
+      {tab === 'research' && <div className="space-y-4"><CompanyResearchWorkspace onOpenReviewHref={onOpenReviewHref} reviewRecord={reviewRecord} holdings={holdings.map(item=>item.symbol)} watchlist={researchWatchlist} holdingsStatus={portfolioLoading?'loading':portfolioError?'unavailable':'ready'} />{import.meta.env.DEV&&<CompanyDossierPreview/>}<PortfolioResearchPanel /></div>}
 
       {tab === 'holdings' && (
         <div className="space-y-4">
