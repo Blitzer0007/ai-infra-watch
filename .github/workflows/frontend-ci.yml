@@ -2,6 +2,7 @@ name: Frontend CI
 # Purchase-aware portfolio analytics are validated in the standard build.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -35,6 +36,8 @@ on:
       - "tsconfig*.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/vercel-production-deploy.yml"
+      - "scripts/release-candidate.mjs"
       - ".github/workflows/production-validation.yml"
   pull_request:
     paths:
@@ -68,6 +71,8 @@ on:
       - "tsconfig*.json"
       - "vercel.json"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/vercel-production-deploy.yml"
+      - "scripts/release-candidate.mjs"
       - ".github/workflows/production-validation.yml"
 
 concurrency:

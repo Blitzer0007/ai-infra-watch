@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/**"
+      - "scripts/release-candidate.mjs"
       - "src/**"
       - "scripts/forecast-evaluation-demo.mjs"
       - "scripts/forecast-archive-demo.mjs"
@@ -50,6 +51,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/**"
+      - "scripts/release-candidate.mjs"
       - "server/**"
       - "supabase/**"
       - "src/**"

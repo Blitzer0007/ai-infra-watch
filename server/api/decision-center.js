@@ -1,4 +1,5 @@
 import { evaluateExistingRules, sortedHistoryPoints } from '../../shared/portfolioRuleEvaluation.js';
+import { reviewHoldingRules } from '../../shared/portfolioRuleReview.js';
 import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
@@ -405,19 +406,13 @@ export default async function handler(req, res) {
         ruleStates.push({ symbol, state: 'no-data', message: 'Live price unavailable.' });
         continue;
       }
-      const rules = ruleDistance(holding, q, histories[symbol], ruleAssessmentTime);
-      if (rules?.stageStateDirty && holding.id) {
-        try {
-          await supabase('portfolio_holdings?id=eq.' + encodeURIComponent(holding.id), {
-            method: 'PATCH',
-            headers: { Prefer: 'return=minimal' },
-            body: JSON.stringify({ rule_stage_state: rules.stageState || {} }),
-          });
-        } catch {}
-      }
+      const rules = reviewHoldingRules(holding, q, histories[symbol], ruleAssessmentTime.getTime());
+      // This read path does not persist inferred activation/peak state.
+      if (rules.issues.length) configurationIssues.push({ symbol, issues: rules.issues });
       ruleStates.push({
         symbol,
         state: rules.state,
+        issues: rules.issues,
         nearestRule: rules.nearest ? {
           type: rules.nearest.type,
           target: money(rules.nearest.target),
@@ -498,7 +493,11 @@ export default async function handler(req, res) {
         }
       }
 
-      if (rules.state === 'breached') {
+      if (rules.state === 'invalid-config' || rules.state === 'incomplete') {
+        actionItems.push({ severity: 'SETUP', symbol,
+          title: rules.state === 'invalid-config' ? 'Review rule configuration' : 'Rule review incomplete',
+          detail: rules.issues.join(' '), impact: null });
+      } else if (rules.state === 'breached') {
         const hit = rules.rules.find(rule => rule.breached && rule.direction === 'below') ||
           (rules.nearest?.breached ? rules.nearest : null) || rules.rules.find(rule => rule.breached) || rules.nearest;
         actionItems.push({
@@ -600,6 +599,9 @@ export default async function handler(req, res) {
       near: ruleStates.filter(row => row.state === 'near').length,
       noRule: ruleStates.filter(row => row.state === 'no-rule').length,
       noData: ruleStates.filter(row => row.state === 'no-data').length,
+      invalidConfig: ruleStates.filter(row => row.state === 'invalid-config').length,
+      incomplete: ruleStates.filter(row => row.state === 'incomplete').length,
+      evaluated: ruleStates.filter(row => ['clear', 'near', 'breached', 'target-reached'].includes(row.state)).length,
       configurationIssues,
       states: ruleStates,
     };

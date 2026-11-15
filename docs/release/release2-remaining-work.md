@@ -1,5 +1,9 @@
 # Release 2 remaining-work register
 
+Rollout plan: [five milestone production releases](release2-five-deployments.md), requested 15 November 2026. Complete the remaining scope in coherent release candidates; retain explicit authentic-source/live-verification gaps and separate activation controls. No milestone deployment has been performed under that plan.
+
+15 November increment: [risk and release foundation](release2-risk-release-foundation.md) adds strict rule admission, visible configuration/coverage gaps, removal of inferred stage writes from Decision Center reads, Server Smart Alert quote/auth safeguards and tested manual release controls. This advances milestone 1; accounting/source acceptance, hosted release prerequisites and the overall completion estimate have not been re-certified.
+
 Assessed 14 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 60% engineering complete / 40% pending**, rounded to the nearest five points. The weighted estimate is 57.75%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. The glossary/help slice shipped separately in PR #169; broader Release 1/2 implementation remains on feature branches/draft PRs, with its production rollout pending.
 
 ## Already implemented
@@ -64,8 +68,8 @@ Done when dossier and research outputs trace each used fact to compatible eviden
 
 ### 5. Shared risk evaluation and Release 1 dependencies — core review prerequisite
 
-- The [existing-rule kernel extraction](release2-shared-rule-kernel.md) is implemented with an explicit clock, legacy wrapper, shared math exports and tested browser adapter. Complete remaining configuration/coverage contracts and UI integration over that boundary.
-- Complete remaining rule/configuration-validation and client/server parity cases without changing business thresholds.
+- The [existing-rule kernel extraction](release2-shared-rule-kernel.md) and [strict configuration/coverage review](release2-risk-release-foundation.md) are implemented with preserved legacy thresholds, browser/server parity, explicit invalid/incomplete states and Decision Center UI issues/counts. Complete authenticated history/source contracts and remaining consumer integration; loaded points do not establish complete coverage.
+- Extend reviewed rule cases into remaining consumers and supported manual exit types without changing business thresholds; do not substitute permissive legacy evaluation for strict admission.
 - Add consolidated auditable risk evaluations and any explicitly local, unsaved what-if controls over that shared kernel, preserving decision/evidence/accounting gates.
 - Complete reconciliation/coverage explanations and sign off or explicitly defer remaining Release 1 acceptance items.
 - EV/EBITDA and standalone EPS-growth glossary definitions and contextual dossier links are implemented in the [valuation input review](release2-valuation-input-review.md); retain their denominator, period/share-basis and capital-scope caveats as remaining financial integrations are reviewed.

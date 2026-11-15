@@ -22,6 +22,10 @@ type DecisionData = {
     near: number;
     noRule: number;
     noData: number;
+    invalidConfig?: number;
+    incomplete?: number;
+    evaluated?: number;
+    configurationIssues?: Array<{symbol:string;issues:string[]}>;
   };
   portfolio?: {
     holdings: number;
@@ -70,6 +74,13 @@ function money(value: number | null | undefined) {
 function signedMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return '—';
   return (value >= 0 ? '+$' : '−$') + Math.abs(value).toFixed(2);
+}
+
+function evaluatedRuleCount(rules: DecisionData['rules']) {
+  if (!rules || !Number.isSafeInteger(rules.total) || rules.total < 0 || !Number.isSafeInteger(rules.evaluated) || rules.evaluated! < 0) return 0;
+  const unresolved = [rules.noRule, rules.noData, rules.invalidConfig ?? 0, rules.incomplete ?? 0];
+  if (unresolved.some(value => !Number.isSafeInteger(value) || value < 0) || rules.evaluated! + unresolved.reduce((a,b) => a+b,0) !== rules.total) return 0;
+  return rules.evaluated!;
 }
 
 export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view: string) => void }) {
@@ -141,10 +152,17 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Cash-flow P&L" value={signedMoney(portfolio.cashFlowPnl)} tone={(portfolio.cashFlowPnl || 0) >= 0 ? 'good' : 'danger'} />
         <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
-        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules set" value={(rules.total - rules.noRule) + '/' + rules.total} tone={rules.noRule ? 'warn' : 'good'} />
+        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={evaluatedRuleCount(rules) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
       </div>
 
       <PreTradeGate data={data} />
+
+      {Array.isArray(rules.configurationIssues) && rules.configurationIssues.length > 0 && <details className="rounded-xl border border-amber-400/20 bg-amber-400/[.035] p-3" data-testid="decision-rule-issues">
+        <summary className="cursor-pointer text-xs font-bold text-amber-200">Rule configuration and coverage issues</summary>
+        <ul className="mt-2 space-y-2 text-xs text-white/60">
+          {rules.configurationIssues.map((entry,index) => <li key={entry.symbol + '-' + index}><strong className="text-white/80">{entry.symbol}</strong>: {entry.issues.join(' ')}</li>)}
+        </ul>
+      </details>}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-3">
         <div className="rounded-xl border border-white/5 bg-black/10 p-3">
@@ -205,7 +223,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       <DecisionJournalPanel />
 
       <div className="text-[8px] font-mono text-white/25">
-        Last checked {data.checkedAt ? new Date(data.checkedAt).toLocaleTimeString() : '—'} · {watch.length} watch items · {rules.noRule} holdings without active rules · 50 verified forecasts is a minimum evidence gate, not 50 independent tests.
+        Last checked {data.checkedAt ? new Date(data.checkedAt).toLocaleTimeString() : '—'} · {watch.length} watch items · {rules.noRule} holdings without active rules · {(rules.invalidConfig ?? 0) + (rules.incomplete ?? 0)} rule reviews need attention · 50 verified forecasts is a minimum evidence gate, not 50 independent tests.
       </div>
     </section>
   );
@@ -225,8 +243,8 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     },
     {
       label: 'Position rules',
-      ok: Boolean(rules && rules.total > 0 && rules.noRule === 0),
-      detail: rules ? (rules.total - rules.noRule) + '/' + rules.total + ' holdings have active rules' : 'Rule state unavailable',
+      ok: Boolean(rules && rules.total > 0 && evaluatedRuleCount(rules) === rules.total),
+      detail: rules ? evaluatedRuleCount(rules) + '/' + rules.total + ' holdings have mathematically evaluated rules; data eligibility is separate' : 'Rule state unavailable',
     },
     {
       label: 'Decision-driving signals',

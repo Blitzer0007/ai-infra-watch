@@ -1,5 +1,7 @@
 # AI Infra Watch — Release 2 engineering plan
 
+Rollout direction updated 15 November 2026: [five milestone production releases](release2-five-deployments.md), each tied to a completed, reviewed candidate and its own acceptance/rollback evidence. This replaces the single final-rollout schedule; live acquisition/delivery and production database changes remain separate actions.
+
 Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; the [read-only inbox and focused Portfolio workspaces](release2-inbox-portfolio-review.md) implement the first R2.3 reader slice. The [fictional notification-policy preview](release2-notification-policy-preview.md) adds the offline proposal slice of R2.3. Financial/provider work, authoritative live policy adapters and evaluation extensions remain pending. No new sending policy is activated.
 
 Current [progress estimate](release2-progress.md): approximately 55% engineering complete / 45% pending, with production rollout not started. The [daily Telegram brief](release2-daily-telegram-review.md) adds concise presentation, full-versus-shown queue counts and correct holding links to the existing digest, tested with fictional transports only. Current increment: the offline purged forecast-scoring protocol. The [remaining-work register](release2-remaining-work.md) consolidates model/source, risk/accounting, company-research, alert/agent and release-acceptance tasks.
