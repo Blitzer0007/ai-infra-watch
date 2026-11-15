@@ -36,3 +36,7 @@
 
 ## Codex continuation
 Read this file and the latest draft PR for \`release/milestone2-integrated-candidate-20261115\`, review the exact current commit and tests. If CI fails, inspect authentic job logs, correct the underlying issue and rerun full CI until green. After green, audit remaining Milestone 2 acceptance gaps, particularly production-independent route/navigation restoration, stable editing, authentication, mobile keyboard access and dossier source boundaries. Keep all original work and PRs unchanged; stop at review-only.
+
+## First exact-candidate CI failures and planned correction
+
+Commit `e3553dfe85a724e7b2251bb7b5cfad7a34f02b38` failed Frontend CI (`35` unit test failures all caused by three omitted fictional fixtures) and one Playwright assertion expecting nonexistent text `Portfolio evidence`. Actual Evidence view rendered `Evidence coverage`; the browser test must use that real label without changing the zero-unexpected-write assertion. The correction imports `qa/fixtures/dossier-operating.fictional.json`, `qa/fixtures/sec-statements.fictional.json`, and `qa/fixtures/release2/research-input.json` intact from the verified source branch and updates only the mismatched test selector. The existing source-quality contracts and security checks are unchanged. **The corrected SHA requires its own successful CI; this is not pass evidence.**

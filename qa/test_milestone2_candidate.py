@@ -37,6 +37,6 @@ def test_portfolio_evidence_navigation_cannot_create_scorecard_rows(page):
             if req.method not in ("GET", "HEAD") and "/api/signal-scorecard" in req.url else None)
     page.goto("/portfolio?portfolio_tab=evidence")
     expect(page.get_by_test_id("portfolio-intelligence")).to_be_visible()
-    expect(page.get_by_text("Portfolio evidence", exact=False).first).to_be_visible()
+    expect(page.get_by_text("Evidence coverage", exact=True).first).to_be_visible()
     page.wait_for_timeout(1000)
     assert writes == [], "Opening portfolio evidence must not POST signal-scorecard observations"
