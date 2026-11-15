@@ -7,10 +7,10 @@ const run = (file:string, id:number, overrides:any = {}) => ({ id, path:'.github
   head_sha:SHA, head_branch:'main', event:'push', status:'completed', conclusion:'success', ...overrides });
 const candidate = (overrides:any = {}) => ({ repository:'Blitzer0007/ai-infra-watch', ref:'refs/heads/main',
   dispatchSha:SHA, expectedSha:SHA, currentMainSha:SHA,mainProtected:true,
-  runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2)], ...overrides });
+  runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2),run('security-audit.yml',8)], ...overrides });
 
 test('release accepts exact main and successful required CI, without optional path-filtered runs', () => {
-  assert.deepEqual(verifyCandidate(candidate()), [1,2]);
+  assert.deepEqual(verifyCandidate(candidate()), [1,2,8]);
 });
 for (const changes of [{repository:'other/repo'}, {ref:'refs/heads/feature'}, {expectedSha:'main'},
   {dispatchSha:OTHER}, {currentMainSha:OTHER}, {mainProtected:false},{mainProtected:undefined},{runs:[]}, {runs:null}]) {
@@ -24,11 +24,16 @@ for (const changes of [{event:'pull_request'}, {head_sha:OTHER}, {head_branch:'f
     assert.throws(() => verifyCandidate(candidate({runs:[run('frontend-ci.yml',1,changes),run('qa-validation.yml',2)]})));
   });
 }
+test('a missing, failing or pending security audit blocks the release',()=>{
+ for(const audit of [null,run('security-audit.yml',8,{conclusion:'failure'}),run('security-audit.yml',8,{status:'in_progress',conclusion:null})]){
+  assert.throws(()=>verifyCandidate(candidate({runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2),...(audit?[audit]:[])]})));
+ }
+});
 test('latest relevant run blocks release while optional failures and reruns remain unresolved', () => {
   for (const extra of [run('frontend-ci.yml',3,{status:'queued',conclusion:null}),run('vercel-python-ci.yml',4,{conclusion:'failure'})]) {
     assert.throws(() => verifyCandidate(candidate({runs:[...candidate().runs,extra]})));
   }
-  assert.deepEqual(verifyCandidate(candidate({runs:[run('frontend-ci.yml',1,{conclusion:'failure'}),run('frontend-ci.yml',3),run('qa-validation.yml',2)]})),[3,2]);
+  assert.deepEqual(verifyCandidate(candidate({runs:[run('frontend-ci.yml',1,{conclusion:'failure'}),run('frontend-ci.yml',3),run('qa-validation.yml',2),run('security-audit.yml',8)]})),[3,2,8]);
 });
 test('Vercel checks fixed project/team and production READY state; staged metadata binds commit', () => {
   const project={id:'prj_test',accountId:'team_test'};
@@ -55,7 +60,7 @@ test('CI requests page through exact-sha evidence and forbid redirects; no deplo
       ? {workflow_runs:rows,total_count:102} : {workflow_runs:candidate().runs,total_count:102};
     return new Response(JSON.stringify(body),{status:200});
   };
-  assert.deepEqual(await checkCandidate({GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token'},fetcher),[1,2]);
+  assert.deepEqual(await checkCandidate({GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token'},fetcher),[1,2,8]);
   assert.equal(requests.length,3);
   assert(requests.every(r=>r.url.startsWith('https://api.github.com/repos/Blitzer0007/ai-infra-watch/') && r.options.redirect==='error'));
   assert(requests[2].url.includes('head_sha='+SHA));
