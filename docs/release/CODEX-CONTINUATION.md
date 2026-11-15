@@ -1,5 +1,12 @@
 # AI Infra Watch — continuation draft (Codex / ChatGPT)
 
+## Latest verified Milestone 2 status — 15 November 2026
+
+**Feature branch verified; release candidate NOT assembled or approved.** PR #168 at 9458b2eca91656deae16446592ae4cbaa1f43155 passed 7/7 exact-head workflows, including [full mocked UI/API/disposable DB](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43735386317). The detected passive browser-side POST /api/signal-scorecard effects were removed, and the zero-unexpected-writes regression now passes. PR #168 remains draft, stacked on draft PR #167. PR #167 conflicts with current main; the combined branch is 85 commits ahead and 10 behind main. See [isolated candidate review](milestone2-release-candidate-review.md) for pinned source, overlap, acceptance and candidate assembly boundaries.
+
+**Next:** Codex Cloud must create a minimal Milestone 2 candidate from the current production main, reconcile exact main auth/accounting/release safeguards, run full CI on the new candidate, and leave the candidate draft. No new milestone starts before all exact-candidate checks pass. No release, merge, deployment, production data/secret reads, Supabase writes, live polling or Telegram sends are authorized.
+
+
 Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud and ChatGPT with connected GitHub tools. It is maintained proactively because an agent cannot reliably detect a quota cutoff. Read the latest copy on the feature branch, not just an older pasted copy.
 
 ## Repository and branches
@@ -29,7 +36,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 
 Continue **Milestone 2 — integrated Portfolio core**. No second release is authorized merely by this development request. Maintain this handoff so a different ChatGPT model can resume safely using repository state.
 
-Checkpoint: **Exact Calendar/Inbox opened-record context added; new-head CI pending; not deployed**. Earlier navigation checks are retained. Accounting and prior navigation checkpoints remain preserved. Inspect the latest PR head and exact-head CI before continuing.
+Checkpoint: **Milestone 2 source integration verified at 9458b2e (7/7 GitHub CI); NOT isolated against production main or deployed**. Accounting and navigation safeguards remain retained.
 
 Completed in this increment:
 
@@ -90,7 +97,7 @@ The correction removes implicit browser scorecard POST effects from `PortfolioSi
 
 - The main-based Milestone 1 accounting compatibility safeguards are now reconciled in the newer Portfolio view in this checkpoint. Keep the strict projection and historical abstention while integrating additional contexts; do not copy the older whole component over the newer UI.
 - The data-free auth handler/check is now reconciled from production main. Keep it intact; broader integrated Portfolio acceptance remains a release prerequisite.
-- Milestone 2 still needs broader Portfolio/Opportunities/dossier/calendar/inbox user stories, source/conflict explanations, retained reading/editing state, missing/loading/error cases and keyboard/mobile acceptance.
+- Milestone 2 has passed expanded **feature-branch** Portfolio/Opportunities/dossier/calendar/inbox review journeys, source/conflict boundaries, editing/reading retention, missing-source cases and mobile checks. **Still needed:** a minimal isolated candidate from latest main, three-way dependency and safety reconciliation, full exact-candidate CI, final accessibility/compatibility review and separate authorization.
 - Real issuer/source acquisition, authoritative full ledger/corporate-action evidence, live NVIDIA/JEV effectiveness and forecast outcomes remain unverified. Fictional fixtures, hashes and declarations do not establish those facts.
 - Other milestones and historical scope: `release2-five-deployments.md`, `release2-remaining-work.md`, `release2-engineering-plan.md`. Older statements saying no milestone has shipped are superseded by this checkpoint.
 

@@ -2,7 +2,7 @@
 
 **Candidate:** Draft PR #168, `feature/release2-opportunity-research`, stacked on draft PR #167. **Not merged or deployed.**
 **As of:** 15 November 2026.
-**Status:** Source integration and fictional acceptance suite extended; **release-candidate sign-off not yet granted**. The exact post-change head must pass all seven GitHub workflows; do not substitute previous-head green results.
+**Status:** **Feature-branch integrated acceptance verified at 9458b2e (7/7 exact-head GitHub workflows)**; **main-based candidate/release not yet approved or deployed**. See [main compatibility review](milestone2-release-candidate-review.md).
 
 ## Defined Milestone 2 boundary
 
@@ -35,10 +35,10 @@ The initial integrated acceptance run failed because entering Evidence emitted t
 ## Verification and release gate
 
 - Before this source increment, `8b5a2a2896c86bcaed39ad5033bdd503df2bd190` passed all seven required workflows on the exact SHA.
-- The new coherent source checkpoint needs its **own exact-head** Frontend CI, Backend Container CI, Python Agents Tests, Continuous Quality Eval, AI Quality Gate, Vercel Python CI and UI API DB Validation results. This document is not a test result.
+- **Verified:** final feature-branch commit 9458b2eca91656deae16446592ae4cbaa1f43155 passed all seven exact-head workflows. [UI/API/DB](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43735386317) includes mocked Playwright journeys/disposable PostgreSQL tests with no reported failures. These **do not** certify a different future candidate or merge SHA.
 - For any failing test, investigate underlying code/fixture behavior, fix it and require fresh exact-head green CI without disabling checks or lowering standards.
 - **Unshipped, release blockers:** reviewed release-candidate diff must reconcile the draft PR stack against current `main`; final compatibility/security/accessibility/resource review, candidate acceptance matrix and separate user authorization remain outstanding. Do not merge PR #167/#168 or deploy merely because source tests pass.
 
 ## Next Codex handoff
 
-Read this document, `CODEX-CONTINUATION.md`, draft PR #168, and the latest exact-head workflow/job conclusions. Finish remaining verified integration defects only. If all required checks are green, prepare a **review-only isolated Milestone 2 release-candidate specification** against current `main` and list material dependencies; do not merge, deploy, fetch production private data or activate live agents.
+Read this document, `CODEX-CONTINUATION.md`, draft PR #168, and the latest exact-head workflow/job conclusions. Finish remaining verified integration defects only. The [isolated Milestone 2 release-candidate review](milestone2-release-candidate-review.md) is now documented. Build and verify the minimal candidate from fresh `main` with Codex Cloud; do not merge, deploy, fetch production private data or activate live agents.
