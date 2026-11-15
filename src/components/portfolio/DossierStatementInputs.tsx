@@ -2,8 +2,8 @@ import {formatStatementValue,type AdmittedStatement, type admitDossierStatements
 import {dossierStatusLabels} from '../../utils/companyDossier';
 import {SEC_STATEMENT_CONCEPTS} from '../../../shared/secStatementObservations.js';
 const statementConcepts=SEC_STATEMENT_CONCEPTS as readonly {metric:string;label:string}[];
-export function DossierStatementCards({rows,fictional}:{rows:AdmittedStatement[];fictional:boolean}){
-  return <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><article key={row.id} data-testid="dossier-statement" data-metric={row.metric} className="min-w-0 space-y-2 break-words rounded-lg border border-cyan-200/25 p-3 text-sm">
+export function DossierStatementCards({rows,fictional,testId='dossier-statement'}:{rows:AdmittedStatement[];fictional:boolean;testId?:string}){
+  return <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><article key={row.id} data-testid={testId} data-metric={row.metric} className="min-w-0 space-y-2 break-words rounded-lg border border-cyan-200/25 p-3 text-sm">
     <h4 className="font-semibold">{row.label}</h4><p>{fictional?'Fictional · ':''}Original declaration bound · source unverified</p>
     <p data-testid="statement-value" className="text-lg font-semibold">{formatStatementValue(row.value,row.unit)}</p>
     <p>{row.period.start?`${row.period.start} to ${row.period.end} · annual duration`:`As of ${row.period.end} · instant`}</p>

@@ -1,21 +1,26 @@
 import {useId,useState} from 'react';
 import type {CompanyFinancialObservation,FinancialObservationRequest} from '../../utils/companyFinancialObservations';
-import {DOSSIER_SECTIONS,dossierFinancials,dossierObservations,dossierStatusLabels,dossierIssueLabels,formatDossierValue,type DossierSection} from '../../utils/companyDossier';
+import {DOSSIER_SECTIONS,dossierObservations,dossierStatusLabels,dossierIssueLabels,formatDossierValue,type DossierSection} from '../../utils/companyDossier';
 import {statementRows} from '../../utils/dossierStatements';
-import {reviewDossierValuation} from '../../utils/dossierValuation';
+import {reviewDossierOperating} from '../../utils/dossierOperating';
 import {DossierStatementCards,DossierStatementSources} from './DossierStatementInputs';
 import DossierValuationReview from './DossierValuationReview';
 import FinancialTerm from '../education/FinancialTerm';
+import {DossierOperatingPanel,DossierOperatingSources,DossierOperatingStatus} from './DossierOperatingInputs';
 
 const control='min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold';
-type Props={symbol:string;configuredName?:string;request:FinancialObservationRequest|null;statements?:unknown;fictional?:boolean;key?:string};
+type Props={symbol:string;configuredName?:string;request:FinancialObservationRequest|null;statements?:unknown;operations?:unknown;fictional?:boolean;key?:string};
 
-export default function CompanyDossier({symbol,configuredName,request,statements=null,fictional=false}:Props){
+export default function CompanyDossier({symbol,configuredName,request,statements=null,operations=null,fictional=false}:Props){
   const [section,setSection]=useState<DossierSection>('Overview');
+  const [annualChoice,setAnnualChoice]=useState<{scope:string;period:string}|null>(null);
   const id=useId(),panel=id+'-panel',heading=id+'-heading';
-  const {snapshot,status}=dossierFinancials(symbol,request);
+  const reviewed=reviewDossierOperating(symbol,request,statements,operations);
+  const {snapshot,status}=reviewed.financials;
+  const annual=reviewed.operating;
+  const annualPeriod=annualChoice?.scope===annual.scope&&annual.periods.some(p=>p.key===annualChoice.period)?annualChoice.period:'';
   const rows=dossierObservations(snapshot,section);
-  const valuationReview=reviewDossierValuation(symbol,request,statements);
+  const valuationReview=reviewed.valuation;
   const {statementAdmission}=valuationReview;
   const balanceInputs=statementRows(statementAdmission,'Financial health'),valuationInputs=statementRows(statementAdmission,'Valuation');
   const references=[...new Map((snapshot?.observations??[]).flatMap(o=>o.references.map(ref=>[ref.accession,ref] as const))).values()];
@@ -27,6 +32,7 @@ export default function CompanyDossier({symbol,configuredName,request,statements
       {fictional&&<p className="rounded-lg border border-amber-200/30 p-3 font-semibold text-amber-100">Fictional data only. These are invented financial statements, not a real issuer or your holdings. Every populated figure below is a demonstration.</p>}
       <p>Read-only research · no accounting reconciliation or decision eligibility is granted.</p>
       {statementAdmission.status!=='not-connected'&&<p role={statementAdmission.status==='invalid'?'alert':'status'} data-testid="dossier-statement-status">{statementAdmission.status==='conditional'?'Additional statement inputs: partial, bound declarations.':statementAdmission.status==='invalid'?'Additional statement inputs withheld.':'Additional statement inputs need data.'} {statementAdmission.reason}</p>}
+      <DossierOperatingStatus view={annual}/>
     </header>
     <nav aria-label={symbol+' dossier sections'} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {DOSSIER_SECTIONS.map(label=><button key={label} type="button" aria-pressed={section===label} aria-controls={panel} onClick={()=>setSection(label)} className={control+(section===label?' border-cyan-200/60 bg-cyan-200/10 text-cyan-100':' border-white/25 text-white/80')}>{label}</button>)}
@@ -45,6 +51,7 @@ export default function CompanyDossier({symbol,configuredName,request,statements
         {!rows.length&&<p>No supported observations loaded for this section. This does not mean zero revenue, zero cash flow or a healthy balance sheet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><Observation key={row.id} row={row} fictional={fictional}/>)}</div>
         {section==='Financial health'&&<><DossierStatementCards rows={balanceInputs} fictional={fictional}/><p>{balanceInputs.length?'Cash and individual borrowing declarations are shown where supported. Total interest-bearing debt, lease scope and component overlap remain unverified; components are not summed.':'Cash and interest-bearing debt are unavailable.'} Total liabilities / equity is a different measure from debt / equity.</p></>}
+        <DossierOperatingPanel view={annual} section={section} period={annualPeriod} onPeriod={period=>setAnnualChoice({scope:annual.scope,period})} fictional={fictional}/>
       </>}
       {section==='Valuation'&&<>
         <p>Valuation multiples unavailable. {statementAdmission.status==='conditional'?(valuationInputs.length?'Some share/EPS declarations are loaded below; compatible price, adjustment evidence, complete debt scope and EBITDA remain unavailable.':'Some statement declarations are loaded; supported share/EPS coverage, compatible price, adjustment evidence, complete debt scope and EBITDA remain incomplete.'):'No compatible price, shares, earnings or EBITDA contract is connected here.'}</p>
@@ -68,6 +75,7 @@ export default function CompanyDossier({symbol,configuredName,request,statements
           <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Publication uncertainty bounds</summary><p className="break-words">Earliest bound: {ref.publicationWindow.earliest}. Exclusive latest bound: {ref.publicationWindow.latest_exclusive}. These are conservative date-policy bounds, not known publication timestamps or proof of historical availability.</p></details>
         </article>)}
         <DossierStatementSources admission={statementAdmission}/>
+        <DossierOperatingSources view={annual} fictional={fictional}/>
       </>}
     </section>
   </section>;

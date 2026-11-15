@@ -12,6 +12,13 @@ export function reviewDossierValuation(symbol:string,reference:FinancialObservat
   // Reuse the original-row boundary once. Never accept a caller-supplied readiness flag,
   // price, multiple or pre-normalized observation instead of the supplied originals.
   const statementAdmission=admitDossierStatements(symbol,reference,packet);
+  return fromAdmission(statementAdmission);
+}
+/** Monotonic withdrawal only: cross-source conflicts cannot add inputs. */
+export function withholdDossierValuationStatements(review:ReturnType<typeof reviewDossierValuation>){
+  return fromAdmission({...review.statementAdmission,status:'invalid',snapshots:[],reason:'Loaded dossier sources disagree. All additional core statement figures are withheld.'});
+}
+function fromAdmission(statementAdmission:ReturnType<typeof admitDossierStatements>){
   const rows=statementAdmission.snapshots.flatMap(s=>s.observations);
   const metric=(id:string)=>rows.filter(row=>row.metric===id);
   const eps=metric('diluted_eps'),shares=metric('common_shares_outstanding'),cash=metric('cash_equivalents');
