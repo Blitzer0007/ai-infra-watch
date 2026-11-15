@@ -66,6 +66,7 @@ export default function App() {
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
   const [portfolioSymbolsKnown,setPortfolioSymbolsKnown]=useState(false);
+  const [portfolioQuoteTab,setPortfolioQuoteTab]=useState(()=>new URLSearchParams(window.location.search).get('portfolio_tab')||'overview');
   const [calendarSnapshot,setCalendarSnapshot]=useState(unavailableCatalystSnapshot);
   const [reviewSessions]=useState(()=>({calendar:createReviewReadingSession(),alerts:createReviewReadingSession()}));
   const reviewRecords=useRef(new Map<string,ReviewRecordContext>());
@@ -172,7 +173,7 @@ export default function App() {
   }, [config, tickerPrices]);
 
   useEffect(() => {
-    if (activeView !== 'portfolio') return;
+    if (activeView !== 'portfolio'||portfolioQuoteTab==='research') return;
     let cancelled = false;
     let timer: number | undefined;
 
@@ -213,7 +214,7 @@ export default function App() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [activeView, config, portfolioSymbols]);
+  }, [activeView, config, portfolioSymbols, portfolioQuoteTab]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
     setIsLiveLoading(true);
@@ -333,11 +334,14 @@ export default function App() {
       }
     }
     setReviewRecordEntry(entry);
+    if(nextView==='portfolio')setPortfolioQuoteTab(new URL(safe,'https://navigation.invalid').searchParams.get('portfolio_tab')||'overview');
     window.history.pushState(entry?{view:nextView,aiwReviewEntry:entry}:{view:nextView},'',safe);
     setActiveView(nextView);setIsMobileMenuOpen(false);
   };
   const handleNavigate = (view: string) => {
     const nextView = VIEW_IDS.has(view) ? view : 'overview';
+    if(nextView==='portfolio'&&activeView==='portfolio'){setIsMobileMenuOpen(false);return;}
+    if(nextView==='portfolio')setPortfolioQuoteTab('overview');
     setReviewRecordEntry(null);
     setActiveView(nextView);
     setIsMobileMenuOpen(false);
@@ -348,6 +352,7 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => {
       const view=viewFromPath(window.location.pathname);
+      if(view==='portfolio')setPortfolioQuoteTab(new URLSearchParams(window.location.search).get('portfolio_tab')||'overview');
       const entry=window.history.state?.aiwReviewEntry;
       setReviewRecordEntry(view==='portfolio'&&typeof entry==='string'&&reviewRecords.current.has(entry)?entry:null);
       setActiveView(view);
@@ -625,7 +630,7 @@ export default function App() {
               {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} session={reviewSessions.calendar} onOpenResearch={handleReviewHref} />}
               {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} session={reviewSessions.alerts} onOpenResearch={handleReviewHref} />}
               {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices } as unknown as Record<string,Record<string,unknown>>} loading={isLiveLoading} holdingsAvailable={portfolioSymbolsKnown} />}
-              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} researchWatchlist={config.watchlist} reviewRecord={reviewRecord} onOpenReviewHref={handleReviewHref} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} researchWatchlist={config.watchlist} reviewRecord={reviewRecord} onOpenReviewHref={handleReviewHref} onSectionChange={setPortfolioQuoteTab} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
               {activeView === 'quality' && <AIQualityLab />}

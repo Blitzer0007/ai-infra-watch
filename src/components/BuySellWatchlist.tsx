@@ -122,7 +122,7 @@ export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSna
     };
 
     void refreshQuotes();
-    void authFetch('/api/alert-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    if(!import.meta.env.DEV&&import.meta.env.VITE_QA_MODE!=='true') void authFetch('/api/alert-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       watchlist: config.watchlist,
       alerts: config.alerts,
       largeMoveEnabled: config.largeMoveEnabled,

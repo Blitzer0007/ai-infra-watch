@@ -77,6 +77,9 @@ def test_unavailable_holdings_do_not_become_a_complete_zero_position_scan(page):
     fictional_portfolio(page)
     page.route('**/api/portfolio?includeLots=true',lambda route:route.fulfill(status=503,content_type='application/json',body='{}'))
     goto_app(page)
+    # Settle the simulated failed portfolio request before clicking a React navigation control.
+    # Keep the real sidebar-navigation assertion; do not bypass it with a direct URL.
+    page.wait_for_load_state('networkidle')
     page.get_by_test_id('nav-opportunities').click()
     scanner = page.get_by_test_id('opportunity-scanner')
     scanner.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
