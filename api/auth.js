@@ -1,4 +1,4 @@
-import { accessConfigured } from './_access-auth.js';
+import { accessConfigured, requireAccess } from './_access-auth.js';
 
 const attempts = new Map();
 const WINDOW_MS = 10 * 60 * 1000;
@@ -10,6 +10,12 @@ function expectedToken() {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  // Release probes use the same private-access gate without reading account data.
+  // Ordinary GETs keep their existing method rejection. No auth-attempt state changes.
+  if (req.method === 'GET' && req.query?.check === 'release') {
+    if (!requireAccess(req, res)) return;
+    return res.status(200).json({ ok: true, authenticated: true });
+  }
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ ok: false, error: 'Method not allowed' });
