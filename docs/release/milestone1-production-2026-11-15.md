@@ -17,4 +17,3 @@ Build URL: https://ai-infra-watch-b6z6038tf-green-2888.vercel.app
 Implementation: https://github.com/Blitzer0007/ai-infra-watch/pull/170
 
 Data-free access verification: https://github.com/Blitzer0007/ai-infra-watch/pull/171
-

@@ -8,6 +8,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 - Active development: `feature/release2-opportunity-research`, draft PR [#168](https://github.com/Blitzer0007/ai-infra-watch/pull/168), stacked on `feature/release1-portfolio-command-center` / draft PR #167. Do not retarget or merge the unfinished stack as a shortcut.
 - Cloud workspace: `/workspace/ai-infra-watch`. No Windows execution is required.
 - Source baseline before this checkpoint: `562d9ddc3a6c1be4f86471f4e9eea9f8c6a0a101`; 1,754 Node tests and all seven CI workflows passed on that exact baseline. Those results do not certify subsequent source changes.
+- Milestone 2 source implementation commit: `dbf0d1f36392464735b8da3d96f2cdeb7c80fba4`; later documentation-only checkpoints do not change that source implementation.
 - Discover the latest checkpoint SHA from the draft PR head or `git log -1 --format=%H -- docs/release/CODEX-CONTINUATION.md`; a file cannot embed its own future commit SHA.
 
 ## Production — Milestone 1 completed, 1/5 releases
