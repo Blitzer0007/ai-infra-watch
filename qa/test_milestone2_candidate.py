@@ -40,3 +40,98 @@ def test_portfolio_evidence_navigation_cannot_create_scorecard_rows(page):
     expect(page.get_by_text("Evidence coverage", exact=True).first).to_be_visible()
     page.wait_for_timeout(1000)
     assert writes == [], "Opening portfolio evidence must not POST signal-scorecard observations"
+
+
+def test_selected_calendar_record_stays_distinct_from_financial_dossier(page):
+    """Only the clicked source row is retained in memory; no new financial reads."""
+    from test_catalyst_calendar import prepare, load_snapshot, fixture_event
+    page.add_init_script('localStorage.setItem("aiw_config_v1",JSON.stringify({watchlist:["FICT"],alerts:[],finnhubKey:""}))')
+    prepare(page, [
+        fixture_event(id="first", title="First fictional issuer event"),
+        fixture_event(id="second", title="Second fictional issuer revision", sourceUrl="https://example.com/issuer/second")
+    ])
+    calendar = load_snapshot(page)
+    reads, writes = [], []
+    page.on("request", lambda req: reads.append(req.url) if "/api/earnings-alerts" in req.url else None)
+    page.on("request", lambda req: writes.append((req.method, req.url)) if req.method not in ("GET", "HEAD") else None)
+    calendar.get_by_test_id("catalyst-event").filter(has_text="Second fictional issuer revision").get_by_role(
+        "link", name="Research FICT", exact=True).click()
+    research = page.get_by_test_id("company-research-workspace")
+    origin = research.get_by_test_id("research-origin-context")
+    expect(origin).to_contain_text("Second fictional issuer revision")
+    expect(origin).not_to_contain_text("First fictional issuer event")
+    expect(research.get_by_test_id("research-source-boundary")).to_contain_text("independent evidence scopes")
+    assert "Second fictional" not in page.url
+    assert "sourceUrl" not in page.url
+    research.get_by_text("Company dossier", exact=True).click()
+    expect(research.get_by_test_id("dossier-source-status")).to_contain_text("Financial source not connected")
+    research.get_by_role("link", name="Return to Calendar", exact=True).click()
+    expect(page.get_by_test_id("catalyst-calendar")).to_be_visible()
+    assert reads == [] and writes == []
+
+
+def test_inbox_provider_receipt_is_not_corroboration_and_does_not_replay(page):
+    """Provider acceptance cannot become a read receipt, issuer fact, or automatic resend."""
+    from test_alert_inbox import open_inbox, LOCAL, server_item, payload
+    import json
+    page.add_init_script('localStorage.setItem("aiw_config_v1",JSON.stringify({watchlist:["FICT"],alerts:[],finnhubKey:""}))')
+    inbox = open_inbox(page, [LOCAL])
+    calls, writes = [], []
+    page.on("request", lambda req: writes.append(req.url) if req.method not in ("GET", "HEAD") else None)
+    def respond(route):
+        calls.append(route.request.url)
+        route.fulfill(status=200, content_type="application/json",
+                      body=json.dumps(payload([server_item()])))
+    page.route("**/api/alert-inbox*", respond)
+    inbox.get_by_role("button", name="Load server delivery history", exact=True).click()
+    record = inbox.get_by_test_id("inbox-record").filter(has_text="Server delivery record")
+    expect(record).to_have_count(1)
+    record.get_by_role("link", name="Research FICT", exact=True).click()
+    research = page.get_by_test_id("company-research-workspace")
+    expect(research.get_by_test_id("research-origin-context")).to_contain_text("not a read receipt")
+    expect(research.get_by_test_id("research-source-boundary")).to_contain_text("Telegram provider receipt")
+    assert "providerMessageId" not in page.url and "episodeId" not in page.url
+    research.get_by_role("link", name="Return to Alert inbox", exact=True).click()
+    expect(page.get_by_test_id("alert-inbox").get_by_test_id("inbox-record")).to_have_count(2)
+    assert len(calls) == 1 and writes == []
+
+
+def test_portfolio_editor_draft_survives_section_switch_without_saving(page):
+    """Same mounted editor retains typed values; no implicit portfolio API writes."""
+    mock_local_apis(page)
+    writes = []
+    page.on("request", lambda req: writes.append((req.method, req.url))
+            if req.method not in ("GET", "HEAD") else None)
+    page.goto("/portfolio?portfolio_tab=holdings")
+    portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.get_by_test_id("portfolio-add-holding").click()
+    portfolio.get_by_test_id("portfolio-field-ticker").fill("FICT")
+    portfolio.get_by_test_id("portfolio-field-notes").fill("Fictional unsubmitted draft")
+    expect(portfolio.get_by_test_id("portfolio-unsaved-draft")).to_contain_text("unsaved")
+    portfolio.get_by_role("button", name="Evidence", exact=True).click()
+    expect(portfolio.get_by_test_id("portfolio-field-ticker")).to_have_value("FICT")
+    expect(portfolio.get_by_test_id("portfolio-field-notes")).to_have_value("Fictional unsubmitted draft")
+    portfolio.get_by_role("button", name="My Holdings", exact=True).click()
+    expect(portfolio.get_by_test_id("portfolio-field-ticker")).to_have_value("FICT")
+    assert writes == []
+    portfolio.get_by_role("button", name="Cancel", exact=True).last.click()
+    assert portfolio.get_by_test_id("portfolio-unsaved-draft").count() == 0
+
+
+def test_null_journal_weekly_and_unavailable_holdings_preserve_app_shell(page):
+    """Incomplete optional backend data must never crash the whole dashboard."""
+    from test_release2 import fictional_portfolio
+    errors = []
+    page.on("pageerror", lambda err: errors.append(str(err)))
+    fictional_portfolio(page)
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(
+        status=503, content_type="application/json", body="{}"))
+    page.route("**/api/decision-journal*", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"entries":[],"weekly":null}'))
+    page.goto("/")
+    expect(page.get_by_test_id("decision-journal")).to_be_visible()
+    expect(page.get_by_test_id("decision-weekly-review")).to_be_visible()
+    expect(page.get_by_test_id("decision-journal")).to_contain_text("UNAVAILABLE")
+    page.get_by_test_id("nav-opportunities").click()
+    expect(page.get_by_test_id("opportunity-scanner")).to_be_visible()
+    assert errors == []
