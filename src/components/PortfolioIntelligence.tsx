@@ -81,6 +81,7 @@ export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHre
   const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
   useEffect(()=>{onSectionChange?.(tab);},[tab,onSectionChange]);
   const [holdingsVisited, setHoldingsVisited] = useState(tab === 'holdings');
+  const [managementDraftOpen, setManagementDraftOpen] = useState(false);
   const sectionHeading = useRef<HTMLHeadingElement>(null);
   const focusSection = useRef(false);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
@@ -616,10 +617,11 @@ export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHre
         {analyses.map(holding=><option key={holding.symbol} value={holding.symbol}>{holding.symbol} · {holding.name}</option>)}
       </FilterSelect>}
       {tab==='holdings'&&selectedAnalysis&&<button type="button" aria-haspopup="dialog" onClick={event=>openHoldingDetail(selectedAnalysis.symbol,event.currentTarget)} className="rounded-lg border border-cyan-200/40 px-4 py-2 text-sm font-semibold text-cyan-100">Open selected holding</button>}
+      {managementDraftOpen && tab !== 'holdings' && <p data-testid="portfolio-draft-retained" role="status" className="rounded-xl border border-amber-200/30 bg-amber-200/5 p-3 text-sm text-amber-100">A holding management form is still open in My Holdings. Return there to save or cancel. Switching sections did not save or discard the form.</p>}
       {holdingsVisited && <div hidden={tab !== 'holdings'}>
           <details className="rounded-xl border border-white/15 p-4" data-testid="portfolio-management">
             <summary className="cursor-pointer text-sm font-semibold">Manage positions and purchases</summary>
-            <div className="mt-4"><PortfolioManager holdings={holdings} onChanged={setHoldings} /></div>
+            <div className="mt-4"><PortfolioManager holdings={holdings} onChanged={setHoldings} onDraftOpenChange={setManagementDraftOpen} /></div>
           </details>
       </div>}
       {(tab === 'holdings' || tab === 'performance') && <div className="flex flex-wrap items-end gap-3">

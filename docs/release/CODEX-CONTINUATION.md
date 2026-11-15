@@ -66,6 +66,18 @@ Next concrete increment — before a Milestone 2 release:
 
 **Next:** Verify the new head and repair failed tests if any; expand integrated Portfolio editing/source/conflict/context checks, including auxiliary disclosure retention and mobile/keyboard acceptance. Preserve main Milestone 1, the draft PR stack, and all no-production restrictions. The public `@aravind` Event Risk Radar is separately specified in `docs/release/release2-event-risk-radar-aravind.md`; it is not activated.
 
+## Milestone 2 all-in-one integration acceptance checkpoint — 15 November 2026
+
+This coherent candidate finishes an additional **fixture-based Milestone 2 integration pass** on draft PR #168. Read [the acceptance matrix](milestone2-integration-acceptance.md) alongside this handoff. No claim of complete source truth or production readiness is implied.
+
+- `PortfolioManager.tsx` and `PortfolioIntelligence.tsx`: expose a visible unsaved holding-management editor/purchase session on section navigation, preserving existing mounted forms and requiring explicit Save/Cancel. No automatic save, storage or network request was introduced.
+- `CompanyResearchWorkspace.tsx`: show the boundary between an original opened Calendar/Inbox record and the independent, unconnected financial dossier; a provider receipt is not a read receipt or corroborated investment event.
+- `qa/test_milestone2_integrated.py` and `qa-validation.yml`: exercise actual browser journeys with fictional/isolated data, several same-symbol events, source/receipt uncertainty, 360/768/1440px editor retention, independent dossier disclosure, direct-entry failure and zero request writes.
+- The previous head `8b5a2a2896c86bcaed39ad5033bdd503df2bd190` was confirmed **7/7 required workflows passed** before beginning this batch. The new commit must be verified independently; do not advance to another milestone or claim green until that exact SHA succeeds.
+- The full draft stack is **not an isolated Milestone 2 release candidate**. Compare with current production `main`, preserve Milestone 3–5 work on branch, and obtain a separate review/authorization before any promotion. Live provider truth, ledger completeness, external model usefulness and historical forecasts remain outside fixture certification.
+
+**After exact-head success:** finish only any outstanding Milestone 2 blockers discovered during integration, then prepare a read-only isolated release-candidate review and compatibility matrix. Remain draft; no merge, deployment, production-data reads/writes, Telegram or live polling.
+
 ## Remaining integration/safety work
 
 - The main-based Milestone 1 accounting compatibility safeguards are now reconciled in the newer Portfolio view in this checkpoint. Keep the strict projection and historical abstention while integrating additional contexts; do not copy the older whole component over the newer UI.
