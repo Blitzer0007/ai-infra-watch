@@ -1,4 +1,5 @@
 import {createReviewReadingSession,canonicalReviewHref,type ReviewWorkspace} from './utils/reviewWorkspaceNavigation';
+import type {ReviewRecordContext} from './utils/reviewRecordContext';
 import AlertInbox from './components/alerts/AlertInbox';
 import OpportunityScanner from './components/opportunities/OpportunityScanner';
 import CatalystCalendar from './components/calendar/CatalystCalendar';
@@ -62,6 +63,10 @@ type LivePrice = {
 
 export default function App() {
   const [reviewSessions]=useState(()=>({calendar:createReviewReadingSession(),alerts:createReviewReadingSession()}));
+  // Opaque navigation keys reference bounded session-only records; no record contents enter URLs or history.
+  const reviewRecords=useRef(new Map<string,ReviewRecordContext>());
+  const [reviewRecordEntry,setReviewRecordEntry]=useState<string|null>(null);
+  const reviewRecord=reviewRecordEntry&&window.history.state?.aiwReviewEntry===reviewRecordEntry?reviewRecords.current.get(reviewRecordEntry)??null:null;
   const [portfolioQuoteTab,setPortfolioQuoteTab]=useState(()=>new URLSearchParams(window.location.search).get('portfolio_tab')||'summary');
   const [calendarSnapshot, setCalendarSnapshot] = useState(unavailableCatalystSnapshot);
   const [activeView, setActiveView] = useState<string>(() => viewFromPath(window.location.pathname));
@@ -352,13 +357,23 @@ export default function App() {
   const rememberReviewDeparture=()=>{
     if(activeView==='calendar'||activeView==='alerts')reviewSessions[activeView].restore=Boolean(reviewSessions[activeView].focusKey);
   };
-  const handleReviewHref=(href:string)=>{
+  const handleReviewHref=(href:string,record?:ReviewRecordContext)=>{
     const safe=canonicalReviewHref(href);if(!safe)return;
     rememberReviewDeparture();
     const nextView=viewFromPath(safe.split('?')[0]);
-    if(nextView==='portfolio')setPortfolioQuoteTab('research');
+    let entry:string|null=null;
+    if(nextView==='portfolio'){
+      setPortfolioQuoteTab('research');
+      const params=new URL(safe,'https://review.invalid').searchParams;
+      if(record&&record.symbol===params.get('research_symbol')&&record.origin===params.get('research_from')){
+        entry=crypto.randomUUID();
+        if(reviewRecords.current.size>=100)reviewRecords.current.delete(reviewRecords.current.keys().next().value!);
+        reviewRecords.current.set(entry,record);
+      }
+    }
+    setReviewRecordEntry(entry);
     pendingNavigation.current=nextView!==activeView;
-    window.history.pushState({view:nextView},'',safe);
+    window.history.pushState(entry?{view:nextView,aiwReviewEntry:entry}:{view:nextView},'',safe);
     setActiveView(nextView);setIsMobileMenuOpen(false);
   };
   const handleNavigate = (view: string) => {
@@ -366,6 +381,7 @@ export default function App() {
     const nextView = VIEW_IDS.has(view) ? view : 'overview';
     pendingNavigation.current = nextView !== activeView;
     if(nextView==='portfolio'&&activeView!=='portfolio')setPortfolioQuoteTab('summary');
+    setReviewRecordEntry(null);
     setActiveView(nextView);
     setIsMobileMenuOpen(false);
     const nextPath = (nextView==='calendar'||nextView==='alerts')&&reviewSessions[nextView].href?reviewSessions[nextView].href:VIEW_PATHS[nextView] || '/overview';
@@ -377,6 +393,8 @@ export default function App() {
     const onPopState = () => {
       const nextView = viewFromPath(window.location.pathname);
       if(nextView==='portfolio')setPortfolioQuoteTab(new URLSearchParams(window.location.search).get('portfolio_tab')||'summary');
+      const entry=window.history.state?.aiwReviewEntry;
+      setReviewRecordEntry(nextView==='portfolio'&&typeof entry==='string'&&reviewRecords.current.has(entry)?entry:null);
       if (nextView !== activeView) {
         rememberReviewDeparture();
         pendingNavigation.current = true;
@@ -665,7 +683,7 @@ export default function App() {
               {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
               {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} session={reviewSessions.alerts} onOpenResearch={handleReviewHref} />}
               {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} session={reviewSessions.calendar} onOpenResearch={handleReviewHref} />}
-              {activeView === 'portfolio' && <PortfolioIntelligence onSectionChange={setPortfolioQuoteTab} onOpenReviewHref={handleReviewHref} researchWatchlist={config.watchlist} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence onSectionChange={setPortfolioQuoteTab} onOpenReviewHref={handleReviewHref} reviewRecord={reviewRecord} researchWatchlist={config.watchlist} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} calendarSnapshot={calendarSnapshot} />}
               {activeView === 'quality' && <AIQualityLab />}
