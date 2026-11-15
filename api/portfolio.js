@@ -1,6 +1,6 @@
 import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
-import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs, storedCashFlowInputs } from '../server/services/ledgerInputs.js';
+import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs, storedCashFlowInputs, transactionQuality } from '../server/services/ledgerInputs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -121,30 +121,6 @@ function normalizeLot(row) {
     marketClose: row.__marketClose || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
-}
-
-function transactionQuality(row) {
-  const warnings = [];
-  if (!row.trade_date || Number.isNaN(Date.parse(String(row.trade_date)))) warnings.push('invalid trade date');
-  const quantity = Number(row.quantity);
-  const amount = Number(row.amount);
-  const price = row.price == null ? null : Number(row.price);
-  if (!(quantity > 0)) warnings.push('non-positive quantity');
-  if (!(amount > 0)) warnings.push('non-positive amount');
-  if (price != null && Number.isFinite(price) && price > 0 && quantity > 0 && amount > 0) {
-    const implied = quantity * price;
-    const tolerance = Math.max(0.05, Math.abs(amount) * 0.01);
-    if (Math.abs(implied - amount) > tolerance) warnings.push('price × quantity differs from amount');
-  }
-  if (row.quantity_derived) warnings.push('quantity derived');
-  if (row.price_derived) warnings.push('price derived');
-  const currency = String(row.currency || 'USD').toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) warnings.push('invalid currency');
-  return {
-    status: warnings.length ? 'review' : 'ok',
-    warnings,
-    currency,
   };
 }
 

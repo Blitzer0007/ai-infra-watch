@@ -9,7 +9,7 @@ test('authenticated Decision Center GET exposes blocked rule reviews and never p
   process.env.AIW_ACCESS_TOKEN=testAccess;
   delete process.env.FINNHUB_API_KEY;
   delete process.env.ALPHA_VANTAGE_API_KEY;
-  const now=Date.parse('2026-11-14T12:00:00Z');
+  const now=Date.parse('2026-11-13T18:00:00Z');
   t.mock.timers.enable({apis:['Date'],now});
   const holdings=[
     {id:'fictional-1',symbol:'FICT',quantity:1,average_cost:100,loss_limit_pct:100},
@@ -29,7 +29,8 @@ test('authenticated Decision Center GET exposes blocked rule reviews and never p
     }
     if(url.origin==='https://query1.finance.yahoo.com' && url.pathname.startsWith('/v8/finance/chart/')){
       const symbol=decodeURIComponent(url.pathname.split('/').at(-1));
-      return reply({chart:{result:[{meta:{symbol,regularMarketPrice:100,regularMarketTime:now/1000,currency:'USD',exchangeTimezoneName:'America/New_York',chartPreviousClose:100},
+      return reply({chart:{result:[{meta:{symbol,regularMarketPrice:100,regularMarketTime:now/1000,currency:'USD',exchangeTimezoneName:'America/New_York',chartPreviousClose:100,
+        currentTradingPeriod:{regular:{start:now/1000-3600,end:now/1000+3600}}},
         timestamp:[Date.parse('2026-11-01T12:00:00Z')/1000,Date.parse('2026-11-02T12:00:00Z')/1000],
         indicators:{quote:[{close:[100,140]}],adjclose:[{adjclose:[100,140]}]}}]}});
     }
@@ -43,6 +44,11 @@ test('authenticated Decision Center GET exposes blocked rule reviews and never p
   assert.deepEqual(body.rules.states.map(row=>row.state),['invalid-config','incomplete','clear']);
   assert.equal(body.rules.evaluated,1);assert.equal(body.rules.invalidConfig,1);assert.equal(body.rules.incomplete,1);
   assert.equal(body.rules.configurationIssues.length,2);
+  assert.equal(body.portfolio.totalTradingPnl,null);
+  assert.equal(body.portfolio.openCostBasis,null);
+  assert.equal(body.portfolio.cashFlowPnl,null);
+  assert.equal(body.portfolio.accountingReconciled,false);
+  assert.equal(body.benchmark.SPY.pnl,null);
   assert(body.rules.states[1].issues[0].includes('coverage'));
   assert(requests.length>0);assert(requests.every(row=>row.method==='GET'));
 });

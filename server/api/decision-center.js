@@ -1,5 +1,6 @@
 import { evaluateExistingRules, sortedHistoryPoints } from '../../shared/portfolioRuleEvaluation.js';
 import { reviewHoldingRules } from '../../shared/portfolioRuleReview.js';
+import { calculateReviewedServerPortfolio } from '../utils/reviewedDecisionAccounting.js';
 import { QUANTITY_EPSILON } from '../../shared/accountingPrecision.js';
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote } from '../../api/_market-data.js';
@@ -30,7 +31,9 @@ async function supabase(path, options = {}) {
 }
 
 function money(value) {
-  return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
+  if (!Number.isFinite(value)) return null;
+  const rounded = Number(value.toFixed(2));
+  return value !== 0 && rounded === 0 ? value : rounded;
 }
 
 function pct(value) {
@@ -366,28 +369,26 @@ export default async function handler(req, res) {
       'portfolio_holdings?select=id,symbol,quantity,average_cost,purchase_date,decision_thesis,loss_limit_pct,exit_rule_type,exit_rule_value,exit_rule_text,broker_alert_prices,broker_alerts,broker_alerts_review_required,rule_stages,rule_stage_state,target_allocation_pct,max_allocation_pct,risk_group,risk_beta,risk_leverage,scenario_shock_pct&quantity=gt.0&order=symbol.asc',
     );
     const transactionRows = await supabase(
-      'portfolio_transactions?select=symbol,transaction_type,trade_date,quantity,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc',
+      'portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc',
     );
 
     const symbols = holdingRows.map(row => String(row.symbol).toUpperCase());
     const quoteEntries = await Promise.all(symbols.map(async symbol => {
       try { return [symbol, await routedQuote(symbol)]; } catch { return [symbol, null]; }
     }));
-    const quotes = Object.fromEntries(quoteEntries);
+    const ruleAssessmentTime = new Date();
+    const actual = calculateReviewedServerPortfolio(holdingRows, transactionRows, Object.fromEntries(quoteEntries), ruleAssessmentTime.getTime());
+    const quotes = actual.admittedQuotes;
     const profitReviewSymbols = holdingRows.filter(holding => {
       const symbol = String(holding.symbol).toUpperCase();
-      const price = Number(quotes[symbol]?.price), cost = Number(holding.average_cost);
-      return price > 0 && cost > 0 && (price / cost - 1) * 100 >= 15;
+      const mark = actual.positionMarks.find(row => row.symbol === symbol);
+      const cost = actual.positionOpenCostBasis[symbol];
+      return mark?.value > 0 && cost > 0 && (mark.value / cost - 1) * 100 >= 15;
     }).map(holding => String(holding.symbol).toUpperCase());
     const analystTargetsResult = await fetchAnalystTargets(profitReviewSymbols);
     const analystTargets = analystTargetsResult.targets;
 
-    const totalCurrentValue = symbols.reduce((sum, symbol) => {
-      const holding = holdingRows.find(row => String(row.symbol).toUpperCase() === symbol);
-      const price = Number(quotes[symbol]?.price);
-      const quantity = Number(holding?.quantity);
-      return sum + (price > 0 && quantity > 0 ? price * quantity : 0);
-    }, 0);
+    const totalCurrentValue = actual.currentValue;
 
     const histories = {};
     await Promise.all([...symbols, 'SPY', 'SOXX'].filter((symbol,index,list)=>list.indexOf(symbol)===index).map(async symbol => {
@@ -397,13 +398,12 @@ export default async function handler(req, res) {
     const actionItems = [];
     const ruleStates = [];
     const configurationIssues = [];
-    const ruleAssessmentTime = new Date();
 
     for (const holding of holdingRows) {
       const symbol = String(holding.symbol).toUpperCase();
       const q = quotes[symbol];
       if (!q?.price) {
-        ruleStates.push({ symbol, state: 'no-data', message: 'Live price unavailable.' });
+        ruleStates.push({ symbol, state: 'no-data', message: 'Quote unavailable or withheld by data-quality checks.' });
         continue;
       }
       const rules = reviewHoldingRules(holding, q, histories[symbol], ruleAssessmentTime.getTime());
@@ -459,6 +459,7 @@ export default async function handler(req, res) {
         });
       } else if (
         currentAllocationPct != null &&
+        actual.accountingReconciled === true &&
         hasTarget &&
         currentAllocationPct < targetAllocationPct &&
         String(holding.decision_thesis || '').trim() &&
@@ -507,7 +508,7 @@ export default async function handler(req, res) {
           detail: hit?.unit === 'days'
             ? 'Your ' + hit.type + ' has reached ' + hit.target + ' days.'
             : 'Price $' + q.price.toFixed(2) + ' is at/below your ' + hit.type + ' of $' + hit.target.toFixed(2) + '.',
-          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+          impact: money(actual.positionUnrealizedPnl[symbol]),
         });
       } else if (rules.state === 'target-reached') {
         const target = rules.targetReached || rules.nearest;
@@ -516,7 +517,7 @@ export default async function handler(req, res) {
           symbol,
           title: 'Target reached',
           detail: 'Price $' + q.price.toFixed(2) + ' is at/above your broker upside alert of $' + target.target.toFixed(2) + '. Review your staged exit rule.',
-          impact: money((Number(holding.quantity) * Math.max(0, q.price - Number(holding.average_cost))) || 0),
+          impact: money(actual.positionUnrealizedPnl[symbol]),
         });
       } else if (rules.state === 'near') {
         const near = rules.nearest;
@@ -552,34 +553,23 @@ export default async function handler(req, res) {
 
     actionItems.sort((a, b) => ({ ACT: 0, WATCH: 1, SETUP: 2 }[a.severity] - { ACT: 0, WATCH: 1, SETUP: 2 }[b.severity]) || a.symbol.localeCompare(b.symbol));
 
-    const actual = calculateActualPortfolio(holdingRows, transactionRows, quotes, histories);
     const benchmark = {};
     for (const symbol of ['SPY', 'SOXX']) {
-      try {
-        const q = await routedQuote(symbol);
-        benchmark[symbol] = simulateSameCash(transactionRows, histories[symbol], q.price);
-      } catch {
-        benchmark[symbol] = simulateSameCash(transactionRows, histories[symbol], null);
-      }
+      // Legacy cash mirroring remains exported for compatibility, but cannot
+      // establish a sourced/coverage-compatible benchmark comparison here.
+      benchmark[symbol] = { value: null, netDeposits: null, pnl: null, shares: null,
+        coverage: { status: 'needs-evidence', reason: 'Comparable dated cash flows and supported historical price coverage are unverified.' } };
     }
 
-    const topHoldings = holdingRows.map(holding => {
-      const q = quotes[String(holding.symbol).toUpperCase()];
-      return {
-        symbol: String(holding.symbol).toUpperCase(),
-        value: q?.price > 0 ? q.price * Number(holding.quantity) : 0,
-      };
-    }).filter(row => row.value > 0).sort((a, b) => b.value - a.value);
+    const topHoldings = [...actual.positionMarks].filter(row => row.value > 0).sort((a,b) => b.value-a.value);
 
     const topValue = topHoldings.slice(0, 3).reduce((sum, row) => sum + row.value, 0);
     const concentrationPct = actual.currentValue > 0 ? topValue / actual.currentValue * 100 : null;
 
     const scenarioGroups = {};
-    for (const holding of holdingRows) {
+    for (const holding of actual.currentValue > 0 ? holdingRows : []) {
       const symbol=String(holding.symbol).toUpperCase();
-      const last=sortedHistoryPoints(histories[symbol]).at(-1);
-      const price=Number(quotes[symbol]?.price)>0?Number(quotes[symbol].price):Number(last?.price);
-      const value=price>0?price*Number(holding.quantity):0;
+      const value=actual.positionMarks.find(row=>row.symbol===symbol)?.value;
       if(!(value>0))continue;
       const group=String(holding.risk_group||'unclassified').trim().toLowerCase()||'unclassified';
       const {beta,leverage,shockPct}=scenarioParameters(holding);
@@ -590,7 +580,8 @@ export default async function handler(req, res) {
       scenarioGroups[group].holdings++;
     }
     const riskScenarios=Object.values(scenarioGroups).map(item=>({...item,shock:-item.weightedShock,effectiveShockPct:item.stressValue>0?item.weightedShock/item.stressValue*100:null})).sort((a,b)=>b.weightedShock-a.weightedShock);
-    const totalScenarioShock=riskScenarios.reduce((sum,item)=>sum+item.shock,0);
+    const rawScenarioShock=riskScenarios.length ? riskScenarios.reduce((sum,item)=>sum+item.shock,0) : null;
+    const totalScenarioShock=Number.isFinite(rawScenarioShock) ? rawScenarioShock : null;
 
     const portfolioRules = {
       total: ruleStates.length,
@@ -628,9 +619,14 @@ export default async function handler(req, res) {
         unrealizedPnl: money(actual.unrealizedPnl),
         realizedPnl: money(actual.realizedPnl),
         totalTradingPnl: money(actual.totalTradingPnl),
-        cashFlowPnl: money(actual.pnl),
+        cashFlowPnl: null,
         returnVsGrossPurchaseCostPct: pct(actual.returnVsGrossPurchaseCostPct),
         accountingStatus: actual.accountingStatus,
+        accountingIssues: actual.accountingIssues,
+        historyCoverage: actual.historyCoverage,
+        corporateActionCoverage: actual.corporateActionCoverage,
+        accountingReconciled: actual.accountingReconciled,
+        grantsDecisionEligibility: actual.grantsDecisionEligibility,
         quantityMismatchSymbols: actual.quantityMismatchSymbols,
         derivedTransactionCount: actual.derivedTransactionCount,
         concentrationTop3Pct: pct(concentrationPct),
@@ -649,6 +645,8 @@ export default async function handler(req, res) {
       forecast,
       signalGate,
       notes: [
+        'Trading figures are conditional calculations over matched loaded records; full account history and corporate actions remain unverified. Stored average cost never substitutes for ledger evidence.',
+        'Cash-flow P&L and benchmark comparisons are withheld until compatible external cash-flow and history evidence is supported.',
         'Action items are review prompts based on your stored rules and current evidence; they are not automatic trade instructions.',
         'Fresh analyst price targets can add profit-review prompts near consensus targets; analyst targets are not intrinsic value estimates.',
         'Benchmark results mirror your dated portfolio cash flows using the same cash amounts on the same dates.',

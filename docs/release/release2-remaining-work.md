@@ -4,6 +4,8 @@ Rollout plan: [five milestone production releases](release2-five-deployments.md)
 
 15 November increment: [risk and release foundation](release2-risk-release-foundation.md) adds strict rule admission, visible configuration/coverage gaps, removal of inferred stage writes from Decision Center reads, Server Smart Alert quote/auth safeguards and tested manual release controls. This advances milestone 1; accounting/source acceptance, hosted release prerequisites and the overall completion estimate have not been re-certified.
 
+The subsequent [Decision Center accounting review](release2-decision-accounting-review.md) shares the existing strict browser ledger/quote checks with the server, removes cost/history-price and false-zero fallbacks, withholds unsupported cash-flow/benchmark comparisons and exposes conditional accounting coverage. This implements one remaining server-consumer boundary; full-history/source truth, other return/history/FX consumers and production acceptance remain pending.
+
 Assessed 14 November 2026 in Codex Cloud. This register consolidates the [Release 2 plan](release2-engineering-plan.md), implementation reviews and the current source tree. **About 60% engineering complete / 40% pending**, rounded to the nearest five points. The weighted estimate is 57.75%; it is not a percentage of formulas proven correct, data verified, tests passed or production work completed. The glossary/help slice shipped separately in PR #169; broader Release 1/2 implementation remains on feature branches/draft PRs, with its production rollout pending.
 
 ## Already implemented
@@ -44,7 +46,7 @@ The [loaded-position valuation integrity increment](release2-position-valuation-
 
 - Prove import/full-trade-history coverage and gross/fee/currency semantics; resolve inventory mismatches, derived inputs and ambiguous same-day ordering.
 - Establish corporate-action/dividend/split and cash-flow treatment before complete account-performance claims.
-- Extend the implemented offline weighted-average cross-check to remaining supported consumers and authoritative histories; resolve cross-layer precision/tolerance/accounting-method parity and diagnostics.
+- The [Decision Center server consumer](release2-decision-accounting-review.md) now uses the shared strict loaded-record/quote boundary and preserves exact browser parity. Extend the offline weighted-average cross-check to other supported consumers and authoritative histories; resolve remaining cross-layer accounting-method and precision diagnostics.
 - Pass a reviewed reconciled accounting receipt into Python/agent context; restore cost/P&L aggregates only when the required facts are supported.
 
 Done when quantities/costs/cash flows reconcile to authoritative evidence. The loaded-record review is conditional and does not establish this completeness.
@@ -78,7 +80,7 @@ Done when risk explanations use one reviewed kernel and the Release 1 completion
 
 ### 6. Alert coverage and scheduler transparency — core; activation separate
 
-The [browser quote-admission safety follow-up](release2-browser-quote-alert-admission.md) is implemented: strict declared quote quality/identity/units/session/freshness, eligible baselines, rejection without state reset, chronology/deduplication and separate local receipts. Server scanner/relay admission, source authenticity, delivery acceptance and read-only suppression-coverage presentation remain pending. No activation is implied.
+The [browser quote-admission safety follow-up](release2-browser-quote-alert-admission.md) and [Server Smart Alert quote/authorization safeguards](release2-risk-release-foundation.md) are implemented. The [Decision Center](release2-decision-accounting-review.md) now shares browser quote admission. Other scanner/relay paths, source authenticity, delivery acceptance and read-only suppression-coverage presentation remain pending. No activation is implied.
 
 - Extend the bounded read-only inbox beyond the implemented re-entry delivery reader/local history to remaining approved alert classes.
 - Add supported trigger reasons/severity and job/scheduler-health DTO integration without invoking scans, claims, retries or sends. Unknown health/coverage must remain unknown.

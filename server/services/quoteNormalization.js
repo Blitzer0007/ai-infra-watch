@@ -43,9 +43,11 @@ export function normalizeYahooQuote(result, nowMs = Date.now(), expectedSymbol =
   const session = regularSessionMetadata(meta,nowMs);
   return { price:meta.regularMarketPrice,changePct:ratioChange(meta.regularMarketPrice,previous.price),prevClose:previous.price,
     dailyChangeSource:previous.source,...range(meta.regularMarketDayLow,meta.regularMarketDayHigh),
-    source:'Yahoo Finance',provider:'yahoo',sourceMode:'live',returnedSymbol:typeof meta.symbol==='string'?meta.symbol.trim().toUpperCase():null,
+    source:'Yahoo Finance',provider:'yahoo',sourceMode:meta.simulated === true ? 'simulated' : 'live',returnedSymbol:typeof meta.symbol==='string'?meta.symbol.trim().toUpperCase():null,
     currency:typeof meta.currency==='string'&&meta.currency.trim()?meta.currency:null,
-    retrievedAt:new Date(nowMs).toISOString(),adjustedBasis:'raw',...session,asOf:session.marketTime,stale:false };
+    marketTimePrecision:session.marketTime === null ? 'unknown' : 'instant',
+    retrievedAt:new Date(nowMs).toISOString(),adjustedBasis:'raw',...session,asOf:session.marketTime,
+    stale:meta.stale ?? false,simulated:meta.simulated ?? false };
 }
 
 export function normalizeFinnhubQuote(value, nowMs = Date.now()) {

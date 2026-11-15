@@ -32,6 +32,10 @@ type DecisionData = {
     currentValue: number | null;
     netContributed: number | null;
     cashFlowPnl: number | null;
+    totalTradingPnl?: number | null;
+    accountingStatus?: string;
+    accountingReconciled?: boolean;
+    accountingIssues?: Array<{code:string;symbol:string|null;message:string}>;
     concentrationTop3Pct: number | null;
     semiconductorShock15Pct: number | null;
     scenarioShockTotal?: number | null;
@@ -69,11 +73,13 @@ type DecisionData = {
 
 function money(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return '—';
-  return (value < 0 ? '−$' : '$') + Math.abs(value).toFixed(2);
+  const amount = Math.abs(value);
+  return (value < 0 ? '−$' : '$') + (amount > 0 && amount < .005 ? amount.toExponential(3) : amount.toFixed(2));
 }
 function signedMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return '—';
-  return (value >= 0 ? '+$' : '−$') + Math.abs(value).toFixed(2);
+  const amount = Math.abs(value);
+  return (value >= 0 ? '+$' : '−$') + (amount > 0 && amount < .005 ? amount.toExponential(3) : amount.toFixed(2));
 }
 
 function evaluatedRuleCount(rules: DecisionData['rules']) {
@@ -128,8 +134,12 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
   const portfolio = data.portfolio!;
   const spy = data.benchmark?.SPY;
   const soxx = data.benchmark?.SOXX;
-  const excessSpy = spy && portfolio.cashFlowPnl != null && spy.pnl != null && spy.coverage?.status !== 'partial' ? portfolio.cashFlowPnl - spy.pnl : null;
-  const excessSoxx = soxx && portfolio.cashFlowPnl != null && soxx.pnl != null && soxx.coverage?.status !== 'partial' ? portfolio.cashFlowPnl - soxx.pnl : null;
+  const comparisonReady = portfolio.accountingReconciled === true && portfolio.quoteCoverage?.status === 'complete';
+  const spyPnl = comparisonReady && spy?.coverage?.status === 'complete' ? spy.pnl : null;
+  const soxxPnl = comparisonReady && soxx?.coverage?.status === 'complete' ? soxx.pnl : null;
+  const accountPnl = comparisonReady ? portfolio.cashFlowPnl : null;
+  const excessSpy = spyPnl != null && accountPnl != null ? accountPnl - spyPnl : null;
+  const excessSoxx = soxxPnl != null && accountPnl != null ? accountPnl - soxxPnl : null;
 
   return (
     <section className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-4 md:p-5 space-y-4" data-testid="decision-impact-center">
@@ -150,12 +160,20 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
-        <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Cash-flow P&L" value={signedMoney(portfolio.cashFlowPnl)} tone={(portfolio.cashFlowPnl || 0) >= 0 ? 'good' : 'danger'} />
+        <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Trading P&L" value={signedMoney(portfolio.accountingStatus === 'conditional-loaded-records' ? portfolio.totalTradingPnl : null)} tone={portfolio.accountingStatus !== 'conditional-loaded-records' || portfolio.totalTradingPnl == null ? 'neutral' : portfolio.totalTradingPnl >= 0 ? 'good' : 'danger'} />
         <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={evaluatedRuleCount(rules) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
       </div>
 
       <PreTradeGate data={data} />
+
+      <details className="rounded-xl border border-amber-400/20 bg-amber-400/[.035] p-3" data-testid="decision-accounting-issues">
+        <summary className="cursor-pointer text-xs font-bold text-amber-200">Accounting coverage and inputs</summary>
+        <p className="mt-2 text-xs text-white/60">Trading figures require matched original loaded records. Full account history and corporate actions remain unverified. Cash-flow P&amp;L and benchmark comparisons need separately supported evidence.</p>
+        <ul className="mt-2 space-y-2 text-xs text-white/60">
+          {(Array.isArray(portfolio.accountingIssues) ? portfolio.accountingIssues : []).map((entry,index) => <li key={entry.code + '-' + index}>{entry.symbol ? entry.symbol + ': ' : ''}{entry.message}</li>)}
+        </ul>
+      </details>
 
       {Array.isArray(rules.configurationIssues) && rules.configurationIssues.length > 0 && <details className="rounded-xl border border-amber-400/20 bg-amber-400/[.035] p-3" data-testid="decision-rule-issues">
         <summary className="cursor-pointer text-xs font-bold text-amber-200">Rule configuration and coverage issues</summary>
@@ -190,21 +208,21 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
                 </div>
               </div>
             ))}
-            {!actions.length && <div className="flex items-center gap-2 text-[10px] text-emerald-300"><CheckCircle2 className="w-4 h-4" /> No rule breach or near-rule item is currently detected.</div>}
+            {!actions.length && <div className="flex items-center gap-2 text-[10px] text-amber-200"><AlertTriangle className="w-4 h-4" /> No usable review prompts returned. Check rule and data coverage before interpreting this as no risk.</div>}
           </div>
         </div>
 
         <div className="rounded-xl border border-white/5 bg-black/10 p-3">
           <div className="text-[9px] font-mono uppercase tracking-widest text-white/25">Your result vs simple benchmark</div>
           <div className="text-sm font-black mt-1">Same cash-flow benchmark</div>
-          <div className="text-[9px] text-white/35 mt-1">Your real dated cash flows are compared with putting the same cash into a broad market benchmark on the same dates.</div>
+          <div className="text-[9px] text-white/35 mt-1">{comparisonReady ? 'Compare supported dated account cash flows with the same amounts invested on the same dates.' : 'Cash-flow and history evidence is incomplete; comparisons are unavailable.'}</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
-            <MiniResult label="You" value={signedMoney(portfolio.cashFlowPnl)} />
-            <MiniResult label="SPY" value={signedMoney(spy?.pnl)} />
+            <MiniResult label="You" value={signedMoney(accountPnl)} />
+            <MiniResult label="SPY" value={signedMoney(spyPnl)} />
             <MiniResult label="You − SPY" value={signedMoney(excessSpy)} />
           </div>
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <MiniResult label="SOXX" value={signedMoney(soxx?.pnl)} />
+            <MiniResult label="SOXX" value={signedMoney(soxxPnl)} />
             <MiniResult label="You − SOXX" value={signedMoney(excessSoxx)} />
           </div>
         </div>
@@ -240,6 +258,11 @@ function PreTradeGate({ data }: { data: DecisionData }) {
       label: 'Fresh portfolio pricing',
       ok: portfolio?.quoteCoverage?.status === 'complete',
       detail: portfolio?.quoteCoverage ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
+    },
+    {
+      label: 'Accounting reconciliation',
+      ok: portfolio?.accountingReconciled === true,
+      detail: 'Matched loaded records do not establish full-history reconciliation.',
     },
     {
       label: 'Position rules',

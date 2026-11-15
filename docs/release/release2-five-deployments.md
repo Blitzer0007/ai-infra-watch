@@ -45,3 +45,5 @@ Record the release number, candidate SHA, included/deferred changes, CI links, p
 Track feature implementation, fixture/disposable verification, authentic-source/live verification and production deployment separately. Real issuer/history/accounting evidence, secure development provider access, genuine NVIDIA/JEV effectiveness and matured predictive outcomes cannot be certified by code completion or mock tests. Missing evidence must remain visible and cannot be promoted to a positive financial or forecasting claim.
 
 The next implementation is release 1's remaining shared risk/configuration and server-alert safeguards, alongside the pipeline changes above. This document updates the rollout plan only; it creates no deploy, merge, schedule, provider call, production database change or Telegram send.
+
+Implementation follow-up: [risk/release foundation](release2-risk-release-foundation.md) and [Decision Center accounting abstention](release2-decision-accounting-review.md) are implemented on the feature branch. Remaining source/history contracts, other consumers and hosted acceptance still block declaring milestone 1 complete or deployed.
