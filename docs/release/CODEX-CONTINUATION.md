@@ -8,7 +8,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 - Active development: `feature/release2-opportunity-research`, draft PR [#168](https://github.com/Blitzer0007/ai-infra-watch/pull/168), stacked on `feature/release1-portfolio-command-center` / draft PR #167. Do not retarget or merge the unfinished stack as a shortcut.
 - Cloud workspace: `/workspace/ai-infra-watch`. No Windows execution is required.
 - Source baseline before this checkpoint: `562d9ddc3a6c1be4f86471f4e9eea9f8c6a0a101`; 1,754 Node tests and all seven CI workflows passed on that exact baseline. Those results do not certify subsequent source changes.
-- Milestone 2 source implementation commit: `dbf0d1f36392464735b8da3d96f2cdeb7c80fba4`; later documentation-only checkpoints do not change that source implementation.
+- Initial Milestone 2 source commit: `dbf0d1f36392464735b8da3d96f2cdeb7c80fba4`. The current checkpoint also includes legacy-link reload canonicalization; obtain the latest implementation from the current feature/PR head rather than stopping at that initial commit.
 - Discover the latest checkpoint SHA from the draft PR head or `git log -1 --format=%H -- docs/release/CODEX-CONTINUATION.md`; a file cannot embed its own future commit SHA.
 
 ## Production — Milestone 1 completed, 1/5 releases
@@ -31,7 +31,7 @@ Checkpoint: **company research navigation implemented and locally verified; not 
 
 Completed in this increment:
 
-- Independent `research_symbol` prevents an unheld Opportunities candidate from silently becoming the first holding. Invalid/ambiguous/unknown symbols show an explicit gap; no substitute dossier appears.
+- Legacy company links are canonicalized into `research_symbol` before selected-holding restoration; reload retains an unheld company. Independent `research_symbol` prevents an unheld Opportunities candidate from silently becoming the first holding. Invalid/ambiguous/unknown symbols show an explicit gap; no substitute dossier appears.
 - `CompanyResearchWorkspace.tsx` uses the current configured watchlist plus bounded loaded holdings, separate membership status, a labelled picker and Back/Forward support. It reuses the manual, lazy, source-unconnected dossier without any provider/model/financial request.
 - Scanner search/status/display limit use a bounded URL contract and a fixed return route. A lost frozen snapshot is not recreated or automatically rescanned. Positions, notes, credentials and arbitrary return URLs are not copied into generated links.
 - The shipped `api/auth.js` data-free check and `server/api/release-access-check.test.js` were carried forward from production main without overwriting the newer Portfolio UI.
@@ -43,10 +43,10 @@ Files to inspect:
 - `src/components/opportunities/OpportunityScanner.tsx` / `OpportunityCard.tsx`: view-state retention and dossier links.
 - `src/components/portfolio/CompanyResearchWorkspace.tsx`: independent read-only company destination.
 - `src/components/PortfolioIntelligence.tsx` / `src/App.tsx`: current watchlist/context wiring.
-- `qa/test_company_research_navigation.py`: ten intercepted integration cases; added to `qa-validation.yml`.
+- `qa/test_company_research_navigation.py`: eleven intercepted integration cases; added to `qa-validation.yml`.
 - `docs/release/release2-company-research-navigation.md`: implementation review and limits.
 
-Verification at this checkpoint: **1,763 Node tests passed**, TypeScript/build/security/32-file migration manifest/whitespace passed; **51 focused browser cases passed** across the new flow, Opportunities, holding dialog, dossier and Portfolio navigation. The source security scan ran after new files were tracked. Existing large-bundle warnings remain. These are real Cloud checks; final saved-head CI is recorded in draft PR #168 and must be checked there, not inferred from a previous commit.
+Verification at this checkpoint: **1,763 Node tests passed**, TypeScript/build/security/32-file migration manifest/whitespace passed; **52 focused browser cases passed** across the new flow, Opportunities, holding dialog, dossier and Portfolio navigation. The source security scan ran after new files were tracked. Existing large-bundle warnings remain. These are real Cloud checks; final saved-head CI is recorded in draft PR #168 and must be checked there, not inferred from a previous commit.
 
 Next concrete increment — do this before a Milestone 2 release:
 

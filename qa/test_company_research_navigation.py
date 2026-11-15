@@ -38,6 +38,18 @@ def test_opportunity_to_unheld_dossier_and_explicit_rescan_retains_filters(page)
  expect(scanner.get_by_role('combobox',name='Research status')).to_have_value('needs-data')
  expect(scanner.get_by_test_id('opportunity-card')).to_have_count(1)
 
+def test_legacy_unheld_company_link_is_canonical_before_reload(page):
+ fictional_portfolio(page)
+ page.goto('/portfolio?portfolio_tab=research&portfolio_symbol=DEMO')
+ research=workspace(page)
+ expect(research.get_by_role('combobox',name='Research company',exact=True)).to_have_value('DEMO')
+ page.wait_for_load_state('networkidle')
+ assert 'research_symbol=DEMO' in page.url
+ page.reload()
+ expect(research.get_by_role('combobox',name='Research company',exact=True)).to_have_value('DEMO')
+ expect(research.get_by_test_id('research-position-context')).to_contain_text('no loaded position')
+
+
 def test_company_picker_back_forward_never_replaces_the_selected_holding(page):
  fictional_portfolio(page)
  page.goto('/portfolio?portfolio_tab=research&research_symbol=DEMO&portfolio_symbol=FICT')

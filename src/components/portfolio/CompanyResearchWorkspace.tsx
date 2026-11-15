@@ -12,6 +12,14 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
   const [returnHref,setReturnHref]=useState(()=>opportunityReturnHref(new URLSearchParams(window.location.search)));
   const controlId=useId();
   useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    // Canonicalize old company links before holding restoration can rewrite its own symbol.
+    if(window.location.pathname==='/portfolio'&&params.get('portfolio_tab')==='research'&&selection.symbol&&!params.has('research_symbol')){
+      params.set('research_symbol',selection.symbol);
+      window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    }
+  },[selection.symbol]);
+  useEffect(()=>{
     const restore=()=>{const params=new URLSearchParams(window.location.search);setSelection(readResearchSelection(params));setReturnHref(opportunityReturnHref(params));};
     window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);
   },[]);
@@ -33,7 +41,7 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
       <option value="">Choose a configured company</option>
       {symbols.map(symbol=><option key={symbol} value={symbol}>{symbol}{names.get(symbol)?' · '+names.get(symbol):''}</option>)}
     </select>
-    {selection.invalid?<p role="alert">The research symbol is malformed or ambiguous. No substitute company is shown.</p>:selection.symbol&&!active?<p role="alert">This research symbol is not in the configured holdings or watchlist. No substitute company is shown.</p>:null}
+    {selection.invalid?<p role="alert">The research symbol is malformed or ambiguous. No substitute company is shown.</p>:selection.symbol&&!active?<p role="alert">This research symbol is not in the available configured company context. No substitute company is shown.</p>:null}
     {active&&<>
       <p data-testid="research-position-context" className="text-sm text-amber-200">{holdingsStatus!=='ready'?'Holding membership is unavailable. This research view does not establish a position.':holdings.includes(active)?'In loaded holdings · accounting and financial evidence remain subject to their own review.':'Watchlist company · no loaded position. Returns, sizing and position actions are not inferred.'}</p>
       <HoldingCompanyDossier key={active} symbol={active} configuredName={name}/>
