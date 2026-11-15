@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import handler from '../../api/auth.js';
 
 const keys=['AIW_ACCESS_TOKEN','AGENT_API_TOKEN','CRON_SECRET'];
+const fictionalAccess='fictional-only-release-key';
 function fixture(t){
  const prior=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
  for(const key of keys)delete process.env[key];
@@ -21,27 +22,27 @@ test('release access probe withholds when authentication is not configured and n
  assert.equal(res.headers['Cache-Control'],'no-store');
 });
 test('anonymous and invalid release probes return only the private-access denial',async t=>{
- const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN='fictional-only-release-key';
- for(const headers of [{},{authorization:'Bearer fictional-wrong-key'}]){
+ const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN=fictionalAccess;
+ for(const headers of [{},{authorization:'Bearer '+'fictional-wrong-key'}]){
   const res=await invoke({method:'GET',query:{check:'release'},headers});
   assert.equal(res.code,401);assert.deepEqual(res.body,{ok:false,error:'Authentication required'});
   assert.equal(res.headers['Cache-Control'],'no-store');
  }
 });
 test('authenticated release probe returns only a boolean access receipt',async t=>{
- const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN='fictional-only-release-key';
- const res=await invoke({method:'GET',query:{check:'release'},headers:{authorization:'Bearer fictional-only-release-key'}});
+ const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN=fictionalAccess;
+ const res=await invoke({method:'GET',query:{check:'release'},headers:{authorization:'Bearer '+fictionalAccess}});
  assert.equal(res.code,200);assert.deepEqual(res.body,{ok:true,authenticated:true});
  assert.equal(JSON.stringify(res.body).includes('fictional-only-release-key'),false);
 });
 test('existing method restrictions and login attempts are preserved',async t=>{
- const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN='fictional-only-release-key';
+ const invoke=fixture(t);process.env.AIW_ACCESS_TOKEN=fictionalAccess;
  for(const query of [{},{check:'other'},{check:['release']}]){
   const res=await invoke({method:'GET',query,headers:{}});assert.equal(res.code,405);assert.equal(res.headers.Allow,'POST');
  }
  for(let i=0;i<20;i++)assert.equal((await invoke()).code,401);
  const invalid=await invoke({method:'POST',headers:{'x-forwarded-for':'192.0.2.171'},body:{token:''}});
  assert.equal(invalid.code,401);
- const valid=await invoke({method:'POST',headers:{'x-forwarded-for':'192.0.2.171'},body:{token:'fictional-only-release-key'}});
+ const valid=await invoke({method:'POST',headers:{'x-forwarded-for':'192.0.2.171'},body:{token:fictionalAccess}});
  assert.equal(valid.code,200);assert.deepEqual(valid.body,{ok:true,authenticated:true});
 });
