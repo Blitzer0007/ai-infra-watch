@@ -2,10 +2,14 @@ name: Frontend CI
 # Purchase-aware portfolio analytics are validated in the standard build.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "src/**"
+      - "shared/**"
+      - "scripts/release-candidate.mjs"
+      - "scripts/fixtures/**"
       - "api/**"
       - "server/**"
       - "supabase/**"
@@ -21,6 +25,9 @@ on:
       - "server/**"
       - "supabase/**"
       - "src/**"
+      - "shared/**"
+      - "scripts/release-candidate.mjs"
+      - "scripts/fixtures/**"
       - "api/**"
       - "package.json"
       - "package-lock.json"

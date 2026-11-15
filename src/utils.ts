@@ -1,4 +1,6 @@
 import { WatchlistItem } from './types';
+import { parseQuoteObservation } from './utils/quoteObservation';
+import { quoteSourceMetadata, providerObservationInstant } from './utils/quoteSourceMetadata';
 
 export interface AppConfig {
   finnhubKey: string;
@@ -64,13 +66,14 @@ export function saveConfig(cfg: AppConfig): void {
   }
 }
 
-export function formatPrice(p: number | undefined): string {
-  if (p === undefined || isNaN(p)) return '—';
+export function formatPrice(p: number | null | undefined): string {
+  if (typeof p !== 'number' || !Number.isFinite(p)) return '—';
+  if (p !== 0 && Math.abs(p) < 0.005) return p.toExponential(4);
   return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function formatPct(p: number | undefined): string {
-  if (p === undefined || isNaN(p)) return '—';
+export function formatPct(p: number | null | undefined): string {
+  if (typeof p !== 'number' || !Number.isFinite(p)) return '—';
   const prefix = p >= 0 ? '+' : '';
   return `${prefix}${p.toFixed(2)}%`;
 }
@@ -78,17 +81,22 @@ export function formatPct(p: number | undefined): string {
 export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefresh = false): Promise<{
   price: number;
   changePct: number;
-  low: number;
-  high: number;
-  prevClose: number;
+  low: number | null;
+  high: number | null;
+  prevClose: number | null;
   source: 'live';
   provider?: string;
   retrievedAt?: string;
+  currency?: string | null;
+  isMarketSessionOpen?: boolean | null;
+  status?: string;
+  simulated?: boolean;
+  fallbackUsed?: boolean;
   marketTime?: string | null;
   asOf?: string | null;
   stale?: boolean;
   cached?: boolean;
-}> {
+} & ReturnType<typeof quoteSourceMetadata>> {
   if (!apiKey) {
     const res = await fetch(
       '/api/quote?symbol=' + encodeURIComponent(symbol) + (forceRefresh ? '&refresh=true' : ''),
@@ -96,19 +104,22 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     );
     if (!res.ok) throw new Error('Server quote request failed: HTTP ' + res.status);
     const data = await res.json();
-    if (!Number.isFinite(data?.price)) throw new Error('Server quote returned no price');
+    const observed = parseQuoteObservation(data, symbol);
+    if (!observed) throw new Error('Server quote returned no usable price and daily move');
     return {
-      price: data.price,
-      changePct: Number(data.changePct) || 0,
-      low: Number(data.low) || data.price,
-      high: Number(data.high) || data.price,
-      prevClose: Number(data.prevClose) || data.price,
+      ...quoteSourceMetadata(data),
+      ...observed,
       source: 'live',
       provider: data.provider,
       retrievedAt: data.retrievedAt,
+      currency: data.currency,
+      isMarketSessionOpen: data.isMarketSessionOpen,
+      status: data.status,
+      simulated: data.simulated,
+      fallbackUsed: data.fallbackUsed,
       marketTime: data.marketTime,
       asOf: data.asOf,
-      stale: data.stale === true,
+      stale: data.stale,
       cached: data.cached === true
     };
   }
@@ -119,21 +130,19 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
     const data = await res.json();
     
     // Finnhub fields: c=current, d=change, dp=percent change, h=high, l=low, o=open, pc=prev close
-    if (data.c === 0 && data.pc === 0) {
+    const observed = parseQuoteObservation({price:data.c,changePct:data.dp,low:data.l,high:data.h,prevClose:data.pc}, symbol);
+    if (!observed) {
       throw new Error(`Symbol ${symbol} not found or rate limit hit.`);
     }
     
     return {
-      price: data.c,
-      changePct: data.dp,
-      low: data.l,
-      high: data.h,
-      prevClose: data.pc,
+      ...quoteSourceMetadata({sourceMode:'live',adjustedBasis:'raw'}),
+      ...observed,
       source: 'live',
       provider: 'Finnhub',
       retrievedAt: new Date().toISOString(),
-      marketTime: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
-      asOf: data.t && Number.isFinite(Number(data.t)) ? new Date(Number(data.t) * 1000).toISOString() : null,
+      marketTime: providerObservationInstant(data.t),
+      asOf: providerObservationInstant(data.t),
       stale: false,
       cached: false
     };
@@ -145,19 +154,22 @@ export async function fetchLiveQuote(symbol: string, apiKey: string, forceRefres
       );
       if (!res.ok) throw new Error('Server quote fallback failed: HTTP ' + res.status);
       const data = await res.json();
-      if (!Number.isFinite(data?.price)) throw new Error('No live quote available');
+      const observed = parseQuoteObservation(data, symbol);
+      if (!observed) throw new Error('No usable price and daily move available');
       return {
-        price: data.price,
-        changePct: Number(data.changePct) || 0,
-        low: Number(data.low) || data.price,
-        high: Number(data.high) || data.price,
-        prevClose: Number(data.prevClose) || data.price,
+        ...quoteSourceMetadata(data),
+        ...observed,
         source: 'live',
         provider: data.provider,
         retrievedAt: data.retrievedAt,
+        currency: data.currency,
+        isMarketSessionOpen: data.isMarketSessionOpen,
+        status: data.status,
+        simulated: data.simulated,
+        fallbackUsed: data.fallbackUsed,
         marketTime: data.marketTime,
         asOf: data.asOf,
-        stale: data.stale === true,
+        stale: data.stale,
         cached: data.cached === true
       };
     } catch {
