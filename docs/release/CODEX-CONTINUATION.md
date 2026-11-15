@@ -29,7 +29,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 
 Continue **Milestone 2 — integrated Portfolio core**. No second release is authorized merely by this development request. Maintain this handoff so a different ChatGPT model can resume safely using repository state.
 
-Checkpoint: **Calendar/Inbox company research round trips implemented and locally verified; not deployed**. Accounting and prior navigation checkpoints remain preserved. Inspect the latest PR head and exact-head CI before continuing.
+Checkpoint: **Exact Calendar/Inbox opened-record context added; new-head CI pending; not deployed**. Earlier navigation checks are retained. Accounting and prior navigation checkpoints remain preserved. Inspect the latest PR head and exact-head CI before continuing.
 
 Completed in this increment:
 
@@ -57,6 +57,14 @@ Next concrete increment — before a Milestone 2 release:
 3. Show original event date precision, certainty/correction and source gaps, or separate browser-detection/server-delivery evidence. Do not infer a read receipt, correlate episodes by symbol/date, grant financial/decision eligibility or synthesize facts. On reload/unknown origin show unavailable context rather than selecting another record.
 4. Verify multiple records for one symbol, Back/Forward/return focus, missing/loading/error and 360/768/1440px keyboard/mobile stories with fictional fixtures. No automatic feed/history read, model run, retry, schedule or send.
 5. Continue broader Portfolio editing/source/conflict/context acceptance. Auxiliary disclosures outside record explanations and unsupported live/source/history integrations remain pending. Update this file/review/register after meaningful checkpoints. Production stays at Milestone 1 until a later release is ready and authorized.
+
+## Checkpoint — exact Calendar/Inbox record context (15 November 2026)
+
+**Implementation:** On draft PR #168, added `src/utils/reviewRecordContext.ts` (and five fictional unit cases), `src/components/portfolio/ReviewOriginContext.tsx`, and updated Calendar/Inbox links, App session navigation, and Company Research rendering. The clicked record is independently sanitized and bounded; App keeps at most 100 entries in memory. The navigation history carries only a random opaque key (never raw bodies, episode IDs or provider message IDs); a direct/reloaded research view cannot reconstruct missing context. Calendar shows original precision/confirmation and correction limitations. Browser detection and server delivery remain separate; a provider message ID is not a read receipt. The manually opened dossier stays source-unconnected. No new provider calls, writer, schedules, polling, Supabase changes or Telegram sends.
+
+**Tests:** `src/utils/reviewRecordContext.test.ts` covers distinct same-symbol events, bounded corrections/credential redaction, alert source separation, provider receipt uncertainty and invalid input. `qa/test_review_workspace_navigation.py` now includes five fictional browser scenarios (three responsive widths and two inbox flows), including Back/Forward and reload failure-of-context. **This ChatGPT session did not execute Node, TypeScript, Python or browser tests.** Baseline `b2c5ef2` had seven successful workflows; that evidence does not certify these edits. Inspect the exact new head's GitHub CI and fix genuine regressions before additional implementation. GitHub source commits were made in small connected-tool updates, not a cloud workspace build.
+
+**Next:** Verify the new head and repair failed tests if any; expand integrated Portfolio editing/source/conflict/context checks, including auxiliary disclosure retention and mobile/keyboard acceptance. Preserve main Milestone 1, the draft PR stack, and all no-production restrictions. The public `@aravind` Event Risk Radar is separately specified in `docs/release/release2-event-risk-radar-aravind.md`; it is not activated.
 
 ## Remaining integration/safety work
 
