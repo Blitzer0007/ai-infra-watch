@@ -1,4 +1,6 @@
-import {reviewReturnHref} from '../../utils/reviewWorkspaceNavigation';
+import {reviewReturnHref,readReviewOrigin} from '../../utils/reviewWorkspaceNavigation';
+import type {ReviewRecordContext} from '../../utils/reviewRecordContext';
+import ReviewOriginContext from './ReviewOriginContext';
 import {useEffect,useId,useState} from 'react';
 import {STOCK_UNIVERSE} from '../../utils/stockUniverse';
 import {validHoldingSymbol} from '../../utils/holdingDetailNavigation';
@@ -6,9 +8,9 @@ import {opportunityReturnHref,readResearchSelection} from '../../utils/companyRe
 import type {LedgerAvailability} from '../../utils/loadedLedgerReview';
 import HoldingCompanyDossier from './HoldingCompanyDossier';
 
-type Props={onOpenReviewHref?:(href:string)=>void;holdings:readonly string[];watchlist:readonly string[];holdingsStatus:LedgerAvailability};
+type Props={onOpenReviewHref?:(href:string)=>void;reviewRecord?:ReviewRecordContext|null;holdings:readonly string[];watchlist:readonly string[];holdingsStatus:LedgerAvailability};
 /** Company selection is independent of the selected position. This view has no data transport. */
-export default function CompanyResearchWorkspace({holdings,watchlist,holdingsStatus,onOpenReviewHref}:Props){
+export default function CompanyResearchWorkspace({holdings,watchlist,holdingsStatus,onOpenReviewHref,reviewRecord=null}:Props){
   const [selection,setSelection]=useState(()=>readResearchSelection(new URLSearchParams(window.location.search)));
   const readReturn=()=>{const p=new URLSearchParams(window.location.search);return reviewReturnHref(p)??{href:opportunityReturnHref(p),label:'Return to Opportunities'};};
   const [returnLink,setReturnLink]=useState(readReturn);
@@ -32,7 +34,9 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
   function choose(symbol:string){
     if(!symbols.includes(symbol))return;
     const params=new URLSearchParams(window.location.search);params.set('research_symbol',symbol);
-    window.history.pushState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    const state=window.history.state&&typeof window.history.state==='object'?{...window.history.state}:{};
+    delete state.aiwReviewEntry;
+    window.history.pushState(state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
     setSelection({symbol,invalid:false});
   }
   return <section className="min-w-0 space-y-4 rounded-xl border border-white/20 p-4" data-testid="company-research-workspace" aria-label="Company research context">
@@ -46,6 +50,7 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
     {selection.invalid?<p role="alert">The research symbol is malformed or ambiguous. No substitute company is shown.</p>:selection.symbol&&!active?<p role="alert">This research symbol is not in the available configured company context. No substitute company is shown.</p>:null}
     {active&&<>
       <p data-testid="research-position-context" className="text-sm text-amber-200">{holdingsStatus!=='ready'?'Holding membership is unavailable. This research view does not establish a position.':holdings.includes(active)?'In loaded holdings · accounting and financial evidence remain subject to their own review.':'Watchlist company · no loaded position. Returns, sizing and position actions are not inferred.'}</p>
+      <ReviewOriginContext origin={readReviewOrigin(new URLSearchParams(window.location.search))} record={window.history.state?.aiwReviewEntry?reviewRecord:null} symbol={active}/>
       <HoldingCompanyDossier key={active} symbol={active} configuredName={name}/>
     </>}
     <a className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-3 py-2 text-sm text-cyan-100" href={returnLink.href} onClick={event=>{if(returnLink.label==='Return to Opportunities'||!onOpenReviewHref||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();onOpenReviewHref(returnLink.href);}}>{returnLink.label}</a>
