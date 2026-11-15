@@ -78,6 +78,14 @@ This coherent candidate finishes an additional **fixture-based Milestone 2 integ
 
 **After exact-head success:** finish only any outstanding Milestone 2 blockers discovered during integration, then prepare a read-only isolated release-candidate review and compatibility matrix. Remain draft; no merge, deployment, production-data reads/writes, Telegram or live polling.
 
+## Verified CI regression and source fix — 15 November 2026
+
+The all-in-one milestone batch `0eafeb8f50d5be248db6cea7e38bbc44c690a327` passed six required GitHub workflows but **failed** the full UI/API/DB workflow at [run 43734154874](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43734154874). The only three failures were teardown assertions in the new 360/768/1440px editor-navigation tests. Recorded browser requests showed two **POST /api/signal-scorecard** per visit to the Evidence section. Code inspection confirmed `server/api/signal-scorecard.js` treats POST as a persistent Supabase upsert, so this was a real **passive write risk**, not merely an over-strict fixture.
+
+The correction removes implicit browser scorecard POST effects from `PortfolioSignalFusion.tsx` and `PortfolioIntelligence.tsx` while keeping ordinary read-only `SignalScorecardPanel.tsx` GET history available. The existing cross-workspace browser test continues to prohibit all non-GET requests during navigation, preserving the regression gate rather than weakening it. **Behavioral trade-off:** simply viewing a page no longer creates scorecard observations; if legitimate signal collection is required, design an explicit, separately authorized server ingestion path with source/quote checks and idempotency. Do not silently restore browser writes.
+
+**Verification:** Re-run all seven workflows against the exact next commit after this fix. This note records diagnosis and implementation intent, **not new-head pass evidence**. Keep PR #168 draft; no production Supabase data was accessed or modified during this fix.
+
 ## Remaining integration/safety work
 
 - The main-based Milestone 1 accounting compatibility safeguards are now reconciled in the newer Portfolio view in this checkpoint. Keep the strict projection and historical abstention while integrating additional contexts; do not copy the older whole component over the newer UI.

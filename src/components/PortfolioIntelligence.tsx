@@ -32,7 +32,6 @@ import { applyStressHysteresis, calculatePortfolioAttribution, calculatePortfoli
 import { calculateLoadedTradingPerformance, reviewLoadedPositionAccounting } from '../utils/reviewedPortfolioAccounting';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
-import { authFetch } from '../utils/apiAuth';
 import { selectDynamicPeers } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../utils/evidenceExposure';
@@ -283,31 +282,8 @@ export default function PortfolioIntelligence({ onSectionChange, onOpenReviewHre
       rationale: card.reasons[0].explanation, strategyContext: card.reasons[0].explanation,
       averageInAlert: false, recoveryAlert: false, potentialUpsideSignal: 'INSUFFICIENT DATA' as const };
   }), [rawAnalyses, decisionCards]);
-  const signalScorecardSentRef = useRef(new Set<string>());
-  useEffect(() => {
-    if ((import.meta as any).env.DEV || (import.meta as any).env.VITE_QA_MODE === 'true' || !analyses.length) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
-    const pending = analyses.filter(item => item.state !== 'INSUFFICIENT DATA').filter(item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      return sessionStorage.getItem('aiw_scorecard_sent:' + signalKey) !== '1' && !signalScorecardSentRef.current.has(signalKey);
-    });
-    if (!pending.length) return;
-    void Promise.allSettled(pending.map(async item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      signalScorecardSentRef.current.add(signalKey);
-      try {
-        await authFetch('/api/signal-scorecard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signalKey, symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }),
-        });
-        sessionStorage.setItem('aiw_scorecard_sent:' + signalKey, '1');
-      } catch {
-        signalScorecardSentRef.current.delete(signalKey);
-      }
-    }));
-  }, [analyses]);
+  // Portfolio review is read-only: displaying a decision must never upsert signal history.
+  // Any future recording needs a separately reviewed, explicitly authorized ingestion path.
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const detailAnalysis=analyses.find(position=>position.symbol===detailSymbol);
   const detailQuote=detailSymbol?normalizeDecisionQuote(detailSymbol,livePrices[detailSymbol]):null;

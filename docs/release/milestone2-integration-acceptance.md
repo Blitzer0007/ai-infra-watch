@@ -28,6 +28,10 @@ The five-deployment plan defines this milestone as **Portfolio / Opportunities /
 4. Preserve all existing abstentions for incomplete holdings, absent quote timestamps, missing market histories, unsupported cash-flow reconciliation and financial source conflicts. No source-status claim should be upgraded solely because the UI is integrated.
 5. Browser tests use fictional/isolated fixture data; no production secrets, private financial rows, production Supabase writes, provider polling, Telegram sends or Vercel deployments.
 
+## Confirmed passive-write defect fixed in this batch
+
+The initial integrated acceptance run failed because entering Evidence emitted two browser-side `POST /api/signal-scorecard` requests. The scorecard API persists POST payloads. These passive writes were removed from the Portfolio and Signal Fusion view components rather than weakening the test. Read-only historical scorecard GET remains; any subsequent recording requires explicit review/authorization. The three new viewport tests still assert **zero non-GET requests**. The first run's six green checks do not certify the corrected head.
+
 ## Verification and release gate
 
 - Before this source increment, `8b5a2a2896c86bcaed39ad5033bdd503df2bd190` passed all seven required workflows on the exact SHA.
