@@ -2,7 +2,7 @@
 import { pathToFileURL } from 'node:url';
 
 export const RELEASE_REPOSITORY = 'Blitzer0007/ai-infra-watch';
-const REQUIRED = ['frontend-ci.yml', 'qa-validation.yml'];
+const REQUIRED = ['frontend-ci.yml', 'qa-validation.yml', 'security-audit.yml'];
 const CHECKS = [...REQUIRED, 'vercel-python-ci.yml', 'agents-python-tests.yml',
   'ai-quality-gate.yml', 'continuous-quality-eval.yml', 'backend-container-ci.yml'];
 

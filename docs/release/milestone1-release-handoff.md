@@ -2,7 +2,7 @@
 
 ## Candidate boundary
 
-`release/milestone1-safety` starts at production main `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`. It backports the shared accounting/quote/rule boundaries, alert and digest safeguards, production-UI compatibility and manual release guard from `feature/release2-opportunity-research` (source foundation `e53682c408ccd3346c554e6af4e76f37d9c93995`). The exact candidate head and CI links belong in its draft PR. Draft PRs #167/#168 remain separate; never merge that unfinished stack as a shortcut.
+`release/milestone1-safety` starts at production main `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`. It backports the shared accounting/quote/rule boundaries, alert and digest safeguards, production-UI compatibility and manual release guard from `feature/release2-opportunity-research` (source foundation `e53682c408ccd3346c554e6af4e76f37d9c93995`). The exact candidate head and CI links are recorded in [draft PR #170](https://github.com/Blitzer0007/ai-infra-watch/pull/170). Draft PRs #167/#168 remain separate; never merge that unfinished stack as a shortcut.
 
 No migration, lockfile, new schedule, research agent, polling activation or Telegram recipient/policy is introduced. Existing Git deployment automation stays disabled in `vercel.json`. No release is dispatched by this branch or a PR.
 
@@ -18,7 +18,7 @@ No migration, lockfile, new schedule, research agent, polling activation or Tele
 
 Read-only evidence on 15 November: `main` is unprotected and the rulesets list is empty. Protection administration returns HTTP 403 to the GitHub integration. The Cloud browser fallback is blocked by its URL security policy. Production-environment metadata is not exposed by the available connector endpoint. These are unresolved controls, not completed checks.
 
-1. At [GitHub branch settings](https://github.com/Blitzer0007/ai-infra-watch/settings/branches), protect `main` (or enforce an equivalent ruleset): require PRs and the successful Frontend CI and UI API DB Validation checks, block force pushes/deletion and avoid an unrestricted bypass. Confirm the branch metadata reports protected and inspect the actual enforced rules; a rule name is insufficient.
+1. At [GitHub branch settings](https://github.com/Blitzer0007/ai-infra-watch/settings/branches), protect `main` (or enforce an equivalent ruleset): require PRs and the successful Frontend CI, UI API DB Validation and Security audit checks, block force pushes/deletion and avoid an unrestricted bypass. Confirm the branch metadata reports protected and inspect the actual enforced rules; a rule name is insufficient.
 2. At [GitHub environment settings](https://github.com/Blitzer0007/ai-infra-watch/settings/environments), configure/verify `production` required reviewers and restrict deployment branches to `main`. Configure existing CI secrets directly in GitHub; do not paste, export or show them to the agent.
 3. Verify Vercel Git auto-deployment/production assignment remains disabled for project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`.
 
