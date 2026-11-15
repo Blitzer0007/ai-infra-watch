@@ -80,6 +80,10 @@ Next concrete increment — before a Milestone 2 release:
 - JEV credits are in the official TypeSafe console. The configured NVIDIA shortlist uses `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1`; do not append OpenRouter's `:free` suffix or assume live availability/usefulness. No production key retrieval or unapproved provider call is implied.
 - A different ChatGPT model is fine for continuation: repository state, contracts, tests and actual CI are authoritative. Re-read the checkpoint and diffs; do not invent missing conversation history or treat illustrative fixtures as verified financial facts.
 
+## Verification-first development gate (standing user requirement)
+
+**Do not advance milestones, declare completion, mark a checkpoint verified, or start the next feature batch until all required GitHub CI workflows on the exact current commit SHA have completed successfully.** Always monitor checks through terminal conclusions: running/queued/pending/cancelled/skipped/neutral are **not** equivalent to passed; investigate any missing or unexpectedly skipped required checks. If any required test or workflow fails, inspect its jobs/logs, fix the underlying regression without weakening tests/security/financial integrity gates, push a coherent fix, and repeat the complete exact-head verification cycle until green. Do not rely on green checks from an earlier commit; each code or documentation change advances the head and needs its own validation. Avoid sequences of tiny commits that repeatedly cancel required checks; prefer one coherent tested checkpoint. Do not merge or deploy under this rule without separate explicit owner approval. If infrastructure or access prevents verification, record **BLOCKED / NOT VERIFIED** with the exact SHA and cause, preserve the draft PR, and do not claim passing or continue into the next milestone.
+
 ## Working safely and testing
 
 - Preserve all existing changes and draft branches; inspect status before editing. No force pushes, resets or discards.
