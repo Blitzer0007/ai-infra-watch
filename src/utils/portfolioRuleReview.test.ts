@@ -6,17 +6,21 @@ import { reviewStoredHoldingRules } from './portfolioRuleEvaluation';
 
 const NOW=Date.parse('2026-11-14T12:00:00Z');
 const quote={price:100};
-const history={points:[{date:'2026-11-01',price:100},{date:'2026-11-02',price:140}],
-  coverage:{status:'complete',startDate:'2026-11-01',endDate:'2026-11-14'}};
-const review=(holding:any,q:any=quote,h:any={},at:any=NOW)=>reviewHoldingRules(holding,q,h,at);
-const camel=(h:any)=>({averageCost:h.average_cost,purchaseDate:h.purchase_date,lossLimitPct:h.loss_limit_pct,
+// Fictional declarations only: these invented availability/calendar fields are not source proof.
+function retained(h:any){return {...h,points:(h.points||[]).map((p:any)=>({...p,availableAt:p.date+'T21:00:00Z'})),
+  provenance:{contractVersion:'retained-rule-history-v1',symbol:'FICT',currency:'USD',priceBasis:'raw-close',sourceMode:'retained-declarations',
+    retrievedAt:new Date(NOW).toISOString(),corporateActions:'declared-none',expectedSessionDates:(h.points||[]).map((p:any)=>p.date)}};}
+const history=retained({points:[{date:'2026-11-01',price:100},{date:'2026-11-02',price:140}],
+  coverage:{status:'complete',startDate:'2026-11-01',endDate:'2026-11-14'}});
+const review=(holding:any,q:any=quote,h:any={},at:any=NOW)=>reviewHoldingRules(holding&&typeof holding==='object'&&!Array.isArray(holding)?Object.create(holding,{symbol:{value:holding.symbol||'FICT'}}):holding,q,h,at);
+const camel=(h:any)=>({symbol:h.symbol||'FICT',averageCost:h.average_cost,purchaseDate:h.purchase_date,lossLimitPct:h.loss_limit_pct,
   exitRuleType:h.exit_rule_type,exitRuleValue:h.exit_rule_value,brokerAlertPrices:h.broker_alert_prices,
   brokerAlerts:h.broker_alerts,brokerAlertsReviewRequired:h.broker_alerts_review_required,ruleStages:h.rule_stages});
 
 test('valid retained numerical outputs survive strict admission without stage persistence',()=>{
   const fixture=JSON.parse(readFileSync('scripts/fixtures/portfolio-rule-parity.fictional.json','utf8'));
   for(const c of fixture.cases.filter((c:any)=>!['invalid-price','invalid-staged-stop-fallback','future-history-excluded'].includes(c.id))){
-    const h={...c.history,coverage:history.coverage};
+    const h=retained({...c.history,coverage:history.coverage});
     const result=review(c.holding,c.quote,h,c.nowMs);
     assert.deepEqual(result,{...c.expected,issues:[],stageStateDirty:false},c.id);
     assert.deepEqual(reviewStoredHoldingRules(camel(c.holding),c.quote,h,c.nowMs),result,c.id+' client parity');
@@ -76,7 +80,7 @@ test('full history recomputes staged activation; stored state cannot keep an uno
     {type:'take_profit',pct:20},{type:'trailing',pct:10,activates_after:'take_profit'}],
     rule_stage_state:{stage_0:{hitDate:'2026-11-01'},stage_1:{activatedDate:'2026-11-01',peak:999}}};
   const before=JSON.stringify(holding);
-  const result=review(holding,quote,{...history,points:[{date:'2026-11-01',price:100}]});
+  const result=review(holding,quote,retained({...history,points:[{date:'2026-11-01',price:100}]}));
   assert.equal(result.state,'clear');assert.equal(result.rules.length,1);
   assert.deepEqual(result.stageState,{});assert.equal(result.stageStateDirty,false);
   assert.equal(JSON.stringify(holding),before);
@@ -97,6 +101,6 @@ test('an absent stage fraction remains unknown rather than turning into zero',()
 test('an uncalculable activated trailing distance withholds the entire staged review',()=>{
   const holding={average_cost:1,purchase_date:'2026-11-01',rule_stages:[
     {type:'take_profit',pct:20},{type:'trailing',pct:10,activates_after:'take_profit'}]};
-  const result=review(holding,{price:1e308},{...history,points:[{date:'2026-11-01',price:1.2}]});
+  const result=review(holding,{price:1e308},retained({...history,points:[{date:'2026-11-01',price:1.2}]}));
   assert.equal(result.state,'incomplete');assert.deepEqual(result.rules,[]);
 });

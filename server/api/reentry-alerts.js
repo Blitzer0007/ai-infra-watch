@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, createVerify } from 'node:crypto';
 import { requireAccess } from '../../api/_access-auth.js';
+import { admitYahooAlertQuote } from '../utils/serverAlertQuote.js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ISSUER = 'https://token.actions.githubusercontent.com';
@@ -146,20 +147,23 @@ export function calculateReentryIndicators({ price, closes, adjustedCloses, time
   };
 }
 
-async function quoteHistory(symbol) {
+export async function quoteHistory(symbol, fetcher = fetch, clock = () => Date.now()) {
   const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?range=1y&interval=1d';
-  const response=await fetch(url,{headers:{'User-Agent':'ai-infra-watch/1.0'},signal:AbortSignal.timeout(10000)});
+  const response=await fetcher(url,{headers:{'User-Agent':'ai-infra-watch/1.0'},signal:AbortSignal.timeout(10000),redirect:'error'});
   if(!response.ok) throw new Error('Market quote unavailable for '+symbol);
   const body=await response.json(), result=body?.chart?.result?.[0];
   const meta=result?.meta;
+  const assessedAt = clock();
+  if (body?.chart?.error != null || body?.chart?.result?.length !== 1 || !admitYahooAlertQuote(symbol,meta,assessedAt,assessedAt).eligible) {
+    throw new Error('Re-entry quote withheld: identity, units, quality, exact time or regular session is unsupported.');
+  }
   const timestamps=result?.timestamp;
   const closes=result?.indicators?.quote?.[0]?.close;
   const adjustedCloses=result?.indicators?.adjclose?.[0]?.adjclose;
   if(!meta || !Array.isArray(timestamps) || !Array.isArray(closes) || !Array.isArray(adjustedCloses)) {
     throw new Error('Adjusted history unavailable for '+symbol);
   }
-  const lastValidRaw=closes.map(Number).filter(v=>Number.isFinite(v)&&v>0).at(-1);
-  const price=Number(meta.regularMarketPrice || lastValidRaw);
+  const price=meta.regularMarketPrice;
   const regularMarketTime=meta.regularMarketTime == null ? NaN : Number(meta.regularMarketTime);
   const regularPeriod=meta.currentTradingPeriod?.regular;
   const regularSessionEnd=regularPeriod?.end == null ? NaN : Number(regularPeriod.end);
@@ -179,7 +183,7 @@ async function quoteHistory(symbol) {
   const regularSession = Number.isFinite(sessionStart) && Number.isFinite(sessionEnd) && sessionStart > 0 && sessionEnd > sessionStart
     ? { start: sessionStart, end: sessionEnd }
     : null;
-  return {...indicators,retrievedAt:new Date().toISOString(),marketTime,regularSession};
+  return {...indicators,retrievedAt:new Date(assessedAt).toISOString(),marketTime,regularSession};
 }
 
 function newYorkClockParts(value) {

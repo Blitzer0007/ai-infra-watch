@@ -45,7 +45,8 @@ jobs:
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
-      VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
+      # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.
+      VERCEL_CLI_VERSION: "58.4.4"
 
     steps:
       - name: Checkout
@@ -86,7 +87,7 @@ jobs:
         shell: bash
         run: |
           if ! [[ "$VERCEL_CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Set a reviewed exact VERCEL_CLI_VERSION in the protected production environment."
+            echo "::error::The reviewed Vercel CLI version must be an exact release."
             exit 1
           fi
           npm install --global "vercel@$VERCEL_CLI_VERSION"

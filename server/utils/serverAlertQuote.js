@@ -16,7 +16,7 @@ export function admitYahooAlertQuote(symbol, meta, nowMs, retrievedAtMs) {
   const marketMs = meta.regularMarketTime * 1000;
   if (marketMs > retrievedAtMs || nowMs - marketMs > SERVER_ALERT_QUOTE_MAX_AGE_MS) return blocked('stale-or-future-market-time');
   const regular = meta.currentTradingPeriod?.regular;
-  if (!instant(regular?.start) || !instant(regular?.end) || regular.start >= regular.end ||
+  if (!instant(regular?.start) || !instant(regular?.end) || regular.start >= regular.end || regular.end - regular.start > 86400 ||
       marketMs < regular.start * 1000 || marketMs >= regular.end * 1000 || nowMs < regular.start * 1000 || nowMs >= regular.end * 1000) return blocked('regular-session-not-confirmed');
   if (meta.marketState != null && meta.marketState !== 'REGULAR') return blocked('non-regular-market-state');
   const nowSession = getMarketSessionInfo(new Date(nowMs));

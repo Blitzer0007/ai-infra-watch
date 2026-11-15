@@ -50,11 +50,14 @@ def test_strict_browser_review_withholds_bad_configuration_and_partial_history(p
       Date.now=()=>{throw Error('ambient clock forbidden');};
       const at=Date.parse('2026-11-14T12:00:00Z'), quote={price:100};
       const run=(holding,history={})=>PortfolioRules.reviewStoredHoldingRules(holding,quote,history,at);
-      const holding={purchaseDate:'2026-11-01',exitRuleType:'trailing_stop',exitRuleValue:10};
+      const holding={symbol:'FICT',purchaseDate:'2026-11-01',exitRuleType:'trailing_stop',exitRuleValue:10};
       const history={points:[{date:'2026-11-01',price:100},{date:'2026-11-02',price:140}]};
       const before=JSON.stringify({holding,history});
       const partial=run(holding,history);
-      const complete=run(holding,{...history,coverage:{status:'complete',startDate:'2026-11-01',endDate:'2026-11-14'}});
+      const complete=run(holding,{...history,points:history.points.map(p=>({...p,availableAt:p.date+'T21:00:00Z'})),
+        coverage:{status:'complete',startDate:'2026-11-01',endDate:'2026-11-14'},provenance:{
+          contractVersion:'retained-rule-history-v1',symbol:'FICT',currency:'USD',priceBasis:'raw-close',sourceMode:'retained-declarations',
+          retrievedAt:'2026-11-14T12:00:00Z',corporateActions:'declared-none',expectedSessionDates:history.points.map(p=>p.date)}});
       if(JSON.stringify({holding,history})!==before)throw Error('input mutation');
       return {invalid:run({averageCost:100,lossLimitPct:100}),partial,complete};
     }""")

@@ -1,6 +1,7 @@
 // Strict admission around the retained legacy math; no transport, clock or storage.
 import { evaluateExistingRules } from './portfolioRuleEvaluation.js';
 import { optionalFiniteNumber } from './portfolioRuleMath.js';
+import { admitRuleHistory } from './ruleHistoryAdmission.js';
 
 const missing = value => value == null || value === '';
 const record = value => value != null && typeof value === 'object' && !Array.isArray(value);
@@ -76,6 +77,8 @@ export function reviewHoldingRules(holding, quote, history, nowMs) {
   if (issues.length) return blocked('invalid-config', [...new Set(issues)]);
 
   if (needsHistory) {
+    const admitted=admitRuleHistory(holding.symbol,history,nowMs);
+    if(!admitted.eligible)incomplete.push(admitted.reason);
     const coverage = history?.coverage;
     const points = history?.points;
     if (!record(coverage) || coverage.status !== 'complete' || !date(coverage.startDate) || !date(coverage.endDate) ||

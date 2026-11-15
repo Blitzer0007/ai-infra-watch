@@ -49,6 +49,6 @@ test('authenticated Decision Center GET exposes blocked rule reviews and never p
   assert.equal(body.portfolio.cashFlowPnl,null);
   assert.equal(body.portfolio.accountingReconciled,false);
   assert.equal(body.benchmark.SPY.pnl,null);
-  assert(body.rules.states[1].issues[0].includes('coverage'));
+  assert(body.rules.states[1].issues.some(reason=>reason.includes('coverage')));
   assert(requests.length>0);assert(requests.every(row=>row.method==='GET'));
 });

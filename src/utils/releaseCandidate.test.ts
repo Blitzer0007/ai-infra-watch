@@ -6,14 +6,14 @@ const SHA = 'a'.repeat(40), OTHER = 'b'.repeat(40);
 const run = (file:string, id:number, overrides:any = {}) => ({ id, path:'.github/workflows/' + file,
   head_sha:SHA, head_branch:'main', event:'push', status:'completed', conclusion:'success', ...overrides });
 const candidate = (overrides:any = {}) => ({ repository:'Blitzer0007/ai-infra-watch', ref:'refs/heads/main',
-  dispatchSha:SHA, expectedSha:SHA, currentMainSha:SHA,
+  dispatchSha:SHA, expectedSha:SHA, currentMainSha:SHA,mainProtected:true,
   runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2)], ...overrides });
 
 test('release accepts exact main and successful required CI, without optional path-filtered runs', () => {
   assert.deepEqual(verifyCandidate(candidate()), [1,2]);
 });
 for (const changes of [{repository:'other/repo'}, {ref:'refs/heads/feature'}, {expectedSha:'main'},
-  {dispatchSha:OTHER}, {currentMainSha:OTHER}, {runs:[]}, {runs:null}]) {
+  {dispatchSha:OTHER}, {currentMainSha:OTHER}, {mainProtected:false},{mainProtected:undefined},{runs:[]}, {runs:null}]) {
   test('release rejects mismatched or missing candidate evidence: ' + JSON.stringify(changes), () => {
     assert.throws(() => verifyCandidate(candidate(changes)));
   });
@@ -51,7 +51,7 @@ test('CI requests page through exact-sha evidence and forbid redirects; no deplo
   const fetcher:typeof fetch=async(input,options)=>{
     const url=String(input);
     requests.push({url,options});
-    const body=url.includes('/git/ref/') ? {object:{sha:SHA}} : url.endsWith('page=1')
+    const body=url.includes('/branches/main') ? {commit:{sha:SHA},protected:true} : url.endsWith('page=1')
       ? {workflow_runs:rows,total_count:102} : {workflow_runs:candidate().runs,total_count:102};
     return new Response(JSON.stringify(body),{status:200});
   };

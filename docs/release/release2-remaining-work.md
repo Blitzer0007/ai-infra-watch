@@ -1,5 +1,7 @@
 # Release 2 remaining-work register
 
+Milestone 1 now has an explicit [acceptance checklist and hosted blockers](milestone1-acceptance.md). Digest/return/re-entry guards and versioned history admission are implemented; isolated main-based candidate integration and hosted protection/release acceptance remain open. The informal milestone percentage is superseded by those evidence gates.
+
 Rollout plan: [five milestone production releases](release2-five-deployments.md), requested 15 November 2026. Complete the remaining scope in coherent release candidates; retain explicit authentic-source/live-verification gaps and separate activation controls. No milestone deployment has been performed under that plan.
 
 15 November increment: [risk and release foundation](release2-risk-release-foundation.md) adds strict rule admission, visible configuration/coverage gaps, removal of inferred stage writes from Decision Center reads, Server Smart Alert quote/auth safeguards and tested manual release controls. This advances milestone 1; accounting/source acceptance, hosted release prerequisites and the overall completion estimate have not been re-certified.

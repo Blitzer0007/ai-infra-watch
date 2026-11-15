@@ -10,7 +10,12 @@ function exercise(method, decisionAvailable = true) {
     const calls=[]; let telegramPayload=null;
     globalThis.fetch=async (input, options={})=>{
       const url=String(input); const method=options.method||'GET'; calls.push({url,method});
+      if(url.startsWith('https://digest-fixture.invalid/rest/v1/portfolio_holdings') && method==='GET') return new Response(JSON.stringify([{symbol:'NVDA',quantity:1,average_cost:999}]));
       if(url.startsWith('https://digest-fixture.invalid/rest/v1/') && method==='GET') return new Response('[]');
+      if(url.startsWith('https://query1.finance.yahoo.com/v8/finance/chart/NVDA?') && method==='GET') {
+        const now=Date.now()/1000;
+        return new Response(JSON.stringify({chart:{result:[{meta:{symbol:'NVDA',regularMarketPrice:100,regularMarketTime:Math.floor(now),currency:'USD',currentTradingPeriod:{regular:{start:now-1000,end:now+1000}}}}]}}));
+      }
       if(url==='https://ai-infra-watch-theta.vercel.app/api/market?route=decision-center' && method==='GET') {
         return new Response(JSON.stringify(${decisionAvailable} ? {
           ok:true, checkedAt:'2026-11-08T10:00:00Z', actionItems:[{symbol:'NVDA',severity:'ACT',title:'Rule reached',detail:'Fictional rule evidence.'}],

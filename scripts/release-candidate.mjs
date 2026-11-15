@@ -6,8 +6,9 @@ const REQUIRED = ['frontend-ci.yml', 'qa-validation.yml'];
 const CHECKS = [...REQUIRED, 'vercel-python-ci.yml', 'agents-python-tests.yml',
   'ai-quality-gate.yml', 'continuous-quality-eval.yml', 'backend-container-ci.yml'];
 
-export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, currentMainSha, runs }) {
+export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, currentMainSha, mainProtected, runs }) {
   if (repository !== RELEASE_REPOSITORY || ref !== 'refs/heads/main') throw Error('Release requires the intended repository and main branch.');
+  if (mainProtected !== true) throw Error('Production main must have enforced branch protection.');
   if (!/^[a-f0-9]{40}$/.test(expectedSha || '') || dispatchSha !== expectedSha || currentMainSha !== expectedSha) {
     throw Error('Reviewed candidate, dispatch commit and current main must match.');
   }
@@ -57,7 +58,7 @@ export async function jsonGet(url, token, fetcher = fetch) {
 export async function checkCandidate(env, fetcher = fetch) {
   const repo = RELEASE_REPOSITORY;
   const base = 'https://api.github.com/repos/' + repo;
-  const main = await jsonGet(base + '/git/ref/heads/main', env.GH_TOKEN, fetcher);
+  const main = await jsonGet(base + '/branches/main', env.GH_TOKEN, fetcher);
   const runs = [];
   for (let page = 1; page <= 10; page++) {
     const body = await jsonGet(base + '/actions/runs?head_sha=' + encodeURIComponent(env.EXPECTED_MAIN_SHA || '') + '&per_page=100&page=' + page, env.GH_TOKEN, fetcher);
@@ -67,7 +68,7 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (!body.workflow_runs.length || page === 10) throw Error('CI evidence is incomplete.');
   }
   return verifyCandidate({ repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF, dispatchSha: env.GITHUB_SHA,
-    expectedSha: env.EXPECTED_MAIN_SHA, currentMainSha: main?.object?.sha, runs });
+    expectedSha: env.EXPECTED_MAIN_SHA, currentMainSha: main?.commit?.sha, mainProtected: main?.protected, runs });
 }
 
 async function main() {
