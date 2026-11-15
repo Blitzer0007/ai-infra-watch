@@ -4,6 +4,8 @@ Milestone 1 is **deployed**, with one of five planned production releases comple
 
 Milestone 2 development has started with [company research navigation](release2-company-research-navigation.md): Opportunities retain an unheld company's identity, dossier inspection is read-only/unconnected, and scanner view filters survive the return link. It is not deployed. Read the current [portable Codex/ChatGPT checkpoint](CODEX-CONTINUATION.md) before continuing.
 
+The next [reviewed holding-accounting increment](release2-reviewed-position-accounting.md) reconciles per-position cost/P&L and scenarios with original loaded ledger inputs, preserves quote valuation and complete-denominator weights, and withholds unsupported historical portfolio/peer/exit-target results. It preserves the newer navigation and remains unreleased; full-history/source evidence is still pending.
+
 Rollout plan: [five milestone production releases](release2-five-deployments.md). Remaining source/accounting truth and live-activation boundaries remain open independently of code-release progress. Existing percentage estimates below are historical and have not been re-certified by this increment.
 
 15 November increment: [risk and release foundation](release2-risk-release-foundation.md) adds strict rule admission, visible configuration/coverage gaps, removal of inferred stage writes from Decision Center reads, Server Smart Alert quote/auth safeguards and tested manual release controls. This was part of the subsequently shipped Milestone 1. Authoritative accounting/source evidence and future hosted-control setup remain pending; the overall engineering percentage has not been re-certified.

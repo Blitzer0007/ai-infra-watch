@@ -1,6 +1,17 @@
 from __future__ import annotations
 
 import json
+import datetime
+import os
+import subprocess
+from pathlib import Path
+from functools import lru_cache
+from urllib.parse import parse_qs,urlparse
+
+@lru_cache
+def fictional_portfolio_projection():
+    root=Path(__file__).resolve().parents[1]
+    return json.loads(subprocess.check_output(["node","qa/fixtures/milestone1-portfolio.fictional.mjs","legacy-ui"],cwd=root,env={"PATH":os.environ["PATH"]},text=True))
 
 def mock_local_apis(page):
     if __import__('os').getenv('QA_UI_MOCKS') != 'true':
@@ -15,7 +26,9 @@ def mock_local_apis(page):
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'ok':True,'mode':'autonomous-mcp','question':'What changed recently for NVDA?','summary':'Mocked evidence-backed synthesis for UI validation.','answer_source':'deterministic-evidence','jev':{'enabled':True,'evidence_gate':{'action':'stop','evidence_quality':80}},'calls':[{'tool':'stocks.get_quote','ok':True}],'trajectory':[]}))
             return
         if '/api/quote' in url:
-            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','price':200.0,'changePct':1.0,'provider':'qa'})); return
+            symbol=parse_qs(urlparse(url).query).get('symbol',['NVDA'])[0]
+            now=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
+            route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':symbol,'returnedSymbol':symbol,'price':200.0,'changePct':1.0,'provider':'qa-fictional','sourceMode':'live','currency':'USD','adjustedBasis':'raw','marketTimePrecision':'instant','marketTime':now,'retrievedAt':now,'isMarketSessionOpen':True,'stale':False,'simulated':False})); return
         if '/api/company-scale' in url:
             if 'action=analyst' in url:
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':'NVDA','source':'Finnhub analyst','retrievedAt':'2026-10-02T07:00:00Z','recommendation':{'period':'2026-09-30','strongBuy':5,'buy':20,'hold':8,'sell':2,'strongSell':1},'priceTarget':{'median':250,'mean':245,'low':180,'high':300},'epsEstimates':[{'period':'2026','average':2.5,'analysts':20}], 'revenueEstimates':[{'period':'2026','average':200000000000,'analysts':18}], 'available':['recommendation','priceTarget','epsEstimates','revenueEstimates'],'errors':[]})); return
@@ -33,10 +46,14 @@ def mock_local_apis(page):
             elif route.request.method == 'DELETE':
                 route.fulfill(status=204, body='')
             else:
-                if 'holdingId=' in url:
+                if 'includeTransactions=true' in url:
+                    route.fulfill(status=200,content_type='application/json',body=_json.dumps({'transactions':fictional_portfolio_projection()['transactions']}))
+                elif 'includeCashFlows=true' in url:
+                    route.fulfill(status=200,content_type='application/json',body=_json.dumps({'cashFlows':[]}))
+                elif 'holdingId=' in url:
                     route.fulfill(status=200, content_type='application/json', body=_json.dumps({'lots':[{'id':'lot-qa-1','holdingId':'qa-nvda','symbol':'NVDA','purchaseDate':'2026-10-02','investedAmount':200,'executionPrice':200,'quantity':1,'notes':'QA lot'}]}))
                 else:
-                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{'id':'qa-nvda','symbol':'NVDA','quantity':1,'averageCost':150,'purchaseDate':'2026-01-01','notes':'','targetAllocationPct':15,'maxAllocationPct':20}]}))
+                    route.fulfill(status=200, content_type='application/json', body=_json.dumps({'holdings':[{**fictional_portfolio_projection()['holdings'][0],'id':'qa-nvda','targetAllocationPct':15,'maxAllocationPct':20}]}))
             return
         if '/api/forecast-verification' in url:
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({

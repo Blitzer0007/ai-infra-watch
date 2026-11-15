@@ -1,5 +1,5 @@
 import LoadedLedgerReview from './portfolio/LoadedLedgerReview';
-import type { LedgerAvailability } from '../utils/loadedLedgerReview';
+import type { LoadedLedgerInput, LedgerAvailability } from '../utils/loadedLedgerReview';
 import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
 import HoldingCompanyDossier from './portfolio/HoldingCompanyDossier';
@@ -27,16 +27,17 @@ import PortfolioSignalFusion from './PortfolioSignalFusion';
 import UnifiedEventTimeline from './UnifiedEventTimeline';
 import JevDecisionPanel from './JevDecisionPanel';
 import { FilterInput, FilterSelect } from './FilterControls';
-import { applyStressHysteresis, buildPortfolioDailySeriesFromTransactions, buildPortfolioPerformanceIndexFromTransactions, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks, stressLabel } from '../utils/measurement';
-import { calculateLoadedTradingPerformance } from '../utils/reviewedPortfolioAccounting';
+import { applyStressHysteresis, calculatePortfolioAttribution, calculatePortfolioConcentration, calculatePortfolioCorrelation, calculatePortfolioStressScore, comparePortfolioToBenchmarks, stressLabel } from '../utils/measurement';
+import { calculateLoadedTradingPerformance, reviewLoadedPositionAccounting } from '../utils/reviewedPortfolioAccounting';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
 import { authFetch } from '../utils/apiAuth';
-import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
+import { selectDynamicPeers } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../utils/evidenceExposure';
 import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
+import { formatPrice } from '../utils';
 type Price = {
   currency?: string; isMarketSessionOpen?: boolean; status?: string; simulated?: boolean; fallbackUsed?: boolean;
   price: number;
@@ -50,14 +51,6 @@ type Price = {
 };
 type PortfolioHistoryPoint = { date: string; price: number };
 type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
-type HistoricalPriceState = {
-  loading: boolean;
-  high52w: number | null;
-  high52wDate: string | null;
-  historicalHigh: number | null;
-  historicalHighDate: string | null;
-  error: string;
-};
 type SelectedChartState = {
   loading: boolean;
   points: PortfolioHistoryPoint[];
@@ -77,6 +70,7 @@ type Props = {
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
+const formatUsdPrice = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? '$' + formatPrice(value) : '—';
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
 export default function PortfolioIntelligence({ researchWatchlist = [], livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
@@ -101,19 +95,8 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => localStorage.getItem('aiw_portfolio_currency') === 'INR' ? 'INR' : 'USD');
   const [usdInr, setUsdInr] = useState<number | null>(null);
-  const [historicalPrice, setHistoricalPrice] = useState<HistoricalPriceState>({
-    loading: false,
-    high52w: null,
-    high52wDate: null,
-    historicalHigh: null,
-    historicalHighDate: null,
-    error: '',
-  });
   const [chartRange, setChartRange] = useState<SelectedChartState['range']>('1Y');
   const [selectedChart, setSelectedChart] = useState<SelectedChartState>({ loading: false, points: [], range: '1Y', error: '', retrievedAt: null });
-  const [peerComparison, setPeerComparison] = useState<PeerCounterfactual | null>(null);
-  const [peerPortfolioComparisons, setPeerPortfolioComparisons] = useState<PeerCounterfactual[]>([]);
-  const [peerLoading, setPeerLoading] = useState(false);
   const [analystConsensus, setAnalystConsensus] = useState<any>(null);
   const [analystLoading, setAnalystLoading] = useState(false);
   const [analystError, setAnalystError] = useState('');
@@ -247,38 +230,6 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
   }, []);
   useEffect(() => {
     let cancelled = false;
-    if (tab !== 'holdings' || !detailSymbol || !holdings.some(holding=>holding.symbol===detailSymbol)) return;
-    if (!selected) {
-      setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
-      return () => { cancelled = true; };
-    }
-
-    setHistoricalPrice({ loading: true, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
-    fetchHistoryCached(selected, 'max', 300000)
-      .then(points => {
-        if (cancelled) return;
-        if (!points.length) throw new Error('No historical price points available');
-        const cutoff = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-        const recent = points.filter((point: {date:string;price:number}) => point.date >= cutoff);
-        const high52 = (recent.length ? recent : points).reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
-        const historicalHigh = points.reduce((best: {date:string;price:number}, point: {date:string;price:number}) => point.price > best.price ? point : best);
-        setHistoricalPrice({
-          loading: false,
-          high52w: high52.price,
-          high52wDate: high52.date,
-          historicalHigh: historicalHigh.price,
-          historicalHighDate: historicalHigh.date,
-          error: '',
-        });
-      })
-      .catch(error => {
-        if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
-      });
-    return () => { cancelled = true; };
-  }, [selected, tab, detailSymbol, holdings.map(holding=>holding.symbol).join(',')]);
-
-  useEffect(() => {
-    let cancelled = false;
     if (!['performance','rotation','evidence'].includes(tab)) return;
     const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
@@ -299,16 +250,15 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
   const [rotationGroup, setRotationGroup] = useState<string>('All');
   const rotation = useMemo(() => buildMoneyRotation(portfolioHistory.histories, livePrices, rotationHorizon), [portfolioHistory.histories, livePrices, rotationHorizon]);
-  const rawAnalyses = useMemo(() => withCurrentPortfolioWeights(buildPositionAnalyses(livePrices, intelligence, positions)), [livePrices, intelligence, positions]);
-  const tradePerformance = useMemo(() => calculateLoadedTradingPerformance({
-    holdings,transactions:portfolioTransactions,holdingsAvailability:portfolioLoading?'loading':portfolioError?'unavailable':'ready',transactionsAvailability,assessedAt:new Date().toISOString(),
-  },
-    rawAnalyses.map(item => ({
-      symbol: item.symbol,
-      quantity: item.quantity,
-      currentPrice: item.livePrice != null && !item.liveStale ? item.livePrice : null,
-    })),
-  ), [holdings,portfolioLoading,portfolioError,transactionsAvailability,rawAnalyses,portfolioTransactions]);
+  const baseAnalyses = useMemo(() => buildPositionAnalyses(livePrices, intelligence, positions), [livePrices, intelligence, positions]);
+  const loadedInput = useMemo<LoadedLedgerInput>(() => ({
+    holdings, transactions: portfolioTransactions, holdingsAvailability: portfolioLoading ? 'loading' : portfolioError ? 'unavailable' : 'ready',
+    transactionsAvailability, assessedAt: new Date().toISOString(),
+  }), [holdings, portfolioTransactions, portfolioLoading, portfolioError, transactionsAvailability]);
+  const rawAnalyses = useMemo(() => withCurrentPortfolioWeights(reviewLoadedPositionAccounting(loadedInput, baseAnalyses).positions), [loadedInput, baseAnalyses]);
+  const tradePerformance = useMemo(() => calculateLoadedTradingPerformance(loadedInput,
+    rawAnalyses.map(item => ({ symbol: item.symbol, quantity: item.quantity, currentPrice: item.livePrice != null && !item.liveStale ? item.livePrice : null })),
+  ), [loadedInput, rawAnalyses]);
   const decisionCards = useMemo(() => {
     const now = Date.now();
     return rawAnalyses.map(position => {
@@ -406,88 +356,6 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
     return () => { cancelled = true; };
   }, [selected, chartRange, tab, detailSymbol, selectedAnalysis?.symbol]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (tab !== 'performance') return;
-    if (!analyses.length) {
-      setPeerPortfolioComparisons([]);
-      return () => { cancelled = true; };
-    }
-    const jobs = analyses.map(async analysis => {
-      const meta = STOCK_UNIVERSE.find(item => item.symbol === analysis.symbol);
-      if (!meta) return null;
-      const peer = selectMostRelevantPeer(meta, livePrices);
-      if (!peer) return null;
-      try {
-        const history = await fetchHistoryCached(peer.symbol, 'max');
-        return calculatePeerCounterfactual({
-          holding: analysis,
-          peer,
-          peerHistory: history,
-          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
-          actualCurrentPrice: analysis.livePrice,
-          transactions: portfolioTransactions,
-        });
-      } catch {
-        return calculatePeerCounterfactual({
-          holding: analysis,
-          peer,
-          peerHistory: [],
-          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
-          actualCurrentPrice: analysis.livePrice,
-          transactions: portfolioTransactions,
-        });
-      }
-    });
-    Promise.all(jobs).then(results => {
-      if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)).map((item, index) => ({ ...item, holdingSymbol: analyses[index]?.symbol || '—' })) as Array<PeerCounterfactual & { holdingSymbol: string }>);
-    });
-    return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (tab !== 'holdings' || !detailSymbol || selectedAnalysis?.symbol!==detailSymbol) return;
-    if (!selectedAnalysis) {
-      setPeerComparison(null);
-      return () => { cancelled = true; };
-    }
-    const meta = STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol);
-    if (!meta) {
-      setPeerComparison(null);
-      return () => { cancelled = true; };
-    }
-    const peer = selectMostRelevantPeer(meta, livePrices);
-    if (!peer) {
-      setPeerComparison(null);
-      return () => { cancelled = true; };
-    }
-    setPeerLoading(true);
-    fetchHistoryCached(peer.symbol, 'max')
-      .then(history => {
-        if (cancelled) return;
-        setPeerComparison(calculatePeerCounterfactual({
-          holding: selectedAnalysis,
-          peer,
-          peerHistory: history,
-          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
-          actualCurrentPrice: selectedAnalysis.livePrice,
-          transactions: portfolioTransactions,
-        }));
-      })
-      .catch(() => {
-        if (!cancelled) setPeerComparison(calculatePeerCounterfactual({
-          holding: selectedAnalysis,
-          peer,
-          peerHistory: [],
-          peerCurrentPrice: livePrices[peer.symbol]?.price ?? null,
-          actualCurrentPrice: selectedAnalysis.livePrice,
-        }));
-      })
-      .finally(() => { if (!cancelled) setPeerLoading(false); });
-    return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, detailSymbol]);
-
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
       const searchable = (h.symbol + ' ' + h.name + ' ' + h.theme).toLowerCase();
@@ -495,7 +363,7 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
       if (!searchable.includes(q.trim().toLowerCase())) return false;
       if (holdingFilter === 'Up today' && !(h.dailyChangePct != null && h.dailyChangePct > 0)) return false;
       if (holdingFilter === 'Down today' && !(h.dailyChangePct != null && h.dailyChangePct < 0)) return false;
-      if (holdingFilter === 'Below your buy price' && !(h.livePrice != null && h.livePrice < h.averageCost)) return false;
+      if (holdingFilter === 'Below your buy price' && !(h.costBasisSupported === true && h.livePrice != null && h.livePrice < h.averageCost)) return false;
       if (holdingFilter === 'Needs attention' && !['ADD REVIEW', 'RISK REVIEW', 'INSUFFICIENT DATA'].includes(h.state)) return false;
       return true;
     });
@@ -570,27 +438,15 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
   const macroHighCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'high').length;
   const macroMediumCount = macroRisks.filter(risk => String(risk?.impactRating).toLowerCase() === 'medium').length;
   const attribution = useMemo(() => calculatePortfolioAttribution(portfolioMetricInputs), [portfolioMetricInputs]);
-  const portfolioHistoryValue = useMemo(
-    () => buildPortfolioPerformanceIndexFromTransactions(
-      portfolioHistory.histories,
-      portfolioTransactions,
-    ),
-    [portfolioHistory.histories, portfolioTransactions],
-  );
   const correlationSymbols = analyses.slice().sort((a, b) => (b.portfolioWeight ?? 0) - (a.portfolioWeight ?? 0)).slice(0, 8).map(item => item.symbol);
   const portfolioCorrelation = useMemo(() => calculatePortfolioCorrelation(portfolioHistory.histories, correlationSymbols), [portfolioHistory.histories, correlationSymbols.join(',')]);
-  const stressTrend = useMemo(() => buildPortfolioDailySeriesFromTransactions(
-    Object.fromEntries(Object.entries(portfolioHistory.histories).filter(([symbol]) => !['SPY', 'QQQ', 'SOXX'].includes(symbol))) as Record<string, PortfolioHistoryPoint[]>,
-    portfolioTransactions,
-    30,
-  ), [portfolioHistory.histories, portfolioTransactions]);
-  const syntheticPortfolioHistory = useMemo(() => { if (!stressTrend.length) return []; let value = 100; const rows: PortfolioHistoryPoint[] = [{ date: stressTrend[0].date, price: value }]; stressTrend.slice(1).forEach(row => { value *= 1 + row.returnPct / 100; rows.push({ date: row.date, price: value }); }); return rows; }, [stressTrend]);
-  const benchmarkComparisons = useMemo(() => comparePortfolioToBenchmarks(syntheticPortfolioHistory, Object.fromEntries(['SPY', 'QQQ', 'SOXX'].map(symbol => [symbol, portfolioHistory.histories[symbol] || []]))), [syntheticPortfolioHistory, portfolioHistory.histories]);
+  // Loaded-record agreement is not evidence of complete history, corporate actions or source prices.
+  const benchmarkComparisons = useMemo(() => comparePortfolioToBenchmarks([], {}), []);
   const topConcentration = concentration.topHolding;
   const top3ConcentrationPct = concentration.top3Weight == null ? null : concentration.top3Weight * 100;
   const groupConcentration = concentration.groupWeights.slice(0, 3);
-  const stressTrendAverage = stressTrend.length ? stressTrend.reduce((sum, row) => sum + row.stressScore, 0) / stressTrend.length : null;
-  const stressTrendLatest = stressTrend.at(-1)?.stressScore ?? null;
+  const stressTrendAverage: number | null = null;
+  const stressTrendLatest: number | null = null;
   const decisionContext = useMemo(() => {
     const heldSymbols = new Set(analyses.map(item => item.symbol));
     const relevantContracts = contracts.filter(item => heldSymbols.has(String(item?.company || '').toUpperCase())).length;
@@ -838,7 +694,7 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
       {tab === 'performance' && (
               <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
                 <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
-                  <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio performance &amp; risk</div><h2 className="text-lg font-black mt-1">Risk, performance &amp; market comparison</h2><p className="text-[10px] text-white/35 mt-1">Weights require supported current values for all loaded holdings. Benchmarks use overlapping market dates.</p></div>
+                  <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio performance &amp; risk</div><h2 className="text-lg font-black mt-1">Risk, performance &amp; market comparison</h2><p className="text-[10px] text-white/35 mt-1">Weights require supported current values for all loaded holdings. Historical portfolio and benchmark returns are withheld until complete ledger, corporate-action and source-price coverage is verified.</p></div>
                   <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
@@ -849,37 +705,11 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
                   <Info label="Diversification level" value={concentration.effectiveHoldings == null ? '—' : concentration.effectiveHoldings.toFixed(1) + ' eq.'} />
                 </div>
                 <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
-                  <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day portfolio pressure trend</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using the actual held quantities from the broker transaction history; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
-                    <div className="h-36 mt-2">{stressTrend.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={stressTrend}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} /><XAxis dataKey="date" hide /><YAxis domain={[0, 100]} hide /><Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(0), 'Stress']} /><Line type="monotone" dataKey="stressScore" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Not enough overlapping market history yet.</div>}</div>
-                  </div>
+                  <div className="rounded-xl border border-white/5 bg-black/10 p-3"><h3 className="text-xs font-semibold">30-day portfolio pressure trend</h3><p className="text-xs text-amber-200/70 mt-2">Unavailable: complete portfolio history and corporate actions are unverified. Current descriptive risk metrics remain separate.</p></div>
                   <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Where your money is concentrated</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No holdings with a usable value yet.</div>}</div></div>
                 </div>
                 <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr] gap-3 mt-3">
-                  <div className="rounded-xl border border-white/5 bg-black/10 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Portfolio history</div>
-                        <div className="text-[9px] text-white/30 mt-1">Transaction-aware portfolio performance since your first active holding; broker buys and sells are reconstructed against historical market prices.</div>
-                      </div>
-                      <div className="text-right text-[9px] font-mono text-white/35">
-                        {portfolioHistoryValue.length ? portfolioHistoryValue[0].date + ' → ' + portfolioHistoryValue.at(-1)!.date : 'No history'}
-                      </div>
-                    </div>
-                    <div className="h-40 mt-2">
-                      {portfolioHistoryValue.length > 1 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={portfolioHistoryValue}>
-                            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} />
-                            <XAxis dataKey="date" hide />
-                            <YAxis hide domain={['auto', 'auto']} />
-                            <Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(1), 'Indexed value']} />
-                            <Line type="monotone" dataKey="normalizedValue" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      ) : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Not enough shared holding history yet.</div>}
-                    </div>
-                    <div className="text-[8px] font-mono text-white/20 mt-1">Indexed to 100 at the first date when the broker transaction history shows an active position; market performance is separated from new cash added by later purchases. This is historical reconstruction, not a forecast.</div>
-                  </div>
+                  <div className="rounded-xl border border-white/5 bg-black/10 p-3" data-testid="historical-return-status"><h3 className="text-xs font-semibold">Portfolio history</h3><p className="text-xs text-amber-200/70 mt-2">Historical returns unavailable: complete ledger history, corporate actions and source-price coverage are unverified. Loaded-record P&amp;L is conditional and does not establish a historical return series.</p></div>
                   <div className="rounded-xl border border-white/5 bg-black/10 p-3">
                     <div className="text-[8px] font-mono uppercase tracking-widest text-white/25">How your holdings move together</div>
                     <div className="text-[9px] text-white/30 mt-1">Pearson correlation of daily returns over the overlapping available history. At least five shared sessions are required.</div>
@@ -903,12 +733,12 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
         
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
                   <PortfolioAttributionRows rows={attribution} />
-                  <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Compared with the market</div><div className="space-y-2 mt-3">{benchmarkComparisons.map(item => <div key={item.benchmark} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-black">{item.benchmark}</div><div className="text-[8px] font-mono text-white/25">{item.sampleDays ? item.startDate + ' → ' + item.endDate + ' · ' + item.sampleDays + ' sessions' : 'No overlapping history'}</div></div><div className="text-right"><div className="text-[9px] font-mono text-white/45">Portfolio {item.portfolioReturnPct == null ? '—' : (item.portfolioReturnPct >= 0 ? '+' : '') + item.portfolioReturnPct.toFixed(2) + '%'}</div><div className="text-[9px] font-mono text-white/45">{item.benchmark} {item.benchmarkReturnPct == null ? '—' : (item.benchmarkReturnPct >= 0 ? '+' : '') + item.benchmarkReturnPct.toFixed(2) + '%'}</div><div className={'text-[9px] font-mono font-bold ' + (item.relativeReturnPct == null ? 'text-white/25' : item.relativeReturnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{benchmarkResultLabel(item.relativeReturnPct, item.benchmark)}</div></div></div>)}</div></div>
+                  <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Compared with the market</div><div className="space-y-2 mt-3">{benchmarkComparisons.map(item => <div key={item.benchmark} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-black">{item.benchmark}</div><div className="text-[8px] font-mono text-white/25">{item.sampleDays ? item.startDate + ' → ' + item.endDate + ' · ' + item.sampleDays + ' sessions' : 'History/source coverage unverified'}</div></div><div className="text-right"><div className="text-[9px] font-mono text-white/45">Portfolio {item.portfolioReturnPct == null ? '—' : (item.portfolioReturnPct >= 0 ? '+' : '') + item.portfolioReturnPct.toFixed(2) + '%'}</div><div className="text-[9px] font-mono text-white/45">{item.benchmark} {item.benchmarkReturnPct == null ? '—' : (item.benchmarkReturnPct >= 0 ? '+' : '') + item.benchmarkReturnPct.toFixed(2) + '%'}</div><div className={'text-[9px] font-mono font-bold ' + (item.relativeReturnPct == null ? 'text-white/25' : item.relativeReturnPct >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{benchmarkResultLabel(item.relativeReturnPct, item.benchmark)}</div></div></div>)}</div></div>
                 </div>
                 <div className="mt-3 text-[8px] font-mono text-white/20">Risk pressure uses observed market moves and your portfolio mix; it is not a forecast. P&amp;L contribution shows what helped or hurt performance. Market comparisons use the same overlapping dates.</div>
               </section>
               )}
-      {tab === 'performance' && <PortfolioPeerImpactSummary comparisons={peerPortfolioComparisons} />}
+      {tab === 'performance' && <HistoricalPeerUnavailable />}
       {tab === 'performance' && (
               <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-7 gap-3" id="portfolio-investment-summary">
                 <Metric label="Open cost basis" value={formatPortfolioMoney(tradePerformance.openCostBasis)} suffix={tradePerformance.openCostBasis != null ? 'Conditional remaining cost from loaded trades' : 'Original trade inputs required'} tone="neutral" icon={<WalletCards/>}/>
@@ -924,7 +754,8 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
       {tab === 'holdings' && (
         <div className="space-y-4">
 
-              <Panel title="Your holdings" subtitle="Your saved positions with live prices, returns, rules and review signals. Select a holding to see more.">
+              <Panel title="Your holdings" subtitle="Your saved positions with admitted prices, conditional P&L and review context. Select a holding to see more.">
+              <p role="status" className="mb-3 text-xs text-amber-200/70">{accountingNote}. Cost and P&amp;L use original loaded trades; complete history and corporate actions remain unverified.</p>
               <div className="rounded-xl border border-white/5 bg-black/10 p-3 mb-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                   <FilterInput
@@ -1009,7 +840,7 @@ export default function PortfolioIntelligence({ researchWatchlist = [], livePric
           <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />
           <button type="button" onClick={()=>changeTab('radar')} className="min-h-11 rounded-lg border border-cyan-200/40 px-3 py-2 text-sm text-cyan-100">Open Event Risk Radar · fictional preview</button>
           <HoldingCompanyDossier key={detailSymbol} symbol={detailSymbol} configuredName={detailAnalysis.name}/>
-          <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary><div className="mt-4 space-y-4"><PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/><PeerCounterfactualPanel h={detailAnalysis} comparison={peerComparison} loading={peerLoading}/></div></details>
+          <details className="rounded-xl border border-white/15 p-4" data-testid="holding-research-detail"><summary className="cursor-pointer text-sm font-semibold">Company, valuation and analyst detail</summary><div className="mt-4 space-y-4"><PositionDetail h={detailAnalysis}/><HistoricalPeerUnavailable /></div></details>
         </>}
       </HoldingDetailDialog>}
 
@@ -1319,8 +1150,8 @@ function PositionRow({h,selected,onSelect}:{h:PositionAnalysis;selected:boolean;
       </div>
     </div>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/5">
-      <MiniMetric label="Qty" value={h.quantitySupported !== false && Number.isFinite(h.quantity) ? h.quantity.toFixed(4) : '—'} />
-      <MiniMetric label="Avg cost" value={h.costBasisSupported !== false && Number.isFinite(h.averageCost) ? '$' + h.averageCost.toFixed(2) : '—'} />
+      <MiniMetric label="Qty" value={h.quantitySupported !== false && Number.isFinite(h.quantity) ? h.quantity.toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—'} />
+      <MiniMetric label="Avg cost" value={h.costBasisSupported === true ? formatUsdPrice(h.averageCost) : '—'} />
       <MiniMetric label="P&L" value={h.pnlPct == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'} valueClass={pnlClass} />
       <MiniMetric label="Current value" value={value == null ? '—' : '$' + value.toFixed(2)} valueClass="text-white/85" />
     </div>
@@ -1534,7 +1365,7 @@ function DecisionGateSummary({h}:{h:PositionAnalysis}) {
   const groupThreshold = leveraged ? 68 : 62;
   const breadthThreshold = leveraged ? 0.67 : 0.50;
   const gates = [
-    ['Below average cost', h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
+    ['Below average cost', h.costBasisSupported === true && h.livePrice != null && !h.liveStale && h.livePrice < h.averageCost],
     ['Group score', h.groupScore != null && h.groupScore >= groupThreshold],
     ['Group participation', h.groupBreadth != null && h.groupBreadth >= breadthThreshold],
     ['Group vs universe', h.relativeToUniverse != null && h.relativeToUniverse >= 0],
@@ -1548,27 +1379,15 @@ function DecisionGateSummary({h}:{h:PositionAnalysis}) {
   </section>;
 }
 
-function PortfolioPeerImpactSummary({comparisons}:{comparisons:Array<PeerCounterfactual & { holdingSymbol?: string }>}) {
-  const available = comparisons.filter(item => item.status === 'available' && item.hypotheticalProfit != null && item.actualProfit != null);
-  const actualProfit = available.reduce((sum, item) => sum + (item.actualProfit ?? 0), 0);
-  const peerProfit = available.reduce((sum, item) => sum + (item.hypotheticalProfit ?? 0), 0);
-  const difference = peerProfit - actualProfit;
-  const totalBasis = available.reduce((sum, item) => sum + (Number.isFinite(item.actualCostBasis) ? Math.abs(Number(item.actualCostBasis)) : 0), 0);
-  const aggregateReturnGap = totalBasis > 0 ? (difference / totalBasis) * 100 : null;
-  const coverage = comparisons.length ? Math.round((available.length / comparisons.length) * 100) : 0;
-  const contributors = [...available]
-    .filter(item => item.difference != null)
-    .sort((a, b) => Math.abs(b.difference ?? 0) - Math.abs(a.difference ?? 0))
-    .slice(0, 5);
-  return <section className="rounded-2xl border border-white/10 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-white/40">Portfolio peer comparison</div><h2 className="text-base font-black mt-1">Actual portfolio vs peer opportunity-cost scenario</h2><div className="text-[9px] text-white/35 mt-1">Uses your broker transaction history and purchase dates where available. The peer scenario mirrors the same cash-flow pattern using the peer's historical prices. Historical comparison only.</div></div><div className="text-[8px] font-mono text-white/25">{available.length}/{comparisons.length} holdings covered</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label="Actual total profit" value={available.length ? actualProfit.toFixed(2) : '—'}/><Info label="Peer scenario profit" value={available.length ? peerProfit.toFixed(2) : '—'}/><Info label="Peer minus actual" value={available.length ? (difference >= 0 ? '+' : '') + difference.toFixed(2) : '—'}/><Info label="Avg peer gap" value={aggregateReturnGap == null ? '—' : (aggregateReturnGap >= 0 ? '+' : '') + aggregateReturnGap.toFixed(2) + ' pts'}/><Info label="Coverage" value={comparisons.length ? coverage + '%' : '—'}/></div>
-    {contributors.length > 0 && <div className="mt-3 border-t border-white/5 pt-3"><div className="text-[9px] font-mono uppercase text-white/35">Largest contributors to the difference</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">{contributors.map(item => <div key={(item.holdingSymbol || '—') + ':' + (item.peer?.symbol || '—')} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 px-3 py-2"><div><div className="text-[10px] font-bold">{item.holdingSymbol || 'Holding'} → {item.peer?.symbol || 'Peer'}</div><div className="text-[8px] text-white/30">Historical opportunity-cost comparison · not a forecast</div></div><div className="text-[10px] font-mono font-bold text-white/65">{(item.difference ?? 0) >= 0 ? '+' : ''}{(item.difference ?? 0).toFixed(2)}</div></div>)}</div></div>}
+function HistoricalPeerUnavailable() {
+  return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4" data-testid="historical-peer-status">
+    <h3 className="text-sm font-semibold">Peer opportunity-cost comparison</h3>
+    <p className="text-xs text-amber-200/70 mt-2">Unavailable: complete ledger history, corporate actions and comparable source-price coverage are unverified. No peer return or portfolio replacement result is calculated.</p>
   </section>;
 }
 
 function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:PositionAnalysis;chart:SelectedChartState;chartRange:SelectedChartState['range'];onChartRangeChange:(range:SelectedChartState['range'])=>void}) {
-  const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
+  const priceText = formatUsdPrice(h.livePrice);
   return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / price history</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
@@ -1580,47 +1399,25 @@ function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:Posi
   </section>;
 }
 
-function PeerCounterfactualPanel({h,comparison,loading}:{h:PositionAnalysis;comparison:PeerCounterfactual|null;loading:boolean}) {
-  const gap = comparison?.differencePctPoints ?? null;
-  const peer = comparison?.peer?.symbol || 'Peer';
-  const gapSentence = gap == null
-    ? 'Historical opportunity-cost comparison only.'
-    : gap > 0
-      ? peer + ' beat ' + h.symbol + ' by ' + gap.toFixed(2) + ' pts over the same comparison window.'
-      : gap < 0
-        ? h.symbol + ' beat ' + peer + ' by ' + Math.abs(gap).toFixed(2) + ' pts over the same comparison window.'
-        : h.symbol + ' and ' + peer + ' matched over the same comparison window.';
-  return <section className="rounded-2xl border border-violet-400/15 bg-[#15181E]/60 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-violet-300">Peer opportunity-cost comparison</div><h2 className="text-base font-black mt-1">{comparison?.peer?.symbol || (loading ? 'Finding most relevant peer…' : 'No configured peer')}</h2><div className="text-[9px] text-white/35 mt-1">{comparison?.peer?.reasons.join(' · ') || 'Shows what the closest configured peer would have done over the same historical window.'}</div><div className="text-[9px] text-white/55 mt-2">{gapSentence} Hindsight only — not a signal and never used by allocation prompts.</div></div><div className="text-[8px] font-mono text-white/25">Historical comparison · not a forecast</div></div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3"><Info label={comparison?.basis === 'broker-transactions' ? 'Your total return' : 'Your return'} value={comparison?.actualReturnPct == null ? (h.pnlPct == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%') : (comparison.actualReturnPct >= 0 ? '+' : '') + comparison.actualReturnPct.toFixed(2) + '%'}/><Info label="Peer scenario return" value={comparison?.hypotheticalReturnPct == null ? '—' : (comparison.hypotheticalReturnPct >= 0 ? '+' : '') + comparison.hypotheticalReturnPct.toFixed(2) + '%'}/><Info label="Peer minus you" value={comparison?.differencePctPoints == null ? '—' : (comparison.differencePctPoints >= 0 ? '+' : '') + comparison.differencePctPoints.toFixed(2) + ' pts'}/><Info label="Your value now" value={h.currentValue == null ? '—' : h.currentValue.toFixed(2)}/><Info label={comparison?.basis === 'broker-transactions' ? 'Peer scenario value if you made the same trades' : 'Peer scenario value'} value={comparison?.hypotheticalValue == null ? '—' : comparison.hypotheticalValue.toFixed(2)}/></div>
-    <div className="mt-2 text-[8px] font-mono text-white/25">{comparison?.basis === 'broker-transactions' ? 'Mirrors your broker buy/sell cash flows in the peer using each transaction date. This compares historical total-return outcomes, not a forecast.' : comparison?.peerEntryDate ? 'Same investment amount from ' + comparison.peerEntryDate + ' · ' + comparison.peer?.name : 'Peer purchase-date history is unavailable.'}</div>
-  </section>;
-}
-
-function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice:HistoricalPriceState}) {
+function PositionDetail({h}:{h:PositionAnalysis}) {
   const [customTarget, setCustomTarget] = useState('');
-  const canCalculateExitScenarios = h.livePrice != null && h.pnl != null && h.pnlPct != null;
+  const canCalculateExitScenarios = h.costBasisSupported === true && h.livePrice != null && h.pnl != null;
   const isLeveraged = h.symbol === 'SOXL';
   const addGroupThreshold = isLeveraged ? 68 : 62;
   const addBreadthThreshold = isLeveraged ? 0.67 : 0.50;
   const scenarioPrices = [
     canCalculateExitScenarios && h.livePrice != null ? { label: 'Current', price: h.livePrice } : null,
-    { label: 'Break-even (average cost)', price: h.averageCost },
+    canCalculateExitScenarios ? { label: 'Break-even (average cost)', price: h.averageCost } : null,
     canCalculateExitScenarios && h.livePrice != null ? { label: '+10% from current', price: h.livePrice * 1.10 } : null,
     canCalculateExitScenarios && h.livePrice != null ? { label: '+20% from current', price: h.livePrice * 1.20 } : null,
-    historicalPrice.high52w != null ? { label: '52-week high', price: historicalPrice.high52w, date: historicalPrice.high52wDate } : null,
-    historicalPrice.historicalHigh != null ? { label: 'Historical high (available)', price: historicalPrice.historicalHigh, date: historicalPrice.historicalHighDate } : null,
-    Number(customTarget) > 0 ? { label: 'Custom target', price: Number(customTarget) } : null,
+    canCalculateExitScenarios && Number(customTarget) > 0 ? { label: 'Custom target', price: Number(customTarget) } : null,
   ].filter(Boolean) as Array<{label:string;price:number;date?:string}>;
-  const scenarios = scenarioPrices.filter(row => Number.isFinite(row.price) && row.price > 0).map(row => ({ ...row, ...calculatePositionScenario(h, row.price) }));
-  const distanceTo52wHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.high52w != null && h.livePrice > 0
-    ? ((historicalPrice.high52w / h.livePrice) - 1) * 100
-    : null;
-  const distanceToHistoricalHigh = canCalculateExitScenarios && h.livePrice != null && historicalPrice.historicalHigh != null && h.livePrice > 0
-    ? ((historicalPrice.historicalHigh / h.livePrice) - 1) * 100
-    : null;
+  const scenarios = scenarioPrices.filter(row => Number.isFinite(row.price) && row.price > 0 && row.price <= 1e12).map(row => {
+    const change = h.livePrice != null && h.livePrice > 0 ? (row.price / h.livePrice - 1) * 100 : null;
+    return { ...row, ...calculatePositionScenario(h, row.price), fromCurrentPct: change != null && Number.isFinite(change) ? change : null };
+  });
   const checks = [
-    { label: 'Below average cost', passed: canCalculateExitScenarios && h.livePrice != null && h.livePrice < h.averageCost, detail: canCalculateExitScenarios && h.livePrice != null ? '$' + h.livePrice.toFixed(2) + ' vs $' + h.averageCost.toFixed(2) : 'Fresh quote required' },
+    { label: 'Below average cost', passed: canCalculateExitScenarios && h.costBasisSupported === true && h.livePrice != null && h.livePrice < h.averageCost, detail: canCalculateExitScenarios && h.livePrice != null ? formatUsdPrice(h.livePrice) + ' vs ' + formatUsdPrice(h.averageCost) : 'Fresh quote required' },
     { label: 'Group strength', passed: h.groupScore != null && h.groupScore >= addGroupThreshold, detail: h.groupScore == null ? 'No group strength' : Math.round(h.groupScore) + '/100 · need ≥' + addGroupThreshold },
     { label: 'Group participation', passed: h.groupBreadth != null && h.groupBreadth >= addBreadthThreshold, detail: h.groupBreadth == null ? 'No group participation' : Math.round(h.groupBreadth * 100) + '% · need ≥' + Math.round(addBreadthThreshold * 100) + '%' },
     { label: 'Group vs all tracked', passed: h.relativeToUniverse != null && h.relativeToUniverse >= 0, detail: h.relativeToUniverse == null ? 'No comparison available' : (h.relativeToUniverse >= 0 ? '+' : '') + h.relativeToUniverse.toFixed(2) + ' pts' },
@@ -1628,10 +1425,11 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
   ];
 
   return <Panel title={h.symbol + ' decision context'} subtitle={h.name + ' · ' + h.group}>
+    <p className="mb-3 text-xs text-amber-200/70" data-testid="position-accounting-status">{h.costBasisSupported ? 'Loaded-record cost and P&L only; full history and corporate actions remain unverified.' : 'Original ledger inputs are unsupported or incomplete; position cost and P&L are withheld.'}</p>
     <div className="grid grid-cols-2 gap-2">
-      <Info label="Invested cost" value={h.investedValue == null ? '—' : '$' + h.investedValue.toFixed(2)}/>
-      <Info label="Current value" value={h.currentValue == null ? '—' : '$' + h.currentValue.toFixed(2)}/>
-      <Info label="P&L" value={h.pnl == null ? '—' : (h.pnl >= 0 ? '+' : '') + '$' + h.pnl.toFixed(2) + (h.pnlPct == null ? ' · return % unavailable' : ' (' + h.pnlPct.toFixed(2) + '%)')}/>
+      <Info label="Invested cost" value={formatUsdPrice(h.investedValue)}/>
+      <Info label="Current value" value={formatUsdPrice(h.currentValue)}/>
+      <Info label="P&L" value={h.pnl == null ? '—' : (h.pnl >= 0 ? '+' : '') + formatUsdPrice(h.pnl) + (h.pnlPct == null ? ' · return % unavailable' : ' (' + h.pnlPct.toFixed(2) + '%)')}/>
       <Info label="Daily move" value={h.dailyChangePct == null ? '—' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '%'}/>
       <Info label="Group strength" value={h.groupScore == null ? '—' : Math.round(h.groupScore) + '/100'}/>
       <Info label="Group participation" value={h.groupBreadth == null ? '—' : Math.round(h.groupBreadth * 100) + '% up'}/>
@@ -1643,9 +1441,9 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
       <Info label="First broker purchase" value={h.firstPurchaseDate || h.purchaseDate || 'Not set'} />
       <Info label="Holding period" value={h.holdingPeriodDays == null ? '—' : h.holdingPeriodDays + ' days'} />
       <Info label="Purchase lots" value={String(h.purchaseLotCount ?? 0)} />
-      <Info label="Average cost" value={h.costBasisSupported !== false && Number.isFinite(h.averageCost) ? h.averageCost.toFixed(2) : '—'} />
+      <Info label="Average cost" value={h.costBasisSupported === true ? formatUsdPrice(h.averageCost) : '—'} />
       <Info label="Upside evidence" value={h.potentialUpsideSignal} />
-      <Info label="Current vs average" value={canCalculateExitScenarios && h.livePrice != null ? (((h.livePrice / h.averageCost) - 1) * 100 >= 0 ? '+' : '') + (((h.livePrice / h.averageCost) - 1) * 100).toFixed(2) + '%' : '—'} />
+      <Info label="Current vs average" value={h.pnlPct == null ? '—' : (h.pnlPct >= 0 ? '+' : '') + h.pnlPct.toFixed(2) + '%'} />
       <Info label="Current allocation" value={h.portfolioWeight == null ? '—' : (h.portfolioWeight * 100).toFixed(1) + '%'} />
       <Info label="Target allocation" value={h.targetAllocationPct == null ? 'Not set' : h.targetAllocationPct.toFixed(1) + '%'} />
       <Info label="Max / reduce-review" value={h.maxAllocationPct == null ? 'Not set' : h.maxAllocationPct.toFixed(1) + '%'} />
@@ -1689,16 +1487,16 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
         <div>
           <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">What-if price scenarios</div>
           <div className="text-base font-black mt-1">{h.symbol} · {h.name}</div>
-          <div className="text-[10px] text-white/35 mt-1">Estimated proceeds and P&amp;L for the full position at each reference price. Historical levels are reference points, not forecasts.</div>
+          <div className="text-[10px] text-white/35 mt-1">Hypothetical full-position proceeds and P&amp;L using conditional loaded-record cost. These scenarios are not forecasts or trade instructions.</div>
         </div>
         <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[.05] px-2.5 py-2 text-right">
           <div className="text-[8px] font-mono uppercase tracking-wider text-cyan-200/70">Stock symbol</div>
           <div className="text-sm font-black font-mono text-cyan-100">{h.symbol}</div>
-          <div className="text-[8px] font-mono text-white/30">Qty {h.quantitySupported !== false && Number.isFinite(h.quantity) ? h.quantity.toFixed(4) : '—'}</div>
+          <div className="text-[8px] font-mono text-white/30">Qty {h.quantitySupported !== false && Number.isFinite(h.quantity) ? h.quantity.toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—'}</div>
         </div>
       </div>
-      {historicalPrice.loading && <div className="text-[10px] font-mono text-white/30 mt-3">Loading historical highs…</div>}
-      {historicalPrice.error && <div className="text-[10px] font-mono text-amber-300/70 mt-3">Historical comparison unavailable: {historicalPrice.error}</div>}
+      <p className="text-xs text-amber-200/70 mt-3" data-testid="historical-target-status">Historical exit targets are withheld: corporate actions and comparable source-price coverage are unverified.</p>
+      {!canCalculateExitScenarios && <p className="text-xs text-amber-200/70 mt-2">Scenarios unavailable: reviewed original ledger cost and an admitted current quote are required.</p>}
       {scenarios.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <DataTable
@@ -1708,26 +1506,22 @@ function PositionDetail({h, historicalPrice}:{h:PositionAnalysis;historicalPrice
         initialSort={{ key: 'reference', direction: 'asc' }}
         columns={[
           { key: 'reference', header: 'Reference', accessor: row => row.label, render: row => <div><span className="text-white/60">{row.label}</span>{row.date ? <span className="block text-[8px] text-white/25 mt-0.5">{row.date}</span> : null}</div> },
-          { key: 'price', header: 'Price', accessor: row => row.price, type: 'currency', render: row => '$' + row.price.toFixed(2) },
-          { key: 'saleValue', header: 'Position value', accessor: row => row.saleValue, type: 'currency', render: row => row.saleValue == null ? '—' : '$' + row.saleValue.toFixed(2) },
-          { key: 'profit', header: 'Profit / loss', accessor: row => row.pnl, type: 'currency', render: row => row.pnl == null ? '—' : (row.pnl >= 0 ? '+' : '−') + '$' + Math.abs(row.pnl).toFixed(2) },
+          { key: 'price', header: 'Price', accessor: row => row.price, type: 'currency', render: row => formatUsdPrice(row.price) },
+          { key: 'saleValue', header: 'Position value', accessor: row => row.saleValue, type: 'currency', render: row => formatUsdPrice(row.saleValue) },
+          { key: 'profit', header: 'Profit / loss', accessor: row => row.pnl, type: 'currency', render: row => row.pnl == null ? '—' : (row.pnl >= 0 ? '+' : '−') + formatUsdPrice(Math.abs(row.pnl)) },
           { key: 'return', header: 'Return', accessor: row => row.returnPct, type: 'percent', render: row => row.returnPct == null ? '—' : (row.returnPct >= 0 ? '+' : '') + row.returnPct.toFixed(2) + '%' },
-          { key: 'fromCurrent', header: 'Change from current', accessor: row => canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null, type: 'percent', render: row => { const v = canCalculateExitScenarios && h.livePrice != null && h.livePrice > 0 ? ((row.price / h.livePrice) - 1) * 100 : null; return v == null ? '—' : <span className={v > 0 ? 'text-emerald-300 font-bold' : v < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(v >= 0 ? '+' : '') + v.toFixed(2) + '%'}</span>; } },
+          { key: 'fromCurrent', header: 'Change from current', accessor: row => row.fromCurrentPct, type: 'percent', render: row => row.fromCurrentPct == null ? '—' : <span className={row.fromCurrentPct > 0 ? 'text-emerald-300 font-bold' : row.fromCurrentPct < 0 ? 'text-rose-300 font-bold' : 'text-white/55'}>{(row.fromCurrentPct >= 0 ? '+' : '') + row.fromCurrentPct.toFixed(2) + '%'}</span> },
         ]}
       />
         </div>
       )}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Info label="52-week high distance" value={distanceTo52wHigh == null ? '—' : '+' + distanceTo52wHigh.toFixed(2) + '% from current'} />
-        <Info label="Historical high distance" value={distanceToHistoricalHigh == null ? '—' : '+' + distanceToHistoricalHigh.toFixed(2) + '% from current'} />
-      </div>
       <div className="mt-3 rounded-xl border border-white/5 bg-black/10 p-3">
         <div className="text-[9px] font-mono uppercase tracking-widest text-white/30">Your target price</div>
         <div className="mt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
           <input
             type="number"
             min="0"
-            step="0.01"
+            step="any"
             value={customTarget}
             onChange={e => setCustomTarget(e.target.value)}
             placeholder="Enter price"

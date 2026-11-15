@@ -15,6 +15,8 @@ export type PortfolioPosition = {
   quantity: number;
   averageCost: number;
   investedValue: number | null;
+  /** Exact conditional cost supplied by the original-loaded-ledger projection, not a rounded average. */
+  loadedCostBasis?: number | null;
   snapshotCurrentValue: number | null;
   currency: string | null;
   quantitySupported?: boolean;
@@ -145,6 +147,8 @@ export function mapStoredPortfolioHoldings(holdings: StoredPortfolioHolding[]): 
   return holdings.map(enrichHolding);
 }
 
+export const SNAPSHOT_COST_ISSUE = 'Loaded cost basis or USD cost currency is unavailable or invalid; P&L is withheld.';
+
 function avg(values: number[]) {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
@@ -162,13 +166,13 @@ export function buildPositionAnalyses(
     const liveIsFresh = quality.eligible;
     const quantityValid = position.quantitySupported !== false && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0;
     const value = livePrice == null || !quantityValid ? null : livePrice * position.quantity;
-    const currentValue = value != null && Number.isFinite(value) ? value : null;
+    const currentValue = value != null && Number.isFinite(value) && value <= 1e12 ? value : null;
     const costValid = recordedCostSupported(position);
     const difference = currentValue != null && costValid ? currentValue - position.investedValue! : null;
     const pnl = difference != null && Number.isFinite(difference) ? difference : null;
     const percent = pnl != null && position.investedValue! > 0 ? pnl / position.investedValue! * 100 : null;
     const pnlPct = percent != null && Number.isFinite(percent) ? percent : null;
-    const valuationIssues = [...quality.reasons, ...(!quantityValid || (value != null && currentValue == null) ? ['Quantity or position-value arithmetic is unsupported.'] : []), ...(!costValid ? ['Loaded cost basis or USD cost currency is unavailable or invalid; P&L is withheld.'] : [])];
+    const valuationIssues = [...quality.reasons, ...(!quantityValid || (value != null && currentValue == null) ? ['Quantity or position-value arithmetic is unsupported.'] : []), ...(!costValid ? [SNAPSHOT_COST_ISSUE] : [])];
     const group = intelligence.groups.find((item) => item.name === position.group) ?? null;
 
     const peerReturns = position.peers
@@ -295,20 +299,22 @@ export function buildPositionAnalyses(
   });
 }
 
-type LoadedCostInput = Pick<PortfolioPosition, 'quantity' | 'averageCost' | 'investedValue' | 'currency' | 'quantitySupported' | 'costBasisSupported'>;
+type LoadedCostInput = Pick<PortfolioPosition, 'quantity' | 'averageCost' | 'investedValue' | 'currency' | 'quantitySupported' | 'costBasisSupported' | 'loadedCostBasis'>;
 function recordedCostSupported(position: LoadedCostInput) {
   return position.currency === 'USD' && position.quantitySupported !== false && position.costBasisSupported !== false && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0
     && typeof position.averageCost === 'number' && Number.isFinite(position.averageCost) && position.averageCost >= 0
     && typeof position.investedValue === 'number' && Number.isFinite(position.investedValue) && position.investedValue >= 0
-    && position.investedValue === position.quantity * position.averageCost;
+    && (position.loadedCostBasis !== undefined
+      ? typeof position.loadedCostBasis === 'number' && Number.isFinite(position.loadedCostBasis) && position.loadedCostBasis >= 0 && position.loadedCostBasis <= 1e12 && position.loadedCostBasis === position.investedValue
+      : position.investedValue === position.quantity * position.averageCost);
 }
 
 /** Hypothetical target math only. It does not supply a current observation or a forecast. */
 export function calculatePositionScenario(position: LoadedCostInput, price: number) {
   const value = position.quantitySupported !== false && typeof price === 'number' && Number.isFinite(price) && price > 0 && typeof position.quantity === 'number' && Number.isFinite(position.quantity) && position.quantity >= 0 ? price * position.quantity : null;
-  const saleValue = value != null && Number.isFinite(value) ? value : null;
+  const saleValue = value != null && Number.isFinite(value) && value <= 1e12 ? value : null;
   const profit = saleValue != null && recordedCostSupported(position) ? saleValue - position.investedValue! : null;
-  const pnl = profit != null && Number.isFinite(profit) ? profit : null;
+  const pnl = profit != null && Number.isFinite(profit) && Math.abs(profit) <= 1e12 ? profit : null;
   const percent = pnl != null && position.investedValue! > 0 ? pnl / position.investedValue! * 100 : null;
   return { saleValue, pnl, returnPct: percent != null && Number.isFinite(percent) ? percent : null };
 }

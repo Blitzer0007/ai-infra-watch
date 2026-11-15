@@ -143,8 +143,12 @@ def test_original_storage_gap_cannot_be_hidden_by_a_legacy_numeric_default(page,
     record[field] = default
     page.goto('/portfolio?portfolio_tab=holdings')
     nvda = row(page, 'NVDA')
-    expect(metric(nvda, 'P&L')).to_contain_text('—')
-    expect(metric(nvda, 'Avg cost')).to_contain_text('—')
     if field == 'quantity':
+        expect(metric(nvda, 'P&L')).to_contain_text('—')
+        expect(metric(nvda, 'Avg cost')).to_contain_text('—')
         expect(metric(nvda, 'Current value')).to_contain_text('—')
         expect(nvda).to_contain_text('Portfolio share unavailable')
+    else:
+        # Original trade receipts supply cost; missing snapshot defaults do not.
+        expect(metric(nvda, 'Avg cost')).to_contain_text('$100.00')
+        expect(metric(nvda, 'P&L')).to_contain_text('+0.00%')

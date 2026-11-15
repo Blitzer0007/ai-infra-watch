@@ -8,6 +8,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 - Active development: `feature/release2-opportunity-research`, draft PR [#168](https://github.com/Blitzer0007/ai-infra-watch/pull/168), stacked on `feature/release1-portfolio-command-center` / draft PR #167. Do not retarget or merge the unfinished stack as a shortcut.
 - Cloud workspace: `/workspace/ai-infra-watch`. No Windows execution is required.
 - Source baseline before this checkpoint: `562d9ddc3a6c1be4f86471f4e9eea9f8c6a0a101`; 1,754 Node tests and all seven CI workflows passed on that exact baseline. Those results do not certify subsequent source changes.
+- Previous verified Milestone 2 head: `378db7a8810e7147edc240a0d259124923f62e0f` (all seven CI workflows passed).
 - Initial Milestone 2 source commit: `dbf0d1f36392464735b8da3d96f2cdeb7c80fba4`. The current checkpoint also includes legacy-link reload canonicalization; obtain the latest implementation from the current feature/PR head rather than stopping at that initial commit.
 - Discover the latest checkpoint SHA from the draft PR head or `git log -1 --format=%H -- docs/release/CODEX-CONTINUATION.md`; a file cannot embed its own future commit SHA.
 
@@ -27,39 +28,40 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 
 Continue **Milestone 2 — integrated Portfolio core**. No second release is authorized merely by this development request. Maintain this handoff so a different ChatGPT model can resume safely using repository state.
 
-Checkpoint: **company research navigation implemented and locally verified; not deployed**. The documentation-only checkpoint `8589c84d7ea9b74eaabe244f035777f9554b39f4` was pushed before implementation so a remote continuation was already available. This newer checkpoint contains the implementation; inspect the current PR #168 head and CI before continuing.
+Checkpoint: **reviewed per-position accounting and historical abstention implemented and locally verified; not deployed**. The previous company research/navigation checkpoint remains intact. Read the latest PR head and exact-head CI rather than assuming the previous head certifies this implementation.
 
 Completed in this increment:
 
-- Legacy company links are canonicalized into `research_symbol` before selected-holding restoration; reload retains an unheld company. Independent `research_symbol` prevents an unheld Opportunities candidate from silently becoming the first holding. Invalid/ambiguous/unknown symbols show an explicit gap; no substitute dossier appears.
-- `CompanyResearchWorkspace.tsx` uses the current configured watchlist plus bounded loaded holdings, separate membership status, a labelled picker and Back/Forward support. It reuses the manual, lazy, source-unconnected dossier without any provider/model/financial request.
-- Scanner search/status/display limit use a bounded URL contract and a fixed return route. A lost frozen snapshot is not recreated or automatically rescanned. Positions, notes, credentials and arbitrary return URLs are not copied into generated links.
-- The shipped `api/auth.js` data-free check and `server/api/release-access-check.test.js` were carried forward from production main without overwriting the newer Portfolio UI.
-- A root `AGENTS.md` now requires this continuation file to be kept current at checkpoints. Release plan/register headings now point to the actual shipped Milestone 1 evidence.
+- `reviewLoadedPositionAccounting` reviews original loaded receipts itself, binds the displayed holdings to original quantities, and folds exact remaining ledger cost into conditional per-position P&L and scenarios. It never mutates raw holdings/trades or grants accounting/source/history/decision authority.
+- Unknown fees/currency/order, quantity gaps or unavailable original trades withhold cost/P&L/scenarios. Independently admitted current quote values stay separate; partial coverage retains no subset weights. Missing snapshot cost cannot override supported original trade cost, and a missing original quantity cannot become zero.
+- Exact scenario cost avoids rebuilding cost from a rounded/divided average. Null, observed zero, losses, fractional quantities and tiny costs are kept distinct; finite bounded arithmetic and tiny-money formatting apply to the reviewed view.
+- Unsupported portfolio historical returns/pressure reconstruction, benchmark comparisons, peer counterfactuals and historical-high exit targets show unavailable explanations. Their financial consumers and additional maximum-history requests are removed from this UI. The explicit descriptive price chart/correlation remains separate.
+- The newer Portfolio dialog/navigation/editors, independent `research_symbol`, scanner return filters and shipped data-free auth check are preserved.
+- Shared positive browser mocks now contain fictional original-ledger receipts and complete quote declarations. These declarations are test inputs, never proof of authentic source/history coverage.
 
 Files to inspect:
 
-- `src/utils/companyResearchNavigation.ts` and `.test.ts`: bounded URL/return contract and five deterministic cases.
-- `src/components/opportunities/OpportunityScanner.tsx` / `OpportunityCard.tsx`: view-state retention and dossier links.
-- `src/components/portfolio/CompanyResearchWorkspace.tsx`: independent read-only company destination.
-- `src/components/PortfolioIntelligence.tsx` / `src/App.tsx`: current watchlist/context wiring.
-- `qa/test_company_research_navigation.py`: eleven intercepted integration cases; added to `qa-validation.yml`.
-- `docs/release/release2-company-research-navigation.md`: implementation review and limits.
+- `src/utils/reviewedPortfolioAccounting.ts`, `portfolioPositions.ts`, `reviewedPositionAccounting.test.ts`: strict per-position projection and exact conditional scenario cost.
+- `src/components/PortfolioIntelligence.tsx`: projected rows/scenarios, abstention explanations and preserved newer navigation.
+- `qa/test_reviewed_positions.py`, `test_portfolio_valuation.py`, `test_accounting_consumers.py`: fictional accounting/valuation integration; new suite in `qa-validation.yml`.
+- `qa/test_ui.py`, `qa/fixtures/milestone1-portfolio.fictional.mjs`: shared positive fixtures reconciled from the production safety backport, preserving newer test flows.
+- `docs/release/release2-reviewed-position-accounting.md`: review, limits and evidence.
+- Previous navigation: `companyResearchNavigation.ts`, `CompanyResearchWorkspace.tsx`, scanner/card components and `qa/test_company_research_navigation.py`.
 
-Verification at this checkpoint: **1,763 Node tests passed**, TypeScript/build/security/32-file migration manifest/whitespace passed; **52 focused browser cases passed** across the new flow, Opportunities, holding dialog, dossier and Portfolio navigation. The source security scan ran after new files were tracked. Existing large-bundle warnings remain. These are real Cloud checks; final saved-head CI is recorded in draft PR #168 and must be checked there, not inferred from a previous commit.
+Verification: **1,784 Node tests passed** (21 new per-position cases); 60 focused original-input accounting cases also passed after the final explicit-null guard cleanup. **102 distinct focused browser cases passed** across the new view, existing accounting/valuation, dialog, navigation, company research and shared UI/exploratory flows. A sortable-column selector and shared positive-mock timestamp precision were corrected; the final new-suite and affected UI/exploratory reruns passed without weakening gates. TypeScript/build/tracked-source security/32-file migration manifest/whitespace checks passed. Existing main-bundle warnings remain (~1,760 kB). Exact saved-head CI is recorded in draft PR #168; inspect its current SHA/status, not previous-head evidence.
 
 Next concrete increment — do this before a Milestone 2 release:
 
-1. Reconcile the shipped per-position accounting safeguards into the newer Portfolio flow. `tradePerformance` is strict, but `rawAnalyses` still starts from stored holding average cost. Review `PortfolioIntelligence.tsx` near `rawAnalyses`/`tradePerformance`, `reviewedPortfolioAccounting.ts`, `loadedLedgerReview.ts`, and production main's older component for the intended abstention. Preserve the newer navigation/dialog; do not copy the whole older UI.
-2. Fold reviewed original-ledger remaining cost into per-position conditional P&L/scenario displays. Unknown fees/currency/order/quantity or unavailable trades must withhold those financial fields; admitted quote valuation/complete-denominator weights remain separate. Never mutate raw holdings or saved rule configuration to make calculations pass.
-3. Carry forward historical portfolio/peer return and historical exit-target abstention. Remaining feature paths still call legacy historical/counterfactual calculators without supported full-history/source contracts. Add visible unavailable explanations and fictional regressions rather than declaring source coverage complete.
-4. Finish the remaining calendar/inbox/dossier context and accessibility stories without automatic provider reads or live activation. The new dossier remains explicitly unconnected; it is not financial enrichment or verified issuer research.
-5. Update this file/review/register, run meaningful focused plus required checks, commit/push a coherent checkpoint to draft PR #168. Keep production at Milestone 1 until a later release is actually ready and authorized.
+1. Verify this saved checkpoint and exact-head CI on draft PR #168 before starting further edits. Keep the PR draft; do not merge or deploy it.
+2. Integrate retained Calendar/Inbox reading context with company research. Inspect `src/components/calendar/CatalystCalendar.tsx`, `src/components/alerts/AlertInbox.tsx`, App routing and the research navigation contract. Calendar/Inbox filters currently live in component state and can be lost when navigating away.
+3. Add bounded URL-based view-state/Back-Forward restoration and fixed internal issuer/return links using already loaded context. Preserve event precision/corrections and alert delivery/source explanations; never infer read/acceptance or complete source coverage. Do not serialize alert text, financial rows, arbitrary URLs or credentials into links.
+4. Verify return flows with fictional fixtures, loading/partial/error states, keyboard focus and 360/768/1440px layouts. Calendar stays loaded-snapshot only; Inbox server reads remain explicit. No automatic feed refresh, model request, polling, retry or send.
+5. Update this handoff and integration review after each meaningful checkpoint. Broader remaining Portfolio/Opportunities/dossier/calendar/inbox acceptance still gates Milestone 2. Production stays at Milestone 1 until a later release is ready and authorized.
 
 ## Remaining integration/safety work
 
-- The main-based Milestone 1 backport included compatibility changes in the older production Portfolio UI. Carry those safeguards forward while preserving the newer feature navigation: ledger-reviewed per-position cost/P&L, safe tiny/null formatting, and withholding unsupported historical/peer return claims. Do not copy the older whole component over the newer UI.
-- The data-free auth handler/check is now reconciled from production main. Keep it intact; the remaining Portfolio compatibility work above is still a release prerequisite.
+- The main-based Milestone 1 accounting compatibility safeguards are now reconciled in the newer Portfolio view in this checkpoint. Keep the strict projection and historical abstention while integrating additional contexts; do not copy the older whole component over the newer UI.
+- The data-free auth handler/check is now reconciled from production main. Keep it intact; broader integrated Portfolio acceptance remains a release prerequisite.
 - Milestone 2 still needs broader Portfolio/Opportunities/dossier/calendar/inbox user stories, source/conflict explanations, retained reading/editing state, missing/loading/error cases and keyboard/mobile acceptance.
 - Real issuer/source acquisition, authoritative full ledger/corporate-action evidence, live NVIDIA/JEV effectiveness and forecast outcomes remain unverified. Fictional fixtures, hashes and declarations do not establish those facts.
 - Other milestones and historical scope: `release2-five-deployments.md`, `release2-remaining-work.md`, `release2-engineering-plan.md`. Older statements saying no milestone has shipped are superseded by this checkpoint.
