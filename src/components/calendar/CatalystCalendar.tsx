@@ -6,9 +6,10 @@ import { FilterBar, FilterInput, FilterSelect } from '../FilterControls';
 import CatalystEventCard, { CatalystEvidence } from './CatalystEventCard';
 import {useReviewWorkspace} from '../../hooks/useReviewWorkspace';
 import {readCalendarView,calendarViewParams,type ReviewReadingSession} from '../../utils/reviewWorkspaceNavigation';
+import type {ReviewRecordContext} from '../../utils/reviewRecordContext';
 const readView=(p:URLSearchParams)=>readCalendarView(p,loadReviewTimeZone());
 
-type Props = { snapshot: CatalystSnapshot; onOpenWatchlist: () => void; session:ReviewReadingSession; onOpenResearch:(href:string)=>void };
+type Props = { snapshot: CatalystSnapshot; onOpenWatchlist: () => void; session:ReviewReadingSession; onOpenResearch:(href:string,record?:ReviewRecordContext)=>void };
 export default function CatalystCalendar({ snapshot, onOpenWatchlist, session, onOpenResearch }: Props) {
   const reading=useReviewWorkspace('calendar',readView,calendarViewParams,session);
   const {days,confirmation,zone}=reading.view;
