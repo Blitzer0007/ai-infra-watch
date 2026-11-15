@@ -19,12 +19,13 @@ import {calculateLoadedTradingPerformance} from '../utils/reviewedPortfolioAccou
 import {reviewLoadedLedger,type LedgerAvailability} from '../utils/loadedLedgerReview';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
-import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../utils/evidenceExposure';
 import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
+import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
+import type { ReviewRecordContext } from '../utils/reviewRecordContext';
 type Price = {
   price: number;
   changePct: number;
@@ -61,12 +62,15 @@ type Props = {
   macroRisks?: any[];
   news?: any[];
   politicalSignals?: any[];
+  researchWatchlist?:readonly string[];
+  reviewRecord?:ReviewRecordContext|null;
+  onOpenReviewHref?:(href:string,record?:ReviewRecordContext)=>void;
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
-export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
+export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], researchWatchlist=[], reviewRecord=null, onOpenReviewHref }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => {
     const value = new URLSearchParams(window.location.search).get('portfolio_tab');
     return value === 'holdings' || value === 'performance' || value === 'evidence' || value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
@@ -130,9 +134,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     return request;
   };
 
-  const changeTab = (nextTab: PortfolioTab) => {
-    setTab(nextTab);
-  };
+  const changeTab = (nextTab: PortfolioTab) => { setTab(nextTab); };
+  useEffect(()=>{
+    const restore=()=>{
+      const v=new URLSearchParams(window.location.search).get('portfolio_tab');
+      setTab(v==='holdings'||v==='performance'||v==='evidence'||v==='research'||v==='watchlist'||v==='events'||v==='rotation'||v==='network'?v:'overview');
+    };
+    window.addEventListener('popstate',restore);
+    return()=>window.removeEventListener('popstate',restore);
+  },[]);
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
     localStorage.setItem('aiw-portfolio-view-mode', mode);
@@ -240,31 +250,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return {...row,averageCost:cost,investedValue:ledger?.openCostBasis??null,costBasisSupported:!!ledger,pnl,whatIfProfitAt10Pct:ledger&&row.currentValue!==null?row.currentValue*1.1-ledger.openCostBasis:null,whatIfProfitAt20Pct:ledger&&row.currentValue!==null?row.currentValue*1.2-ledger.openCostBasis:null,pnlPct:pnl!==null&&ledger!.openCostBasis>0?pnl/ledger!.openCostBasis*100:null,portfolioWeight:weight,minorPosition:weight!==null&&weight<.02};
     });
   },[livePrices,intelligence,positions,loadedReview]);
-  const signalScorecardSentRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true' || !analyses.length) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
-    const pending = analyses.filter(item => item.state !== 'INSUFFICIENT DATA').filter(item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      return sessionStorage.getItem('aiw_scorecard_sent:' + signalKey) !== '1' && !signalScorecardSentRef.current.has(signalKey);
-    });
-    if (!pending.length) return;
-    void Promise.allSettled(pending.map(async item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      signalScorecardSentRef.current.add(signalKey);
-      try {
-        await authFetch('/api/signal-scorecard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signalKey, symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }),
-        });
-        sessionStorage.setItem('aiw_scorecard_sent:' + signalKey, '1');
-      } catch {
-        signalScorecardSentRef.current.delete(signalKey);
-      }
-    }));
-  }, [analyses]);
+  // Passive portfolio review must not POST observations; scorecard history is read-only.
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const selectedPeerSet = useMemo(() => selectedAnalysis ? selectDynamicPeers(STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol) ?? selectedAnalysis as any, livePrices) : { primary: null, core: [], extended: [] }, [selectedAnalysis?.symbol, livePrices]);
 
@@ -810,7 +796,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       </div>
 
 
-      {tab === 'research' && <PortfolioResearchPanel />}
+      {tab === 'research' && <div className="space-y-4">
+        <CompanyResearchWorkspace holdings={holdings.map(row=>row.symbol)}
+          watchlist={researchWatchlist} holdingsStatus={portfolioLoading?'loading':portfolioError?'unavailable':'ready'}
+          onOpenReviewHref={onOpenReviewHref} reviewRecord={reviewRecord}/>
+        <PortfolioResearchPanel />
+      </div>}
 
       {tab === 'holdings' && (
         <div className="space-y-4">

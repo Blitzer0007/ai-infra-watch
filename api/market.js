@@ -1,3 +1,4 @@
+import alertInboxHandler from '../server/api/alert-inbox.js';
 import quoteHandler from '../server/api/quote.js';
 import marketDataHealthHandler from '../server/api/market-data-health.js';
 import companyScaleHandler from '../server/api/company-scale.js';
@@ -14,6 +15,7 @@ import reentryAlertsHandler from '../server/api/reentry-alerts.js';
 import jevLabHandler from '../server/api/jev-lab.js';
 
 const routes = {
+  'alert-inbox': alertInboxHandler,
   quote: quoteHandler,
   'market-data-health': marketDataHealthHandler,
   'company-scale': companyScaleHandler,

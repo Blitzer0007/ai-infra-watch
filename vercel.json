@@ -4,6 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/alert-inbox", "destination": "/api/market?route=alert-inbox" },
     {
       "source": "/api/quote",
       "destination": "/api/market?route=quote"
