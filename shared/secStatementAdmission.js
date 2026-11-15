@@ -1,5 +1,5 @@
 /** Independent original-row admission. Shares policy constants, never calls producer. */
-import {SEC_STATEMENT_CONCEPTS,SEC_STATEMENT_FAILURES,SEC_STATEMENT_LIMITS} from './secStatementObservations.js';
+import {SEC_STATEMENT_CONCEPTS,SEC_OPERATING_CONCEPTS,SEC_STATEMENT_FAILURES,SEC_STATEMENT_LIMITS} from './secStatementObservations.js';
 import {forecastDay,forecastInstantMicros} from '../src/utils/forecastInputs.js';
 import {councilPublicationWindow} from './councilAdmission.js';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -15,17 +15,18 @@ function equal(a,b,depth=0){
   return false;
 }
 
-function audit(request){
+function audit(request,registry,contractVersion,annualOnly){
   if(!exact(request,['symbol','expectedCik','assessedAt','retrievedAt','period','source'])||typeof request.symbol!=='string'||!/^[A-Z0-9.^=-]{1,20}$/.test(request.symbol)
     ||typeof request.expectedCik!=='string'||!/^\d{10}$/.test(request.expectedCik)||originalCik(request.expectedCik)===null
     ||forecastInstantMicros(request.assessedAt)===null||(request.retrievedAt!==null&&forecastInstantMicros(request.retrievedAt)===null)
     ||!exact(request.period,['start','end'])||!forecastDay(request.period.end))return null;
   const p=request.period;
+  if(annualOnly&&p.start===null)return null;
   if(p.start!==null&&(!forecastDay(p.start)||(Date.parse(p.end)-Date.parse(p.start))<300*86400000||(Date.parse(p.end)-Date.parse(p.start))>400*86400000))return null;
-  const kind=p.start===null?'instant':'annual-duration',specs=SEC_STATEMENT_CONCEPTS.filter(c=>c.kind===kind);
-  const out={contractVersion:'sec-statement-observations-v1',symbol:request.symbol,cik:request.expectedCik,assessedAt:request.assessedAt,retrievedAt:null,
+  const kind=p.start===null?'instant':'annual-duration',specs=registry.filter(c=>c.kind===kind);
+  const out={contractVersion,symbol:request.symbol,cik:request.expectedCik,assessedAt:request.assessedAt,retrievedAt:null,
     requestedPeriod:{start:p.start,end:p.end,kind},requestedMetrics:specs.map(c=>c.metric),status:'invalid-payload',sourceStatus:'invalid-payload',observations:[],issues:[],missingMetrics:specs.map(c=>c.metric),rowsInspected:0,
-    unsupportedDerivedMetrics:[...unsupported],sourceCoverage:'unverified',sourceAuthenticityVerified:false,issuerMappingVerified:false,simulationStatus:'not-established',grantsDecisionEligibility:false,grantsValuationEligibility:false,
+    unsupportedDerivedMetrics:[...(annualOnly?['revenue-growth','operating-margin','free-cash-flow']:[]),...unsupported],...(annualOnly?{aggregationEligibility:false}:{}),sourceCoverage:'unverified',sourceAuthenticityVerified:false,issuerMappingVerified:false,simulationStatus:'not-established',grantsDecisionEligibility:false,grantsValuationEligibility:false,
     usageScope:'projection-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
   const finding=(metric,code)=>{if(out.issues.length<SEC_STATEMENT_LIMITS.issues&&!out.issues.find(i=>i.metric===metric&&i.code===code))out.issues.push({metric,code});};
   const reject=(code,status='invalid-payload')=>{finding(null,code);out.status=status;out.observations=[];return out;};
@@ -42,7 +43,7 @@ function audit(request){
   if(raw.simulated===true){out.sourceStatus='loaded';out.simulationStatus='declared-simulated';return reject('SIMULATED_SOURCE','unavailable');}
   out.sourceStatus='loaded';out.status='unavailable';
   let budget=0;
-  for(const spec of SEC_STATEMENT_CONCEPTS){
+  for(const spec of registry){
     const concept=raw.facts[spec.namespace]?.[spec.tag];if(concept===undefined)continue;
     if(!object(concept)||!object(concept.units))return reject('INVALID_UNIT_CONTAINER');
     const arrays=Object.values(concept.units);
@@ -75,9 +76,9 @@ function audit(request){
       else if(!(['10-K','10-K/A'].includes(row.form)&&row.fp==='FY')&&!(kind==='instant'&&['10-Q','10-Q/A'].includes(row.form)&&['Q1','Q2','Q3'].includes(row.fp)))reason='UNSUPPORTED_FILING';
       else if(!Number.isInteger(row.fy)||row.fy<1000||row.fy>9999)reason='FILING_FISCAL_LABEL_MISSING';
       else if(row.end>row.filed)reason='TIME_ORDER_INVALID';
-      else if(typeof row.val!=='number'||!Number.isFinite(row.val)||(spec.unit!=='USD/shares'&&row.val<0))reason='INVALID_VALUE';
+      else if(typeof row.val!=='number'||!Number.isFinite(row.val)||(spec.unit!=='USD/shares'&&spec.signed!==true&&row.val<0))reason='INVALID_VALUE';
       else if(Number.isInteger(row.val)&&!Number.isSafeInteger(row.val))reason='NUMERIC_PRECISION_UNSUPPORTED';
-      else if(row.frame!==undefined&&(typeof row.frame!=='string'||!/^CY\d{4}(?:Q[1-4])?I?$/.test(row.frame)))reason='UNSUPPORTED_FRAME';
+      else if(row.frame!==undefined&&(typeof row.frame!=='string'||!/^CY\d{4}(?:Q[1-4])?I?$/.test(row.frame)||(annualOnly&&!/^CY\d{4}$/.test(row.frame))))reason='UNSUPPORTED_FRAME';
       if(reason){rejected=true;finding(spec.metric,reason);}
     }
     if(rejected)continue;
@@ -104,11 +105,13 @@ function audit(request){
   return out;
 }
 
-export function validateSecStatementReceipt(request,receipt){
-  const base={contractVersion:'sec-statement-admission-v1',status:'invalid',snapshot:null,reason:'STATEMENT_RECEIPT_NOT_BOUND',verifiesSourceRecords:false,issuerMappingVerified:false,grantsDecisionEligibility:false,grantsValuationEligibility:false,aggregationEligibility:false,usageScope:'validation-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
+function validate(request,receipt,registry,annualOnly=false){
+  const base={contractVersion:annualOnly?'sec-operating-admission-v1':'sec-statement-admission-v1',status:'invalid',snapshot:null,reason:'STATEMENT_RECEIPT_NOT_BOUND',verifiesSourceRecords:false,issuerMappingVerified:false,grantsDecisionEligibility:false,grantsValuationEligibility:false,aggregationEligibility:false,usageScope:'validation-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
   try{
-    const expected=audit(request);
+    const expected=audit(request,registry,annualOnly?'sec-operating-observations-v1':'sec-statement-observations-v1',annualOnly);
     if(!expected||!equal(receipt,expected))return base;
     return {...base,status:expected.status==='partial'?'conditional':'needs-data',snapshot:expected,reason:expected.status==='partial'?'ORIGINAL_INPUTS_BOUND':'INPUTS_UNAVAILABLE'};
   }catch{return base;}
 }
+export function validateSecStatementReceipt(request,receipt){return validate(request,receipt,SEC_STATEMENT_CONCEPTS);}
+export function validateSecOperatingReceipt(request,receipt){return validate(request,receipt,SEC_OPERATING_CONCEPTS,true);}

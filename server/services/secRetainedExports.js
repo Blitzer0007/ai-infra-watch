@@ -1,8 +1,8 @@
 // Supplied bytes only. No file/network access, ambient clock, configuration or writer.
 import {createHash} from 'node:crypto';
 import {forecastDay,forecastInstantMicros} from '../../src/utils/forecastInputs.js';
-import {buildSecStatementObservations,SEC_STATEMENT_FAILURES} from '../../shared/secStatementObservations.js';
-import {validateSecStatementReceipt} from '../../shared/secStatementAdmission.js';
+import {buildSecStatementObservations,buildSecOperatingObservations,SEC_STATEMENT_FAILURES} from '../../shared/secStatementObservations.js';
+import {validateSecStatementReceipt,validateSecOperatingReceipt} from '../../shared/secStatementAdmission.js';
 
 export const SEC_EXPORT_LIMITS=Object.freeze({manifestBytes:16384,listingsBytes:4*1024*1024,companyfactsBytes:16*1024*1024,listingRows:30000,depth:32,nodes:400000});
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -95,13 +95,13 @@ function listingFrom(v,r){
 }
 
 /** Integrity and supplied-listing consistency only, never publisher authentication. */
-export function reviewRetainedSecExports(args){
+function reviewExports(args,operating=false){
   const bindings={manifestPinMatched:false,manifestSha256:null,manifestBytes:0,listings:{bytesMatched:false,inspectedBytes:0,sha256:null,requestedUrl:null,finalUrl:null,retrievedAt:null},companyfacts:{bytesMatched:false,inspectedBytes:0,sha256:null,requestedUrl:null,finalUrl:null,retrievedAt:null}};
   const sourceStatus={listings:'not-inspected',companyfacts:'not-inspected'};
-  const base={contractVersion:'sec-retained-export-review-v1',status:'needs-data',code:'EXPORT_INPUT_INVALID',bindings,sourceStatus,listing:null,companyfactsEntityName:null,nameAgreement:'not-checked',simulationStatus:'not-established',snapshots:[],sourceAuthenticityVerified:false,issuerMappingVerified:false,historicalAvailabilityVerified:false,originalFilingDocumentRetained:false,grantsDecisionEligibility:false,grantsValuationEligibility:false,aggregationEligibility:false,usageScope:'offline-validation-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0},acquisitionUsage:'unknown'};
+  const base={contractVersion:operating?'sec-retained-operating-review-v1':'sec-retained-export-review-v1',status:'needs-data',code:'EXPORT_INPUT_INVALID',bindings,sourceStatus,listing:null,companyfactsEntityName:null,nameAgreement:'not-checked',simulationStatus:'not-established',snapshots:[],sourceAuthenticityVerified:false,issuerMappingVerified:false,historicalAvailabilityVerified:false,originalFilingDocumentRetained:false,grantsDecisionEligibility:false,grantsValuationEligibility:false,aggregationEligibility:false,usageScope:'offline-validation-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0},acquisitionUsage:'unknown'};
   try{
     if(!exact(args,['request','manifestBytes','expectedManifestSha256','artifacts']))stop('EXPORT_INPUT_INVALID');
-    const r=args.request;if(!requestValid(r))stop('EXPORT_REQUEST_INVALID');
+    const r=args.request;if(!requestValid(r)||(operating&&r.periods.some(p=>p.start===null)))stop('EXPORT_REQUEST_INVALID');
     if(!digest(args.expectedManifestSha256))stop('MANIFEST_PIN_REQUIRED');
     const mb=bytes(args.manifestBytes,SEC_EXPORT_LIMITS.manifestBytes);bindings.manifestBytes=mb.length;
     if(sha(mb)!==args.expectedManifestSha256)stop('MANIFEST_PIN_MISMATCH');bindings.manifestPinMatched=true;bindings.manifestSha256=args.expectedManifestSha256;
@@ -126,7 +126,8 @@ export function reviewRetainedSecExports(args){
     const snapshots=[],filings=new Map();
     for(const period of r.periods){
       const request={symbol:r.symbol,expectedCik:r.expectedCik,assessedAt:r.assessedAt,retrievedAt:m.sources.companyfacts.retrievedAt,period,source:{status:'loaded',facts}};
-      const projection=buildSecStatementObservations(request),admitted=validateSecStatementReceipt(request,projection);
+      const projection=operating?buildSecOperatingObservations(request):buildSecStatementObservations(request);
+      const admitted=operating?validateSecOperatingReceipt(request,projection):validateSecStatementReceipt(request,projection);
       if(admitted.status==='invalid'||!admitted.snapshot||admitted.snapshot.status==='invalid-payload')stop('STATEMENT_INPUTS_INVALID');
       for(const row of admitted.snapshot.observations){
         const f=row.filing,metadata=JSON.stringify([f.form,f.filedOn,f.filingFiscalYear,f.filingFiscalPeriod]);
@@ -135,6 +136,8 @@ export function reviewRetainedSecExports(args){
       snapshots.push(admitted.snapshot);
     }
     if(!snapshots.some(s=>s.observations.length))stop('NO_SUPPORTED_STATEMENTS');
-    return {...base,status:'conditional',code:'RETAINED_EXPORT_DECLARATIONS_BOUND',listing,companyfactsEntityName:facts.entityName,nameAgreement:listing.declaredName===facts.entityName?'exact-declarations':'different-declarations',snapshots};
+    return {...base,status:'conditional',code:operating?'RETAINED_OPERATING_DECLARATIONS_BOUND':'RETAINED_EXPORT_DECLARATIONS_BOUND',listing,companyfactsEntityName:facts.entityName,nameAgreement:listing.declaredName===facts.entityName?'exact-declarations':'different-declarations',snapshots};
   }catch(e){return {...base,code:e instanceof ExportError?e.message:'EXPORT_INPUT_INVALID'};}
 }
+export function reviewRetainedSecExports(args){return reviewExports(args);}
+export function reviewRetainedSecOperatingExports(args){return reviewExports(args,true);}

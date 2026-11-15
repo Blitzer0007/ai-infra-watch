@@ -16,6 +16,20 @@ export const SEC_STATEMENT_CONCEPTS=Object.freeze([
   {metric:'basic_eps',namespace:'us-gaap',tag:'EarningsPerShareBasic',unit:'USD/shares',kind:'annual-duration',label:'Basic earnings per share',basis:'duration-basic-eps'},
   {metric:'diluted_eps',namespace:'us-gaap',tag:'EarningsPerShareDiluted',unit:'USD/shares',kind:'annual-duration',label:'Diluted earnings per share',basis:'duration-diluted-eps'},
 ].map(Object.freeze));
+// Separate annual profile. Alternative revenue tags are independent declarations,
+// and context-unverified expense/adjustment tags never become EBITDA components.
+function operatingRegistry(){return Object.freeze([
+  {metric:'revenue_contract_excluding_tax',tag:'RevenueFromContractWithCustomerExcludingAssessedTax',label:'Contract revenue excluding assessed tax',basis:'declared-contract-revenue-excluding-assessed-tax',signed:true},
+  {metric:'revenues_declared',tag:'Revenues',label:'Revenues — separate declaration',basis:'declared-revenues-scope-unverified',signed:true},
+  {metric:'net_sales_declared',tag:'SalesRevenueNet',label:'Net sales — separate declaration',basis:'declared-net-sales-scope-unverified',signed:true},
+  {metric:'operating_income_loss',tag:'OperatingIncomeLoss',label:'Operating income (loss)',basis:'declared-operating-income-loss',signed:true},
+  {metric:'net_income_loss',tag:'NetIncomeLoss',label:'Net income (loss) — NetIncomeLoss declaration',basis:'declared-net-income-loss-scope-unverified',signed:true},
+  {metric:'operating_cash_flow',tag:'NetCashProvidedByUsedInOperatingActivities',label:'Net cash provided by (used in) operating activities',basis:'declared-operating-cash-flow',signed:true},
+  {metric:'ppe_payments',tag:'PaymentsToAcquirePropertyPlantAndEquipment',label:'Payments to acquire property, plant and equipment',basis:'declared-ppe-cash-payments',signed:false},
+  {metric:'depreciation_depletion_amortization',tag:'DepreciationDepletionAndAmortization',label:'Depreciation, depletion and amortization — context unverified',basis:'declared-dda-context-unverified',signed:true},
+  {metric:'share_based_compensation',tag:'ShareBasedCompensation',label:'Share-based compensation — context unverified',basis:'declared-share-based-compensation-context-unverified',signed:true},
+].map(c=>Object.freeze({...c,namespace:'us-gaap',unit:'USD',kind:'annual-duration'})));}
+export const SEC_OPERATING_CONCEPTS=/* @__PURE__ */operatingRegistry();
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const exact=(v,keys)=>object(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
 const cik=v=>typeof v==='string'&&/^\d{1,10}$/.test(v)&&Number(v)>0?v.padStart(10,'0'):Number.isSafeInteger(v)&&v>0&&v<=9999999999?String(v).padStart(10,'0'):null;
@@ -23,17 +37,18 @@ const ROW_KEYS=new Set(['start','end','val','accn','fy','fp','form','filed','fra
 const DAY=86400000;
 
 /** Period is explicit. FY/FP below are filing focus, not the fact's fiscal year. */
-export function buildSecStatementObservations(request){
+function project(request,registry,contractVersion,annualOnly=false){
   if(!exact(request,['symbol','expectedCik','assessedAt','retrievedAt','period','source'])||typeof request.symbol!=='string'||!/^[A-Z0-9.^=-]{1,20}$/.test(request.symbol)
     ||typeof request.expectedCik!=='string'||!/^\d{10}$/.test(request.expectedCik)||!cik(request.expectedCik)
     ||forecastInstantMicros(request.assessedAt)===null||(request.retrievedAt!==null&&forecastInstantMicros(request.retrievedAt)===null)
-    ||!exact(request.period,['start','end'])||!forecastDay(request.period.end)
+    ||!exact(request.period,['start','end'])||!forecastDay(request.period.end)||(annualOnly&&request.period.start===null)
     ||(request.period.start!==null&&(!forecastDay(request.period.start)||(Date.parse(request.period.end)-Date.parse(request.period.start))/DAY<300||(Date.parse(request.period.end)-Date.parse(request.period.start))/DAY>400)))throw Error('Invalid statement scope');
   const kind=request.period.start===null?'instant':'annual-duration';
-  const concepts=SEC_STATEMENT_CONCEPTS.filter(c=>c.kind===kind);
-  const result={contractVersion:'sec-statement-observations-v1',symbol:request.symbol,cik:request.expectedCik,assessedAt:request.assessedAt,retrievedAt:null,
+  const concepts=registry.filter(c=>c.kind===kind);
+  const result={contractVersion,symbol:request.symbol,cik:request.expectedCik,assessedAt:request.assessedAt,retrievedAt:null,
     requestedPeriod:{...request.period,kind},requestedMetrics:concepts.map(c=>c.metric),status:'invalid-payload',sourceStatus:'invalid-payload',observations:[],issues:[],missingMetrics:concepts.map(c=>c.metric),rowsInspected:0,
-    unsupportedDerivedMetrics:['total-interest-bearing-debt','enterprise-value','ebitda','price-earnings','enterprise-value-ebitda'],
+    unsupportedDerivedMetrics:[...(annualOnly?['revenue-growth','operating-margin','free-cash-flow']:[]),'total-interest-bearing-debt','enterprise-value','ebitda','price-earnings','enterprise-value-ebitda'],
+    ...(annualOnly?{aggregationEligibility:false}:{}),
     sourceCoverage:'unverified',sourceAuthenticityVerified:false,issuerMappingVerified:false,simulationStatus:'not-established',grantsDecisionEligibility:false,grantsValuationEligibility:false,
     usageScope:'projection-only',usage:{providerCalls:0,modelCalls:0,databaseCalls:0}};
   const issue=(metric,code)=>{if(result.issues.length<SEC_STATEMENT_LIMITS.issues&&!result.issues.some(i=>i.metric===metric&&i.code===code))result.issues.push({metric,code});};
@@ -52,7 +67,7 @@ export function buildSecStatementObservations(request){
   result.sourceStatus='loaded';result.status='unavailable';
   // Bound every recognized unit array, including unsupported units and periods.
   let total=0;
-  for(const c of SEC_STATEMENT_CONCEPTS){
+  for(const c of registry){
     const concept=facts.facts[c.namespace]?.[c.tag];if(concept===undefined)continue;
     if(!object(concept)||!object(concept.units))return stop('INVALID_UNIT_CONTAINER');
     if(Object.keys(concept.units).length>8)return stop('SOURCE_LIMIT');
@@ -95,9 +110,9 @@ export function buildSecStatementObservations(request){
       if(!annual&&!quarterly){issue(c.metric,'UNSUPPORTED_FILING');continue;}
       if(!Number.isInteger(row.fy)||row.fy<1000||row.fy>9999){issue(c.metric,'FILING_FISCAL_LABEL_MISSING');continue;}
       if(row.end>row.filed){issue(c.metric,'TIME_ORDER_INVALID');continue;}
-      if(typeof row.val!=='number'||!Number.isFinite(row.val)||(c.unit!=='USD/shares'&&row.val<0)){issue(c.metric,'INVALID_VALUE');continue;}
+      if(typeof row.val!=='number'||!Number.isFinite(row.val)||(c.unit!=='USD/shares'&&c.signed!==true&&row.val<0)){issue(c.metric,'INVALID_VALUE');continue;}
       if(Number.isInteger(row.val)&&!Number.isSafeInteger(row.val)){issue(c.metric,'NUMERIC_PRECISION_UNSUPPORTED');continue;}
-      if(row.frame!==undefined&&(typeof row.frame!=='string'||!/^CY\d{4}(?:Q[1-4])?I?$/.test(row.frame))){issue(c.metric,'UNSUPPORTED_FRAME');continue;}
+      if(row.frame!==undefined&&(typeof row.frame!=='string'||!/^CY\d{4}(?:Q[1-4])?I?$/.test(row.frame)||(annualOnly&&!/^CY\d{4}$/.test(row.frame)))){issue(c.metric,'UNSUPPORTED_FRAME');continue;}
       accepted.push(item);
     }
     // A malformed newest duplicate/vintage invalidates the metric, never falls back.
@@ -127,3 +142,5 @@ export function buildSecStatementObservations(request){
   else issue(null,'NO_SUPPORTED_OBSERVATIONS');
   return result;
 }
+export function buildSecStatementObservations(request){return project(request,SEC_STATEMENT_CONCEPTS,'sec-statement-observations-v1');}
+export function buildSecOperatingObservations(request){return project(request,SEC_OPERATING_CONCEPTS,'sec-operating-observations-v1',true);}
