@@ -29,7 +29,7 @@ def test_glossary_keyboard_escape_and_mobile_layout(page):
     page.get_by_test_id('nav-guide').click()
     glossary = page.get_by_role('region', name='Financial glossary')
     glossary.get_by_role('button', name='Explain P/E ratio', exact=True).wait_for()
-    assert glossary.get_by_role('button').count() == 20
+    assert glossary.get_by_role('button').count() == 22
     button = glossary.get_by_role('button', name='Explain P/E ratio', exact=True)
     button.focus()
     page.keyboard.press('Enter')
@@ -120,6 +120,19 @@ def test_glossary_search_related_terms_and_focus_containment(page):
     expect(original).to_be_focused()
     original.click()
     dialog.get_by_role('heading', name='P/E ratio', exact=True).wait_for()
+
+
+def test_glossary_eps_growth_and_ev_ebitda_are_searchable_and_linked(page):
+    mock_local_apis(page);goto_app(page);page.get_by_test_id('nav-guide').click()
+    glossary=page.get_by_role('region',name='Financial glossary');search=glossary.get_by_role('searchbox',name='Find a financial term')
+    search.fill('eps growth');button=glossary.get_by_role('button',name='Explain EPS growth',exact=True);button.click()
+    dialog=page.get_by_role('dialog');dialog.get_by_role('heading',name='EPS growth',exact=True).wait_for()
+    dialog.get_by_role('button',name='EPS',exact=True).click();expect(dialog.get_by_role('heading',name='EPS',exact=True)).to_be_visible()
+    page.keyboard.press('Escape');expect(button).to_be_focused()
+    search.fill('EV/EBITDA');button=glossary.get_by_role('button',name='Explain EV/EBITDA',exact=True);button.click()
+    expect(dialog).to_contain_text('11 times');dialog.get_by_text('Advanced explanation',exact=True).click()
+    expect(dialog).to_contain_text('preferred equity or noncontrolling interests')
+    page.keyboard.press('Escape');expect(button).to_be_focused()
 
 
 def test_command_center_empty_and_error_states_are_distinct(page):

@@ -51,6 +51,8 @@ The [initial company financial-observation contract](release2-company-financial-
 
 The [initial raw SEC statement adapter](release2-sec-statement-adapters.md) adds cash, three distinct debt components, point/cover-page shares, basic/diluted weighted shares and EPS with original filing-focus metadata, exact requested periods/units and conservative vintage selection. The [independent statement admission and dossier v2](release2-statement-admission-dossier.md) now rechecks normalized receipts against supplied original rows and supports an explicit, atomic, fictional-only UI inspection. Both make no provider/model calls and grant no source/valuation/aggregation authority. Authentic original acquisition/issuer/context evidence, broader taxonomy/debt/EBITDA scope, compatible valuation inputs and actual holding integration remain pending.
 
+The [valuation input review](release2-valuation-input-review.md) now makes missing, declaration-only, nonpositive, ambiguous and unverified P/E/EV/EBITDA inputs explicit in compact dossier checklists, with contextual glossary help. It keeps multiple values null and source/valuation authority false; authentic compatibility evidence and actual valuation calculations remain pending.
+
 - Extend the implemented receipt/raw-statement adapters with remaining financial/taxonomy/context coverage and supported valuation inputs, reusing existing SEC/fundamental/peer paths. The initial raw cash/debt-component/share/EPS scope is implemented, not complete statement coverage or a total-debt/valuation calculation.
 - Preserve fiscal periods, publication/availability, reported-versus-estimated definitions, units/currency, adjustment basis and revisions/restatements. Withhold incompatible or negative/unknown valuation denominators.
 - Extend the implemented sectioned dossier with evidence-backed business/catalyst/risk content, actual holding financial inputs and appropriate Opportunities navigation. The initial UI/holding entry and explicit gaps are implemented; real content and broader integration are not.
@@ -64,7 +66,7 @@ Done when dossier and research outputs trace each used fact to compatible eviden
 - Complete remaining rule/configuration-validation and client/server parity cases without changing business thresholds.
 - Add consolidated auditable risk evaluations and any explicitly local, unsaved what-if controls over that shared kernel, preserving decision/evidence/accounting gates.
 - Complete reconciliation/coverage explanations and sign off or explicitly defer remaining Release 1 acceptance items.
-- Add the outstanding EV/EBITDA and standalone EPS-growth glossary definitions/appropriate links; the existing EPS definition already mentions growth caveats.
+- EV/EBITDA and standalone EPS-growth glossary definitions and contextual dossier links are implemented in the [valuation input review](release2-valuation-input-review.md); retain their denominator, period/share-basis and capital-scope caveats as remaining financial integrations are reviewed.
 
 Done when risk explanations use one reviewed kernel and the Release 1 completion/acceptance contract is resolved. This is not a second competing scoring system.
 

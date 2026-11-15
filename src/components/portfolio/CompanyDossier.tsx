@@ -1,8 +1,11 @@
 import {useId,useState} from 'react';
 import type {CompanyFinancialObservation,FinancialObservationRequest} from '../../utils/companyFinancialObservations';
 import {DOSSIER_SECTIONS,dossierFinancials,dossierObservations,dossierStatusLabels,dossierIssueLabels,formatDossierValue,type DossierSection} from '../../utils/companyDossier';
-import {admitDossierStatements,statementRows} from '../../utils/dossierStatements';
+import {statementRows} from '../../utils/dossierStatements';
+import {reviewDossierValuation} from '../../utils/dossierValuation';
 import {DossierStatementCards,DossierStatementSources} from './DossierStatementInputs';
+import DossierValuationReview from './DossierValuationReview';
+import FinancialTerm from '../education/FinancialTerm';
 
 const control='min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold';
 type Props={symbol:string;configuredName?:string;request:FinancialObservationRequest|null;statements?:unknown;fictional?:boolean;key?:string};
@@ -12,7 +15,8 @@ export default function CompanyDossier({symbol,configuredName,request,statements
   const id=useId(),panel=id+'-panel',heading=id+'-heading';
   const {snapshot,status}=dossierFinancials(symbol,request);
   const rows=dossierObservations(snapshot,section);
-  const statementAdmission=admitDossierStatements(symbol,request,statements);
+  const valuationReview=reviewDossierValuation(symbol,request,statements);
+  const {statementAdmission}=valuationReview;
   const balanceInputs=statementRows(statementAdmission,'Financial health'),valuationInputs=statementRows(statementAdmission,'Valuation');
   const references=[...new Map((snapshot?.observations??[]).flatMap(o=>o.references.map(ref=>[ref.accession,ref] as const))).values()];
   return <section aria-label={symbol+' company dossier'} data-testid="company-dossier" className="min-w-0 space-y-4 rounded-xl border border-cyan-200/25 p-4 text-sm text-white/80">
@@ -37,14 +41,15 @@ export default function CompanyDossier({symbol,configuredName,request,statements
       </>}
       {(section==='Growth'||section==='Financial health')&&<>
         <p>{section==='Growth'?'Annual-duration declarations and their supported comparisons; no growth forecast is supplied.':'Declared cash flows and point-in-time balances; no overall financial-health rating is inferred.'}</p>
+        {section==='Growth'&&<p className="[&_button]:min-h-11"><FinancialTerm termId="eps-growth"/> needs compatible earnings periods and share bases. No EPS-growth calculation is connected here.</p>}
         {!rows.length&&<p>No supported observations loaded for this section. This does not mean zero revenue, zero cash flow or a healthy balance sheet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><Observation key={row.id} row={row} fictional={fictional}/>)}</div>
         {section==='Financial health'&&<><DossierStatementCards rows={balanceInputs} fictional={fictional}/><p>{balanceInputs.length?'Cash and individual borrowing declarations are shown where supported. Total interest-bearing debt, lease scope and component overlap remain unverified; components are not summed.':'Cash and interest-bearing debt are unavailable.'} Total liabilities / equity is a different measure from debt / equity.</p></>}
       </>}
       {section==='Valuation'&&<>
         <p>Valuation multiples unavailable. {statementAdmission.status==='conditional'?(valuationInputs.length?'Some share/EPS declarations are loaded below; compatible price, adjustment evidence, complete debt scope and EBITDA remain unavailable.':'Some statement declarations are loaded; supported share/EPS coverage, compatible price, adjustment evidence, complete debt scope and EBITDA remain incomplete.'):'No compatible price, shares, earnings or EBITDA contract is connected here.'}</p>
-        <ul className="list-disc space-y-2 pl-5"><li>P/E needs supported earnings per share and a compatible price basis.</li><li>EV/EBITDA needs compatible cash, interest-bearing debt, shares, price and EBITDA inputs.</li><li>Missing or nonpositive denominators cannot establish that a company is cheap.</li></ul>
-        <p>{statementAdmission.status==='conditional'?'Valuation remains withheld until the missing compatibility and coverage evidence is supplied.':'Unsupported inputs: cash, interest-bearing debt, shares, EPS and EBITDA. No zero values or multiples are inferred.'}</p>
+        <DossierValuationReview review={valuationReview}/>
+        <p>Valuation remains withheld until the missing compatibility and coverage evidence is supplied. No zero values or multiples are inferred.</p>
         <DossierStatementCards rows={valuationInputs} fictional={fictional}/>
       </>}
       {section==='Catalysts'&&<><p>No company event feed is connected to this dossier. Upcoming-event coverage is unknown; this is not a claim that no events exist.</p><p>Confirmed, estimated, cancelled and date-only events require their own source evidence before they can appear here.</p></>}

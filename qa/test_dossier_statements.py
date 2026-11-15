@@ -27,9 +27,14 @@ if(mode==='wrong-assessment')p.assessedAt='2026-11-14T12:00:01Z';
 if(mode==='duplicate-period')p.entries[1]=p.entries[0];
 if(['zero-eps','negative-eps','tiny-eps'].includes(mode))p.source.facts.facts['us-gaap'].EarningsPerShareBasic.units['USD/shares'][0].val=mode==='zero-eps'?0:mode==='negative-eps'?-.5:1e-10;
 if(mode==='cash-only')p.source.facts.facts={'us-gaap':{CashAndCashEquivalentsAtCarryingValue:p.source.facts.facts['us-gaap'].CashAndCashEquivalentsAtCarryingValue}};
+if(mode==='diluted-zero'||mode==='diluted-loss')p.source.facts.facts['us-gaap'].EarningsPerShareDiluted.units['USD/shares'][0].val=mode==='diluted-zero'?0:-.5;
+if(mode==='basic-only')delete p.source.facts.facts['us-gaap'].EarningsPerShareDiluted;
+if(mode==='cover-only')delete p.source.facts.facts['us-gaap'].CommonStockSharesOutstanding;
+if(mode==='cash-zero')p.source.facts.facts['us-gaap'].CashAndCashEquivalentsAtCarryingValue.units.USD[0].val=0;
+if(mode==='multiple-annual'){const rows=p.source.facts.facts['us-gaap'].EarningsPerShareDiluted.units['USD/shares'];rows.push({...rows[0],start:'2024-01-01',end:'2024-12-31',val:1});p.entries=[p.entries[1],{...p.entries[1],period:{start:'2024-01-01',end:'2024-12-31'}}];}
 if(mode==='source-timeout'){p.source={status:'timeout'};p.retrievedAt=null;}
-if(['zero-eps','negative-eps','tiny-eps','source-timeout','cash-only'].includes(mode))p.entries=p.entries.map(e=>({...e,receipt:buildSecStatementObservations({symbol:p.symbol,expectedCik:p.expectedCik,assessedAt:p.assessedAt,retrievedAt:p.retrievedAt,period:e.period,source:p.source})}));
-return <><label>Statement case<select aria-label='Statement case' value={mode} onChange={e=>setMode(e.target.value)}>{['valid','forged-value','changed-original','forged-authority','private-field','wrong-symbol','wrong-assessment','duplicate-period','zero-eps','negative-eps','tiny-eps','source-timeout','cash-only'].map(s=><option key={s}>{s}</option>)}</select></label><CompanyDossier key={mode} symbol={symbol} request={fictionalDossierRequest} statements={p} fictional/></>}
+if(['zero-eps','negative-eps','tiny-eps','source-timeout','cash-only','diluted-zero','diluted-loss','basic-only','cover-only','cash-zero','multiple-annual'].includes(mode))p.entries=p.entries.map(e=>({...e,receipt:buildSecStatementObservations({symbol:p.symbol,expectedCik:p.expectedCik,assessedAt:p.assessedAt,retrievedAt:p.retrievedAt,period:e.period,source:p.source})}));
+return <><label>Statement case<select aria-label='Statement case' value={mode} onChange={e=>setMode(e.target.value)}>{['valid','forged-value','changed-original','forged-authority','private-field','wrong-symbol','wrong-assessment','duplicate-period','zero-eps','negative-eps','tiny-eps','source-timeout','cash-only','diluted-zero','diluted-loss','basic-only','cover-only','cash-zero','multiple-annual'].map(s=><option key={s}>{s}</option>)}</select></label><CompanyDossier key={mode} symbol={symbol} request={fictionalDossierRequest} statements={p} fictional/></>}
 createRoot(document.getElementById('root')).render(<Harness/>);`;
 process.stdout.write(buildSync({stdin:{contents,resolveDir:process.cwd(),loader:'tsx'},bundle:true,jsx:'automatic',platform:'browser',format:'iife',define:{'process.env.NODE_ENV':'"production"'},write:false}).outputFiles[0].text);
 """
@@ -118,6 +123,50 @@ def test_cash_only_coverage_neither_invents_eps_nor_calls_loaded_cash_missing(st
     assert 'Unsupported inputs: cash' not in values.inner_text()
 
 
+def checklist(page,multiple):
+    return page.locator(f'[data-testid="dossier-valuation-checklist"][data-multiple="{multiple}"]')
+
+
+def test_valuation_checklists_are_compact_and_explain_declared_versus_compatible_inputs(statements):
+    page=statements;section(page,'Valuation');pe=checklist(page,'annual-pe');ev=checklist(page,'ev-ebitda')
+    assert not pe.locator('details').evaluate('(node)=>node.open')
+    expect(pe.get_by_test_id('valuation-withholding')).to_contain_text('Withheld')
+    pe.locator('summary').focus();pe.locator('summary').press('Enter')
+    expect(pe.locator('[data-input="eps"]')).to_contain_text('1.78 USD per share')
+    expect(pe.locator('[data-input="eps"]')).to_contain_text('Declaration only')
+    expect(pe.locator('[data-input="basis"]')).to_contain_text('not automatically trailing twelve months')
+    expect(pe.locator('[data-input="price"]')).to_contain_text('No price is connected')
+    ev.locator('summary').click();expect(ev.locator('[data-input="debt"]')).to_contain_text('Components are not summed')
+    expect(ev.locator('[data-input="shares"]')).to_contain_text('2025-12-31')
+    expect(ev.locator('[data-input="claims"]')).to_contain_text('Preferred equity, noncontrolling interests')
+    expect(ev.locator('[data-input="ebitda"]')).to_contain_text('not substitutes')
+
+
+@pytest.mark.parametrize('mode,multiple,input_id,message',[
+    ('diluted-zero','annual-pe','eps','0 USD per share'),('diluted-loss','annual-pe','eps','-0.5 USD per share'),
+    ('basic-only','annual-pe','eps','Basic EPS is not substituted'),('cover-only','ev-ebitda','shares','Cover-page and weighted-average shares are not substituted'),
+    ('cash-zero','ev-ebitda','cash','0 USD'),('multiple-annual','annual-pe','eps','Several annual diluted EPS periods'),
+    ('forged-value','annual-pe','eps','No supported annual diluted EPS'),('source-timeout','ev-ebitda','cash','Missing cash is not zero'),
+])
+def test_valuation_gaps_keep_zero_loss_ambiguity_and_failed_sources_distinct(statements,mode,multiple,input_id,message):
+    page=statements;page.get_by_label('Statement case',exact=True).select_option(mode);section(page,'Valuation');card=checklist(page,multiple);card.locator('summary').click()
+    expect(card.locator(f'[data-input="{input_id}"]')).to_contain_text(message)
+    expect(card.get_by_test_id('valuation-withholding')).to_contain_text('Not meaningful' if mode in ['diluted-zero','diluted-loss'] else 'Withheld')
+    expect(page.get_by_test_id('dossier-section')).to_contain_text('Valuation multiples unavailable')
+
+
+def test_contextual_valuation_and_eps_growth_glossary_dialogs_restore_focus_without_io(statements):
+    page=statements;section(page,'Valuation');button=checklist(page,'ev-ebitda').get_by_role('button',name='Explain EV/EBITDA',exact=True);button.focus();button.press('Enter')
+    dialog=page.get_by_role('dialog');expect(dialog.get_by_role('heading',name='EV/EBITDA',exact=True)).to_be_visible()
+    dialog.get_by_text('Advanced explanation',exact=True).click();expect(dialog).to_contain_text('Zero or negative EBITDA')
+    for _ in range(7):
+        page.keyboard.press('Tab');assert dialog.evaluate('(node)=>node.contains(document.activeElement)')
+    page.keyboard.press('Escape');expect(button).to_be_focused()
+    section(page,'Growth');eps=page.get_by_role('button',name='Explain EPS growth',exact=True);eps.click();expect(dialog.get_by_role('heading',name='EPS growth',exact=True)).to_be_visible()
+    dialog.get_by_text('Advanced explanation',exact=True).click();expect(dialog).to_contain_text('zero baseline makes the percentage undefined')
+    page.keyboard.press('Escape');expect(eps).to_be_focused()
+
+
 @pytest.mark.parametrize('width',[360,768,1440])
 def test_explicit_manual_statement_loading_keyboard_layout_and_no_requests(page,width):
     mock_local_apis(page);page.set_viewport_size({'width':width,'height':1000});page.goto('/portfolio?portfolio_tab=research')
@@ -128,6 +177,10 @@ def test_explicit_manual_statement_loading_keyboard_layout_and_no_requests(page,
     expect(preview.get_by_test_id('dossier-statement-status')).to_contain_text('partial, bound declarations')
     for name in ['Financial health','Valuation','Sources']:
         nav=preview.get_by_role('button',name=name,exact=True);nav.focus();nav.press('Enter')
+        if name=='Valuation':
+            assert preview.get_by_role('button',name='Explain EV/EBITDA',exact=True).bounding_box()['height']>=44
+            for summary in preview.get_by_test_id('dossier-valuation-checklist').locator('summary').all():
+                summary.focus();summary.press('Enter')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     preview.get_by_role('button',name='Valuation',exact=True).click()
     root=Path(os.getenv('QA_ARTIFACT_DIR','/tmp/aiw-statement-admission'));root.mkdir(parents=True,exist_ok=True)

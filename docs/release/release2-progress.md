@@ -23,6 +23,7 @@ Assessment: 14 November 2026, Asia/Kolkata. Scope: engineering implementation ag
 
 ## Completed increments
 
+- [Valuation input explanations and glossary completion](release2-valuation-input-review.md): compact, read-only P/E/EV/EBITDA input checklists with explicit nonpositive/missing/ambiguous/unsupported distinctions; standalone EPS-growth and EV/EBITDA help. Actual multiples, compatible financial/source evidence and real holding integration remain pending; no eligibility is granted.
 - [Independent statement admission and dossier v2](release2-statement-admission-dossier.md): a separate original-row checker, atomic period/issuer-bound consumer and manual fictional cash/debt/share/EPS inspection with explicit bases and no valuation authority. Actual acquisition/issuer evidence, broader statement/valuation scope and real holding data remain pending; the rounded core estimate is unchanged.
 - [Retained SEC native-export review](release2-sec-retained-exports.md): bounded original-byte/listing/companyfacts parsing, separate integrity pins, exact ticker/exchange/CIK consistency and a fixed fictional demo through the independent statement validator. Publisher/transport truth, historical mappings, actual acquisition and live holding integration remain pending; no authority or runtime connection is added.
 
