@@ -1,5 +1,6 @@
 import { history as routedHistory } from './_market-data.js';
 import { requireAccess } from './_access-auth.js';
+import { storedLedgerInputs, storedHoldingInputs, storedHoldingValuationInputs, storedCashFlowInputs, transactionQuality } from '../server/services/ledgerInputs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -123,35 +124,12 @@ function normalizeLot(row) {
   };
 }
 
-function transactionQuality(row) {
-  const warnings = [];
-  if (!row.trade_date || Number.isNaN(Date.parse(String(row.trade_date)))) warnings.push('invalid trade date');
-  const quantity = Number(row.quantity);
-  const amount = Number(row.amount);
-  const price = row.price == null ? null : Number(row.price);
-  if (!(quantity > 0)) warnings.push('non-positive quantity');
-  if (!(amount > 0)) warnings.push('non-positive amount');
-  if (price != null && Number.isFinite(price) && price > 0 && quantity > 0 && amount > 0) {
-    const implied = quantity * price;
-    const tolerance = Math.max(0.05, Math.abs(amount) * 0.01);
-    if (Math.abs(implied - amount) > tolerance) warnings.push('price × quantity differs from amount');
-  }
-  if (row.quantity_derived) warnings.push('quantity derived');
-  if (row.price_derived) warnings.push('price derived');
-  const currency = String(row.currency || 'USD').toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) warnings.push('invalid currency');
-  return {
-    status: warnings.length ? 'review' : 'ok',
-    warnings,
-    currency,
-  };
-}
-
-function normalizeTransaction(row) {
+export function normalizeTransaction(row) {
   const quality = transactionQuality(row);
   return {
     id: row.id,
     symbol: String(row.symbol).toUpperCase(),
+    accountingInputs: storedLedgerInputs(row),
     transactionType: row.transaction_type === 'SELL' ? 'SELL' : 'BUY',
     orderType: row.order_type || null,
     tradeDate: row.trade_date,
@@ -173,17 +151,19 @@ function normalizeTransaction(row) {
   };
 }
 
-function normalizeCashFlow(row) {
-  return { id: row.id, eventDate: row.event_date, flowType: row.flow_type, amount: Number(row.amount),
+export function normalizeCashFlow(row) {
+  return { accountingInputs:storedCashFlowInputs(row), id: row.id, eventDate: row.event_date, flowType: row.flow_type, amount: Number(row.amount),
     currency: String(row.currency || 'USD').toUpperCase(), fxToUsd: Number(row.fx_to_usd), notes: row.notes || '', createdAt: row.created_at };
 }
 
-function normalize(row) {
+export function normalize(row) {
   return {
     id: row.id,
     symbol: String(row.symbol).toUpperCase(),
     quantity: Number(row.quantity),
     averageCost: Number(row.average_cost),
+    accountingInputs: storedHoldingInputs(row),
+    valuationInputs: storedHoldingValuationInputs(row),
     purchaseDate: row.purchase_date || null,
     notes: row.notes || '',
     createdAt: row.created_at,

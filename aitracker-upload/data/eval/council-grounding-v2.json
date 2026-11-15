@@ -1,0 +1,2001 @@
+{
+  "version": "council-grounding-cases-v2",
+  "label_origin": "developer-authored-fictional-not-human-independent",
+  "base_fixture_sha256": "1857d10a4862768e319e9382d57bdab5b407828b1429314aed33f01f6b924b89",
+  "cases": [
+    {
+      "id": "mixed-evidence-zero-preserved",
+      "category": "reviewable",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": false,
+        "expected_status": "complete",
+        "expected_disposition": "balanced",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Fictional revenue growth is positive, cash flow is negative and daily move is exactly zero. All declared families are conditionally covered; balanced or insufficient is an acceptable research policy, not an outcome label.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "conditional-bull-is-not-a-forecast",
+      "category": "reviewable",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "bull",
+            "summary": "Reported growth supports a conditional upside argument.",
+            "winning_claim_ids": [
+              "bull:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "f590d1a8f759151a7b47cfadaa7fe4e8e0f0ca251056356076217360be02387a",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": false,
+        "expected_status": "complete",
+        "expected_disposition": "provisional-bull",
+        "acceptable_judge_preferences": [
+          "bull",
+          "bear",
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "A cited conditional preference may use the growth fact when all declared input families pass. Any preference or abstention can be provisional; no future winner or decision is labelled.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a provisional bull preference. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "stale-market",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "packet",
+            "evidence",
+            0,
+            "observed_at"
+          ],
+          "value": "2026-11-09T11:00:00Z"
+        },
+        {
+          "path": [
+            "packet",
+            "evidence",
+            1,
+            "observed_at"
+          ],
+          "value": "2026-11-09T11:00:00Z"
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "market"
+        ],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Both market observations have inadmissible stale-market metadata. Other families do not replace missing usable market coverage; effective abstention is mandatory even if Judge proposes balance.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "75c73299abd2c4a947316290399931a5ee47b0f7e2e4f08729a171cdc91e47c2",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "simulated-market",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "packet",
+            "evidence",
+            0,
+            "simulated"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "packet",
+            "evidence",
+            1,
+            "simulated"
+          ],
+          "value": true
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "market"
+        ],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Both market observations have inadmissible simulated-market metadata. Other families do not replace missing usable market coverage; effective abstention is mandatory even if Judge proposes balance.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "1b215b4bd65da65f30950f8f5d0d04c2a7bca78343e5b88f459ec62a6051cebd",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "unknown-market-source",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "packet",
+            "evidence",
+            0,
+            "source_id"
+          ],
+          "value": "unknown"
+        },
+        {
+          "path": [
+            "packet",
+            "evidence",
+            1,
+            "source_id"
+          ],
+          "value": "unknown"
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "market"
+        ],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Both market observations have inadmissible unknown-market-source metadata. Other families do not replace missing usable market coverage; effective abstention is mandatory even if Judge proposes balance.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "9b7c1218b06cfd6f053e6241843870c769b736f648aa3f8ce188ac7f27fbc5b9",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "conflicting-daily-move",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "packet",
+            "evidence"
+          ],
+          "value": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "MSFT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "MSFT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "MSFT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "MSFT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:conflicting-move",
+              "symbol": "MSFT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 1,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "loaded:price",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [
+          "loaded:daily_change_pct",
+          "loaded:conflicting-move"
+        ],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Two daily-move rows share metric and time but disagree between zero and one. Both must be excluded; price still covers market, yet any unresolved conflict requires abstention.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "d11799dee760815392566d0776a8c2571943a824c00703ef5c263666d73e3be6",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "estimated-catalyst",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "sources",
+            "catalyst",
+            "confirmation"
+          ],
+          "value": "estimated"
+        },
+        {
+          "path": [
+            "sources",
+            "catalyst",
+            "confirmation_basis"
+          ],
+          "value": null
+        },
+        {
+          "path": [
+            "packet",
+            "evidence",
+            6,
+            "basis"
+          ],
+          "value": "estimate"
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity"
+        ],
+        "missing_families": [
+          "catalyst"
+        ],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "The event is estimated rather than issuer-confirmed. Its countdown may not fill confirmed catalyst coverage; a recent retrieval cannot upgrade confirmation.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "249de11d271e724f31cbe8afb5b256f251af9451ce7e949b1ea8f72346d5ee33",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "missing-risk-family",
+      "category": "input-abstention",
+      "edits": [
+        {
+          "path": [
+            "packet",
+            "evidence"
+          ],
+          "value": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "MSFT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "MSFT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "MSFT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        {
+          "path": [
+            "sources",
+            "sec",
+            "observations"
+          ],
+          "value": [
+            {
+              "method": "revenue-growth-yoy",
+              "inputs": [
+                {
+                  "tag": "Revenues",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 120,
+                  "unit": "USD"
+                },
+                {
+                  "tag": "Revenues",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2024-01-01",
+                  "period_end": "2024-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 100,
+                  "unit": "USD"
+                }
+              ],
+              "evidence": {
+                "evidence_id": "sec:revenue_growth_pct",
+                "symbol": "MSFT",
+                "family": "financial",
+                "metric": "revenue_growth_pct",
+                "value": 20,
+                "unit": "percent",
+                "source_id": "sec-edgar-companyfacts",
+                "observed_at": null,
+                "published_at": null,
+                "retrieved_at": "2026-11-09T12:00:00.000Z",
+                "basis": "unknown",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "simulated": false
+              }
+            },
+            {
+              "method": "operating-margin",
+              "inputs": [
+                {
+                  "tag": "OperatingIncomeLoss",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 24,
+                  "unit": "USD"
+                },
+                {
+                  "tag": "Revenues",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 120,
+                  "unit": "USD"
+                }
+              ],
+              "evidence": {
+                "evidence_id": "sec:operating_margin_pct",
+                "symbol": "MSFT",
+                "family": "financial",
+                "metric": "operating_margin_pct",
+                "value": 20,
+                "unit": "percent",
+                "source_id": "sec-edgar-companyfacts",
+                "observed_at": null,
+                "published_at": null,
+                "retrieved_at": "2026-11-09T12:00:00.000Z",
+                "basis": "unknown",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "simulated": false
+              }
+            },
+            {
+              "method": "operating-cash-flow-less-capex",
+              "inputs": [
+                {
+                  "tag": "NetCashProvidedByUsedInOperatingActivities",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 10,
+                  "unit": "USD"
+                },
+                {
+                  "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                  "accession": "0000000001-26-000001",
+                  "form": "10-K",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "filed_on": "2026-02-20",
+                  "value": 15,
+                  "unit": "USD"
+                }
+              ],
+              "evidence": {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "symbol": "MSFT",
+                "family": "financial",
+                "metric": "free_cash_flow_usd",
+                "value": -5,
+                "unit": "USD",
+                "source_id": "sec-edgar-companyfacts",
+                "observed_at": null,
+                "published_at": null,
+                "retrieved_at": "2026-11-09T12:00:00.000Z",
+                "basis": "unknown",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "simulated": false
+              }
+            }
+          ]
+        }
+      ],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "056f3a2cfd6c1786538562bd1fbac93f8f050b9e3333ed21a430df7245c5f8f9",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "risk"
+        ],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "complete",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Risk evidence and its bound source observation are absent. Financial cash flow is not a substitute for the separate risk family.",
+        "input_must_abstain": true,
+        "input_edits_sha256": "fb3dd18ca7e9cd18330e3ba8e89e053866bc36396b92c7c96bfa34fbbffe843c",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "unknown-citation",
+      "category": "contract-rejection",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "outside",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "47936fdc9f6f4766d1c6089f433c8291b6c2e629e1c7b11dde637355eeb3fb6e",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "failed",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "The proposed claim names an evidence ID absent from the packet and from inspection. It must fail before acceptance; later scripted Judge text is never executed.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "judge-without-direct-inspection",
+      "category": "contract-rejection",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "loaded:price"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "075ebc38c6bddd52dee173d7e99205e85f65243dba446481484a0a6d51317af5",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "failed",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "Judge cites both side claims after inspecting price only. Reading the arguments is not direct inspection of either underlying growth or cash-flow fact.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "unsupported-word-number",
+      "category": "semantic-counterexample",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue grew ninety percent.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "bb7da29801a88edecd5e80fae52ee6d97e4408a18abf3709504ef7b7b80bdc32",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": false,
+        "expected_status": "complete",
+        "expected_disposition": "balanced",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": false,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "The supplied revenue growth is twenty percent. The frozen proposal says ninety percent using words, which avoids the numeric-character filter but contradicts that fact. The current runtime accepts this unsupported sentence.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "inverted-cash-flow-sign",
+      "category": "semantic-counterexample",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is positive.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "466a1dd5ebb7d624f07d39217dcea1c0639712ccf1d3d8071c1f3bf396b0c758",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": false,
+        "expected_status": "complete",
+        "expected_disposition": "balanced",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": false,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "The supplied free cash flow is negative five. The frozen Bull summary says cash flow is positive despite a valid inspected citation. Citation validity does not make this sentence true; current runtime accepts it.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "unsupported-numeral-blocked",
+      "category": "contract-rejection",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue grew 90 percent.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "balanced",
+            "summary": "Revenue increased while cash flow is negative.",
+            "winning_claim_ids": [
+              "bull:0",
+              "bear:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "bb413b80432d01fc733292cddbefd43f11723c8e31877201f91d098c72d52e89",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": true,
+        "expected_status": "failed",
+        "expected_disposition": "insufficient-evidence",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": false,
+          "bear": true,
+          "judge": true
+        },
+        "rationale": "The same unsupported ninety-percent assertion uses digits. The output contract rejects numeric characters. Contrast with the word-number counterexample; rejection does not establish general semantic grounding.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a balanced comparison. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    },
+    {
+      "id": "unsupported-future-certainty",
+      "category": "semantic-counterexample",
+      "edits": [],
+      "responses": {
+        "bull": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Revenue increased under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "stance": "support",
+                "implication": "growth"
+              }
+            ],
+            "limitations": [
+              "Original source authenticity remains unverified."
+            ]
+          }
+        ],
+        "bear": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "conclude",
+            "summary": "Cash flow is negative under the supplied assumptions.",
+            "claims": [
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "stance": "support",
+                "implication": "cash-flow"
+              }
+            ],
+            "limitations": [
+              "Future outcomes remain unknown."
+            ]
+          }
+        ],
+        "judge": [
+          {
+            "action": "inspect",
+            "evidence_ids": [
+              "sec:revenue_growth_pct",
+              "sec:free_cash_flow_usd"
+            ]
+          },
+          {
+            "action": "judge",
+            "preference": "bull",
+            "summary": "The bull case will certainly win.",
+            "winning_claim_ids": [
+              "bull:0"
+            ]
+          }
+        ]
+      },
+      "labels": {
+        "proposal_sha256": "fb1bd492008d4c302bafea4d6a89567addadf28a91c5aaa759ba606cb752227d",
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "conflicting_ids": [],
+        "must_abstain": false,
+        "expected_status": "complete",
+        "expected_disposition": "provisional-bull",
+        "acceptable_judge_preferences": [
+          "balanced",
+          "insufficient"
+        ],
+        "narrative_supported": {
+          "bull": true,
+          "bear": true,
+          "judge": false
+        },
+        "rationale": "No matured future outcome appears in the packet. The frozen Judge certainty claim is unsupported regardless of positive current revenue growth. A provisional disposition does not ground certainty prose.",
+        "input_must_abstain": false,
+        "input_edits_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "presentation_version": "council-evidence-summary-v1",
+        "accepted_summaries": {
+          "bull": "The bull case cites inspected observations for conditional research.",
+          "bear": "The bear case cites inspected observations for conditional research.",
+          "judge": "The judge recorded a provisional bull preference. Future outcomes remain unknown."
+        },
+        "accepted_limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      }
+    }
+  ]
+}

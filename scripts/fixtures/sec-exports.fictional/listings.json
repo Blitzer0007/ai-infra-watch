@@ -1,0 +1,22 @@
+{
+  "fields": [
+    "cik",
+    "name",
+    "ticker",
+    "exchange"
+  ],
+  "data": [
+    [
+      1,
+      "Fictional Components Ltd",
+      "FICT",
+      "Nasdaq"
+    ],
+    [
+      2,
+      "Other Invented Issuer",
+      "FAKE",
+      "NYSE"
+    ]
+  ]
+}

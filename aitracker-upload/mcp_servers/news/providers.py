@@ -10,6 +10,7 @@ from typing import Protocol
 import httpx
 
 from .schemas import NewsArticle
+from mcp_servers.provider_budget import budgeted_json
 
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "news.json"
 
@@ -99,32 +100,9 @@ class FinnhubNewsProvider:
     def _get(self, path: str, params: dict) -> list | dict:
         if not self.api_key:
             raise NewsError("NO_KEY", "FINNHUB_API_KEY is not set")
-        params = dict(params)
-        params["token"] = self.api_key
-        url = f"{self.BASE}/{path.lstrip('/')}"
-        last_exc: Exception | None = None
-        for attempt in range(self.max_retries + 1):
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.get(url, params=params)
-                if resp.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise NewsError("RATE_LIMIT", "Finnhub rate limit")
-                if resp.status_code >= 400:
-                    if resp.status_code in (408, 409) or resp.status_code >= 500:
-                        if attempt < self.max_retries:
-                            time.sleep(self.base_delay * (2 ** attempt))
-                            continue
-                    raise NewsError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
-                return resp.json()
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        raise NewsError("HTTP_ERROR", f"Finnhub request failed: {last_exc}")
+        return budgeted_json("finnhub", f"{self.BASE}/{path.lstrip('/')}", error_type=NewsError,
+            params={**params, "token": self.api_key}, timeout=self.timeout,
+            max_retries=self.max_retries, base_delay=self.base_delay)
 
     def company(self, symbol: str, days: int = 7) -> list[NewsArticle]:
         end = date.today()

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -23,6 +24,10 @@ from urllib.parse import urlencode
 import httpx
 
 from app.mcp_client.client import MCPClientError
+from app.mcp_client.portfolio_valuation import (
+    MAX_HOLDINGS, MAX_QUOTE_CALLS, QUOTE_TIME_BUDGET_SECONDS,
+    number as portfolio_number, portfolio_context as build_portfolio_context, select_holdings,
+)
 
 
 DEFAULT_SUPABASE_URL = "https://qjgnryjtrdwrbmlgdquk.supabase.co"
@@ -69,10 +74,13 @@ def _number(value: Any, default: float | None = None) -> float | None:
 class ApplicationResearchService:
     """Read-only cross-application research context."""
 
-    def __init__(self, live: bool = False, stocks: Any | None = None, timeout: float = 7.0) -> None:
+    def __init__(self, live: bool = False, stocks: Any | None = None, timeout: float = 7.0,
+                 clock=None, monotonic=time.monotonic) -> None:
         self.live = bool(live)
         self.stocks = stocks
         self.timeout = timeout
+        self._clock = clock or (lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+        self._monotonic = monotonic
         self.supabase_url = (
             os.getenv("SUPABASE_URL")
             or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -93,7 +101,7 @@ class ApplicationResearchService:
         except httpx.HTTPError as exc:
             raise MCPClientError("UPSTREAM_HTTP", f"request failed: {type(exc).__name__}: {exc}") from exc
 
-    def _supabase_get(self, table: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+    def _supabase_get(self, table: str, params: dict[str, Any], *, strict_records: bool = False) -> list[dict[str, Any]]:
         if not self.supabase_key:
             raise MCPClientError("CONFIG", "SUPABASE_SERVICE_ROLE_KEY is not configured")
         data = self._get_json(
@@ -105,10 +113,16 @@ class ApplicationResearchService:
                 "Accept": "application/json",
             },
         )
+        if strict_records and (not isinstance(data, list) or any(not isinstance(row, dict) for row in data)):
+            raise MCPClientError("INVALID_DATA", "Stored holdings response is malformed")
         return _records(data)
 
     def portfolio_context(self, symbol: str | None = None) -> dict[str, Any]:
-        requested = str(symbol or "").strip().upper()
+        if symbol is not None and not isinstance(symbol, str):
+            raise MCPClientError("INVALID_ARGUMENT", "Invalid portfolio symbol")
+        requested = symbol.strip().upper() if symbol else ""
+        if requested and not re.fullmatch(r"[A-Z0-9.^=-]{1,20}", requested):
+            raise MCPClientError("INVALID_ARGUMENT", "Invalid portfolio symbol")
         if not self.live:
             path = self._repo_root / "data" / "portfolio_snapshot.json"
             snapshot = json.loads(path.read_text(encoding="utf-8"))
@@ -124,68 +138,54 @@ class ApplicationResearchService:
                 "persistent": False,
             }
 
-        rows = self._supabase_get(
-            "portfolio_holdings",
-            {"select": "*", "order": "symbol.asc"},
-        )
-        rows = [row for row in rows if (_number(row.get("quantity"), 0.0) or 0.0) > 0]
-        if requested:
-            rows = [row for row in rows if str(row.get("symbol", "")).upper() == requested]
-
-        holdings = []
-        invested_total = 0.0
-        current_total = 0.0
-        live_quote_count = 0
+        params = {"select": "id,symbol,quantity,average_cost,purchase_date,notes", "order": "symbol.asc", "limit": str(MAX_HOLDINGS + 1)}
+        try:
+            rows = self._supabase_get("portfolio_holdings", params, strict_records=True)
+        except Exception as error:
+            code = error.code if isinstance(error, MCPClientError) and error.code in {"CONFIG", "INVALID_DATA"} else "UPSTREAM_HTTP"
+            raise MCPClientError(code, "Stored holdings context is unavailable") from None
+        rows = select_holdings(rows, requested or None)
+        quotes: dict[str, Any] = {}
+        errors: dict[str, str] = {}
+        attempts = 0
+        termination = "completed"
+        started = self._monotonic()
         for row in rows:
-            sym = str(row.get("symbol") or "").strip().upper()
-            qty = _number(row.get("quantity"), 0.0) or 0.0
-            avg = _number(row.get("average_cost"), 0.0) or 0.0
-            invested = qty * avg
-            invested_total += invested
-            current_value: float | None = None
-            daily_change_pct: float | None = None
-            if self.stocks is not None and sym:
-                try:
-                    quote = self.stocks.get_quote(sym).model_dump()
-                    price = _number(quote.get("price"))
-                    if price is not None and price > 0:
-                        current_value = qty * price
-                        current_total += current_value
-                        live_quote_count += 1
-                    daily_change_pct = _number(quote.get("change_pct") or quote.get("changePct"))
-                except Exception:
-                    current_value = None
-            holdings.append({
-                "id": row.get("id"),
-                "symbol": sym,
-                "quantity": qty,
-                "averageCost": avg,
-                "purchaseDate": row.get("purchase_date"),
-                "notes": row.get("notes") or "",
-                "investedValue": round(invested, 4),
-                "currentValue": None if current_value is None else round(current_value, 4),
-                "dailyChangePct": daily_change_pct,
-            })
-
-        current_available = live_quote_count == len(holdings) if holdings else False
-        unrealized = (current_total - invested_total) if current_available else None
-        return {
-            "source": "supabase",
-            "mode": "live",
-            "persistent": True,
-            "holdings": holdings,
-            "portfolio": {
-                "investedValue": round(invested_total, 4),
-                "currentValue": round(current_total, 4) if current_available else None,
-                "unrealizedPnl": round(unrealized, 4) if unrealized is not None else None,
-                "unrealizedPct": round(unrealized / invested_total * 100, 3) if unrealized is not None and invested_total else None,
-            },
-            "data_quality": {
-                "holdingCount": len(holdings),
-                "liveQuoteCount": live_quote_count,
-                "allQuotesFresh": current_available,
-            },
-        }
+            sym = row["symbol"].strip().upper()
+            quantity = portfolio_number(row.get("quantity"), stored=True)
+            if quantity is None or quantity <= 0:
+                errors[sym] = "INVALID_QUANTITY"
+                continue
+            if self.stocks is None:
+                errors[sym] = "QUOTE_NOT_CONFIGURED"
+                continue
+            if attempts >= MAX_QUOTE_CALLS:
+                errors[sym] = "CALL_BUDGET"
+                termination = "call-budget"
+                continue
+            if self._monotonic() - started >= QUOTE_TIME_BUDGET_SECONDS:
+                errors[sym] = "TIME_BUDGET"
+                termination = "time-budget"
+                continue
+            attempts += 1
+            try:
+                value = self.stocks.get_quote(sym)
+                quote = value.model_dump() if hasattr(value, "model_dump") else value
+                if self._monotonic() - started >= QUOTE_TIME_BUDGET_SECONDS:
+                    errors[sym] = "TIME_BUDGET"
+                    termination = "time-budget"
+                elif isinstance(quote, dict):
+                    quotes[sym] = quote
+                else:
+                    errors[sym] = "INVALID_QUOTE"
+            except Exception:
+                errors[sym] = "PROVIDER_FAILED"
+                if self._monotonic() - started >= QUOTE_TIME_BUDGET_SECONDS:
+                    termination = "time-budget"
+        usage = {"quoteCalls": attempts, "maxQuoteCalls": MAX_QUOTE_CALLS, "providerRequestCount": None,
+                 "timeBudgetMs": int(QUOTE_TIME_BUDGET_SECONDS * 1000), "terminationReason": termination,
+                 "loadedSymbols": list(quotes), "unavailableSymbols": list(errors)}
+        return build_portfolio_context(rows, quotes, self._clock(), errors, usage, requested or None)
 
     @staticmethod
     def _normalize_forecast(row: dict[str, Any]) -> dict[str, Any]:

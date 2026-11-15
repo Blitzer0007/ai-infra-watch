@@ -1,0 +1,36 @@
+# Forecast summary integrity corrections
+
+Implemented in Codex Cloud on 9 November 2026, following the [comparative audit](release2-forecast-validation-audit.md). This increment corrects the read-summary path and its presentation. It does not establish forecasting skill, repair historical outcomes or activate model selection.
+
+## Corrected behavior
+
+- Preserve the existing valid-data, earliest-start greedy thinning cohort per ticker/horizon, including its boundary-touch policy. Sort retained output by target day before recent-window and learning/drift slices. Verification processing/backfill time is separate from outcome chronology. These are the newest retained observations **within loaded rows**, not a complete historical inventory.
+- Require explicit verified status, valid ticker/positive integral horizon, a real creation/target date and a positive window. Accept finite decimal numbers or PostgreSQL numeric strings; reject booleans, blanks, objects, hexadecimal and nonfinite values. Date-only legacy creation precision stays date-only. Summary metrics, learning, grouping and the read-side count gate use the same valid metric rows. No future/PIT or actual-session provenance is inferred from a syntactically valid window.
+- Exclude missing, reversed or crossed known quantile bounds from interval coverage. Either interval can fail its nominal coverage target; contradictory narrow/wide findings return **mixed coverage**. Replace **well calibrated** with **consistent with target coverage**. The existing rounded Wilson diagnostic and 50 usable-interval requirement remain descriptive, with no time-cluster/dependence correction or multiple-testing claim.
+- Keep the heuristic score formula and zero-case policy unchanged, but expose direction/score, zero-pair and interval denominators. Genuine zero outcomes remain eligible for point error and usable interval coverage. Selection receipts distinguish invalid, unverified, overlapping and retained rows; statistical-independence verification is explicitly false.
+- A filtered read now loads both 5D and 20D streams for its global gate, without the selected ticker filter. Previously, the global gate received only one horizon while requiring 25 observations in each. Keep the existing 50/25/25 thresholds. At most two queries are made, each limited to 2,000 rows; the response reports scope/truncation and `forecast-summary-v2`. This is a descriptive read-side policy, not the writer's creation-evidence/promotion gate.
+- Malformed/unavailable database responses return a fixed failure, never a successful empty history or raw upstream error. The existing access check, GET-only method and no-store response remain. The panel rejects malformed successful API envelopes, clears old metrics/learning when input changes, aborts superseded requests and ignores late results.
+- Label scores, sample buckets, evidence associations and verification timestamps explicitly. Show the score formula, selection/coverage denominators, incomplete-history limits and the distinction between per-series thinning and statistical independence. Remove the unverified scheduler-health assertion. No new write/action control is added.
+
+## Compatibility and boundaries
+
+API fields are additive apart from stricter eligibility and the corrected verdict strings; existing sample-status enums remain for compatibility, while this panel renders count buckets. Consumers of verdict strings must tolerate the new mixed/consistent values. Valid rows retain the previous thinning membership; their output order changes to target chronology. Equal start-day ties retain the existing input-order policy, not a newly defined duplicate-resolution rule.
+
+The scalar/window/thinning and calibration helpers are shared. After a future approved deployment, other consumers can exclude malformed metadata, see the new ordering or receive corrected coverage diagnostics. This is not a claim that all forecast consumers have been unified: Forward Outlook still performs its own verification-time drift ordering. The legacy verification analytics adapter still supplies an incompatible CI object without usable-interval counts/keys and remains insufficient; it needs a separate contract correction. The writer's gate also requires captured creation evidence, unlike this descriptive reader. These contracts must not be silently treated as equivalent.
+
+No verification/auto-track handler is edited or invoked, no old outcome is rewritten, and no model-promotion rule, forecast horizon, schema, schedule or delivery configuration changes. Shared-helper effects are part of code review, not production activation.
+
+## Verification
+
+- **690 Node tests pass**, including 52 added integrity/read-handler cases. Corrected expectations cover chronological recent/prior windows, mixed calibration, strict scalar/calendar inputs, genuine zeroes, consistent count gates and redacted failures. The old audit counterexample artifact deliberately asserted baseline defects and remains historical evidence outside CI.
+- **Eight browser cases** exercise holding detail → actual authenticated GET handler → entirely intercepted fictional database rows → actual summaries → panel, plus unavailable/malformed responses, input changes, late responses, keyboard and 360/768/1440px layouts. The gateway is QA-only, listens on loopback and forbids any outbound fetch other than its fully intercepted fictional REST address; it inherits only fictional service/session configuration. External browser traffic is blocked by the existing harness.
+- TypeScript, production build, source security, migration-manifest integrity and **25 offline workflow-safety cases** are checked. Existing bundle-size warnings remain. CI adds only these mocked browser cases/artifacts; live and deployment controls remain unchanged. Exact-head CI is recorded in draft PR #168.
+- Fictional screenshots: `/workspace/artifacts/forecast-summary-fix/forecast-summary-{360,768,1440}.png`. They show actual feature-branch rendering, not production evidence.
+
+Follow-up: the [offline session/history preflight](release2-forecast-session-preflight.md) now provides an isolated versioned contract and fictional characterization tests. Legacy writers and hosted history remain unchanged.
+
+## Remaining forecast work
+
+Specify exchange-session entry/target mapping and versioned price-history/PIT guards before changing weekday targets, the freshness guard or stored outcomes. Review holiday closures, future/duplicate/missing bars, observation age, raw/adjusted basis, corporate actions and delistings with independent cases. Then freeze rolling-origin/purged cutoffs, matched benchmark/fee/entry assumptions and proper point/quantile/interval metrics with time-cluster uncertainty. Unify legacy analytics contracts separately and retain historical horizon identity.
+
+Model/provider/backtest effectiveness is unverified. This increment makes no live provider/model/SEC/JEV request, hosted query/write, production secret access, Telegram message, merge or deployment. Rollback is a reviewed application-code revert; no database repair is required. Overall Release 2 remains approximately **55% engineering complete**, with production rollout not started.

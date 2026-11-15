@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 export type DataTableColumn<T> = {
   key: string;
   header: ReactNode;
+  sortLabel?: string;
   accessor: (row: T) => unknown;
   type?: 'text' | 'number' | 'currency' | 'percent' | 'date' | 'datetime';
   align?: 'left' | 'center' | 'right';
@@ -20,6 +21,7 @@ type Props<T> = {
   className?: string;
   initialSort?: { key: string; direction?: 'asc' | 'desc' };
   onRow?: (row: T) => void;
+  label?: string;
 };
 
 function compare(a: unknown, b: unknown, type: DataTableColumn<any>['type'] = 'text') {
@@ -38,7 +40,7 @@ function compare(a: unknown, b: unknown, type: DataTableColumn<any>['type'] = 't
 }
 
 export default function DataTable<T>({
-  rows, columns, rowKey, empty = 'No results.', loading = false, error, className = '', initialSort, onRow,
+  rows, columns, rowKey, empty = 'No results.', loading = false, error, className = '', initialSort, onRow, label = 'Data table',
 }: Props<T>) {
   const [sort, setSort] = useState(initialSort ? { key: initialSort.key, direction: initialSort.direction || 'asc' } : null);
   const sorted = useMemo(() => {
@@ -53,7 +55,8 @@ export default function DataTable<T>({
 
   return (
     <div className={'rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden ' + className}>
-      <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Data table" tabIndex={0}>
+      <p className="border-b border-white/10 px-3 py-2 text-xs text-white/60">Scroll horizontally for all columns. Select a column heading to sort.</p>
+      <div className="aiw-scroll-region overflow-x-auto overscroll-x-contain" role="region" aria-label={label} tabIndex={0}>
         <table className="w-full min-w-max text-[10px] font-mono">
           <thead className="sticky top-0 z-10 bg-[#15181E] text-white/45 uppercase tracking-wider">
             <tr>
@@ -64,8 +67,7 @@ export default function DataTable<T>({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 min-h-8 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 rounded"
-                      aria-label={'Sort by ' + String(column.header)}
-                      aria-sort={active ? (sort?.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-label={'Sort by ' + (column.sortLabel || (typeof column.header === 'string' ? column.header : column.key))}
                       onClick={() => setSort(active ? { key: column.key, direction: sort?.direction === 'asc' ? 'desc' : 'asc' } : { key: column.key, direction: 'asc' })}
                     >
                       {column.header}
@@ -80,7 +82,15 @@ export default function DataTable<T>({
             {loading ? <tr><td colSpan={columns.length} className="p-8 text-center text-white/35">Loading…</td></tr>
               : error ? <tr><td colSpan={columns.length} className="p-8 text-center text-rose-200">{error}</td></tr>
               : sorted.length ? sorted.map((row, index) => (
-                <tr key={rowKey(row, index)} onClick={() => onRow?.(row)} className={'border-t border-white/5 align-top ' + (onRow ? 'cursor-pointer hover:bg-white/[.02]' : '')}>
+                <tr key={rowKey(row, index)} tabIndex={onRow ? 0 : undefined}
+                  onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,select,textarea')) onRow?.(row); }}
+                  onKeyDown={event => {
+                    if (onRow && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      onRow(row);
+                    }
+                  }}
+                  className={'border-t border-white/5 align-top ' + (onRow ? 'cursor-pointer hover:bg-white/[.02]' : '')}>
                   {columns.map(column => <td key={column.key} className={'p-3 ' + align(column.align) + ' ' + (column.className || '')}>{column.render ? column.render(row) : String(column.accessor(row) ?? '—')}</td>)}
                 </tr>
               )) : <tr><td colSpan={columns.length} className="p-8 text-center text-white/35">{empty}</td></tr>}

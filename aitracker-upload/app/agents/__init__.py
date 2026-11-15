@@ -10,6 +10,9 @@ from importlib import import_module
 from typing import Any
 
 _EXPORTS = {
+    "SourceQualityAgent": ("app.agents.source_quality", "SourceQualityAgent"),
+    "QualityRequest": ("app.agents.source_quality", "QualityRequest"),
+    "QualityResult": ("app.agents.source_quality", "QualityResult"),
     "MarketAgent": ("app.agents.market", "MarketAgent"),
     "build_market_graph": ("app.agents.market", "build_market_graph"),
     "FilingsAgent": ("app.agents.filings", "FilingsAgent"),

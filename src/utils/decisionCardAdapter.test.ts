@@ -5,11 +5,12 @@ import { adaptDecisionCard, summarizeDecisionCards, decisionLabels } from './dec
 import type { IntelligenceSnapshot } from './intelligence';
 import type { ValidatedQuote } from './decisionEligibility';
 const now = Date.parse('2026-11-06T18:00:00Z');
-const base: PortfolioPosition = { symbol:'NVDA',name:'Nvidia',group:'Chips',theme:'AI',peers:['AMD'],geo:'US',quantity:2,averageCost:90,investedValue:180,snapshotCurrentValue:180 };
-const prices = { NVDA:{price:100,changePct:2}, AMD:{price:100,changePct:1}, SOXL:{price:100,changePct:2} };
-const intelligence = {groups:[{name:'Chips',score:65,breadth:0.6,relativeToUniverse:1,members:['NVDA','AMD'],avgChange:1}],portfolioBreadth:1,portfolioAverage:1,universeAverage:1,topGroup:'Chips',bottomGroup:'Chips',pairSignals:[]} satisfies IntelligenceSnapshot;
+const base: PortfolioPosition = { symbol:'NVDA',name:'Nvidia',group:'Chips',theme:'AI',peers:['AMD'],geo:'US',quantity:2,averageCost:90,investedValue:180,snapshotCurrentValue:180,currency:'USD' };
+const declared = (symbol:string,changePct:number) => ({price:100,changePct,returnedSymbol:symbol,sourceMode:'live' as const,adjustedBasis:'raw' as const,currency:'USD',provider:'declared-source',marketTimePrecision:'instant' as const,marketTime:'2026-11-06T17:59:00Z',retrievedAt:'2026-11-06T18:00:00Z',isMarketSessionOpen:true});
+const prices = { NVDA:declared('NVDA',2), AMD:declared('AMD',1), SOXL:declared('SOXL',2) };
+const intelligence = {groups:[{name:'Chips',score:65,breadth:0.6,relativeToUniverse:1,members:['NVDA','AMD'],avgChange:1,coverage:{observed:2,expected:2,status:'complete'}}],portfolioBreadth:1,portfolioAverage:1,universeAverage:1,topGroup:'Chips',bottomGroup:'Chips',pairSignals:[]} satisfies IntelligenceSnapshot;
 const quote: ValidatedQuote = {symbol:'NVDA',price:100,currency:'USD',provider:'fixture-authority',marketTime:'2026-11-06T17:59:00Z',retrievedAt:'2026-11-06T18:00:00Z',isMarketSessionOpen:true,status:'valid',fallbackUsed:false};
-const position = buildPositionAnalyses(prices,intelligence,[base])[0];
+const position = buildPositionAnalyses(prices,intelligence,[base],now)[0];
 test('adapter preserves engine states and friendly labels', () => {
   for (const state of Object.keys(decisionLabels) as Array<keyof typeof decisionLabels>) assert.equal(adaptDecisionCard({...position,state},quote,true,now,true).state,state);
 });
@@ -26,7 +27,7 @@ test('partial quote coverage never fabricates a total or concentration', () => {
   assert.equal(summarizeDecisionCards([valid]).portfolioValueUsd,200);
 });
 test('leveraged thresholds are supplied by the existing engine without relaxing them', () => {
-  const leveraged = buildPositionAnalyses(prices,intelligence,[{...base,symbol:'SOXL'}])[0];
+  const leveraged = buildPositionAnalyses(prices,intelligence,[{...base,symbol:'SOXL'}],now)[0];
   assert.equal(leveraged.state,'HOLD / WATCH');
   const card = adaptDecisionCard(leveraged,{...quote,symbol:'SOXL'},true,now,true);
   assert.equal(card.state,'HOLD / WATCH'); assert.equal(card.riskLeverage,3); assert.match(card.reasons[2].explanation,/68/);

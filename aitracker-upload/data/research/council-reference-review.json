@@ -1,0 +1,65 @@
+{
+  "repository": "TauricResearch/TradingAgents",
+  "commit": "9fa1196fffbcfd9de5146d2dd2869df84ab99838",
+  "license": "Apache-2.0",
+  "scope": "selected static source; no import/runtime/model execution",
+  "files": [
+    {
+      "file": "bear_researcher.py",
+      "sha256": "b991494b07b697e62400de5a902d18eb440854d0411b5c5ee04aca35b26198fb",
+      "code_objects": 3,
+      "evidence_id": "ev_c424c9719bb8b626e53a47a7902a0bdbf84399533aa68aeea48a1f889d94b96f",
+      "pyc_sha256": "e9e48f1b075c43e3c02ccbe5fe4c1e8fbaf65a134104d63935264584d859091e",
+      "rea_exit_code": 0
+    },
+    {
+      "file": "bull_researcher.py",
+      "sha256": "b3578f59f15f0fda4b16e6111e0fb6aea4cc9946c768a31452ecaafa7d72c286",
+      "code_objects": 3,
+      "evidence_id": "ev_b2dbf0afe9bfef271624f73187830488dba73e08702174c2d15154ad38a85076",
+      "pyc_sha256": "e5617e732690f284b04431bab7fea43d60cf4eed512c4781eeaed691132d5b50",
+      "rea_exit_code": 0
+    },
+    {
+      "file": "conditional_logic.py",
+      "sha256": "a830189ba0f9e1e3d434acdd4453ba50470deb0b3a5dd50d9e28abb14c1475d7",
+      "code_objects": 5,
+      "evidence_id": "ev_08bdb28cf6265827b0e232c64d51d2fb2a19f46af01069983a8e6509a3f821b0",
+      "pyc_sha256": "f551cc6e192485256f87f550dd9087d738175d8ed920161f8bd24c0ec59a00dd",
+      "rea_exit_code": 0
+    },
+    {
+      "file": "research_manager.py",
+      "sha256": "ee6ccb69df3b7ff6c742e35746e49d1f684161dfe94e1ddd4d4050298228ddf5",
+      "code_objects": 3,
+      "evidence_id": "ev_855737166752c975fe495e451f26d83b5d6ccad138093b9826da599ea1d7b2fa",
+      "pyc_sha256": "ee0768e8c41a3da73d122e9fa5a5cf7c526936fcea083dc59c1be593493d95fb",
+      "rea_exit_code": 0
+    },
+    {
+      "file": "setup.py",
+      "sha256": "f1f2d6dc4303af0423649c6a4af9753f05b6a2cc65c641c3089271fc4fc47009",
+      "code_objects": 16,
+      "evidence_id": "ev_e426fdef605832d0333996272015d22d9b86bcf53bf068028dfc1516286218ac",
+      "pyc_sha256": "a0b39b3417a669bcf29944c32669e51aadf3e72a4b4f4b816f88ffc9a303dcf7",
+      "rea_exit_code": 0
+    },
+    {
+      "file": "structured.py",
+      "sha256": "b69bb29d18232ba15fd44b0057621e7c6af7e2e6a04a220032d7a13dba7e5b7b",
+      "code_objects": 4,
+      "evidence_id": "ev_2b693fe03a213023f7f799a1ed9f76881210022a4252685b52afe94d36f4d11b",
+      "pyc_sha256": "ecf00e094c0cecdbaf4e750e90cc5f48695bda581836c34c3181671d892813b8",
+      "rea_exit_code": 0
+    }
+  ],
+  "tool": "REA 6.8.0 inspect-python-pyc --detail summary --format json",
+  "total_code_objects": 34,
+  "limitations": [
+    "Bytecode is retained as length and SHA-256 only; this workflow does not decompile, disassemble, or recover source.",
+    "The selected file is not executed and CPython is not invoked.",
+    "source_hash_hex is the PEP 552 header field; the original .py is not read.",
+    "python_version is the pinned CPython magic table for this header, not a runtime interpreter."
+  ],
+  "source_review": "Manual review of selected pinned source; no source copied into application. References retained outside Git."
+}

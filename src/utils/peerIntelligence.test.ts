@@ -116,3 +116,29 @@ test('mirrors broker buy and sell cash flows in the peer counterfactual', () => 
   assert.equal(Number(result.actualProfit?.toFixed(2)), 7);
   assert.equal(Number(result.difference?.toFixed(2)), 73);
 });
+
+test('peer entry uses an observed close on or before the trade and never a future price', () => {
+  const base = { holding: { symbol: 'TEST', quantity: 1, investedValue: 100, averageCost: 100, purchaseDate: '2026-01-02' },
+    peer: selectMostRelevantPeer(holding), peerHistory: [{ date: '2026-01-01', price: 10 }, { date: '2026-01-03', price: 50 }],
+    peerCurrentPrice: 20, actualCurrentPrice: 100 };
+  const result = calculatePeerCounterfactual(base);
+  assert.equal(result.peerEntryDate, '2026-01-01'); assert.equal(result.hypotheticalShares, 10);
+  const absent = calculatePeerCounterfactual({ ...base, peerHistory: [{ date: '2026-01-03', price: 50 }] });
+  assert.equal(absent.status, 'history-unavailable'); assert.equal(absent.hypotheticalProfit, null);
+});
+
+test('peer cash-flow comparison includes fees and withholds unsupported sales, currencies and quantities', () => {
+  const buy = { id: '1', symbol: 'TEST', transactionType: 'BUY' as const, tradeDate: '2026-01-01', quantity: 2,
+    amount: 100, price: 50, brokerage: 2, source: 'fixture', sourceRow: 1, currency: 'USD' };
+  const sell = { ...buy, id: '2', transactionType: 'SELL' as const, tradeDate: '2026-01-02', quantity: 1, amount: 60, brokerage: 2, sourceRow: 2 };
+  const base = { holding: { symbol: 'TEST', quantity: 1, investedValue: 51, averageCost: 51, purchaseDate: '2026-01-01' },
+    peer: selectMostRelevantPeer(holding), peerHistory: [{ date: '2026-01-01', price: 100 }, { date: '2026-01-02', price: 100 }],
+    peerCurrentPrice: 100, actualCurrentPrice: 60, transactions: [buy, sell] };
+  const value = calculatePeerCounterfactual(base);
+  assert.equal(value.status, 'available'); assert.ok(Math.abs((value.hypotheticalProfit ?? 1)) < 1e-9);
+  assert.equal(value.actualProfit, 16);
+  for (const replacement of [{ ...sell, amount: 200 }, { ...sell, amount: 1, brokerage: 3 }, { ...sell, quantity: 3 }, { ...sell, currency: 'INR' }]) {
+    const result = calculatePeerCounterfactual({ ...base, transactions: [buy, replacement] });
+    assert.equal(result.status, 'cash-flow-unavailable'); assert.equal(result.difference, null);
+  }
+});

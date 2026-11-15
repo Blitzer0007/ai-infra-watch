@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { captureEarningsCalendar, type CatalystSnapshot } from '../utils/catalystCalendar';
 import { Bell, CheckCircle2, Clock3, ExternalLink, ShieldAlert } from 'lucide-react';
 
 type EarningsAlert = {
@@ -82,7 +83,7 @@ function formatRevenue(value?: number | null): string {
   return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-export default function EarningsAlerts() {
+export default function EarningsAlerts({ onSnapshot }: { onSnapshot?: (snapshot: CatalystSnapshot) => void }) {
   const [data, setData] = useState<EarningsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [browserStatus, setBrowserStatus] = useState<'unknown' | 'enabled' | 'blocked'>('unknown');
@@ -97,6 +98,7 @@ export default function EarningsAlerts() {
     try {
       const res = await fetch('/api/earnings-alerts?days=14', { cache: 'no-store' });
       const payload = await res.json();
+      onSnapshot?.(captureEarningsCalendar(payload, new Date().toISOString(), res.ok));
       setData(payload);
       setLoading(false);
       setLastLoadedAt(Date.now());
@@ -141,6 +143,7 @@ export default function EarningsAlerts() {
     } catch (error) {
       console.error('Earnings alert feed failed:', error);
       setLoading(false);
+      onSnapshot?.(captureEarningsCalendar(null, new Date().toISOString(), false));
       setData({ ok: false, error: 'Unable to load the earnings alert feed.' });
     } finally {
       if (manual) setRefreshing(false);

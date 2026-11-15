@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from playwright.sync_api import expect
 
 ARTIFACTS = Path(os.getenv("QA_ARTIFACT_DIR", "/tmp/aiw-release1"))
 from test_ui import goto_app, mock_local_apis
@@ -28,7 +29,7 @@ def test_glossary_keyboard_escape_and_mobile_layout(page):
     page.get_by_test_id('nav-guide').click()
     glossary = page.get_by_role('region', name='Financial glossary')
     glossary.get_by_role('button', name='Explain P/E ratio', exact=True).wait_for()
-    assert glossary.get_by_role('button').count() == 20
+    assert glossary.get_by_role('button').count() == 22
     button = glossary.get_by_role('button', name='Explain P/E ratio', exact=True)
     button.focus()
     page.keyboard.press('Enter')
@@ -36,8 +37,8 @@ def test_glossary_keyboard_escape_and_mobile_layout(page):
     assert dialog.is_visible()
     assert '$100' in dialog.inner_text()
     page.keyboard.press('Escape')
-    assert page.get_by_role('dialog').count() == 0
-    assert button.evaluate('(element) => element === document.activeElement')
+    expect(page.get_by_role('dialog')).to_have_count(0)
+    expect(button).to_be_focused()
     page.set_viewport_size({'width':360,'height':800})
     button.click()
     assert page.get_by_role('dialog').is_visible()
@@ -116,9 +117,22 @@ def test_glossary_search_related_terms_and_focus_containment(page):
         page.keyboard.press('Tab')
         assert dialog.evaluate('(element) => element.contains(document.activeElement)')
     page.keyboard.press('Escape')
-    assert original.evaluate('(element) => element === document.activeElement')
+    expect(original).to_be_focused()
     original.click()
     dialog.get_by_role('heading', name='P/E ratio', exact=True).wait_for()
+
+
+def test_glossary_eps_growth_and_ev_ebitda_are_searchable_and_linked(page):
+    mock_local_apis(page);goto_app(page);page.get_by_test_id('nav-guide').click()
+    glossary=page.get_by_role('region',name='Financial glossary');search=glossary.get_by_role('searchbox',name='Find a financial term')
+    search.fill('eps growth');button=glossary.get_by_role('button',name='Explain EPS growth',exact=True);button.click()
+    dialog=page.get_by_role('dialog');dialog.get_by_role('heading',name='EPS growth',exact=True).wait_for()
+    dialog.get_by_role('button',name='EPS',exact=True).click();expect(dialog.get_by_role('heading',name='EPS',exact=True)).to_be_visible()
+    page.keyboard.press('Escape');expect(button).to_be_focused()
+    search.fill('EV/EBITDA');button=glossary.get_by_role('button',name='Explain EV/EBITDA',exact=True);button.click()
+    expect(dialog).to_contain_text('11 times');dialog.get_by_text('Advanced explanation',exact=True).click()
+    expect(dialog).to_contain_text('preferred equity or noncontrolling interests')
+    page.keyboard.press('Escape');expect(button).to_be_focused()
 
 
 def test_command_center_empty_and_error_states_are_distinct(page):

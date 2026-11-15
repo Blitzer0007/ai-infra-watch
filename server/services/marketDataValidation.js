@@ -17,6 +17,22 @@ export function adjustedHistoryEligible(points) {
   return points.length > 0 && points.every(p => p.adjustedBasis === 'total_return' && typeof p.price === 'number' && Number.isFinite(p.price) && p.price > 0);
 }
 
+/** Price coverage and observation-time coverage are separate from provider health. */
+export function summarizeQuoteCoverage(quotes, expectedSymbols, nowMs = Date.now()) {
+  const symbols = [...new Set(expectedSymbols)];
+  const observed = symbols.filter(symbol => typeof quotes[symbol]?.price === 'number' && Number.isFinite(quotes[symbol].price) && quotes[symbol].price > 0);
+  const times = observed.map(symbol => quotes[symbol].marketTime).filter(value => typeof value === 'string' && /T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) && Date.parse(value) <= nowMs + 120000);
+  const ordered = times.sort((a,b)=>Date.parse(a)-Date.parse(b));
+  const completeTimes = symbols.length > 0 && observed.length === symbols.length && times.length === symbols.length;
+  return { expected:symbols.length,observed:observed.length,priceCoverage:observed.length===0?'unavailable':observed.length===symbols.length?'complete':'partial',
+    missingSymbols:symbols.filter(symbol=>!observed.includes(symbol)),
+    missingMoveSymbols:observed.filter(symbol=>typeof quotes[symbol].changePct!=='number'||!Number.isFinite(quotes[symbol].changePct)),
+    unknownTimeSymbols:observed.filter(symbol=>!ordered.includes(quotes[symbol].marketTime)),
+    staleSymbols:observed.filter(symbol=>quotes[symbol].stale===true),
+    providers:[...new Set(observed.map(symbol=>quotes[symbol].provider).filter(value=>typeof value==='string'&&value))],
+    timeCoverage:completeTimes?'complete':'incomplete',asOf:completeTimes?ordered[0]:null };
+}
+
 /** Normalize provider-supplied regular-session boundaries without guessing a calendar. */
 export function regularSessionMetadata(meta, nowMs = Date.now()) {
   const marketSeconds = meta?.regularMarketTime;

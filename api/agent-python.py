@@ -15,17 +15,40 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent / "aitracker-upload"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.mcp_client.manager import get_toolbox, toolbox_status
-from app.agents.autonomous import AutonomousMCPAgent
+from app.agents.source_quality import MAX_INPUT_BYTES, SourceQualityAgent
+
+
+def AutonomousMCPAgent(*args, **kwargs):
+    # Source-quality requests must not initialize the optional planner stack.
+    from app.agents.autonomous import AutonomousMCPAgent as Agent
+    return Agent(*args, **kwargs)
 
 app = FastAPI(
     title="AI Infra Watch Autonomous Agent",
     version="1.0.0",
 )
+
+
+@app.middleware("http")
+async def development_task_dispatch(request: Request, call_next):
+    if "task" not in request.query_params:
+        return await call_next(request)
+    try:
+        if request.query_params.get("task") == "council":
+            from app.agents.council_http import council_http
+            response = await council_http(request, _require_auth, settings.AGENT_API_TOKEN)
+        else:
+            response = await _source_quality_http(request)
+    except HTTPException as error:
+        response = JSONResponse(status_code=error.status_code, content={"detail": error.detail}, headers=error.headers)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def _require_auth(authorization: str | None) -> None:
@@ -119,6 +142,41 @@ def health(
         "mcp_ready": bool(mcp.get("connected")) if probe_mcp else None,
         "mcp_probe_error": probe_error,
     }
+
+
+async def _source_quality_http(request: Request) -> JSONResponse:
+    _require_auth(request.headers.get("authorization"))
+    task = request.query_params.get("task")
+    if task != "source-quality":
+        raise HTTPException(status_code=400, detail="Unknown research task")
+    enabled = (os.getenv("SOURCE_QUALITY_DEV_ENABLED") == "true" and not os.getenv("VERCEL")
+               and os.getenv("NODE_ENV") != "production" and os.getenv("VERCEL_ENV") != "production")
+    if not enabled:
+        raise HTTPException(status_code=404, detail="Development review unavailable")
+    # This branch requires configured private auth even on loopback.
+    if not settings.AGENT_API_TOKEN:
+        raise HTTPException(status_code=503, detail="Private access is not configured")
+    if request.method != "POST":
+        raise HTTPException(status_code=405, detail="POST required")
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(status_code=415, detail="JSON required")
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_INPUT_BYTES:
+            raise HTTPException(status_code=413, detail="Request too large")
+        body.extend(chunk)
+    # The HTTP interface uses the fixed v1 diagnostic policy. Custom policies
+    # remain a CLI/library interface, outside this development screen.
+    import json
+    try:
+        decoded = json.loads(body)
+        if not isinstance(decoded, dict) or "policy" in decoded:
+            raise ValueError()
+    except (ValueError, TypeError, RecursionError):
+        raise HTTPException(status_code=400, detail="Invalid source-quality request") from None
+    result = SourceQualityAgent().run_json(bytes(body))
+    return JSONResponse(status_code=400 if result.status == "failed" else 200, content=result.model_dump(mode="json"), headers={"Cache-Control":"no-store"})
+
 
 
 @app.post("/api/agent-python")

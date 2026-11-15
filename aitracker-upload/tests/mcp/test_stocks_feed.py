@@ -27,6 +27,7 @@ class _FakeService:
 
 
 def _batch(price: float, as_of: str) -> QuoteBatch:
+    as_of = {"t0": "2026-08-03T00:00:00Z", "t1": "2026-08-03T00:01:00Z"}.get(as_of, as_of)
     return QuoteBatch(
         quotes=[Quote(symbol="NVDA", price=price, as_of=as_of)],
         as_of=as_of,

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.trajectory import AgentTrajectory
 from app.synthesis.pipeline import MarketSynthesis
+from app.rag.schemas import GroundednessReport
 from mcp_servers.filings.schemas import AnswerResult, FilingRef
 
 # One canonical marker for a run-ending (as opposed to per-item, degrade-and-

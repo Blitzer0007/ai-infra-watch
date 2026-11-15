@@ -1,0 +1,562 @@
+{
+  "fictional": true,
+  "sourceCommit": "59eb550c7d4c8df63a776ee340906cc77e342a36",
+  "cases": [
+    {
+      "id": "declared-quote-0",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": true,
+        "status": "valid",
+        "reasons": [],
+        "quote": {
+          "symbol": "FICT",
+          "price": 100,
+          "currency": "USD",
+          "provider": "declared-provider",
+          "marketTime": "2026-11-13T18:00:00.000Z",
+          "retrievedAt": "2026-11-13T18:00:00.000Z",
+          "isMarketSessionOpen": true,
+          "status": "valid",
+          "fallbackUsed": false,
+          "adjustedBasis": "raw"
+        }
+      }
+    },
+    {
+      "id": "declared-quote-1",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": null,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "missing",
+        "reasons": [
+          "A price observation is required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-2",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 0,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "A positive, finite price is required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-3",
+      "value": {
+        "returnedSymbol": "OTHER",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Provider-returned identity is missing or mismatched."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-4",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": null,
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "missing",
+        "reasons": [
+          "Quote currency provenance is required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-5",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "EUR",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Only USD quotes are supported by this portfolio valuation."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-6",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "simulated",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "simulated",
+        "reasons": [
+          "A declared live source mode is required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-7",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid",
+        "stale": true
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "stale",
+        "reasons": [
+          "Simulated or stale quotes are withheld."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-8",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid",
+        "simulated": true
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "simulated",
+        "reasons": [
+          "Simulated or stale quotes are withheld."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-9",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid",
+        "stale": "false"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Malformed quality marker: stale."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-10",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "date-only",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Exact market and retrieval instants are required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-11",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-02-31T12:00:00Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Exact market and retrieval instants are required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-12",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:02:01.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Quote timestamps are inconsistent or in the future."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-13",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T15:59:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "stale",
+        "reasons": [
+          "Market observation or retrieval is too old for a new assessment."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-14",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": null,
+        "isMarketSessionOpen": true,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "invalid",
+        "reasons": [
+          "Exact market and retrieval instants are required."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-15",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": null,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "missing",
+        "reasons": [
+          "Market session provenance is unavailable."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-16",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": false,
+        "status": "valid"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "missing",
+        "reasons": [
+          "Closed-session prices require explicit last-close provenance."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-17",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "missing"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "missing",
+        "reasons": [
+          "Provider quality status: missing."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-18",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "conflicting"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "conflicting",
+        "reasons": [
+          "Provider quality status: conflicting."
+        ],
+        "quote": null
+      }
+    },
+    {
+      "id": "declared-quote-19",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-11T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": false,
+        "status": "last_close"
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": true,
+        "status": "last_close",
+        "reasons": [],
+        "quote": {
+          "symbol": "FICT",
+          "price": 100,
+          "currency": "USD",
+          "provider": "declared-provider",
+          "marketTime": "2026-11-11T18:00:00.000Z",
+          "retrievedAt": "2026-11-13T18:00:00.000Z",
+          "isMarketSessionOpen": false,
+          "status": "last_close",
+          "fallbackUsed": false,
+          "adjustedBasis": "raw"
+        }
+      }
+    },
+    {
+      "id": "declared-quote-20",
+      "value": {
+        "returnedSymbol": "FICT",
+        "price": 100,
+        "currency": "USD",
+        "provider": "declared-provider",
+        "sourceMode": "live",
+        "adjustedBasis": "raw",
+        "marketTimePrecision": "instant",
+        "marketTime": "2026-11-13T18:00:00.000Z",
+        "retrievedAt": "2026-11-13T18:00:00.000Z",
+        "isMarketSessionOpen": true,
+        "status": "valid",
+        "independentObservations": [
+          {
+            "symbol": "FICT",
+            "provider": "other",
+            "price": 110,
+            "currency": "USD",
+            "adjustedBasis": "raw",
+            "marketTime": "2026-11-13T18:00:00.000Z"
+          }
+        ]
+      },
+      "nowMs": 1794592800000,
+      "expected": {
+        "eligible": false,
+        "status": "conflicting",
+        "reasons": [
+          "Provider quality status: conflicting."
+        ],
+        "quote": null
+      }
+    }
+  ]
+}

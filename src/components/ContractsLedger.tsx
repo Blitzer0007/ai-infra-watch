@@ -265,8 +265,9 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 lg:max-w-2xl">
           {/* Company Filter Dropdown */}
           <div className="flex flex-col space-y-1">
-            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40">Select Company</label>
+            <label htmlFor="contracts-company" className="text-xs font-mono text-white/70">Select company</label>
             <select
+              id="contracts-company"
               value={filterCompany}
               onChange={(e) => setFilterCompany(e.target.value)}
               className="bg-white/5 border border-white/10 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-white font-mono cursor-pointer"
@@ -282,8 +283,9 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
 
           {/* Status Level Filter Dropdown */}
           <div className="flex flex-col space-y-1">
-            <label className="text-[9px] font-mono uppercase tracking-widest text-white/40">Verification / Status</label>
+            <label htmlFor="contracts-status" className="text-xs font-mono text-white/70">Verification / status</label>
             <select
+              id="contracts-status"
               value={filterStatusLevel}
               onChange={(e) => setFilterStatusLevel(e.target.value)}
               className="bg-white/5 border border-white/10 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-white font-mono cursor-pointer"
@@ -297,11 +299,12 @@ export default function ContractsLedger({ liveContracts, portfolioSymbols = [] }
         </div>
 
         <div className="flex flex-col space-y-1 w-full lg:w-80">
-          <label className="text-[9px] font-mono uppercase tracking-widest text-white/40">Text Search</label>
+          <label htmlFor="contracts-search" className="text-xs font-mono text-white/70">Text search</label>
           <div className="relative">
             <Search className="w-4 h-4 text-white/40 absolute left-3 top-2.5" />
             <input
               type="text"
+              id="contracts-search"
               placeholder="Search client, hardware, details..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}

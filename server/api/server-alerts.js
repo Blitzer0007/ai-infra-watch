@@ -5,6 +5,8 @@ import { requireAccess } from '../../api/_access-auth.js';
 import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
 import { getTickerValidationContext } from '../utils/forecastValidation.js';
 import { getMarketSessionInfo, shouldEmitLargeMoveSummary, shouldEvaluateLargeMove } from '../utils/serverAlertSession.js';
+import { fetchServerAlertQuote } from '../utils/serverAlertQuote.js';
+import { optionalFiniteNumber } from '../../shared/portfolioRuleMath.js';
 
 const LARGE_MOVE_CRITICAL_MULTIPLIER = 2;
 const MAX_SMART_ALERTS_PER_SCAN = 10;
@@ -151,31 +153,11 @@ async function getForecastValidationContexts(symbols) {
   return contexts;
 }
 
-async function quote(symbol) {
-  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
-    encodeURIComponent(symbol) + '?range=1d&interval=1d';
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'ai-infra-watch/1.0' },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) throw new Error('quote HTTP ' + response.status);
-  const payload = await response.json();
-  const meta = payload?.chart?.result?.[0]?.meta || {};
-  const price = Number(meta.regularMarketPrice);
-  const prevClose = Number(meta.chartPreviousClose);
-  if (!Number.isFinite(price)) throw new Error('no price');
-  return {
-    price,
-    changePct: Number.isFinite(prevClose) && prevClose !== 0 ? (price / prevClose - 1) * 100 : 0,
-    marketState: String(meta.marketState || '').trim().toUpperCase(),
-  };
-}
-
-function normalizeAlert(row) {
+export function normalizeAlert(row) {
   if (!row) return null;
   const symbol = String(row.symbol || '').trim().toUpperCase();
-  const targetPrice = Number(row.targetPrice);
-  if (!/^[A-Z0-9.^=-]{1,20}$/.test(symbol) || !Number.isFinite(targetPrice) || targetPrice < 0) return null;
+  const targetPrice = optionalFiniteNumber(row.targetPrice);
+  if (!/^[A-Z0-9.^=-]{1,20}$/.test(symbol) || !Number.isFinite(targetPrice) || targetPrice <= 0 || !['above', 'below'].includes(row.type)) return null;
   return {
     symbol,
     targetPrice,
@@ -286,7 +268,8 @@ async function evaluate() {
   const quotes = new Map();
   await Promise.all(watchedSymbols.map(async symbol => {
     try {
-      quotes.set(symbol, await quote(symbol));
+      const q = await fetchServerAlertQuote(symbol);
+      if (q) quotes.set(symbol, q);
     } catch {
       // One unavailable symbol must not block the rest of the alert scan.
     }
@@ -513,6 +496,7 @@ async function evaluate() {
   return {
     evaluated_symbols: watchedSymbols.length,
     fresh_quotes: quotes.size,
+    unavailable_or_withheld_quotes: watchedSymbols.length - quotes.size,
     configured_price_rules: normalizedAlerts.filter(alert => alert.active).length,
     candidate_events: events.length,
     sent: delivery.sent + summaryDelivery.sent,
@@ -525,7 +509,7 @@ async function evaluate() {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
-  if (!authorize(req, res)) return;
+  if (!await authorize(req, res)) return;
 
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' });

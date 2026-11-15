@@ -1,4 +1,5 @@
 import { requireAccess } from '../../api/_access-auth.js';
+import { forecastHorizon } from '../../src/utils/forecastInputs.js';
 import { buildForecastValidationSummary, buildForecastLearningSummary } from '../utils/forecastValidation.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
@@ -16,7 +17,7 @@ function headers() {
   };
 }
 
-async function loadVerifiedForecasts({ ticker, horizon, createdSource = null } = {}) {
+async function loadVerifiedForecasts({ ticker, horizon, horizons = null, createdSource = null } = {}) {
   const params = new URLSearchParams();
   // created_at and target_date are required by independentForecastRows to identify non-overlapping samples.
   params.set('select', 'ticker,horizon,status,created_at,target_date,median,p25,p75,p10,p90,actual_return,median_error,verified_at,evidence_snapshot,created_source');
@@ -25,18 +26,21 @@ async function loadVerifiedForecasts({ ticker, horizon, createdSource = null } =
   params.set('order', 'verified_at.desc');
   params.set('limit', String(MAX_ROWS));
   if (ticker) params.set('ticker', 'eq.' + String(ticker).trim().toUpperCase());
-  if (horizon !== null && horizon !== undefined && horizon !== '' && Number.isFinite(Number(horizon))) {
+  if (horizons) params.set('horizon', 'in.(' + horizons.join(',') + ')');
+  else if (horizon !== null && horizon !== undefined) {
     params.set('horizon', 'eq.' + String(Number(horizon)));
   }
 
   const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?' + params.toString(), {
     headers: headers(),
   });
-  const data = await response.json().catch(() => []);
-  if (!response.ok) {
-    throw new Error(data?.message || 'Failed to load verified forecast history.');
+  if (!response.ok) throw new Error('Verified forecast history is unavailable.');
+  let data;
+  try { data = await response.json(); } catch { throw new Error('Verified forecast history is unavailable.'); }
+  if (!Array.isArray(data) || data.some(row => row === null || typeof row !== 'object' || Array.isArray(row))) {
+    throw new Error('Verified forecast history is unavailable.');
   }
-  return Array.isArray(data) ? data : [];
+  return data;
 }
 
 export default async function handler(req, res) {
@@ -49,9 +53,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (req.query?.ticker !== undefined && typeof req.query.ticker !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Invalid ticker.' });
+    }
     const ticker = String(req.query?.ticker || '').trim().toUpperCase();
-    const horizonValue = Number(req.query?.horizon);
-    const horizon = Number.isFinite(horizonValue) ? horizonValue : null;
+    const suppliedHorizon = req.query?.horizon;
+    const horizon = suppliedHorizon === undefined ? null : forecastHorizon(suppliedHorizon);
+    if (suppliedHorizon !== undefined && horizon === null) return res.status(400).json({ ok: false, error: 'Invalid horizon.' });
     if (ticker && !/^[A-Z0-9.^=-]{1,20}$/.test(ticker)) {
       return res.status(400).json({ ok: false, error: 'Invalid ticker.' });
     }
@@ -59,11 +67,9 @@ export default async function handler(req, res) {
     const rows = await loadVerifiedForecasts({ ticker: ticker || null, horizon });
     const summary = buildForecastValidationSummary(rows);
     const learning = buildForecastLearningSummary(rows);
-    let globalValidationGate = summary.validationGate;
-    if (ticker || horizon != null) {
-      const globalRows = await loadVerifiedForecasts({ horizon: horizon ?? 20 });
-      globalValidationGate = buildForecastValidationSummary(globalRows).validationGate;
-    }
+    const globalRows = ticker || horizon !== null ? await loadVerifiedForecasts({ horizons: [5, 20] }) : rows;
+    const globalStreams = globalRows.filter(row => [5, 20].includes(forecastHorizon(row.horizon)));
+    const globalValidationGate = buildForecastValidationSummary(globalStreams).validationGate;
 
     return res.status(200).json({
       ok: true,
@@ -76,12 +82,14 @@ export default async function handler(req, res) {
       ...summary,
       learning,
       globalValidationGate,
+      globalScope: { horizons: [5, 20], rowLimit: MAX_ROWS, truncated: globalRows.length >= MAX_ROWS },
+      contractVersion: 'forecast-summary-v2',
       generatedAt: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({
       ok: false,
-      error: error instanceof Error ? error.message : 'Forecast validation request failed.',
+      error: 'Forecast validation is unavailable.',
     });
   }
 }
