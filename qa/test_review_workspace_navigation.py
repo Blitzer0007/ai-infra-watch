@@ -202,3 +202,58 @@ def test_research_quote_guard_resumes_when_opening_holdings_and_preserves_same_p
     page.wait_for_load_state('networkidle')
     expect(page.get_by_test_id('portfolio-section-heading')).to_have_text('My Holdings')
     assert control['calls']>baseline
+
+@pytest.mark.parametrize('width',[360,768,1440])
+def test_exact_calendar_record_context_and_reload_gap(page,width):
+    configured_fict(page)
+    prepare(page,[fixture_event(id='first',title='First fictional issuer event'),
+                  fixture_event(id='second',title='Second fictional issuer event',date='2026-11-14',confirmation='estimated',confirmationBasis=None)])
+    calendar=load_snapshot(page)
+    page.set_viewport_size({'width':width,'height':950})
+    assert calendar.get_by_test_id('catalyst-event').count()==2
+    calendar.get_by_test_id('catalyst-event').filter(has_text='Second fictional issuer event').get_by_role('link',name='Research FICT',exact=True).click()
+    context=page.get_by_test_id('research-origin-context')
+    expect(context).to_contain_text('Second fictional issuer event')
+    expect(context).not_to_contain_text('First fictional issuer event')
+    expect(context).to_contain_text('Date only; no event time supplied')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    assert 'Second fictional' not in page.url
+    page.get_by_role('link',name='Return to Calendar',exact=True).click()
+    calendar=page.get_by_test_id('catalyst-calendar')
+    calendar.get_by_test_id('catalyst-event').filter(has_text='First fictional issuer event').get_by_role('link',name='Research FICT',exact=True).click()
+    expect(context).to_contain_text('First fictional issuer event')
+    expect(context).not_to_contain_text('Second fictional issuer event')
+    page.reload()
+    expect(page.get_by_test_id('research-origin-context')).to_contain_text('exact opened event context is unavailable')
+
+
+def test_exact_inbox_record_context_separates_browser_and_server(page):
+    configured_fict(page)
+    inbox=open_inbox(page,[LOCAL]);reads=[]
+    page.route('**/api/alert-inbox*',lambda route:(reads.append(route.request.url),route.fulfill(status=200,content_type='application/json',body=json.dumps(payload([server_item()])))))
+    inbox.get_by_role('button',name='Load server delivery history',exact=True).click()
+    inbox.get_by_test_id('inbox-record').filter(has_text='Browser detection').get_by_role('link',name='Research FICT',exact=True).click()
+    context=page.get_by_test_id('research-origin-context')
+    expect(context).to_contain_text('Local browser detection')
+    expect(context).to_contain_text('No provider acceptance receipt')
+    assert 'fictional-local-event' not in page.url
+    page.get_by_role('link',name='Return to Alert inbox',exact=True).click()
+    inbox=page.get_by_test_id('alert-inbox')
+    inbox.get_by_test_id('inbox-record').filter(has_text='Server delivery record').get_by_role('link',name='Research FICT',exact=True).click()
+    expect(context).to_contain_text('Server re-entry delivery record')
+    expect(context).to_contain_text('not a read receipt')
+    expect(context).to_contain_text('Original trigger and message text are absent')
+    assert len(reads)==1
+    page.go_back();expect(page.get_by_test_id('alert-inbox')).to_be_visible()
+    page.go_forward();expect(page.get_by_test_id('research-origin-context')).to_contain_text('Server re-entry delivery record')
+
+
+def test_reloaded_original_alert_context_is_not_reconstructed(page):
+    configured_fict(page)
+    inbox=open_inbox(page,[LOCAL])
+    inbox.get_by_test_id('inbox-record').get_by_role('link',name='Research FICT',exact=True).click()
+    expect(page.get_by_test_id('research-origin-context')).to_contain_text('Local browser detection')
+    page.reload()
+    expect(page.get_by_test_id('research-origin-context')).to_contain_text('exact opened alert context is unavailable')
+    page.goto('/portfolio?portfolio_tab=research&research_symbol=FICT&research_from=calendar')
+    expect(page.get_by_test_id('research-origin-context')).to_contain_text('exact opened event context is unavailable')
