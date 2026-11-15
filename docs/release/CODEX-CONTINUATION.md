@@ -1,4 +1,4 @@
-# AI Infra Watch — portable development handoff
+# AI Infra Watch — continuation draft (Codex / ChatGPT)
 
 Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud and ChatGPT with connected GitHub tools. It is maintained proactively because an agent cannot reliably detect a quota cutoff. Read the latest copy on the feature branch, not just an older pasted copy.
 
@@ -26,25 +26,48 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 
 Continue **Milestone 2 — integrated Portfolio core**. No second release is authorized merely by this development request. Maintain this handoff so a different ChatGPT model can resume safely using repository state.
 
-Checkpoint: continuity documentation saved; the next implementation is still pending. Working tree was clean before these documentation changes. No Milestone 2 code has been implemented at this checkpoint.
+Checkpoint: **company research navigation implemented and locally verified; not deployed**. The documentation-only checkpoint `8589c84d7ea9b74eaabe244f035777f9554b39f4` was pushed before implementation so a remote continuation was already available. This newer checkpoint contains the implementation; inspect the current PR #168 head and CI before continuing.
 
-Inspection found an integration defect: Opportunities links pass an unheld candidate through `portfolio_symbol`; Portfolio then replaces it with the first loaded holding. Company research must retain its own selected symbol rather than silently showing another company.
+Completed in this increment:
 
-Next concrete increment:
+- Independent `research_symbol` prevents an unheld Opportunities candidate from silently becoming the first holding. Invalid/ambiguous/unknown symbols show an explicit gap; no substitute dossier appears.
+- `CompanyResearchWorkspace.tsx` uses the current configured watchlist plus bounded loaded holdings, separate membership status, a labelled picker and Back/Forward support. It reuses the manual, lazy, source-unconnected dossier without any provider/model/financial request.
+- Scanner search/status/display limit use a bounded URL contract and a fixed return route. A lost frozen snapshot is not recreated or automatically rescanned. Positions, notes, credentials and arbitrary return URLs are not copied into generated links.
+- The shipped `api/auth.js` data-free check and `server/api/release-access-check.test.js` were carried forward from production main without overwriting the newer Portfolio UI.
+- A root `AGENTS.md` now requires this continuation file to be kept current at checkpoints. Release plan/register headings now point to the actual shipped Milestone 1 evidence.
 
-1. Add a separate, bounded company-research navigation contract (`research_symbol`) and safe scanner return context. Preserve the selected holding independently. Reject malformed/unknown symbols without substituting another company or implying a position.
-2. Connect Opportunity cards to a read-only dossier workspace for the configured holding/watchlist company. Keep the dossier source explicitly unconnected, lazy and manual; no financial enrichment/provider/model requests.
-3. Retain scanner search/status/display limit through the link and return navigation. Do not claim a lost frozen snapshot was restored or silently rerun a scan.
-4. Add deterministic URL tests and intercepted browser stories for unheld candidates, malformed/deep links, Back/Forward, missing holdings, mobile and zero writes/detail-provider calls.
-5. Update this file with exact implementation/tests and push a coherent checkpoint to PR #168.
+Files to inspect:
+
+- `src/utils/companyResearchNavigation.ts` and `.test.ts`: bounded URL/return contract and five deterministic cases.
+- `src/components/opportunities/OpportunityScanner.tsx` / `OpportunityCard.tsx`: view-state retention and dossier links.
+- `src/components/portfolio/CompanyResearchWorkspace.tsx`: independent read-only company destination.
+- `src/components/PortfolioIntelligence.tsx` / `src/App.tsx`: current watchlist/context wiring.
+- `qa/test_company_research_navigation.py`: ten intercepted integration cases; added to `qa-validation.yml`.
+- `docs/release/release2-company-research-navigation.md`: implementation review and limits.
+
+Verification at this checkpoint: **1,763 Node tests passed**, TypeScript/build/security/32-file migration manifest/whitespace passed; **51 focused browser cases passed** across the new flow, Opportunities, holding dialog, dossier and Portfolio navigation. The source security scan ran after new files were tracked. Existing large-bundle warnings remain. These are real Cloud checks; final saved-head CI is recorded in draft PR #168 and must be checked there, not inferred from a previous commit.
+
+Next concrete increment — do this before a Milestone 2 release:
+
+1. Reconcile the shipped per-position accounting safeguards into the newer Portfolio flow. `tradePerformance` is strict, but `rawAnalyses` still starts from stored holding average cost. Review `PortfolioIntelligence.tsx` near `rawAnalyses`/`tradePerformance`, `reviewedPortfolioAccounting.ts`, `loadedLedgerReview.ts`, and production main's older component for the intended abstention. Preserve the newer navigation/dialog; do not copy the whole older UI.
+2. Fold reviewed original-ledger remaining cost into per-position conditional P&L/scenario displays. Unknown fees/currency/order/quantity or unavailable trades must withhold those financial fields; admitted quote valuation/complete-denominator weights remain separate. Never mutate raw holdings or saved rule configuration to make calculations pass.
+3. Carry forward historical portfolio/peer return and historical exit-target abstention. Remaining feature paths still call legacy historical/counterfactual calculators without supported full-history/source contracts. Add visible unavailable explanations and fictional regressions rather than declaring source coverage complete.
+4. Finish the remaining calendar/inbox/dossier context and accessibility stories without automatic provider reads or live activation. The new dossier remains explicitly unconnected; it is not financial enrichment or verified issuer research.
+5. Update this file/review/register, run meaningful focused plus required checks, commit/push a coherent checkpoint to draft PR #168. Keep production at Milestone 1 until a later release is actually ready and authorized.
 
 ## Remaining integration/safety work
 
 - The main-based Milestone 1 backport included compatibility changes in the older production Portfolio UI. Carry those safeguards forward while preserving the newer feature navigation: ledger-reviewed per-position cost/P&L, safe tiny/null formatting, and withholding unsupported historical/peer return claims. Do not copy the older whole component over the newer UI.
-- Copy/reconcile the small data-free auth handler/check from production main before the next release candidate; it is not yet on this feature branch at this checkpoint.
+- The data-free auth handler/check is now reconciled from production main. Keep it intact; the remaining Portfolio compatibility work above is still a release prerequisite.
 - Milestone 2 still needs broader Portfolio/Opportunities/dossier/calendar/inbox user stories, source/conflict explanations, retained reading/editing state, missing/loading/error cases and keyboard/mobile acceptance.
 - Real issuer/source acquisition, authoritative full ledger/corporate-action evidence, live NVIDIA/JEV effectiveness and forecast outcomes remain unverified. Fictional fixtures, hashes and declarations do not establish those facts.
 - Other milestones and historical scope: `release2-five-deployments.md`, `release2-remaining-work.md`, `release2-engineering-plan.md`. Older statements saying no milestone has shipped are superseded by this checkpoint.
+
+## Standing preferences and model continuity
+
+- REA is primarily for feature mirroring/reference analysis, not general development work. Existing pinned/static comparisons do not establish complete reference-runtime parity.
+- JEV credits are in the official TypeSafe console. The configured NVIDIA shortlist uses `openai/gpt-oss-20b` at `https://integrate.api.nvidia.com/v1`; do not append OpenRouter's `:free` suffix or assume live availability/usefulness. No production key retrieval or unapproved provider call is implied.
+- A different ChatGPT model is fine for continuation: repository state, contracts, tests and actual CI are authoritative. Re-read the checkpoint and diffs; do not invent missing conversation history or treat illustrative fixtures as verified financial facts.
 
 ## Working safely and testing
 

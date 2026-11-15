@@ -1,5 +1,7 @@
 # AI Infra Watch — Release 2 engineering plan
 
+Current status (15 November 2026): Milestone 1 is deployed under its explicitly approved control exception; [production evidence](milestone1-production-2026-11-15.md). The pre-release notes below are historical where they say the milestone is blocked/unshipped. Continue Milestone 2 from [CODEX-CONTINUATION.md](CODEX-CONTINUATION.md); broader source/accounting truth and future protection setup remain open.
+
 Rollout direction updated 15 November 2026: [five milestone production releases](release2-five-deployments.md), each tied to a completed, reviewed candidate and its own acceptance/rollback evidence. This replaces the single final-rollout schedule; live acquisition/delivery and production database changes remain separate actions.
 
 Status: implementation in progress. R2.1 snapshot research and the first UI/UX pass are implemented in draft PR #168. The [calendar increment](release2-calendar-review.md) implements part of R2.2; the [read-only inbox and focused Portfolio workspaces](release2-inbox-portfolio-review.md) implement the first R2.3 reader slice. The [fictional notification-policy preview](release2-notification-policy-preview.md) adds the offline proposal slice of R2.3. Financial/provider work, authoritative live policy adapters and evaluation extensions remain pending. No new sending policy is activated.

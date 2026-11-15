@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { STOCK_UNIVERSE } from '../../utils/stockUniverse';
 import { captureResearchSnapshot, type ResearchSnapshot } from '../../utils/researchSnapshot';
 import { scanResearchSnapshot, type ResearchCandidate, type ResearchStatus } from '../../utils/opportunityResearch';
+import {readOpportunityView,opportunityViewParams} from '../../utils/companyResearchNavigation';
 import OpportunityCard, { researchLabels } from './OpportunityCard';
 import { formatReviewDate } from '../../utils/portfolioReview';
 import OpportunityJevReview from './OpportunityJevReview';
@@ -13,9 +14,14 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
   const [scan, setScan] = useState<{snapshot:ResearchSnapshot; candidates:ResearchCandidate[]; source:SourceQualitySnapshot|null}|null>(null);
   const sequence=useRef(0);
   const [error,setError] = useState('');
-  const [query,setQuery] = useState('');
-  const [status,setStatus] = useState<ResearchStatus|'all'>('all');
-  const [limit,setLimit] = useState(20);
+  const [query,setQuery] = useState(()=>readOpportunityView(new URLSearchParams(window.location.search)).query);
+  const [status,setStatus] = useState<ResearchStatus|'all'>(()=>readOpportunityView(new URLSearchParams(window.location.search)).status);
+  const [limit,setLimit] = useState(()=>readOpportunityView(new URLSearchParams(window.location.search)).limit);
+  useEffect(()=>{
+    const safe=opportunityViewParams({query,status,limit});
+    window.history.replaceState(window.history.state,'',window.location.pathname+(safe.size?'?'+safe.toString():'')+window.location.hash);
+  },[query,status,limit]);
+  useEffect(()=>{const restore=()=>{const view=readOpportunityView(new URLSearchParams(window.location.search));setQuery(view.query);setStatus(view.status);setLimit(view.limit);};window.addEventListener('popstate',restore);return()=>window.removeEventListener('popstate',restore);},[]);
   const run = () => {
     try {
       const now = Date.now();
@@ -23,7 +29,7 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
       const companies = Object.fromEntries(STOCK_UNIVERSE.map(item => [item.symbol,{name:item.name,assetClass:'unknown' as const}]));
       const snapshot = captureResearchSnapshot({id:'loaded-snapshot:'+now,nowMs:now,holdings,watchlist,quotes,companies,holdingsAvailable});
       const source=(import.meta.env.DEV||import.meta.env.VITE_QA_MODE==='true')?captureSourceQualitySnapshot(snapshot.entries.map(row=>row.symbol),quotes,`source-snapshot:${now}:${++sequence.current}`,now):null;
-      setScan({snapshot,candidates:scanResearchSnapshot(snapshot,now),source}); setError(''); setLimit(20);
+      setScan({snapshot,candidates:scanResearchSnapshot(snapshot,now),source}); setError('');
     } catch { setError('Snapshot could not be evaluated. Existing results have not been replaced; reload reliable inputs before retrying.'); }
   };
   const visible = (scan?.candidates ?? []).filter(item => (status === 'all' || item.status === status) && (item.symbol+' '+item.companyName).toLowerCase().includes(query.trim().toLowerCase()));
@@ -43,13 +49,13 @@ export default function OpportunityScanner({ holdings, watchlist, quotes, loadin
       {!scan.candidates.length ? <p role="status">No holdings or watchlist symbols are available in this snapshot.</p> : <>
         <p className="text-sm">Research input coverage: {scan.candidates.filter(item => item.dataEligibility === 'eligible').length}/{scan.candidates.length} eligible · 0 validated signal families</p>
         <div className="grid gap-3 sm:grid-cols-2 text-sm">
-          <label>Search research candidates<input type="search" value={query} onChange={event => {setQuery(event.target.value);setLimit(20);}} className="mt-1 block w-full min-w-0 rounded border border-white/25 bg-[#15181e] px-3 py-2 focus-visible:outline" /></label>
+          <label>Search research candidates<input type="search" value={query} onChange={event => {setQuery(event.target.value.slice(0,80));setLimit(20);}} className="mt-1 block w-full min-w-0 rounded border border-white/25 bg-[#15181e] px-3 py-2 focus-visible:outline" /></label>
           <label>Research status<select value={status} onChange={event => {setStatus(event.target.value as ResearchStatus|'all');setLimit(20);}} className="mt-1 block w-full min-w-0 rounded border border-white/25 bg-[#15181e] px-3 py-2 focus-visible:outline"><option value="all">All research statuses</option>{Object.entries(researchLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
         <p role="status" className="text-sm">Showing {Math.min(limit,visible.length)} of {visible.length} matching symbols · holdings first, then symbol; no return ranking</p>
         {!visible.length && <p>No research candidates match these filters.</p>}
-        {visible.slice(0,limit).map(candidate => <OpportunityCard key={candidate.symbol} candidate={candidate} />)}
-        {visible.length>limit && <button type="button" className="rounded border border-white/25 px-4 py-2 focus-visible:outline" onClick={() => setLimit(value => value+20)}>Show 20 more</button>}
+        {visible.slice(0,limit).map(candidate => <OpportunityCard key={candidate.symbol} candidate={candidate} view={{query,status,limit}} />)}
+        {visible.length>limit && limit<200 && <button type="button" className="rounded border border-white/25 px-4 py-2 focus-visible:outline" onClick={() => setLimit(value => Math.min(200,value+20))}>Show 20 more</button>}
       </>}
     </>}
   </section>;

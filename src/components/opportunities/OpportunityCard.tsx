@@ -1,8 +1,9 @@
+import {companyResearchHref,type OpportunityView} from '../../utils/companyResearchNavigation';
 import { formatReviewDate } from '../../utils/portfolioReview';
 import type { ResearchCandidate } from '../../utils/opportunityResearch';
 
 export const researchLabels = { 'research-candidate':'Experimental research candidate', monitor:'Monitor reported evidence', 'needs-data':'Needs reliable data', excluded:'Outside issuer research scope' };
-export default function OpportunityCard({ candidate }: { key?:string; candidate:ResearchCandidate }) {
+export default function OpportunityCard({ candidate,view={query:'',status:'all',limit:20} }: { key?:string; candidate:ResearchCandidate;view?:OpportunityView }) {
   return <article className="min-w-0 rounded-xl border border-white/20 bg-white/[.025] p-4" data-testid="opportunity-card">
     <h2 className="text-xl font-bold">{candidate.symbol} <span className="text-sm font-normal text-white/70">{candidate.companyName}</span></h2>
     <p className="mt-2 text-sm text-cyan-200">{researchLabels[candidate.status]} · {candidate.portfolioContext}</p>
@@ -19,6 +20,6 @@ export default function OpportunityCard({ candidate }: { key?:string; candidate:
         <p>No validated return advantage, trade instruction, or portfolio-state change is implied.</p>
       </div>
     </details>
-    <div className="mt-4 flex flex-wrap gap-3 text-sm"><a className="rounded border border-white/25 px-3 py-2 focus-visible:outline" href={'/portfolio?portfolio_tab=research&portfolio_symbol='+encodeURIComponent(candidate.symbol)}>Existing portfolio research</a><a className="rounded border border-white/25 px-3 py-2 focus-visible:outline" href="/guide">Financial glossary</a></div>
+    <div className="mt-4 flex flex-wrap gap-3 text-sm"><a className="rounded border border-white/25 px-3 py-2 focus-visible:outline" href={companyResearchHref(candidate.symbol,view)||undefined}>Open company dossier</a><a className="rounded border border-white/25 px-3 py-2 focus-visible:outline" href="/guide">Financial glossary</a></div>
   </article>;
 }

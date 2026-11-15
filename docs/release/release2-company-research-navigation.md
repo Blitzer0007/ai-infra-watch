@@ -1,0 +1,15 @@
+# Milestone 2 — company research navigation
+
+15 November 2026. Implemented on `feature/release2-opportunity-research` for draft PR #168; not deployed. [Portable continuation checkpoint](CODEX-CONTINUATION.md).
+
+Opportunities previously passed its candidate through the selected-holding parameter. Portfolio could replace an unheld candidate with the first loaded holding, so the research destination could silently refer to a different company. Research now uses an independent `research_symbol`, validates it against the bounded configured context and shows an explicit unavailable state instead of substituting a holding.
+
+- The scanner retains bounded search, status and display-limit fields in the URL. Its dossier link and fixed Opportunities return path copy only those view fields. They never serialize position values, notes, credential fields or an arbitrary return URL.
+- Company research offers a labelled picker, safe Back/Forward restoration, separate holding-membership status and a manually opened dossier. The current watchlist is passed from App, including custom configured symbols; static universe names remain descriptive metadata only.
+- Unknown/ambiguous/malformed symbols cannot open another company's dossier. Missing holdings remain unknown membership rather than proof of no position. A company change remounts the disclosure so stale facts/sections cannot be attributed to another issuer.
+- The dossier source stays explicitly unconnected. The view adds no provider/model requests, holdings edits, accounting authority, source acquisition, polling or messages. Returning to the scanner does not manufacture or silently regenerate a missing frozen snapshot.
+- The shipped data-free authentication check and its four zero-transport tests are carried forward from production main. Other compatibility fixes in the main-based older Portfolio UI still require careful reconciliation with this newer UI before a Milestone 2 release.
+
+Verification: 1,763 Node tests pass, including five URL-contract tests and four carried-forward auth checks; 51 focused browser cases pass across company navigation, Opportunities, holding detail, dossier and Portfolio workspaces. New browser cases cover unheld companies, malformed/unconfigured/ambiguous links, Back/Forward, missing holdings, manual return/rescan, 360/768/1440px layouts and zero writes/detail-provider requests. TypeScript, production build, source security, unchanged 32-file migration manifest and whitespace checks pass. The existing large-bundle warning remains; exact saved-head CI is recorded in draft PR #168.
+
+Milestone 2 is not complete. Next: preserve the shipped per-position ledger/cost and historical-comparison abstention safeguards while integrating the remaining calendar/inbox/dossier stories. Authentic financial sources, full accounting receipts and model/provider effectiveness remain separate prerequisites. Production release count remains **1/5**.

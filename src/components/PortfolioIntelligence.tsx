@@ -3,6 +3,7 @@ import type { LedgerAvailability } from '../utils/loadedLedgerReview';
 import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
 import HoldingCompanyDossier from './portfolio/HoldingCompanyDossier';
+import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
 import CompanyDossierPreview from './portfolio/CompanyDossierPreview';
 import EventRiskRadar from './portfolio/EventRiskRadar';
 import PortfolioValuationCoverage from './portfolio/PortfolioValuationCoverage';
@@ -66,6 +67,7 @@ type SelectedChartState = {
 };
 
 type Props = {
+  researchWatchlist?: readonly string[];
   livePrices?: Record<string, Price>;
   contracts?: any[];
   congressTrades?: any[];
@@ -77,7 +79,7 @@ type Props = {
 const WATCHLIST = STOCK_UNIVERSE;
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
-export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
+export default function PortfolioIntelligence({ researchWatchlist = [], livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
   const [holdingsVisited, setHoldingsVisited] = useState(tab === 'holdings');
   const sectionHeading = useRef<HTMLHeadingElement>(null);
@@ -917,7 +919,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <Metric label="AI infrastructure strength" value={infraScore == null ? 'Unavailable' : Math.round(infraScore).toString()} suffix={infraScore == null ? '' : '/100'} tone={infraScore == null ? 'warn' : infraScore >= 50 ? 'up' : 'down'} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      {tab === 'research' && <div className="space-y-4">{import.meta.env.DEV&&<CompanyDossierPreview/>}<PortfolioResearchPanel /></div>}
+      {tab === 'research' && <div className="space-y-4"><CompanyResearchWorkspace holdings={holdings.map(item=>item.symbol)} watchlist={researchWatchlist} holdingsStatus={portfolioLoading?'loading':portfolioError?'unavailable':'ready'} />{import.meta.env.DEV&&<CompanyDossierPreview/>}<PortfolioResearchPanel /></div>}
 
       {tab === 'holdings' && (
         <div className="space-y-4">

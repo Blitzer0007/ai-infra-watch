@@ -1,5 +1,7 @@
 # Milestone 1 — safety foundation acceptance
 
+Current status (15 November 2026): Milestone 1 is deployed under its explicitly approved control exception; [production evidence](milestone1-production-2026-11-15.md). The pre-release notes below are historical where they say the milestone is blocked/unshipped. Continue Milestone 2 from [CODEX-CONTINUATION.md](CODEX-CONTINUATION.md); broader source/accounting truth and future protection setup remain open.
+
 15 November 2026. This checklist separates implemented safeguards, candidate integration and hosted release acceptance. It replaces an informal completion percentage; **the milestone is not complete while required release controls are unverified or failing**.
 
 ## Implemented and offline verified

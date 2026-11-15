@@ -1,5 +1,7 @@
 # Milestone 1 release handoff
 
+Current status (15 November 2026): Milestone 1 is deployed under its explicitly approved control exception; [production evidence](milestone1-production-2026-11-15.md). The pre-release notes below are historical where they say the milestone is blocked/unshipped. Continue Milestone 2 from [CODEX-CONTINUATION.md](CODEX-CONTINUATION.md); broader source/accounting truth and future protection setup remain open.
+
 ## Candidate boundary
 
 `release/milestone1-safety` starts at production main `d59cb9191d2d33b4e698b7942f31bf5f7557da9c`. It backports the shared accounting/quote/rule boundaries, alert and digest safeguards, production-UI compatibility and manual release guard from `feature/release2-opportunity-research` (source foundation `e53682c408ccd3346c554e6af4e76f37d9c93995`). The exact candidate head and CI links are recorded in [draft PR #170](https://github.com/Blitzer0007/ai-infra-watch/pull/170). Draft PRs #167/#168 remain separate; never merge that unfinished stack as a shortcut.
