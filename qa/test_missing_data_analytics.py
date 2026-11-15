@@ -25,6 +25,12 @@ def setup(page,symbols=('NVDA','AMD'),observed=('NVDA',),histories=None):
     mock_local_apis(page)
     control={'stale':False,'quotes':0}
     rows=[{'id':'fictional-'+symbol,'symbol':symbol,'quantity':1,'averageCost':100,'purchaseDate':'2026-01-01'} for symbol in symbols]
+    # Original fictional quantity/cost receipts keep valuation independent of source gaps.
+    for row in rows:
+        row['currency']='USD'
+        row['accountingInputs']={'contractVersion':'stored-holding-inputs-v1','symbol':row['symbol'],'quantity':row['quantity']}
+    trades=[{'id':'fictional-trade-'+symbol,'symbol':symbol,'dataQuality':'ok','accountingInputs':{'contractVersion':'stored-ledger-inputs-v1','symbol':symbol,'transactionType':'BUY','quantity':1,'amount':100,'brokerage':0,'currency':'USD','tradeDate':'2026-01-01','executedAt':None,'quantityDerived':False,'priceDerived':False}} for symbol in symbols]
+    page.route('**/api/portfolio?includeTransactions=true',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps({'transactions':trades})))
     page.route('**/api/portfolio?includeLots=true',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps({'holdings':rows})))
     page.route('**/api/live-data**',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps({'stockPrices':{},'contracts':[],'news':[],'macroRisks':[]})))
     def quote(route):

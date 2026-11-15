@@ -13,7 +13,7 @@ def fictional_portfolio_projection():
     root=Path(__file__).resolve().parents[1]
     return json.loads(subprocess.check_output(["node","qa/fixtures/milestone1-portfolio.fictional.mjs","legacy-ui"],cwd=root,env={"PATH":os.environ["PATH"]},text=True))
 
-def mock_local_apis(page):
+def mock_local_apis(page, *, declared_quotes=False):
     if __import__('os').getenv('QA_UI_MOCKS') != 'true':
         return
     def api_route(route):
@@ -26,6 +26,9 @@ def mock_local_apis(page):
                 route.fulfill(status=200, content_type='application/json', body=_json.dumps({'ok':True,'mode':'autonomous-mcp','question':'What changed recently for NVDA?','summary':'Mocked evidence-backed synthesis for UI validation.','answer_source':'deterministic-evidence','jev':{'enabled':True,'evidence_gate':{'action':'stop','evidence_quality':80}},'calls':[{'tool':'stocks.get_quote','ok':True}],'trajectory':[]}))
             return
         if '/api/quote' in url:
+            if not declared_quotes:
+                # Legacy source-gap tests intentionally receive incomplete quote metadata.
+                route.fulfill(status=200,content_type='application/json',body=_json.dumps({'symbol':'NVDA','price':200.0,'changePct':1.0,'provider':'qa'})); return
             symbol=parse_qs(urlparse(url).query).get('symbol',['NVDA'])[0]
             now=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
             route.fulfill(status=200, content_type='application/json', body=_json.dumps({'symbol':symbol,'returnedSymbol':symbol,'price':200.0,'changePct':1.0,'provider':'qa-fictional','sourceMode':'live','currency':'USD','adjustedBasis':'raw','marketTimePrecision':'instant','marketTime':now,'retrievedAt':now,'isMarketSessionOpen':True,'stale':False,'simulated':False})); return
@@ -270,7 +273,7 @@ def test_money_rotation_semantic_colors_mount(page):
 
 
 def test_exit_profit_scenarios_identify_selected_ticker(page):
-    mock_local_apis(page)
+    mock_local_apis(page, declared_quotes=True)
     goto_app(page)
     page.goto("/portfolio?portfolio_tab=holdings", wait_until="domcontentloaded")
     portfolio = page.get_by_test_id("portfolio-intelligence")

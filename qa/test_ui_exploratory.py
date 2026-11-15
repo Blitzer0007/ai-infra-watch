@@ -282,7 +282,7 @@ def test_forward_outlook_verified_forecast_results_match_telegram(page):
 
 
 def test_exploratory_sorting_portfolio_scenarios(page):
-    mock_local_apis(page)
+    mock_local_apis(page, declared_quotes=True)
     goto_app(page)
     page.goto("/portfolio", wait_until="domcontentloaded")
     page.get_by_test_id("portfolio-intelligence").wait_for(state="visible", timeout=30000)
@@ -332,7 +332,7 @@ def test_tracker_customize_remove_persists_without_deleting_support(page):
 
 
 def test_exploratory_global_table_accessibility(page):
-    mock_local_apis(page)
+    mock_local_apis(page, declared_quotes=True)
     goto_app(page)
     for nav_id, label in [
         ("congress", "Trade Date"),

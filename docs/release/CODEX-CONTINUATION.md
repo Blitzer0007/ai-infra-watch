@@ -9,6 +9,7 @@ Updated 15 November 2026 UTC. This file is a living checkpoint for Codex Cloud a
 - Cloud workspace: `/workspace/ai-infra-watch`. No Windows execution is required.
 - Source baseline before this checkpoint: `562d9ddc3a6c1be4f86471f4e9eea9f8c6a0a101`; 1,754 Node tests and all seven CI workflows passed on that exact baseline. Those results do not certify subsequent source changes.
 - Previous verified Milestone 2 head: `378db7a8810e7147edc240a0d259124923f62e0f` (all seven CI workflows passed).
+- Accounting implementation source: `7c5bc59509a87b7475e37fa62dd9ff8689b1ac42`; a subsequent test-fixture compatibility checkpoint is included at the current PR head. The first full UI CI run exposed seven fixture-coupling failures; do not report that source head as all-green.
 - Initial Milestone 2 source commit: `dbf0d1f36392464735b8da3d96f2cdeb7c80fba4`. The current checkpoint also includes legacy-link reload canonicalization; obtain the latest implementation from the current feature/PR head rather than stopping at that initial commit.
 - Discover the latest checkpoint SHA from the draft PR head or `git log -1 --format=%H -- docs/release/CODEX-CONTINUATION.md`; a file cannot embed its own future commit SHA.
 
@@ -37,7 +38,7 @@ Completed in this increment:
 - Exact scenario cost avoids rebuilding cost from a rounded/divided average. Null, observed zero, losses, fractional quantities and tiny costs are kept distinct; finite bounded arithmetic and tiny-money formatting apply to the reviewed view.
 - Unsupported portfolio historical returns/pressure reconstruction, benchmark comparisons, peer counterfactuals and historical-high exit targets show unavailable explanations. Their financial consumers and additional maximum-history requests are removed from this UI. The explicit descriptive price chart/correlation remains separate.
 - The newer Portfolio dialog/navigation/editors, independent `research_symbol`, scanner return filters and shipped data-free auth check are preserved.
-- Shared positive browser mocks now contain fictional original-ledger receipts and complete quote declarations. These declarations are test inputs, never proof of authentic source/history coverage.
+- Shared positive browser mocks now contain fictional original-ledger receipts; complete quote declarations are an explicit `declared_quotes=True` opt-in for scenario/table tests. Existing source-gap and controlled council-feed tests keep their incomplete-quote default. Missing-data valuation fixtures supply their own original quantity/trade receipts. These declarations are test inputs, never proof of authentic source/history coverage.
 
 Files to inspect:
 
@@ -48,7 +49,7 @@ Files to inspect:
 - `docs/release/release2-reviewed-position-accounting.md`: review, limits and evidence.
 - Previous navigation: `companyResearchNavigation.ts`, `CompanyResearchWorkspace.tsx`, scanner/card components and `qa/test_company_research_navigation.py`.
 
-Verification: **1,784 Node tests passed** (21 new per-position cases); 60 focused original-input accounting cases also passed after the final explicit-null guard cleanup. **102 distinct focused browser cases passed** across the new view, existing accounting/valuation, dialog, navigation, company research and shared UI/exploratory flows. A sortable-column selector and shared positive-mock timestamp precision were corrected; the final new-suite and affected UI/exploratory reruns passed without weakening gates. TypeScript/build/tracked-source security/32-file migration manifest/whitespace checks passed. Existing main-bundle warnings remain (~1,760 kB). Exact saved-head CI is recorded in draft PR #168; inspect its current SHA/status, not previous-head evidence.
+Verification: **1,784 Node tests passed** (21 new per-position cases); 60 focused original-input accounting cases also passed after the final explicit-null guard cleanup. **102 distinct focused browser cases passed** across the new view, existing accounting/valuation, dialog, navigation, company research and shared UI/exploratory flows. A sortable-column selector and shared positive-mock timestamp precision were corrected; the final new-suite and affected UI/exploratory reruns passed without weakening gates. The full CI run then exposed seven legacy fixture-coupling failures; these were corrected by scoping complete quotes to positive tests and supplying original valuation receipts. The follow-up run passed **29 cases**, with **one production-build council check skipped locally** because its separate preview URL was not supplied (the full CI job supplies it). TypeScript/build/tracked-source security/32-file migration manifest/whitespace checks passed. Existing main-bundle warnings remain (~1,760 kB). Exact saved-head CI is recorded in draft PR #168; inspect its current SHA/status, not previous-head evidence.
 
 Next concrete increment — do this before a Milestone 2 release:
 
