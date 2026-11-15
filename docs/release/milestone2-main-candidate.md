@@ -1,42 +1,67 @@
-# Milestone 2 — main-based review candidate
+# Milestone 2 — isolated main-based candidate and acceptance matrix
 
-**Status: source candidate being assembled; no successful exact-candidate CI evidence until GitHub has finished the new PR checks. Not merged or deployed.**
+**Review date:** 15 November 2026. **Current working PR:** [#172](https://github.com/Blitzer0007/ai-infra-watch/pull/172), draft against production `main`. **No merge or deployment.**
 
-## Source pins
-- Base: production \`main\` at \`d678cbe0ada0a329f541273181fb0b7f52ad0f90\`.
-- Development reference: draft PR #168 at \`d14f5fe57028d3277cc229b704bc126192f42815\`, itself stacked on unresolved draft PR #167. Both original PRs remain unchanged.
-- New candidate branch: \`release/milestone2-integrated-candidate-20261115\` created directly from main. New commit SHA must be taken from the PR head.
-- Exact change set is a **main-first port**, not a merge or a copy of all 433 branch files.
+## Pinned sources and verification
 
-## Candidate scope actually intended
-- Integrates read-only **Opportunities**, **Catalyst Calendar**, **Alert Inbox** routes into existing main App, preserving its existing auth, accounting, financial admission and release safeguards.
-- Preserves explicit manual **Scan loaded snapshot** (no automatic research calls) and relevant opportunity/issuer coverage distinctions. Future agent/model and source-quality execution panels have been deliberately excluded from the new scanner.
-- Calendar reuses the **existing Watchlist earnings feed** snapshot. Opening Calendar makes no fetch or notification. Date-only, revisions, source status and missing coverage stay explicit.
-- Alert Inbox distinguishes browser detection from protected delivery ledger status; protected server route is GET-only, using existing authorization and no new schema or notifications. Loading server history remains a user action.
-- Integrates **Company Research** inside the pre-existing main Portfolio Research tab without overwriting main portfolio calculations or Main Milestone 1 data-quality rules. Exact clicked Calendar/Inbox records are bounded in App memory and never inserted in URLs, persisted storage or delivery correlation.
-- Renders a source-boundary disclaimer: opened event/alert evidence is separate from unconnected company financial dossier. Missing evidence cannot become a verified issuer/price/trading signal.
-- Removes two passive browser-side \`POST /api/signal-scorecard\` paths from Portfolio and Signal Fusion while preserving read-only GET history and existing production API authorization. Adds an unsaved-edit disclaimer; does not change Save/Cancel action semantics.
-- Uses portable source/dossier admission modules only for declarative UI explanation. No new autonomous Council/REA model execution, forecaster, event radar, scheduled jobs, provider polling, Telegram sender, schema migration or external secret access is included.
-- Adds offline UI tests for routes, direct-event context loss, responsive layouts and zero passive signal-store writes. Adds deterministic pure unit tests. Existing main CI jobs are retained and must pass.
+| Item | Evidence |
+| --- | --- |
+| Shipped Milestone 1 main base | `d678cbe0ada0a329f541273181fb0b7f52ad0f90` |
+| Stacked development reference | Draft PR #168, `d14f5fe57028d3277cc229b704bc126192f42815`; source branch not rewritten |
+| Current verified *source* checkpoint | `62d3884591af5de3dbca2656e21b7270628517aa` |
+| Frontend CI | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691855), 908/908 Node tests, TypeScript lint, build and migration manifest checks |
+| Security audit | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691902) |
+| UI/API/DB Validation | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691812), mocked Playwright plus disposable Postgres and offline CI-safety jobs |
+| PR comparison | 75 files changed at source checkpoint, based directly on `main`, mergeable without reported textual conflicts |
 
-## Safety and compatibility checks
-1. Compare candidate feature code with main; **main financial/accounting/auth/release source stays authoritative**, including \`api/auth.js\`, \`api/portfolio.js\`, \`shared/portfolioAccounting.js\`, \`shared/quoteAdmission.js\`, \`server/api/decision-center.js\`, \`scripts/release-candidate.mjs\`, and production deploy workflow.
-2. The sole server API addition is read-only \`GET /api/alert-inbox\` routed through the existing protected market router. The GET implementation requires authorization; it may read permitted delivery-ledger metadata only after an actual authorized request. **No live protected request has been made by this candidate development task.**
-3. Main deployment configuration retains \`git.deploymentEnabled=false\`; PR creation does not authorize Vercel preview or production deployment.
-4. QA in GitHub must be mocked/loopback, not live providers or production Supabase. Use only fictional holdings and source fixtures.
-5. The user requires **exact-current-SHA CI to finish successfully before continuation**. A failed check must be diagnosed and repaired; do not disable checks, weaken no-write assertions or count a previous-head success as new-head green.
-6. GitHub previously reported \`main.protected=false\` although \`scripts/release-candidate.mjs\` requires protected main for a release. This remains an independent future release blocker. No settings were changed.
-7. A draft candidate PR or this handoff does **not** authorize merge, deploy, secret inspection, Supabase change, live API polling, Telegram delivery or investment action.
+A future documentation-only commit changes the exact branch SHA and **requires fresh exact-head GitHub conclusions**; these links certify only `62d3884`. The 3 workflow families are the ones triggered by this isolated PR's changed paths. The 4 extra agent/backend/quality workflow families seen on PR #168 are separately path-filtered and were not triggered by this narrower candidate; don't call them passed on this PR.
 
-## Release limitations
-- Live data/source authenticity, complete transactions and corporate actions, true event/inbox delivery coverage, external model accuracy and hosted acceptance are **not validated** by fixture tests.
-- External Council/forecast/risk radar work remains in PR #168 for later milestones; it is not part of this main-based candidate.
-- Candidate fidelity must be assessed against the relevant Milestone 2 acceptance matrix; do not mark production release or five-milestone count as completed from code or CI alone.
-- The full PR #168 stack is 85 commits ahead and 10 behind main; this branch does **not** attempt to reconcile every unrelated feature and cannot serve as proof that PR #167 is mergeable.
+## Delivered candidate scope
 
-## Codex continuation
-Read this file and the latest draft PR for \`release/milestone2-integrated-candidate-20261115\`, review the exact current commit and tests. If CI fails, inspect authentic job logs, correct the underlying issue and rerun full CI until green. After green, audit remaining Milestone 2 acceptance gaps, particularly production-independent route/navigation restoration, stable editing, authentication, mobile keyboard access and dossier source boundaries. Keep all original work and PRs unchanged; stop at review-only.
+- Retains the production main auth, quote-admission, ledger/accounting, risk-rule kernel, controlled alerts and release scripts. Does **not** wholesale merge PR #167 or #168.
+- Adds read-only **Opportunities** manual frozen-snapshot scanning, **Catalyst Calendar** based on a Watchlist-loaded earnings snapshot, and **Alert Inbox** with an explicit manual server-history GET.
+- Adds Company Research to the existing main Portfolio Research section, independently selecting configured holdings/watchlist companies. Issuer names, financial statements and Telegram receipts are not assumed authentic or corroborated.
+- Keeps selected Calendar/Inbox records in a bounded App-session map and off URLs; a reload or direct link has no original record and displays unavailability instead of selecting a same-symbol substitute.
+- Prevents passive `POST /api/signal-scorecard` from Portfolio and Signal Fusion review, and prevents a Watchlist configuration POST in development/QA. Existing production config synchronization remains under the pre-existing app controls.
+- Pauses inherited per-portfolio quote, history, FX and analyst request paths while Company Research is selected; existing global bootstrap behavior is not changed.
+- Fixes the existing `DecisionJournalPanel` nullable weekly-result rendering crash by using its defined unavailable fallback. No journal is written by viewing it.
+- Exposes unsaved-holding-form status without automatically saving or discarding a draft when switching existing Portfolio sections.
 
-## First exact-candidate CI failures and planned correction
+## Candidate acceptance matrix
 
-Commit `e3553dfe85a724e7b2251bb7b5cfad7a34f02b38` failed Frontend CI (`35` unit test failures all caused by three omitted fictional fixtures) and one Playwright assertion expecting nonexistent text `Portfolio evidence`. Actual Evidence view rendered `Evidence coverage`; the browser test must use that real label without changing the zero-unexpected-write assertion. The correction imports `qa/fixtures/dossier-operating.fictional.json`, `qa/fixtures/sec-statements.fictional.json`, and `qa/fixtures/release2/research-input.json` intact from the verified source branch and updates only the mismatched test selector. The existing source-quality contracts and security checks are unchanged. **The corrected SHA requires its own successful CI; this is not pass evidence.**
+| Workstream | Verified fictional/offline coverage | Remaining limitation |
+| --- | --- | --- |
+| Main accounting/data quality | Main TypeScript/Node tests, release/security and disposable database jobs pass; audited main accounting files unchanged | Genuine broker completeness, corporate actions and issuer source accuracy not established |
+| Portfolio editor | Draft values persist across section changes; explicit save/cancel; no passive network writes asserted | This is main's existing editor, not the redesigned progressive editor from PR #168; advanced Back/Forward editing UX remains to be reconciled |
+| Opportunities | `qa/test_release2.py` and `qa/test_company_research_navigation.py`: frozen manual scans, status and filters, research selection, failure/empty distinctions, keyboard/responsiveness | Zero verified signal families; no autonomous ranking, new feed, or live-model performance proof |
+| Calendar | `qa/test_catalyst_calendar.py`: existing feed only after manual Watchlist access, date precision/zone, cancellation/revision, stale/simulated/failed sources, small screens | No independent new catalyst feed; snapshot coverage is bounded and session-local |
+| Alert Inbox | `qa/test_alert_inbox.py`, `server/api/alert-inbox.test.js`, `server/services/alertInbox.test.js`: GET-only authorization, recipient scope, redaction, provider uncertainty, paging, no resend | No real delivery/read receipt verification; query requires an authorized explicit user request |
+| Cross-workspace exact context | `qa/test_milestone2_candidate.py`: clicked Calendar event vs unrelated event, opened Inbox delivery, research/dossier separation, return without source re-fetch, link redaction and missing context after direct entry | This is narrower than the complete reading-context/scroll/focus/back-stack acceptance of stacked PR #168 |
+| Missing/error states | Browser tests cover missing holdings, empty data and null journal weekly summaries without dashboard crash | Hosted-production journey and independent accessibility audit are not established |
+| Writes, security and free tiers | Passive signal-store writes absent; existing production auth/portfolio APIs and deployments untouched; new inbox route is protected GET-only; no added cron/migrations | Authorized user interactions with existing editable components still need normal app permissions; no real Supabase or Telegram calls were made in verification |
+
+## Precise candidate file boundaries
+
+- **Main-preserving integrations:** `src/App.tsx`, `src/components/PortfolioIntelligence.tsx`, `PortfolioManager.tsx`, `PortfolioSignalFusion.tsx`, `BuySellWatchlist.tsx`, `EarningsAlerts.tsx`, `DecisionJournalPanel.tsx`.
+- **New review surfaces:** `src/components/opportunities/*`, `src/components/calendar/*`, `src/components/alerts/AlertInbox.tsx`, `src/components/portfolio/{CompanyResearchWorkspace,CompanyDossier,ReviewOriginContext,HoldingCompanyDossier}*`, related read-only adapters/utilities.
+- **Protected read API:** `api/market.js`, `vercel.json` (the `/api/alert-inbox` GET route), `server/api/alert-inbox.js`, `server/services/alertInbox.js`, `shared/alertDeliveryEvidence.js` and their offline unit tests.
+- **Deterministic tests and sources:** `qa/test_milestone2_candidate.py`, `qa/test_release2.py`, `qa/test_alert_inbox.py`, `qa/test_catalyst_calendar.py`, `qa/test_company_research_navigation.py`, fictional dossier/SEC fixture files, `.github/workflows/qa-validation.yml`.
+- **Deliberately untouched:** `api/auth.js`, `api/portfolio.js`, `server/api/decision-center.js`, production release workflow, Supabase migrations, cron workflows, production secrets or rows.
+- For the exhaustive 75-file manifest, review [PR #172 Files changed](https://github.com/Blitzer0007/ai-infra-watch/pull/172/files); this table is a scope summary, not a complete manifest.
+
+## Excluded from this isolated candidate / acceptance gaps
+
+The more extensive PR #168 design includes `PortfolioCommandCenter`, `HoldingDetailDialog`, `PortfolioNavigation`, consolidated section/back-stack/focus UX and expanded source/conflict presentation. Those components **were not ported wholesale** into this candidate because doing so would pull large stacked dependencies and risk overwriting shipped Milestone 1 safeguards. Do **not** treat source-branch 7/7 green CI as proof that those features shipped through this candidate.
+
+Likewise, Milestone 3 Bull/Bear/Judge agents and provider budgets, Milestone 4 forecasts/outcome claims, and Milestone 5 broad operational work remain deferred. The current candidate is a **tested integration increment**, not certification that every original Milestone 2 experience is fully replicated, or that any investment forecast is accurate.
+
+## Release blockers, authorization, rollback
+
+1. GitHub reports production `main.protected=false`, while the existing release script requires protected main. The prior one-off Milestone 1 owner exception is **not** automatically renewed. No protection/settings change was made.
+2. Independent product/compatibility review must decide whether to accept this narrower Milestone 2 increment or add remaining redesigned Portfolio UX before release. Do not silently classify those unported journeys as completed.
+3. A PR merge, Vercel build/staging/promotion, production data access, Supabase mutation, live provider polling, autonomous agent execution or Telegram send requires separate authorization. None occurred here.
+4. Production remains on the previously verified Milestone 1 deployment. Its reviewed rollback target remains documented in the original source-branch continuation. No rollback or deployment occurred.
+
+## Next Codex session
+
+Read this document, `docs/release/CODEX-CONTINUATION.md` on PR #172, and the **live PR head / exact SHA check conclusions**. Do not resume the older stacked draft in place of this main-based candidate. Resolve any new CI regression before moving on, preserve tests and financial abstentions, maintain a candidate-only acceptance matrix, and stop at a draft reviewed PR unless the owner separately authorizes merge/release.
