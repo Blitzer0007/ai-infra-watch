@@ -1,0 +1,1400 @@
+{
+  "sourceCommit": "59eb550c7d4c8df63a776ee340906cc77e342a36",
+  "fictional": true,
+  "cases": [
+    {
+      "id": "known-fees-partial-sale",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 2,
+              "amount": 200,
+              "brokerage": 2,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "s",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1,
+              "amount": 120,
+              "brokerage": 1,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 2,
+        "reviewedTransactionCount": 2,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 1,
+            "ledgerQuantity": 1,
+            "currency": "USD",
+            "openCostBasis": 101,
+            "recordedTradeResult": 18
+          }
+        ],
+        "totals": {
+          "openCostBasis": 101,
+          "recordedTradeResult": 18,
+          "grossPurchaseCost": 202,
+          "netSaleProceeds": 119
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 150,
+        "openCostBasis": 101,
+        "unrealizedPnl": 49,
+        "realizedPnl": 18,
+        "totalTradingPnl": 67,
+        "grossPurchaseCost": 202,
+        "netSaleProceeds": 119,
+        "returnVsGrossPurchaseCostPct": 33.16831683168317,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "weighted-average",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 2,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 2
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b1",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 2,
+              "amount": 20,
+              "brokerage": 2,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "b2",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 12,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "s",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1,
+              "amount": 15,
+              "brokerage": 1,
+              "currency": "USD",
+              "tradeDate": "2026-03-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 2,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 3,
+        "reviewedTransactionCount": 3,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 2,
+            "ledgerQuantity": 2,
+            "currency": "USD",
+            "openCostBasis": 22.666666666666664,
+            "recordedTradeResult": 2.666666666666666
+          }
+        ],
+        "totals": {
+          "openCostBasis": 22.666666666666664,
+          "recordedTradeResult": 2.666666666666666,
+          "grossPurchaseCost": 34,
+          "netSaleProceeds": 14
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 300,
+        "openCostBasis": 22.666666666666664,
+        "unrealizedPnl": 277.3333333333333,
+        "realizedPnl": 2.666666666666666,
+        "totalTradingPnl": 280,
+        "grossPurchaseCost": 34,
+        "netSaleProceeds": 14,
+        "returnVsGrossPurchaseCostPct": 823.5294117647059,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "fees-exceed-sale",
+      "input": {
+        "holdings": [],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 2,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "s",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1,
+              "amount": 1,
+              "brokerage": 3,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 0,
+        "transactionCount": 2,
+        "reviewedTransactionCount": 2,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 0,
+            "ledgerQuantity": 0,
+            "currency": "USD",
+            "openCostBasis": 0,
+            "recordedTradeResult": -4
+          }
+        ],
+        "totals": {
+          "openCostBasis": 0,
+          "recordedTradeResult": -4,
+          "grossPurchaseCost": 2,
+          "netSaleProceeds": -2
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 0,
+        "openCostBasis": 0,
+        "unrealizedPnl": 0,
+        "realizedPnl": -4,
+        "totalTradingPnl": -4,
+        "grossPurchaseCost": 2,
+        "netSaleProceeds": -2,
+        "returnVsGrossPurchaseCostPct": -200,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "minimum-remaining-unit",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1e-8,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1e-8
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 2e-8,
+              "amount": 2,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "s",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1e-8,
+              "amount": 1,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1e-8,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 2,
+        "reviewedTransactionCount": 2,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 1e-8,
+            "ledgerQuantity": 1e-8,
+            "currency": "USD",
+            "openCostBasis": 1,
+            "recordedTradeResult": 0
+          }
+        ],
+        "totals": {
+          "openCostBasis": 1,
+          "recordedTradeResult": 0,
+          "grossPurchaseCost": 2,
+          "netSaleProceeds": 1
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 0.0000015,
+        "openCostBasis": 1,
+        "unrealizedPnl": -0.9999985,
+        "realizedPnl": 0,
+        "totalTradingPnl": -0.9999985,
+        "grossPurchaseCost": 2,
+        "netSaleProceeds": 1,
+        "returnVsGrossPurchaseCostPct": -49.999925,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "small-money",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 1e-10,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 1,
+        "reviewedTransactionCount": 1,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 1,
+            "ledgerQuantity": 1,
+            "currency": "USD",
+            "openCostBasis": 1e-10,
+            "recordedTradeResult": 0
+          }
+        ],
+        "totals": {
+          "openCostBasis": 1e-10,
+          "recordedTradeResult": 0,
+          "grossPurchaseCost": 1e-10,
+          "netSaleProceeds": 0
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 150,
+        "openCostBasis": 1e-10,
+        "unrealizedPnl": 149.9999999999,
+        "realizedPnl": 0,
+        "totalTradingPnl": 149.9999999999,
+        "grossPurchaseCost": 1e-10,
+        "netSaleProceeds": 0,
+        "returnVsGrossPurchaseCostPct": 149999999999900,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "fractional-inventory",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 0.2,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 0.2
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b1",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 0.1,
+              "amount": 10,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "b2",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 0.2,
+              "amount": 20,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "s",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 0.1,
+              "amount": 12,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-03-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 0.2,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 3,
+        "reviewedTransactionCount": 3,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 0.2,
+            "ledgerQuantity": 0.2,
+            "currency": "USD",
+            "openCostBasis": 20,
+            "recordedTradeResult": 2
+          }
+        ],
+        "totals": {
+          "openCostBasis": 20,
+          "recordedTradeResult": 2,
+          "grossPurchaseCost": 30,
+          "netSaleProceeds": 12
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 30,
+        "openCostBasis": 20,
+        "unrealizedPnl": 10,
+        "realizedPnl": 2,
+        "totalTradingPnl": 12,
+        "grossPurchaseCost": 30,
+        "netSaleProceeds": 12,
+        "returnVsGrossPurchaseCostPct": 40,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "execution-order-over-row-order",
+      "input": {
+        "holdings": [],
+        "transactions": [
+          {
+            "id": "z-sale",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1,
+              "amount": 120,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": "2026-01-01T13:00:00+01:00",
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "a-buy",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": "2026-01-01T11:00:00Z",
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 0,
+        "transactionCount": 2,
+        "reviewedTransactionCount": 2,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 0,
+            "ledgerQuantity": 0,
+            "currency": "USD",
+            "openCostBasis": 0,
+            "recordedTradeResult": 20
+          }
+        ],
+        "totals": {
+          "openCostBasis": 0,
+          "recordedTradeResult": 20,
+          "grossPurchaseCost": 100,
+          "netSaleProceeds": 120
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 0,
+        "openCostBasis": 0,
+        "unrealizedPnl": 0,
+        "realizedPnl": 20,
+        "totalTradingPnl": 20,
+        "grossPurchaseCost": 100,
+        "netSaleProceeds": 120,
+        "returnVsGrossPurchaseCostPct": 20,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "multiple-and-closed-symbols",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICB",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICB",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "a-buy",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "b-buy",
+            "symbol": "FICB",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICB",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 80,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          },
+          {
+            "id": "a-sale",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "SELL",
+              "quantity": 1,
+              "amount": 110,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-02-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICB",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "matched-loaded-records",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 3,
+        "reviewedTransactionCount": 3,
+        "issues": [],
+        "positions": [
+          {
+            "symbol": "FICB",
+            "holdingQuantity": 1,
+            "ledgerQuantity": 1,
+            "currency": "USD",
+            "openCostBasis": 80,
+            "recordedTradeResult": 0
+          },
+          {
+            "symbol": "FICT",
+            "holdingQuantity": 0,
+            "ledgerQuantity": 0,
+            "currency": "USD",
+            "openCostBasis": 0,
+            "recordedTradeResult": 10
+          }
+        ],
+        "totals": {
+          "openCostBasis": 80,
+          "recordedTradeResult": 10,
+          "grossPurchaseCost": 180,
+          "netSaleProceeds": 110
+        },
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "conditional-loaded-records",
+        "currentValue": 150,
+        "openCostBasis": 80,
+        "unrealizedPnl": 70,
+        "realizedPnl": 10,
+        "totalTradingPnl": 80,
+        "grossPurchaseCost": 180,
+        "netSaleProceeds": 110,
+        "returnVsGrossPurchaseCostPct": 44.44444444444444,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": "USD",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "unknown-fee",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": null,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "needs-data",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 1,
+        "reviewedTransactionCount": 1,
+        "issues": [
+          {
+            "code": "FEE_UNKNOWN",
+            "symbol": "FICT",
+            "recordId": "b"
+          }
+        ],
+        "positions": [],
+        "totals": null,
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "ledger-inputs-unverified",
+        "currentValue": 150,
+        "openCostBasis": null,
+        "unrealizedPnl": null,
+        "realizedPnl": null,
+        "totalTradingPnl": null,
+        "grossPurchaseCost": null,
+        "netSaleProceeds": null,
+        "returnVsGrossPurchaseCostPct": null,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": null,
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "unknown-currency",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "b",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": 0,
+              "currency": null,
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "needs-data",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 1,
+        "reviewedTransactionCount": 1,
+        "issues": [
+          {
+            "code": "CURRENCY_UNKNOWN_OR_UNSUPPORTED",
+            "symbol": "FICT",
+            "recordId": "b"
+          }
+        ],
+        "positions": [],
+        "totals": null,
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "ledger-inputs-unverified",
+        "currentValue": 150,
+        "openCostBasis": null,
+        "unrealizedPnl": null,
+        "realizedPnl": null,
+        "totalTradingPnl": null,
+        "grossPurchaseCost": null,
+        "netSaleProceeds": null,
+        "returnVsGrossPurchaseCostPct": null,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": null,
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "quantity-mismatch",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 2,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 2
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "buy",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "ready"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 2,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "needs-data",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 1,
+        "reviewedTransactionCount": 1,
+        "issues": [
+          {
+            "code": "QUANTITY_MISMATCH",
+            "symbol": "FICT",
+            "recordId": null
+          }
+        ],
+        "positions": [],
+        "totals": null,
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "ledger-inputs-unverified",
+        "currentValue": 300,
+        "openCostBasis": null,
+        "unrealizedPnl": null,
+        "realizedPnl": null,
+        "totalTradingPnl": null,
+        "grossPurchaseCost": null,
+        "netSaleProceeds": null,
+        "returnVsGrossPurchaseCostPct": null,
+        "quantityMismatchSymbols": [
+          "FICT"
+        ],
+        "derivedTransactionCount": 0,
+        "currency": null,
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    },
+    {
+      "id": "unavailable",
+      "input": {
+        "holdings": [
+          {
+            "symbol": "FICT",
+            "quantity": 1,
+            "averageCost": 999,
+            "notes": "private holding text",
+            "accountingInputs": {
+              "contractVersion": "stored-holding-inputs-v1",
+              "symbol": "FICT",
+              "quantity": 1
+            }
+          }
+        ],
+        "transactions": [
+          {
+            "id": "buy",
+            "symbol": "FICT",
+            "dataQuality": "ok",
+            "amount": 999,
+            "brokerage": 999,
+            "currency": "EUR",
+            "quantity": 999,
+            "sourceRow": 999,
+            "notes": "private trade text",
+            "accountingInputs": {
+              "contractVersion": "stored-ledger-inputs-v1",
+              "symbol": "FICT",
+              "transactionType": "BUY",
+              "quantity": 1,
+              "amount": 100,
+              "brokerage": 0,
+              "currency": "USD",
+              "tradeDate": "2026-01-01",
+              "executedAt": null,
+              "quantityDerived": false,
+              "priceDerived": false
+            }
+          }
+        ],
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingsAvailability": "ready",
+        "transactionsAvailability": "unavailable"
+      },
+      "marks": [
+        {
+          "symbol": "FICT",
+          "quantity": 1,
+          "currentPrice": 150
+        }
+      ],
+      "review": {
+        "contractVersion": "loaded-ledger-review-v1",
+        "status": "unavailable",
+        "assessedAt": "2026-11-14T12:00:00Z",
+        "holdingCount": 1,
+        "transactionCount": 1,
+        "reviewedTransactionCount": 0,
+        "issues": [
+          {
+            "code": "RECORDS_UNAVAILABLE",
+            "symbol": null,
+            "recordId": null
+          }
+        ],
+        "positions": [],
+        "totals": null,
+        "historyCoverage": "unverified",
+        "corporateActionCoverage": "unverified",
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "verifiesSourceRecords": false
+      },
+      "performance": {
+        "status": "ledger-inputs-unverified",
+        "currentValue": 150,
+        "openCostBasis": null,
+        "unrealizedPnl": null,
+        "realizedPnl": null,
+        "totalTradingPnl": null,
+        "grossPurchaseCost": null,
+        "netSaleProceeds": null,
+        "returnVsGrossPurchaseCostPct": null,
+        "quantityMismatchSymbols": [],
+        "derivedTransactionCount": 0,
+        "currency": null,
+        "accountingReconciled": false,
+        "grantsDecisionEligibility": false,
+        "historyCoverage": "unverified"
+      }
+    }
+  ]
+}

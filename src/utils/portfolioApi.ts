@@ -16,6 +16,9 @@ export type RuleStage = {
 };
 
 export type StoredPortfolioHolding = {
+  valuationInputs?: {contractVersion:'stored-holding-valuation-v1';symbol:string|null;quantity:number|null;averageCost:number|null;currency:string|null};
+  currency?: string;
+  accountingInputs?: {contractVersion:'stored-holding-inputs-v1';symbol:string|null;quantity:number|null};
   id: string;
   symbol: string;
   quantity: number;
@@ -45,6 +48,7 @@ export type StoredPortfolioHolding = {
 };
 
 export type PortfolioTransaction = {
+  accountingInputs?: import('./loadedLedgerReview').StoredLedgerInputs;
   id: string;
   symbol: string;
   transactionType: 'BUY' | 'SELL';
@@ -67,6 +71,7 @@ export type PortfolioTransaction = {
 };
 
 export type PortfolioCashFlow = {
+  accountingInputs?: {contractVersion:'stored-cash-flow-inputs-v1';eventDate:string|null;flowType:'deposit'|'withdrawal'|'dividend'|'fee'|'reward'|null;amount:number|null;currency:string|null;fxToUsd:number|null};
   id: string; eventDate: string; flowType: 'deposit' | 'withdrawal' | 'dividend' | 'fee' | 'reward';
   amount: number; currency: string; fxToUsd: number; notes: string; createdAt?: string;
 };

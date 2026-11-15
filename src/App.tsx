@@ -41,6 +41,7 @@ import DataHealth from './components/DataHealth';
 import AIQualityLab from './components/AIQualityLab';
 
 type LivePrice = {
+  returnedSymbol?:string|null;sourceMode?:string;currency?:string|null;adjustedBasis?:string;marketTimePrecision?:string;isMarketSessionOpen?:boolean|null;simulated?:boolean;status?:string;fallbackUsed?:boolean;independentObservations?:unknown;
   price: number;
   changePct: number;
   provider?: string;
@@ -82,6 +83,7 @@ export default function App() {
 
   useEffect(() => {
     const syncServerAlertConfig = async (cfg: AppConfig) => {
+      if (import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true') return;
       if (!getAccessToken()) return;
       try {
         await authFetch('/api/alert-config', {
@@ -175,6 +177,9 @@ export default function App() {
               marketTime: res.marketTime,
               asOf: res.asOf,
               stale: res.stale,
+              returnedSymbol:res.returnedSymbol,sourceMode:res.sourceMode,currency:res.currency,adjustedBasis:res.adjustedBasis,
+              marketTimePrecision:res.marketTimePrecision,isMarketSessionOpen:res.isMarketSessionOpen,simulated:res.simulated,status:res.status,
+              fallbackUsed:res.fallbackUsed,independentObservations:res.independentObservations,
               cached: res.cached
             };
           }
@@ -265,6 +270,9 @@ export default function App() {
               marketTime: res.marketTime,
               asOf: res.asOf,
               stale: res.stale,
+              returnedSymbol:res.returnedSymbol,sourceMode:res.sourceMode,currency:res.currency,adjustedBasis:res.adjustedBasis,
+              marketTimePrecision:res.marketTimePrecision,isMarketSessionOpen:res.isMarketSessionOpen,simulated:res.simulated,status:res.status,
+              fallbackUsed:res.fallbackUsed,independentObservations:res.independentObservations,
               cached: res.cached
             };
           }

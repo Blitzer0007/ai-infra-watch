@@ -1,6 +1,7 @@
 import { STOCK_UNIVERSE, type StockUniverseEntry } from './stockUniverse';
 
 export type PricePoint = {
+  returnedSymbol?:string|null; sourceMode?:string;currency?:string|null;adjustedBasis?:string;marketTimePrecision?:string;marketTime?:string|null;isMarketSessionOpen?:boolean|null;simulated?:boolean;status?:string;
   price: number;
   changePct: number;
   provider?: string;
@@ -9,6 +10,7 @@ export type PricePoint = {
   cached?: boolean;
 };
 export type IntelligenceGroup = {
+  coverage?:{status:string};
   name: string;
   members: string[];
   avgChange: number;
@@ -185,3 +187,5 @@ export function buildMoneyRotation(
   });
   return { groups: groupRows, pairs, selectedHorizon, methodology: 'Flow proxy = horizon-specific group return percentile rank, with breadth and momentum shown separately; this is not literal capital-flow data.', freshness: 'Historical prices are fetched from the live market history feed; generated ' + now.slice(0, 19) + 'Z.' };
 }
+
+export const usablePricePoint=(value:PricePoint|undefined):value is PricePoint=>!!value&&value.stale!==true&&typeof value.price==='number'&&Number.isFinite(value.price)&&value.price>0&&typeof value.changePct==='number'&&Number.isFinite(value.changePct);
