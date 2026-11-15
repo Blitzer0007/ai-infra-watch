@@ -1,6 +1,6 @@
 # Release 2 remaining-work register
 
-Milestone 1 now has an explicit [acceptance checklist and hosted blockers](milestone1-acceptance.md). Digest/return/re-entry guards and versioned history admission are implemented; isolated main-based candidate integration and hosted protection/release acceptance remain open. The informal milestone percentage is superseded by those evidence gates.
+Milestone 1 now has an explicit [acceptance checklist and hosted blockers](milestone1-acceptance.md). Digest/return/re-entry guards and versioned history admission are implemented; an isolated main-based safety candidate is prepared and being verified separately; hosted protection/release acceptance remains blocked. See the [release handoff](milestone1-release-handoff.md). The informal milestone percentage is superseded by those evidence gates.
 
 Rollout plan: [five milestone production releases](release2-five-deployments.md), requested 15 November 2026. Complete the remaining scope in coherent release candidates; retain explicit authentic-source/live-verification gaps and separate activation controls. No milestone deployment has been performed under that plan.
 

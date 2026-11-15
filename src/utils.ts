@@ -66,13 +66,14 @@ export function saveConfig(cfg: AppConfig): void {
   }
 }
 
-export function formatPrice(p: number | undefined): string {
-  if (p === undefined || isNaN(p)) return '—';
+export function formatPrice(p: number | null | undefined): string {
+  if (typeof p !== 'number' || !Number.isFinite(p)) return '—';
+  if (p !== 0 && Math.abs(p) < 0.005) return p.toExponential(4);
   return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function formatPct(p: number | undefined): string {
-  if (p === undefined || isNaN(p)) return '—';
+export function formatPct(p: number | null | undefined): string {
+  if (typeof p !== 'number' || !Number.isFinite(p)) return '—';
   const prefix = p >= 0 ? '+' : '';
   return `${prefix}${p.toFixed(2)}%`;
 }
