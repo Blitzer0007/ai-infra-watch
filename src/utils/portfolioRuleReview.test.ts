@@ -93,3 +93,10 @@ test('an absent stage fraction remains unknown rather than turning into zero',()
   const result=review({average_cost:100,purchase_date:'2026-11-01',rule_stages:[{type:'take_profit',pct:20,fraction:null}]},quote,history);
   assert.equal(result.rules[0].fraction,null);assert.equal(result.state,'clear');
 });
+
+test('an uncalculable activated trailing distance withholds the entire staged review',()=>{
+  const holding={average_cost:1,purchase_date:'2026-11-01',rule_stages:[
+    {type:'take_profit',pct:20},{type:'trailing',pct:10,activates_after:'take_profit'}]};
+  const result=review(holding,{price:1e308},{...history,points:[{date:'2026-11-01',price:1.2}]});
+  assert.equal(result.state,'incomplete');assert.deepEqual(result.rules,[]);
+});

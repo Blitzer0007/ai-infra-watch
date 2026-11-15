@@ -96,7 +96,8 @@ export function reviewHoldingRules(holding, quote, history, nowMs) {
       activates_after: stage.activates_after })), rule_stage_state: {} };
   const result = evaluateExistingRules(projected, quote, needsHistory ? history : { points: [] }, nowMs);
   const minimumRules = (missing(holding.loss_limit_pct) || seen.has('stop') ? 0 : 1) + (alerts ?? prices).length +
-    stages.filter(stage => stage.type !== 'trailing').length + (!stages.length && exitType ? 1 : 0);
+    stages.filter((stage,index) => stage.type !== 'trailing' || result?.stageState?.['stage_' + index]?.activatedDate).length +
+    (!stages.length && exitType ? 1 : 0);
   if (!result || result.rules.length < minimumRules) {
     return blocked('incomplete', ['Configured rules could not be calculated.']);
   }
