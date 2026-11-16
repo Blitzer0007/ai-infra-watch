@@ -2,6 +2,10 @@
 
 **Review date:** 16 November 2026. **Current working PR:** [#172](https://github.com/Blitzer0007/ai-infra-watch/pull/172), draft against production `main`. **No merge or deployment.**
 
+## Milestone 2 final integrated navigation acceptance (pending exact-head verification)
+The last fictional/browser case spans detail → Evidence → browser Back → identical detail → Escape and checks return focus, retained list scroll and zero passive writes at 360, 768 and 1440px. Combined with earlier original Calendar/Inbox clicked-record assertions, the integrated user story has test coverage without using private rows or live providers.
+Production cannot be labeled shipped until main protection is enabled, exact-main CI proves the merge commit, a rollback deployment is verified, the reviewed build is staged/promoted and production tests pass. No release gate waiver is claimed.
+
 ## Additional acceptance: details only on user request (pending exact-head verification)
 - Gates hold-specific advanced market history, 52-week high, analyst and peer comparators behind an explicitly selected, loaded Holding Detail Dialog; no incidental calls from default overview/holdings list.
 - Evidence, Performance and consciously selected Detailed Overview preserve their own advanced read paths. Quote freshness is visible in the modal and older symbol-dependent results are cleared while new evidence loads.

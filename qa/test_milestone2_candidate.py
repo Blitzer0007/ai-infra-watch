@@ -303,3 +303,35 @@ def test_unknown_holding_deeplink_never_fetches_another_symbol_history_or_analys
     expect(dialog.get_by_role("alert")).to_contain_text("No substitute position is shown")
     page.wait_for_load_state("networkidle")
     assert calls == []
+
+
+
+@pytest.mark.parametrize("width", [360, 768, 1440])
+def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, width):
+    """The same selected holding survives a workspace round trip without a background save."""
+    import json
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 950})
+    rows = [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 1, "averageCost": 100, "purchaseDate": "2026-01-02"}]
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": rows})))
+    writes = []
+    page.on("request", lambda req: writes.append((req.method, req.url)) if req.method not in ("GET", "HEAD") and ("/api/portfolio" in req.url or "/api/signal-scorecard" in req.url) else None)
+    page.goto("/portfolio?portfolio_tab=holdings")
+    trigger = page.get_by_role("button", name="Open NVDA holding details from table")
+    expect(trigger).to_be_visible()
+    trigger.scroll_into_view_if_needed()
+    initial_scroll = page.evaluate("scrollY")
+    trigger.click()
+    dialog = page.get_by_role("dialog", name="NVDA holding details")
+    expect(dialog).to_be_visible()
+    dialog.get_by_role("button", name="Open Evidence workspace").click()
+    expect(dialog).to_have_count(0)
+    expect(page.get_by_test_id("portfolio-section-heading")).to_have_text("Evidence")
+    page.go_back()
+    expect(dialog).to_be_visible()
+    assert "portfolio_detail=NVDA" in page.url
+    dialog.press("Escape")
+    expect(dialog).to_have_count(0)
+    expect(trigger).to_be_focused()
+    assert abs(page.evaluate("scrollY") - initial_scroll) < 3
+    assert writes == []
