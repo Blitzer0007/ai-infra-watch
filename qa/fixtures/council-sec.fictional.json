@@ -1,0 +1,105 @@
+{
+  "cik": 1,
+  "entityName": "Fictional issuer, no live financial data",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "units": {
+          "USD": [
+            {
+              "val": 120,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001",
+              "start": "2025-01-01"
+            },
+            {
+              "val": 100,
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001",
+              "start": "2024-01-01"
+            }
+          ]
+        }
+      },
+      "OperatingIncomeLoss": {
+        "units": {
+          "USD": [
+            {
+              "val": 24,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001",
+              "start": "2025-01-01"
+            }
+          ]
+        }
+      },
+      "NetCashProvidedByUsedInOperatingActivities": {
+        "units": {
+          "USD": [
+            {
+              "val": 10,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001",
+              "start": "2025-01-01"
+            }
+          ]
+        }
+      },
+      "PaymentsToAcquirePropertyPlantAndEquipment": {
+        "units": {
+          "USD": [
+            {
+              "val": 15,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001",
+              "start": "2025-01-01"
+            }
+          ]
+        }
+      },
+      "Liabilities": {
+        "units": {
+          "USD": [
+            {
+              "val": 60,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001"
+            }
+          ]
+        }
+      },
+      "StockholdersEquity": {
+        "units": {
+          "USD": [
+            {
+              "val": 30,
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "form": "10-K",
+              "fp": "FY",
+              "accn": "0000000001-26-000001"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

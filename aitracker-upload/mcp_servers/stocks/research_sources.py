@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .providers import QuoteError, _http_retryable
+from mcp_servers.provider_budget import budgeted_json
 
 
 def _list_records(value: Any) -> list[dict[str, Any]]:
@@ -86,29 +87,9 @@ class FinnhubResearchProvider:
     def _get(self, path: str, params: dict[str, Any]) -> Any:
         if not self.api_key:
             raise QuoteError("NO_KEY", "FINNHUB_API_KEY is not set")
-        params = {**params, "token": self.api_key}
-        last_exc: Exception | None = None
-        for attempt in range(self.max_retries + 1):
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.get(f"{self.BASE}/{path.lstrip('/')}", params=params)
-                if response.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("RATE_LIMIT", "Finnhub research endpoint rate limit")
-                if response.status_code >= 400:
-                    if _http_retryable(response.status_code) and attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("HTTP_ERROR", f"Finnhub returned {response.status_code}")
-                return response.json()
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        raise QuoteError("HTTP_ERROR", f"Finnhub request failed: {last_exc}")
+        return budgeted_json("finnhub", f"{self.BASE}/{path.lstrip('/')}", error_type=QuoteError,
+            params={**params, "token": self.api_key}, timeout=self.timeout,
+            max_retries=self.max_retries, base_delay=self.base_delay)
 
     @staticmethod
     def _list(value: Any) -> list[dict[str, Any]]:

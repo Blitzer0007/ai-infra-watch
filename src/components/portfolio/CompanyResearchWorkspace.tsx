@@ -7,6 +7,7 @@ import {validHoldingSymbol} from '../../utils/holdingDetailNavigation';
 import {opportunityReturnHref,readResearchSelection} from '../../utils/companyResearchNavigation';
 import type {LedgerAvailability} from '../../utils/loadedLedgerReview';
 import HoldingCompanyDossier from './HoldingCompanyDossier';
+import ControlledCompanyResearch from './ControlledCompanyResearch';
 
 type Props={onOpenReviewHref?:(href:string)=>void;reviewRecord?:ReviewRecordContext|null;holdings:readonly string[];watchlist:readonly string[];holdingsStatus:LedgerAvailability};
 /** Company selection is independent of the selected position. This view has no data transport. */
@@ -53,6 +54,7 @@ export default function CompanyResearchWorkspace({holdings,watchlist,holdingsSta
       <ReviewOriginContext origin={readReviewOrigin(new URLSearchParams(window.location.search))} record={window.history.state?.aiwReviewEntry?reviewRecord:null} symbol={active}/>
       {readReviewOrigin(new URLSearchParams(window.location.search)) && <p data-testid="research-source-boundary" className="rounded-lg border border-amber-200/20 p-3 text-sm text-amber-100">The opened Calendar or Alert Inbox record and the company dossier are independent evidence scopes. A feed label, a browser detection or a Telegram provider receipt does not verify the issuer, corroborate the event, or establish financial/trading eligibility. Review conflicting source claims separately; missing evidence stays unavailable.</p>}
       <HoldingCompanyDossier key={active} symbol={active} configuredName={name}/>
+      <ControlledCompanyResearch symbol={active} holdingsStatus={holdingsStatus} isHolding={holdings.includes(active)} exactSourceContext={Boolean(window.history.state?.aiwReviewEntry&&reviewRecord)}/>
     </>}
     <a className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-3 py-2 text-sm text-cyan-100" href={returnLink.href} onClick={event=>{if(returnLink.label==='Return to Opportunities'||!onOpenReviewHref||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();onOpenReviewHref(returnLink.href);}}>{returnLink.label}</a>
     <p className="text-xs text-white/60">{returnLink.label==='Return to Opportunities'?'Return links retain search, status and display limits. A lost frozen snapshot is not restored; run the loaded-data scan explicitly when needed.':'Return links retain view options. Searches, expanded explanations and loaded records stay in this app session; a reload loses loaded source records and does not fetch replacements.'}</p>

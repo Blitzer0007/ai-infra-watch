@@ -76,7 +76,9 @@ def test_finnhub_normalizes_quote(monkeypatch):
     assert q.change_pct == 3.2
     assert q.prev_close == 176.74
     assert q.source == "finnhub"
-    assert q.as_of == "2026-08-03T00:00:00Z"
+    assert q.as_of is None  # This response omitted the provider's t field.
+    assert q.retrieved_at == "2026-08-03T00:00:00Z"
+    assert q.currency is None
 
 
 def test_finnhub_derives_change_when_absent(monkeypatch):

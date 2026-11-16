@@ -135,42 +135,43 @@ def _market_via_mcp(toolbox: MCPToolbox) -> tuple[MarketAgentResult | None, list
         step = tool_call("stocks.get_snapshot", note=type(exc).__name__, ok=False)
         return None, [step], f"stocks_failed: {exc}"
 
-    steps.append(tool_call("stocks.get_snapshot", note=f"ok: {len(snap.get('quotes', []))} quotes"))
-
-    quotes = snap.get("quotes", []) or []
-    symbols = [q.get("symbol", "") for q in quotes if q.get("symbol")]
+    if not isinstance(snap, dict) or not isinstance(snap.get("quotes"), list):
+        step = tool_call("stocks.get_snapshot", note="invalid snapshot", ok=False)
+        return None, [step], "stocks_failed: invalid snapshot"
+    quotes = snap["quotes"]
+    steps.append(tool_call("stocks.get_snapshot", note=f"ok: {len(quotes)} quotes"))
+    symbols: list[str] = []
 
     lines: list[str] = []
     insights: list[Any] = []
-    for q in quotes:
-        sym = q.get("symbol", "?")
-        price = q.get("price")
-        change_pct = q.get("change_pct")
-        line_parts = [f"{sym}"]
-        if price is not None:
-            line_parts.append(f"${price}")
-        if change_pct is not None:
-            arrow = "up" if change_pct >= 0 else "down"
-            line_parts.append(f"{arrow} {change_pct:+.2f}%")
-        lines.append(" ".join(line_parts))
+    from mcp_servers.stocks.schemas import Quote, observation_time
+    from pydantic import ValidationError
+
+    for raw in quotes:
         try:
+            q = Quote.model_validate(raw)
+        except ValidationError:
+            continue
+        symbols.append(q.symbol)
+        lines.append(q.one_line())
+        if q.change_pct is not None and (q.as_of is not None or q.simulated):
             from app.synthesis.pipeline import TickerInsight
             insights.append(
                 TickerInsight(
-                    ticker=sym,
-                    move_pct=float(change_pct) if change_pct is not None else 0.0,
-                    reason=f"Last price ${price}" if price is not None else "From MCP snapshot",
+                    ticker=q.symbol,
+                    move_pct=q.change_pct,
+                    reason=q.one_line(),
                 )
             )
-        except Exception:  # noqa: BLE001 — fall through to plain string fallback if import fails
-            pass
 
-    summary = " | ".join(lines) if lines else "No quotes returned."
+    if not lines:
+        return None, steps, "stocks_failed: no usable quotes"
+    summary = " | ".join(lines)
 
     from app.synthesis.pipeline import MarketSynthesis
 
     synthesis = MarketSynthesis(
-        date=snap.get("as_of", "") or "",
+        date=observation_time(snap.get("as_of")) or "",
         summary=summary,
         insights=insights,
         risks=[],

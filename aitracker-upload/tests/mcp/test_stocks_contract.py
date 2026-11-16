@@ -96,14 +96,17 @@ def test_get_quote_result_roundtrips_to_quote(server):
     result = _run(server.call_tool("get_quote", {"symbol": "NVDA"}))
     quote = Quote.model_validate_json(_text(result))
     assert quote.symbol == "NVDA"
-    assert quote.as_of  # timestamp guardrail: never empty
+    assert quote.as_of is None
+    assert quote.retrieved_at == _clock()
+    assert quote.simulated is True
 
 
 def test_get_snapshot_result_roundtrips_to_batch(server):
     result = _run(server.call_tool("get_snapshot", {}))
     batch = QuoteBatch.model_validate_json(_text(result))
     assert len(batch.quotes) == 6
-    assert all(q.as_of for q in batch.quotes)
+    assert batch.as_of is None
+    assert all(q.simulated and q.retrieved_at == _clock() for q in batch.quotes)
 
 
 def test_list_watchlist_returns_symbols(server):

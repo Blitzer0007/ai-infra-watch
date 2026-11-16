@@ -212,6 +212,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   };
   const restoreHoldingList=()=>{
     const origin=listOrigin.current;
+    // Restore synchronously as the native modal closes so focus/scroll is stable
+    // even before the next animation frame (including on narrow screens).
+    const paramsNow=new URLSearchParams(window.location.search);
+    if(origin && window.location.pathname==='/portfolio' && paramsNow.get('portfolio_tab')==='holdings' && !readHoldingNavigation(paramsNow).detail){
+      window.scrollTo({top:origin.scrollY,behavior:'instant'});
+    }
     requestAnimationFrame(()=>{
       const params=new URLSearchParams(window.location.search);
       if(window.location.pathname!=='/portfolio'||params.get('portfolio_tab')!=='holdings'||readHoldingNavigation(params).detail)return;

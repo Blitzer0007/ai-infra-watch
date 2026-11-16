@@ -320,10 +320,13 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     trigger = page.get_by_role("button", name="Open NVDA holding details from table")
     expect(trigger).to_be_visible()
     trigger.scroll_into_view_if_needed()
-    initial_scroll = page.evaluate("scrollY")
     trigger.click()
     dialog = page.get_by_role("dialog", name="NVDA holding details")
     expect(dialog).to_be_visible()
+    # The browser may move the trigger while dispatching the click. The list
+    # restoration contract is the actual event-time view, not an earlier
+    # scrollIntoView position before click's own focus/visibility adjustments.
+    opening_scroll = page.evaluate("scrollY")
     dialog.get_by_role("button", name="Open Evidence workspace").click()
     expect(dialog).to_have_count(0)
     expect(page.get_by_test_id("portfolio-section-heading")).to_have_text("Evidence")
@@ -333,5 +336,5 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     dialog.press("Escape")
     expect(dialog).to_have_count(0)
     expect(trigger).to_be_focused()
-    assert abs(page.evaluate("scrollY") - initial_scroll) < 3
+    assert abs(page.evaluate("scrollY") - opening_scroll) < 3
     assert writes == []

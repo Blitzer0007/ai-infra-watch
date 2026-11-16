@@ -27,7 +27,8 @@ test('authenticated agent proxy forwards the selected internal token to the Pyth
     process.env.AI_INFRA_AGENT_TOKEN = 'internal-agent-token';
     delete process.env.AGENT_API_TOKEN;
     delete process.env.CRON_SECRET;
-    delete process.env.AI_INFRA_AGENT_URL;
+    // Explicitly configured backend origin is trusted; incoming Host is untrusted.
+    process.env.AI_INFRA_AGENT_URL = 'https://research.api.example.com';
     globalThis.fetch = async (url, init) => {
       capturedUrl = String(url);
       capturedInit = init;
@@ -54,7 +55,7 @@ test('authenticated agent proxy forwards the selected internal token to the Pyth
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.mode, 'autonomous-mcp');
-    assert.equal(capturedUrl, 'https://aiw.test/api/agent-python');
+    assert.equal(capturedUrl, 'https://research.api.example.com/api/agent-python');
     assert.equal(capturedInit.headers.Authorization, 'Bearer internal-agent-token');
     assert.equal(JSON.parse(capturedInit.body).question, 'fixture research');
   } finally {

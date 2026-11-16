@@ -603,9 +603,10 @@ export default function App() {
               <button
                 onClick={() => handleFetchLiveData(true)}
                 disabled={isLiveLoading}
+                aria-label={isLiveLoading ? 'SYNCHRONIZING...' : 'REFRESH FEED'}
                 className="bg-emerald-500 hover:bg-emerald-600 text-black px-4 py-2 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer shadow-[0_4px_12px_rgba(16,185,129,0.15)]"
               >
-                <span className={isLiveLoading ? "animate-spin" : ""}>🔄</span>
+                <span aria-hidden="true" className={isLiveLoading ? "animate-spin" : ""}>🔄</span>
                 <span>{isLiveLoading ? "SYNCHRONIZING..." : "REFRESH FEED"}</span>
               </button>
             </div>
@@ -629,10 +630,10 @@ export default function App() {
               {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
               {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} session={reviewSessions.calendar} onOpenResearch={handleReviewHref} />}
               {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} session={reviewSessions.alerts} onOpenResearch={handleReviewHref} />}
-              {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices } as unknown as Record<string,Record<string,unknown>>} loading={isLiveLoading} holdingsAvailable={portfolioSymbolsKnown} />}
+              {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...tickerPrices, ...(liveData?.stockPrices || {}) } as unknown as Record<string,Record<string,unknown>>} loading={isLiveLoading} holdingsAvailable={portfolioSymbolsKnown} />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} researchWatchlist={config.watchlist} reviewRecord={reviewRecord} onOpenReviewHref={handleReviewHref} onSectionChange={setPortfolioQuoteTab} />}
               {activeView === 'research' && <AutonomousResearch />}
-              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
+              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...tickerPrices, ...(liveData?.stockPrices || {}) }} calendarSnapshot={calendarSnapshot} />}
               {activeView === 'quality' && <AIQualityLab />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}

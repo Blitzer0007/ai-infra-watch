@@ -1,0 +1,731 @@
+{
+  "request": {
+    "mode": "loaded-v2",
+    "packet": {
+      "run_id": "fictional-admission",
+      "symbol": "MSFT",
+      "horizon_months": 3,
+      "assessed_at": "2026-11-09T12:00:00.000Z",
+      "evidence": [
+        {
+          "evidence_id": "loaded:price",
+          "symbol": "MSFT",
+          "family": "market",
+          "metric": "price",
+          "value": 100,
+          "unit": "USD",
+          "source_id": "yahoo",
+          "observed_at": "2026-11-09T11:59:00.000001Z",
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "reported",
+          "period_start": null,
+          "period_end": null,
+          "simulated": false
+        },
+        {
+          "evidence_id": "loaded:daily_change_pct",
+          "symbol": "MSFT",
+          "family": "market",
+          "metric": "daily_change_pct",
+          "value": 0,
+          "unit": "percent",
+          "source_id": "yahoo",
+          "observed_at": "2026-11-09T11:59:00.000001Z",
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "reported",
+          "period_start": null,
+          "period_end": null,
+          "simulated": false
+        },
+        {
+          "evidence_id": "sec:revenue_growth_pct",
+          "symbol": "MSFT",
+          "family": "financial",
+          "metric": "revenue_growth_pct",
+          "value": 20,
+          "unit": "percent",
+          "source_id": "sec-edgar-companyfacts",
+          "observed_at": null,
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "unknown",
+          "period_start": "2025-01-01",
+          "period_end": "2025-12-31",
+          "simulated": false
+        },
+        {
+          "evidence_id": "sec:operating_margin_pct",
+          "symbol": "MSFT",
+          "family": "financial",
+          "metric": "operating_margin_pct",
+          "value": 20,
+          "unit": "percent",
+          "source_id": "sec-edgar-companyfacts",
+          "observed_at": null,
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "unknown",
+          "period_start": "2025-01-01",
+          "period_end": "2025-12-31",
+          "simulated": false
+        },
+        {
+          "evidence_id": "sec:free_cash_flow_usd",
+          "symbol": "MSFT",
+          "family": "financial",
+          "metric": "free_cash_flow_usd",
+          "value": -5,
+          "unit": "USD",
+          "source_id": "sec-edgar-companyfacts",
+          "observed_at": null,
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "unknown",
+          "period_start": "2025-01-01",
+          "period_end": "2025-12-31",
+          "simulated": false
+        },
+        {
+          "evidence_id": "sec:liabilities_equity",
+          "symbol": "MSFT",
+          "family": "risk",
+          "metric": "liabilities_equity",
+          "value": 2,
+          "unit": "ratio",
+          "source_id": "sec-edgar-companyfacts",
+          "observed_at": null,
+          "published_at": null,
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "unknown",
+          "period_start": null,
+          "period_end": "2025-12-31",
+          "simulated": false
+        },
+        {
+          "evidence_id": "calendar:event-days",
+          "symbol": "MSFT",
+          "family": "catalyst",
+          "metric": "event_days_until",
+          "value": 3.000000011574074,
+          "unit": "days",
+          "source_id": "loaded-calendar",
+          "observed_at": null,
+          "published_at": "2026-11-01T12:00:00Z",
+          "retrieved_at": "2026-11-09T12:00:00.000Z",
+          "basis": "unknown",
+          "period_start": null,
+          "period_end": null,
+          "simulated": false
+        }
+      ]
+    },
+    "sources": {
+      "sec": {
+        "contract_version": "council-sec-v1",
+        "symbol": "MSFT",
+        "cik": "0000000001",
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "status": "partial",
+        "observations": [
+          {
+            "method": "revenue-growth-yoy",
+            "inputs": [
+              {
+                "tag": "Revenues",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 120,
+                "unit": "USD"
+              },
+              {
+                "tag": "Revenues",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2024-01-01",
+                "period_end": "2024-12-31",
+                "filed_on": "2026-02-20",
+                "value": 100,
+                "unit": "USD"
+              }
+            ],
+            "evidence": {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            }
+          },
+          {
+            "method": "operating-margin",
+            "inputs": [
+              {
+                "tag": "OperatingIncomeLoss",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 24,
+                "unit": "USD"
+              },
+              {
+                "tag": "Revenues",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 120,
+                "unit": "USD"
+              }
+            ],
+            "evidence": {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            }
+          },
+          {
+            "method": "operating-cash-flow-less-capex",
+            "inputs": [
+              {
+                "tag": "NetCashProvidedByUsedInOperatingActivities",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 10,
+                "unit": "USD"
+              },
+              {
+                "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": "2025-01-01",
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 15,
+                "unit": "USD"
+              }
+            ],
+            "evidence": {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "MSFT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            }
+          },
+          {
+            "method": "liabilities-to-equity",
+            "inputs": [
+              {
+                "tag": "Liabilities",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": null,
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 60,
+                "unit": "USD"
+              },
+              {
+                "tag": "StockholdersEquity",
+                "accession": "0000000001-26-000001",
+                "form": "10-K",
+                "period_start": null,
+                "period_end": "2025-12-31",
+                "filed_on": "2026-02-20",
+                "value": 30,
+                "unit": "USD"
+              }
+            ],
+            "evidence": {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "MSFT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            }
+          }
+        ],
+        "issues": [
+          "DATE_ONLY_PUBLICATION"
+        ],
+        "source_authenticity_verified": false
+      },
+      "catalyst": {
+        "evidence_id": "calendar:event-days",
+        "event_at": "2026-11-12T12:00:00.001Z",
+        "confirmation": "confirmed",
+        "confirmation_basis": "issuer",
+        "published_at": "2026-11-01T12:00:00Z",
+        "retrieved_at": "2026-11-09T12:00:00.000Z"
+      }
+    }
+  },
+  "request_raw": "{\"mode\":\"loaded-v2\",\"packet\":{\"run_id\":\"fictional-admission\",\"symbol\":\"MSFT\",\"horizon_months\":3,\"assessed_at\":\"2026-11-09T12:00:00.000Z\",\"evidence\":[{\"evidence_id\":\"loaded:price\",\"symbol\":\"MSFT\",\"family\":\"market\",\"metric\":\"price\",\"value\":100,\"unit\":\"USD\",\"source_id\":\"yahoo\",\"observed_at\":\"2026-11-09T11:59:00.000001Z\",\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"reported\",\"period_start\":null,\"period_end\":null,\"simulated\":false},{\"evidence_id\":\"loaded:daily_change_pct\",\"symbol\":\"MSFT\",\"family\":\"market\",\"metric\":\"daily_change_pct\",\"value\":0,\"unit\":\"percent\",\"source_id\":\"yahoo\",\"observed_at\":\"2026-11-09T11:59:00.000001Z\",\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"reported\",\"period_start\":null,\"period_end\":null,\"simulated\":false},{\"evidence_id\":\"sec:revenue_growth_pct\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"revenue_growth_pct\",\"value\":20,\"unit\":\"percent\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false},{\"evidence_id\":\"sec:operating_margin_pct\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"operating_margin_pct\",\"value\":20,\"unit\":\"percent\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false},{\"evidence_id\":\"sec:free_cash_flow_usd\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"free_cash_flow_usd\",\"value\":-5,\"unit\":\"USD\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false},{\"evidence_id\":\"sec:liabilities_equity\",\"symbol\":\"MSFT\",\"family\":\"risk\",\"metric\":\"liabilities_equity\",\"value\":2,\"unit\":\"ratio\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":null,\"period_end\":\"2025-12-31\",\"simulated\":false},{\"evidence_id\":\"calendar:event-days\",\"symbol\":\"MSFT\",\"family\":\"catalyst\",\"metric\":\"event_days_until\",\"value\":3.000000011574074,\"unit\":\"days\",\"source_id\":\"loaded-calendar\",\"observed_at\":null,\"published_at\":\"2026-11-01T12:00:00Z\",\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":null,\"period_end\":null,\"simulated\":false}]},\"sources\":{\"sec\":{\"contract_version\":\"council-sec-v1\",\"symbol\":\"MSFT\",\"cik\":\"0000000001\",\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"status\":\"partial\",\"observations\":[{\"method\":\"revenue-growth-yoy\",\"inputs\":[{\"tag\":\"Revenues\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":120,\"unit\":\"USD\"},{\"tag\":\"Revenues\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2024-01-01\",\"period_end\":\"2024-12-31\",\"filed_on\":\"2026-02-20\",\"value\":100,\"unit\":\"USD\"}],\"evidence\":{\"evidence_id\":\"sec:revenue_growth_pct\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"revenue_growth_pct\",\"value\":20,\"unit\":\"percent\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false}},{\"method\":\"operating-margin\",\"inputs\":[{\"tag\":\"OperatingIncomeLoss\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":24,\"unit\":\"USD\"},{\"tag\":\"Revenues\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":120,\"unit\":\"USD\"}],\"evidence\":{\"evidence_id\":\"sec:operating_margin_pct\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"operating_margin_pct\",\"value\":20,\"unit\":\"percent\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false}},{\"method\":\"operating-cash-flow-less-capex\",\"inputs\":[{\"tag\":\"NetCashProvidedByUsedInOperatingActivities\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":10,\"unit\":\"USD\"},{\"tag\":\"PaymentsToAcquirePropertyPlantAndEquipment\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":15,\"unit\":\"USD\"}],\"evidence\":{\"evidence_id\":\"sec:free_cash_flow_usd\",\"symbol\":\"MSFT\",\"family\":\"financial\",\"metric\":\"free_cash_flow_usd\",\"value\":-5,\"unit\":\"USD\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":\"2025-01-01\",\"period_end\":\"2025-12-31\",\"simulated\":false}},{\"method\":\"liabilities-to-equity\",\"inputs\":[{\"tag\":\"Liabilities\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":null,\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":60,\"unit\":\"USD\"},{\"tag\":\"StockholdersEquity\",\"accession\":\"0000000001-26-000001\",\"form\":\"10-K\",\"period_start\":null,\"period_end\":\"2025-12-31\",\"filed_on\":\"2026-02-20\",\"value\":30,\"unit\":\"USD\"}],\"evidence\":{\"evidence_id\":\"sec:liabilities_equity\",\"symbol\":\"MSFT\",\"family\":\"risk\",\"metric\":\"liabilities_equity\",\"value\":2,\"unit\":\"ratio\",\"source_id\":\"sec-edgar-companyfacts\",\"observed_at\":null,\"published_at\":null,\"retrieved_at\":\"2026-11-09T12:00:00.000Z\",\"basis\":\"unknown\",\"period_start\":null,\"period_end\":\"2025-12-31\",\"simulated\":false}}],\"issues\":[\"DATE_ONLY_PUBLICATION\"],\"source_authenticity_verified\":false},\"catalyst\":{\"evidence_id\":\"calendar:event-days\",\"event_at\":\"2026-11-12T12:00:00.001Z\",\"confirmation\":\"confirmed\",\"confirmation_basis\":\"issuer\",\"published_at\":\"2026-11-01T12:00:00Z\",\"retrieved_at\":\"2026-11-09T12:00:00.000Z\"}}}",
+  "admission": {
+    "contract_version": "council-admission-v1",
+    "rule_version": "family-provenance-v1",
+    "run_id": "fictional-admission",
+    "request_sha256": "c584af6fcf4b67e2e4e1763c573152523839695a8854363062737f74d475eb5a",
+    "status": "conditional",
+    "records": [
+      {
+        "evidence_id": "loaded:price",
+        "kind": "quote",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": null
+      },
+      {
+        "evidence_id": "loaded:daily_change_pct",
+        "kind": "quote",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": null
+      },
+      {
+        "evidence_id": "sec:revenue_growth_pct",
+        "kind": "sec-duration",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": {
+          "earliest": "2026-02-19T10:00:00+00:00",
+          "latest_exclusive": "2026-02-21T12:00:00+00:00",
+          "precision": "date-only",
+          "offset_policy": "utc-minus12-plus14"
+        }
+      },
+      {
+        "evidence_id": "sec:operating_margin_pct",
+        "kind": "sec-duration",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": {
+          "earliest": "2026-02-19T10:00:00+00:00",
+          "latest_exclusive": "2026-02-21T12:00:00+00:00",
+          "precision": "date-only",
+          "offset_policy": "utc-minus12-plus14"
+        }
+      },
+      {
+        "evidence_id": "sec:free_cash_flow_usd",
+        "kind": "sec-duration",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": {
+          "earliest": "2026-02-19T10:00:00+00:00",
+          "latest_exclusive": "2026-02-21T12:00:00+00:00",
+          "precision": "date-only",
+          "offset_policy": "utc-minus12-plus14"
+        }
+      },
+      {
+        "evidence_id": "sec:liabilities_equity",
+        "kind": "sec-instant",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": {
+          "earliest": "2026-02-19T10:00:00+00:00",
+          "latest_exclusive": "2026-02-21T12:00:00+00:00",
+          "precision": "date-only",
+          "offset_policy": "utc-minus12-plus14"
+        }
+      },
+      {
+        "evidence_id": "calendar:event-days",
+        "kind": "catalyst-countdown",
+        "eligible": true,
+        "reason_codes": [],
+        "publication_window": null
+      }
+    ],
+    "quality": {
+      "usable_ids": [
+        "loaded:price",
+        "loaded:daily_change_pct",
+        "sec:revenue_growth_pct",
+        "sec:operating_margin_pct",
+        "sec:free_cash_flow_usd",
+        "sec:liabilities_equity",
+        "calendar:event-days"
+      ],
+      "issues": [],
+      "missing_families": [],
+      "conflicting_ids": []
+    },
+    "source_authenticity_verified": false,
+    "forecast_validity_established": false,
+    "grants_decision_eligibility": false,
+    "changes_allocation": false,
+    "sends_messages": false
+  },
+  "result": {
+    "contract_version": "portfolio-council-v2",
+    "presentation_version": "council-evidence-summary-v1",
+    "run_id": "fictional-admission",
+    "snapshot_id": "c584af6fcf4b67e2e4e1763c573152523839695a8854363062737f74d475eb5a",
+    "symbol": "MSFT",
+    "horizon_months": 3,
+    "assessed_at": "2026-11-09T12:00:00.000Z",
+    "mode": "fixture",
+    "status": "complete",
+    "termination_reason": "completed",
+    "disposition": "insufficient-evidence",
+    "quality": {
+      "usable_ids": [
+        "loaded:price",
+        "loaded:daily_change_pct",
+        "sec:revenue_growth_pct",
+        "sec:operating_margin_pct",
+        "sec:free_cash_flow_usd",
+        "sec:liabilities_equity",
+        "calendar:event-days"
+      ],
+      "issues": [],
+      "missing_families": [],
+      "conflicting_ids": []
+    },
+    "roles": {
+      "bull": {
+        "summary": "The bull case cites inspected observations for conditional research.",
+        "claims": [
+          {
+            "claim_id": "bull:0",
+            "evidence_id": "sec:revenue_growth_pct",
+            "stance": "support",
+            "implication": "growth"
+          }
+        ],
+        "limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      },
+      "bear": {
+        "summary": "No evidence claims were accepted for the bear case.",
+        "claims": [],
+        "limitations": [
+          "Source authenticity remains unverified.",
+          "Support or challenge is a model interpretation, not a verified causal effect.",
+          "A cited observation does not establish a future outcome."
+        ]
+      },
+      "judge": {
+        "summary": "The judge recorded a balanced comparison. Future outcomes remain unknown.",
+        "preference": "balanced",
+        "winning_claim_ids": []
+      }
+    },
+    "trace": [
+      {
+        "role": "bull",
+        "action": "inspect",
+        "status": "ok"
+      },
+      {
+        "role": "bull",
+        "action": "conclude",
+        "status": "ok"
+      },
+      {
+        "role": "bear",
+        "action": "inspect",
+        "status": "ok"
+      },
+      {
+        "role": "bear",
+        "action": "conclude",
+        "status": "ok"
+      },
+      {
+        "role": "judge",
+        "action": "coverage",
+        "status": "ok"
+      },
+      {
+        "role": "judge",
+        "action": "judge",
+        "status": "ok"
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "loaded:price",
+        "symbol": "MSFT",
+        "family": "market",
+        "metric": "price",
+        "value": 100.0,
+        "unit": "USD",
+        "source_id": "yahoo",
+        "observed_at": "2026-11-09T11:59:00.000001Z",
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "reported",
+        "period_start": null,
+        "period_end": null,
+        "simulated": false
+      },
+      {
+        "evidence_id": "loaded:daily_change_pct",
+        "symbol": "MSFT",
+        "family": "market",
+        "metric": "daily_change_pct",
+        "value": 0.0,
+        "unit": "percent",
+        "source_id": "yahoo",
+        "observed_at": "2026-11-09T11:59:00.000001Z",
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "reported",
+        "period_start": null,
+        "period_end": null,
+        "simulated": false
+      },
+      {
+        "evidence_id": "sec:revenue_growth_pct",
+        "symbol": "MSFT",
+        "family": "financial",
+        "metric": "revenue_growth_pct",
+        "value": 20.0,
+        "unit": "percent",
+        "source_id": "sec-edgar-companyfacts",
+        "observed_at": null,
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "unknown",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "simulated": false
+      },
+      {
+        "evidence_id": "sec:operating_margin_pct",
+        "symbol": "MSFT",
+        "family": "financial",
+        "metric": "operating_margin_pct",
+        "value": 20.0,
+        "unit": "percent",
+        "source_id": "sec-edgar-companyfacts",
+        "observed_at": null,
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "unknown",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "simulated": false
+      },
+      {
+        "evidence_id": "sec:free_cash_flow_usd",
+        "symbol": "MSFT",
+        "family": "financial",
+        "metric": "free_cash_flow_usd",
+        "value": -5.0,
+        "unit": "USD",
+        "source_id": "sec-edgar-companyfacts",
+        "observed_at": null,
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "unknown",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "simulated": false
+      },
+      {
+        "evidence_id": "sec:liabilities_equity",
+        "symbol": "MSFT",
+        "family": "risk",
+        "metric": "liabilities_equity",
+        "value": 2.0,
+        "unit": "ratio",
+        "source_id": "sec-edgar-companyfacts",
+        "observed_at": null,
+        "published_at": null,
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "unknown",
+        "period_start": null,
+        "period_end": "2025-12-31",
+        "simulated": false
+      },
+      {
+        "evidence_id": "calendar:event-days",
+        "symbol": "MSFT",
+        "family": "catalyst",
+        "metric": "event_days_until",
+        "value": 3.000000011574074,
+        "unit": "days",
+        "source_id": "loaded-calendar",
+        "observed_at": null,
+        "published_at": "2026-11-01T12:00:00Z",
+        "retrieved_at": "2026-11-09T12:00:00.000Z",
+        "basis": "unknown",
+        "period_start": null,
+        "period_end": null,
+        "simulated": false
+      }
+    ],
+    "usage": {
+      "model_calls": 6,
+      "tool_calls": 3,
+      "prompt_chars": 29591,
+      "output_token_limit_per_call": 600,
+      "provider_requests": 0,
+      "jev_calls": 0
+    },
+    "policy": {
+      "max_model_calls": 6,
+      "max_tool_calls": 3,
+      "max_seconds": 40.0,
+      "max_prompt_chars": 60000
+    },
+    "source_authenticity_verified": false,
+    "forecast_validity_established": false,
+    "grants_decision_eligibility": false,
+    "changes_allocation": false,
+    "sends_messages": false,
+    "admission": {
+      "contract_version": "council-admission-v1",
+      "rule_version": "family-provenance-v1",
+      "run_id": "fictional-admission",
+      "request_sha256": "c584af6fcf4b67e2e4e1763c573152523839695a8854363062737f74d475eb5a",
+      "status": "conditional",
+      "records": [
+        {
+          "evidence_id": "loaded:price",
+          "kind": "quote",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": null
+        },
+        {
+          "evidence_id": "loaded:daily_change_pct",
+          "kind": "quote",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": null
+        },
+        {
+          "evidence_id": "sec:revenue_growth_pct",
+          "kind": "sec-duration",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": {
+            "earliest": "2026-02-19T10:00:00+00:00",
+            "latest_exclusive": "2026-02-21T12:00:00+00:00",
+            "precision": "date-only",
+            "offset_policy": "utc-minus12-plus14"
+          }
+        },
+        {
+          "evidence_id": "sec:operating_margin_pct",
+          "kind": "sec-duration",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": {
+            "earliest": "2026-02-19T10:00:00+00:00",
+            "latest_exclusive": "2026-02-21T12:00:00+00:00",
+            "precision": "date-only",
+            "offset_policy": "utc-minus12-plus14"
+          }
+        },
+        {
+          "evidence_id": "sec:free_cash_flow_usd",
+          "kind": "sec-duration",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": {
+            "earliest": "2026-02-19T10:00:00+00:00",
+            "latest_exclusive": "2026-02-21T12:00:00+00:00",
+            "precision": "date-only",
+            "offset_policy": "utc-minus12-plus14"
+          }
+        },
+        {
+          "evidence_id": "sec:liabilities_equity",
+          "kind": "sec-instant",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": {
+            "earliest": "2026-02-19T10:00:00+00:00",
+            "latest_exclusive": "2026-02-21T12:00:00+00:00",
+            "precision": "date-only",
+            "offset_policy": "utc-minus12-plus14"
+          }
+        },
+        {
+          "evidence_id": "calendar:event-days",
+          "kind": "catalyst-countdown",
+          "eligible": true,
+          "reason_codes": [],
+          "publication_window": null
+        }
+      ],
+      "quality": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "issues": [],
+        "missing_families": [],
+        "conflicting_ids": []
+      },
+      "source_authenticity_verified": false,
+      "forecast_validity_established": false,
+      "grants_decision_eligibility": false,
+      "changes_allocation": false,
+      "sends_messages": false
+    }
+  }
+}
