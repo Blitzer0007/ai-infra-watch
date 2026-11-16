@@ -20,6 +20,10 @@ Ported from the prior Cloud-tested source branch, without copying the whole Rele
 
 The imported role never authenticates publishers, accesses production DB, sends notifications, contacts NVIDIA/JEV or grants trade eligibility. No production runtime flag or HTTP route is added. The existing current-main auth, quote/portfolio/release safeguards remain intact.
 
+## First exact-head CI regression and repair
+
+Initial PR #173 source commit `98c5997` started the relevant CI families. Python Agents Tests failed **one actual offline CLI regression**: the Source Quality fictional demo fixture had been omitted from the port. The other 114 tests in the same selected group passed. Added the original fictional `aitracker-upload/data/research/source-quality-demo.json` fixture, retaining the source's intentionally simulated/unadmitted evidence. Strengthened the CLI test's explicit authority denial assertions. All required workflows must run successfully on the final corrective commit, not on the earlier failing SHA.
+
 ## Verification and release gates
 
 No inherited source-branch CI conclusion certifies this new branch. Run and wait for exact-head Python Agents Tests and all other applicable workflows. If any fail, fix root causes and rerun on a new SHA. Do not remove safety assertions.

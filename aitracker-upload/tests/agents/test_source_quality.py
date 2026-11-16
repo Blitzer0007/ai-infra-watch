@@ -231,6 +231,7 @@ def test_cli_demo_is_explicitly_simulated_and_imports_no_model_or_credentials(tm
     value = json.loads(result.stdout)
     assert value["status"] == "needs-data" and value["inspection_complete"]
     assert value["tool_calls"] == 2 and value["model_calls"] == value["provider_requests"] == 0
+    assert value["verifies_provider_identity"] is False and value["grants_decision_eligibility"] is False
     script = "from app.agents.source_quality import SourceQualityAgent; import sys; assert 'app.config.settings' not in sys.modules; assert 'app.llm.client' not in sys.modules"
     subprocess.run([sys.executable, "-c", script], cwd=root, env={"PYTHONPATH": str(root)}, check=True)
 
