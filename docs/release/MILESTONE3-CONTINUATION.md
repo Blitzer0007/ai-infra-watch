@@ -35,6 +35,15 @@ Dependency-closed port of source PR #168's Python research council: independentl
 
 **Remaining:** connect the staged modules through an authenticated private development-only route with strict environment guards, build manual review UI, complete source/admission adapters, Company/Catalyst/Daily Review user flows, browser acceptance and full release gates. No user-visible production council yet.
 
+## Third workstream — development UI, private transport and end-to-end test gates
+
+- Ported source-bounded, manual and identity-pinned Source Quality and Bull/Bear/Judge panels, plus an optional explicit JEV coverage-only review in Opportunities. No passive model calls; research is reset on source selection/horizon.
+- The only new JS/Python task routes are guarded by development-only flags and reject `VERCEL`, `VERCEL_ENV=production` and `NODE_ENV=production`, even when opt-in flags are set.
+- Ported authenticated loopback-only relay transport with strict source/admission payload/response validators; migrated current main's autonomous endpoint to trusted configured/own-deployment origin instead of request-supplied Host. General agent path still uses its existing access controls.
+- Ported the upstream end-to-end fictional Source Quality and Council QA scripts and wired them into the existing full mocked Playwright suite. They start isolated development gateways; they make no live provider calls, require no production secrets and should not touch private production rows.
+- `JevAutonomousPortfolioLab` retains current main paper/accounting protections and only adds the QA/development council panel; JEV research is voluntary and may consume configured credits on an explicit click.
+- This is not equivalent to live issuer authentication, verified prediction, cross-worker quotas, a browser accessibility audit or a production-enabled model integration.
+
 ## Next Milestone 3 increments
 
 1. Integrate manual frozen-source quality review into a bounded development/QA user flow and its authenticated local transport, with fail-closed response validation and zero passive writes. Do not expose a live production research endpoint just to demonstrate it.

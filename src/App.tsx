@@ -632,7 +632,7 @@ export default function App() {
               {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices } as unknown as Record<string,Record<string,unknown>>} loading={isLiveLoading} holdingsAvailable={portfolioSymbolsKnown} />}
               {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} researchWatchlist={config.watchlist} reviewRecord={reviewRecord} onOpenReviewHref={handleReviewHref} onSectionChange={setPortfolioQuoteTab} />}
               {activeView === 'research' && <AutonomousResearch />}
-              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
+              {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} calendarSnapshot={calendarSnapshot} />}
               {activeView === 'quality' && <AIQualityLab />}
               {activeView === 'settings' && <Settings />}
               {activeView === 'guide' && <HelpGuide onNavigate={handleNavigate} />}
