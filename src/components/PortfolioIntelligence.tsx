@@ -119,7 +119,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [analystLoading, setAnalystLoading] = useState(false);
   const [analystError, setAnalystError] = useState('');
 
-  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; if(tab==='research')return; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency,tab]);
+  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; if(currency !== 'INR' || !['holdings','performance'].includes(tab))return; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency,tab]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return usd!==0&&Math.abs(usd)<.005?usd.toExponential(4)+' USD':'$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
 
   const historyCacheRef = useRef(new Map<string, { points: PortfolioHistoryPoint[]; fetchedAt: number }>());
@@ -265,7 +265,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, []);
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(tab!=='holdings' || !detailSymbol || selected!==detailSymbol || !holdings.some(row=>row.symbol===detailSymbol)) return;
     if (!selected) {
       setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
       return () => { cancelled = true; };
@@ -293,11 +293,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
       });
     return () => { cancelled = true; };
-  }, [selected, tab]);
+  }, [selected, tab, detailSymbol, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(!['performance','rotation','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed')) return;
     const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
     setPortfolioHistory({ loading: true, histories: {}, error: '' });
@@ -311,7 +311,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
     });
     return () => { cancelled = true; };
-  }, [holdings.map(item => item.symbol).join(','), tab]);
+  }, [holdings.map(item => item.symbol).join(','), tab, viewMode]);
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
@@ -337,12 +337,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(!['holdings','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed'))return;
+    if(tab==='holdings' && (!detailSymbol || selectedAnalysis?.symbol!==detailSymbol || !holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!selectedAnalysis?.symbol) {
       setAnalystConsensus(null);
       return () => { cancelled = true; };
     }
     setAnalystLoading(true);
+    setAnalystConsensus(null);
     setAnalystError('');
     fetch('/api/company-scale?action=analyst&symbol=' + encodeURIComponent(selectedAnalysis.symbol), { cache: 'no-store' })
       .then(async response => {
@@ -354,7 +356,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
       .finally(() => { if (!cancelled) setAnalystLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, tab]);
+  }, [selectedAnalysis?.symbol, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     if (!holdings.length) return;
@@ -363,12 +365,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(!(tab==='overview'&&viewMode==='detailed') && !(tab==='holdings'&&detailSymbol&&selected===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!selected) {
       setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
       return () => { cancelled = true; };
     }
-    setSelectedChart(prev => ({ ...prev, loading: true, range: chartRange, error: '' }));
+    setSelectedChart({ loading: true, points: [], range: chartRange, error: '', retrievedAt: null });
     fetchHistoryCached(selected, chartRange === 'MAX' ? 'max' : '1y')
       .then(points => {
         if (cancelled) return;
@@ -381,15 +383,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
       });
     return () => { cancelled = true; };
-  }, [selected, chartRange, tab]);
+  }, [selected, chartRange, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(tab!=='overview' || viewMode!=='detailed')return;
     if (!loadedReview.accountingReconciled) {
       setPeerPortfolioComparisons([]);
       return () => { cancelled = true; };
     }
+    setPeerPortfolioComparisons([]);
     const jobs = analyses.map(async analysis => {
       const meta = STOCK_UNIVERSE.find(item => item.symbol === analysis.symbol);
       if (!meta) return null;
@@ -420,11 +423,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)).map((item, index) => ({ ...item, holdingSymbol: analyses[index]?.symbol || '—' })) as Array<PeerCounterfactual & { holdingSymbol: string }>);
     });
     return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, viewMode]);
 
   useEffect(() => {
     let cancelled = false;
-    if(tab==='research')return;
+    if(!(tab==='overview'&&viewMode==='detailed') && !(tab==='holdings'&&detailSymbol&&selectedAnalysis?.symbol===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!loadedReview.accountingReconciled || !selectedAnalysis) {
       setPeerComparison(null);
       return () => { cancelled = true; };
@@ -440,6 +443,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return () => { cancelled = true; };
     }
     setPeerLoading(true);
+    setPeerComparison(null);
     fetchHistoryCached(peer.symbol, 'max')
       .then(history => {
         if (cancelled) return;
@@ -463,7 +467,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -950,7 +954,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       )}
       {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
         {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
-          <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Source and accounting gaps remain unchanged; this is not a trade instruction.</p>
+          <FreshnessBadge {...(livePrices[detailAnalysis.symbol] || {})} labelOverride={detailAnalysis.liveStale ? 'Last close' : undefined} showAge />
+          <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Market prices, historical comparators, consensus and source coverage are separately qualified; missing evidence cannot be upgraded into a trade instruction.</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
             <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>

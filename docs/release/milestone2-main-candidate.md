@@ -2,6 +2,11 @@
 
 **Review date:** 16 November 2026. **Current working PR:** [#172](https://github.com/Blitzer0007/ai-infra-watch/pull/172), draft against production `main`. **No merge or deployment.**
 
+## Additional acceptance: details only on user request (pending exact-head verification)
+- Gates hold-specific advanced market history, 52-week high, analyst and peer comparators behind an explicitly selected, loaded Holding Detail Dialog; no incidental calls from default overview/holdings list.
+- Evidence, Performance and consciously selected Detailed Overview preserve their own advanced read paths. Quote freshness is visible in the modal and older symbol-dependent results are cleared while new evidence loads.
+- Browser regression coverage includes no passive advanced reads, positive explicit-detail reads and missing deep-link withholding. Explicit portfolio saves remain in existing management and no new passive writes are allowed.
+
 ## Follow-on integration: holding detail and progressive management (pending exact-head CI)
 The candidate adds a read-only Holding Detail Dialog, explicit route-safe selected-holding context, Escape and focus trapping, Back/Forward and close focus/scroll restoration, and collapsed Holdings-only management that retains unsaved editor state without network writes. Fictional browser tests cover these routes and the pre-existing save contract. This follow-on must pass its own exact-head CI; the previously verified source commit and 3dc1254 checkpoint do not certify it. Inherited selected-position/history fetch timing, independent accessibility review and any real broker/source evidence remain unverified. No merge, deployment or production/backend changes are authorized.
 

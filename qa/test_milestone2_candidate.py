@@ -262,3 +262,44 @@ def test_missing_direct_holding_never_substitutes_another_position(page):
     assert dialog.get_by_role("button", name="Open Evidence workspace").count() == 0
     dialog.press("Escape")
     expect(dialog).to_have_count(0)
+
+
+
+def test_holdings_list_defers_history_analyst_and_currency_reads_until_explicit_detail(page):
+    """A default portfolio review or holdings list must not trigger optional detail reads."""
+    import json
+    mock_local_apis(page)
+    rows = [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 1, "averageCost": 100, "purchaseDate": "2026-01-02"}]
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": rows})))
+    calls = []
+    writes = []
+    page.on("request", lambda req: calls.append(req.url) if "action=history" in req.url or "action=analyst" in req.url or "symbol=INR" in req.url else None)
+    page.on("request", lambda req: writes.append((req.method, req.url)) if req.method not in ("GET", "HEAD") and ("/api/portfolio" in req.url or "/api/signal-scorecard" in req.url) else None)
+    page.goto("/portfolio")
+    expect(page.get_by_test_id("portfolio-command-center")).to_be_visible()
+    page.get_by_role("combobox", name="Portfolio section").select_option("holdings")
+    trigger = page.get_by_role("button", name="Open NVDA holding details from table")
+    expect(trigger).to_be_visible()
+    page.wait_for_load_state("networkidle")
+    assert not calls, "The initial list issued advanced history, analyst or currency requests: " + repr(calls)
+    trigger.click()
+    dialog = page.get_by_role("dialog", name="NVDA holding details")
+    expect(dialog).to_be_visible()
+    page.wait_for_load_state("networkidle")
+    assert any("action=history" in url for url in calls), "Explicit detail must load the selected chart"
+    assert any("action=analyst" in url for url in calls), "Explicit detail must load analyst context"
+    assert writes == []
+
+
+def test_unknown_holding_deeplink_never_fetches_another_symbol_history_or_analyst(page):
+    import json
+    mock_local_apis(page)
+    rows = [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 1, "averageCost": 100}]
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": rows})))
+    calls = []
+    page.on("request", lambda req: calls.append(req.url) if "action=history" in req.url or "action=analyst" in req.url else None)
+    page.goto("/portfolio?portfolio_tab=holdings&portfolio_detail=ZZZZ")
+    dialog = page.get_by_role("dialog", name="ZZZZ holding details")
+    expect(dialog.get_by_role("alert")).to_contain_text("No substitute position is shown")
+    page.wait_for_load_state("networkidle")
+    assert calls == []
