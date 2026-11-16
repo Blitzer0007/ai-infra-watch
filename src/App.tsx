@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen
+  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen, Search
 } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
@@ -12,10 +12,16 @@ import { fetchPortfolioHoldings } from './utils/portfolioApi';
 import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
 import UniversalSearch from './components/UniversalSearch';
+import OpportunityScanner from './components/opportunities/OpportunityScanner';
+import CatalystCalendar from './components/calendar/CatalystCalendar';
+import AlertInbox from './components/alerts/AlertInbox';
+import {unavailableCatalystSnapshot} from './utils/catalystCalendar';
+import {createReviewReadingSession,canonicalReviewHref} from './utils/reviewWorkspaceNavigation';
+import type {ReviewRecordContext} from './utils/reviewRecordContext';
 
-const VIEW_IDS = new Set(['overview','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
+const VIEW_IDS = new Set(['overview','opportunities','calendar','alerts','contracts','tracker','congress','macro','portfolio','watchlist','research','jev-lab','quality','outlook','health','guide','settings']);
 const VIEW_PATHS: Record<string, string> = {
-  overview: '/overview', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
+  overview: '/overview', opportunities: '/opportunities', calendar: '/calendar', alerts: '/alerts', contracts: '/contracts', tracker: '/tracker', congress: '/congress', macro: '/macro',
   portfolio: '/portfolio', watchlist: '/watchlist', research: '/research', 'jev-lab': '/jev-lab', quality: '/quality', outlook: '/outlook',
   health: '/health', guide: '/guide', settings: '/settings'
 };
@@ -59,6 +65,14 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
+  const [portfolioSymbolsKnown,setPortfolioSymbolsKnown]=useState(false);
+  const [portfolioQuoteTab,setPortfolioQuoteTab]=useState(()=>new URLSearchParams(window.location.search).get('portfolio_tab')||'overview');
+  const [calendarSnapshot,setCalendarSnapshot]=useState(unavailableCatalystSnapshot);
+  const [reviewSessions]=useState(()=>({calendar:createReviewReadingSession(),alerts:createReviewReadingSession()}));
+  const reviewRecords=useRef(new Map<string,ReviewRecordContext>());
+  const [reviewRecordEntry,setReviewRecordEntry]=useState<string|null>(null);
+  const reviewRecord=reviewRecordEntry&&window.history.state?.aiwReviewEntry===reviewRecordEntry
+    ?reviewRecords.current.get(reviewRecordEntry)??null:null;
 
   // Live Synthesis Data States
   const [liveData, setLiveData] = useState<{
@@ -111,9 +125,9 @@ export default function App() {
     const loadPortfolioSymbols = async () => {
       try {
         const rows = await fetchPortfolioHoldings();
-        if (!cancelled) setPortfolioSymbols(rows.map(row => row.symbol));
+        if (!cancelled) {setPortfolioSymbols(rows.map(row => row.symbol));setPortfolioSymbolsKnown(true);}
       } catch {
-        if (!cancelled) setPortfolioSymbols(PORTFOLIO_POSITIONS.map(position => position.symbol));
+        if (!cancelled) {setPortfolioSymbols(PORTFOLIO_POSITIONS.map(position => position.symbol));setPortfolioSymbolsKnown(false);}
       }
     };
     void loadPortfolioSymbols();
@@ -159,7 +173,7 @@ export default function App() {
   }, [config, tickerPrices]);
 
   useEffect(() => {
-    if (activeView !== 'portfolio') return;
+    if (activeView !== 'portfolio'||portfolioQuoteTab==='research') return;
     let cancelled = false;
     let timer: number | undefined;
 
@@ -200,7 +214,7 @@ export default function App() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [activeView, config, portfolioSymbols]);
+  }, [activeView, config, portfolioSymbols, portfolioQuoteTab]);
 
   const handleFetchLiveData = async (forceRefresh = false) => {
     setIsLiveLoading(true);
@@ -307,16 +321,42 @@ export default function App() {
     };
   }, []);
 
+  const handleReviewHref=(href:string,record?:ReviewRecordContext)=>{
+    const safe=canonicalReviewHref(href);if(!safe)return;
+    const nextView=viewFromPath(safe.split('?')[0]);
+    let entry:string|null=null;
+    if(nextView==='portfolio'&&record){
+      const params=new URL(safe,'https://navigation.invalid').searchParams;
+      if(record.symbol===params.get('research_symbol')&&record.origin===params.get('research_from')){
+        entry=crypto.randomUUID();
+        if(reviewRecords.current.size>=100)reviewRecords.current.delete(reviewRecords.current.keys().next().value!);
+        reviewRecords.current.set(entry,record);
+      }
+    }
+    setReviewRecordEntry(entry);
+    if(nextView==='portfolio')setPortfolioQuoteTab(new URL(safe,'https://navigation.invalid').searchParams.get('portfolio_tab')||'overview');
+    window.history.pushState(entry?{view:nextView,aiwReviewEntry:entry}:{view:nextView},'',safe);
+    setActiveView(nextView);setIsMobileMenuOpen(false);
+  };
   const handleNavigate = (view: string) => {
     const nextView = VIEW_IDS.has(view) ? view : 'overview';
+    if(nextView==='portfolio'&&activeView==='portfolio'){setIsMobileMenuOpen(false);return;}
+    if(nextView==='portfolio')setPortfolioQuoteTab('overview');
+    setReviewRecordEntry(null);
     setActiveView(nextView);
     setIsMobileMenuOpen(false);
-    const nextPath = VIEW_PATHS[nextView] || '/overview';
-    if (window.location.pathname !== nextPath) window.history.pushState({ view: nextView }, '', nextPath);
+    const nextPath=(nextView==='calendar'||nextView==='alerts')&&reviewSessions[nextView].href
+      ?reviewSessions[nextView].href:VIEW_PATHS[nextView] || '/overview';
+    if (window.location.pathname+window.location.search !== nextPath) window.history.pushState({ view: nextView }, '', nextPath);
   };
-
   useEffect(() => {
-    const onPopState = () => setActiveView(viewFromPath(window.location.pathname));
+    const onPopState = () => {
+      const view=viewFromPath(window.location.pathname);
+      if(view==='portfolio')setPortfolioQuoteTab(new URLSearchParams(window.location.search).get('portfolio_tab')||'overview');
+      const entry=window.history.state?.aiwReviewEntry;
+      setReviewRecordEntry(view==='portfolio'&&typeof entry==='string'&&reviewRecords.current.has(entry)?entry:null);
+      setActiveView(view);
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -337,6 +377,9 @@ export default function App() {
   // The summary is the default landing surface: overview is intentionally the first route.
   const navigationItems = [
     { id: 'overview', label: 'Overview', index: '01', icon: Grid },
+    { id: 'opportunities', label: 'Opportunities', index: 'R2', icon: Search },
+    { id: 'calendar', label: 'Catalyst Calendar', index: 'R2', icon: Calendar },
+    { id: 'alerts', label: 'Alert Inbox', index: 'R2', icon: ShieldAlert },
     { id: 'contracts', label: 'Contracts', index: '02', icon: FileText },
     { id: 'tracker', label: 'Progress Tracker', index: '03', icon: Calendar },
     { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
@@ -583,8 +626,11 @@ export default function App() {
               {activeView === 'tracker' && <ProgressTracker livePrices={liveData?.stockPrices} />}
               {activeView === 'congress' && <CongressTrades liveTrades={liveData?.congressTrades} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
               {activeView === 'macro' && <MacroPolitics onNavigate={handleNavigate} liveRisks={liveData?.macroRisks} livePrices={liveData?.stockPrices || tickerPrices} contracts={liveData?.contracts} news={liveData?.news} politicalSignals={liveData?.politicalSignals} evidenceAvailability={liveData?.evidenceAvailability} />}
-              {activeView === 'watchlist' && <BuySellWatchlist />}
-              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} />}
+              {activeView === 'watchlist' && <BuySellWatchlist onEarningsSnapshot={setCalendarSnapshot} />}
+              {activeView === 'calendar' && <CatalystCalendar snapshot={calendarSnapshot} onOpenWatchlist={() => handleNavigate('watchlist')} session={reviewSessions.calendar} onOpenResearch={handleReviewHref} />}
+              {activeView === 'alerts' && <AlertInbox onOpenHealth={() => handleNavigate('health')} session={reviewSessions.alerts} onOpenResearch={handleReviewHref} />}
+              {activeView === 'opportunities' && <OpportunityScanner holdings={portfolioSymbols} watchlist={config.watchlist} quotes={{ ...(liveData?.stockPrices || {}), ...tickerPrices } as unknown as Record<string,Record<string,unknown>>} loading={isLiveLoading} holdingsAvailable={portfolioSymbolsKnown} />}
+              {activeView === 'portfolio' && <PortfolioIntelligence livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} contracts={liveData?.contracts} congressTrades={liveData?.congressTrades} macroRisks={liveData?.macroRisks} news={liveData?.news} politicalSignals={liveData?.politicalSignals} researchWatchlist={config.watchlist} reviewRecord={reviewRecord} onOpenReviewHref={handleReviewHref} onSectionChange={setPortfolioQuoteTab} />}
               {activeView === 'research' && <AutonomousResearch />}
               {activeView === 'jev-lab' && <JevAutonomousPortfolioLab livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} />}
               {activeView === 'quality' && <AIQualityLab />}

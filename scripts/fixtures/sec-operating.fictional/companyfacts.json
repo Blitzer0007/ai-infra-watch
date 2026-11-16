@@ -1,0 +1,204 @@
+{
+  "cik": 1,
+  "entityName": "Fictional Components Ltd",
+  "facts": {
+    "us-gaap": {
+      "RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "units": {
+          "USD": [
+            {
+              "val": 120,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 100,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "OperatingIncomeLoss": {
+        "units": {
+          "USD": [
+            {
+              "val": 24,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 15,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "units": {
+          "USD": [
+            {
+              "val": -8,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 12,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "NetCashProvidedByUsedInOperatingActivities": {
+        "units": {
+          "USD": [
+            {
+              "val": 20,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 22,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "PaymentsToAcquirePropertyPlantAndEquipment": {
+        "units": {
+          "USD": [
+            {
+              "val": 25,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 20,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "DepreciationDepletionAndAmortization": {
+        "units": {
+          "USD": [
+            {
+              "val": 7,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 5,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      },
+      "ShareBasedCompensation": {
+        "units": {
+          "USD": [
+            {
+              "val": 3,
+              "start": "2025-01-01",
+              "end": "2025-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2025"
+            },
+            {
+              "val": 2,
+              "start": "2024-01-01",
+              "end": "2024-12-31",
+              "filed": "2026-02-20",
+              "accn": "0000000001-26-000001",
+              "form": "10-K",
+              "fy": 2025,
+              "fp": "FY",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

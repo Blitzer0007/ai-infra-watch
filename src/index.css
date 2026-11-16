@@ -313,3 +313,12 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   }
   .aiw-page-header p { font-size: .72rem; }
 }
+
+/* Read-only holding drilldown. Native dialog supplies modal semantics. */
+.aiw-holding-dialog {
+  position: fixed; inset: 0; margin: auto; width: calc(100% - 1rem);
+  max-width: 72rem; max-height: calc(100dvh - 1rem); overflow-y: auto;
+  border: 1px solid #ffffff40; border-radius: 1rem; padding: 0;
+  background: #0f1115; color: white; overscroll-behavior: contain;
+}
+.aiw-holding-dialog::backdrop { background: #000b; }

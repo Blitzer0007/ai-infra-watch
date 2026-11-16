@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Pencil, Plus, Save, Trash2, X, ShieldAlert } from 'lucide-react';
 import {
   addPortfolioPurchase,
@@ -10,11 +10,11 @@ import {
   type StoredPortfolioHolding,
 } from '../utils/portfolioApi';
 
-type Props = { holdings: StoredPortfolioHolding[]; onChanged: (holdings: StoredPortfolioHolding[]) => void };
+type Props = { holdings: StoredPortfolioHolding[]; onChanged: (holdings: StoredPortfolioHolding[]) => void; onDraftOpenChange?: (open: boolean)=>void };
 const emptyForm = { symbol: '', quantity: '', averageCost: '', purchaseDate: '', notes: '', targetAllocationPct: '', maxAllocationPct: '' };
 const emptyPurchase = { investedAmount: '', executionPrice: '', purchaseDate: '', notes: '' };
 
-export default function PortfolioManager({ holdings, onChanged }: Props) {
+export default function PortfolioManager({ holdings, onChanged, onDraftOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StoredPortfolioHolding | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -27,6 +27,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
   const [purchaseBusy, setPurchaseBusy] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
   const [lotChecks, setLotChecks] = useState<Record<string, { status: 'ok' | 'warn' | 'missing'; message: string }>>({});
+  useEffect(()=>{onDraftOpenChange?.(open || purchaseOpen!==null);},[open,purchaseOpen,onDraftOpenChange]);
 
   const edit = (h: StoredPortfolioHolding) => {
     setEditing(h);
@@ -213,6 +214,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
     </div>
 
     {open && <div className="mt-4 rounded-xl border border-white/10 bg-[#0F1115] p-4">
+      <p data-testid="portfolio-unsaved-draft" role="status" className="mb-3 text-sm text-amber-100">This holding form is unsaved. Switching Portfolio sections does not submit it. Select Save holding or Cancel explicitly; reloading discards the form.</p>
       <div className="flex items-center justify-between"><div className="text-xs font-bold">{editing?'Edit holding':'Add holding'}</div><button type="button" aria-label="Close holding editor" onClick={()=>setOpen(false)} className="text-white/45 hover:text-white"><X className="w-4 h-4"/></button></div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-2 mt-3">
         <Field testId="portfolio-field-ticker" label="Ticker" value={form.symbol} onChange={v=>setForm({...form,symbol:v})} placeholder="NVDA"/>

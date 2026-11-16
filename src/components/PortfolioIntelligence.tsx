@@ -1,12 +1,14 @@
 import DataTable from './DataTable';
 import {formatPrice} from '../utils';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useId, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
+import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
+import { HOLDING_FILTERS, HOLDING_SORTS, readHoldingNavigation, writeHoldingNavigation, type HoldingFilter, type HoldingSort } from '../utils/holdingDetailNavigation';
 import PortfolioCashFlows from './PortfolioCashFlows';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
@@ -19,12 +21,17 @@ import {calculateLoadedTradingPerformance} from '../utils/reviewedPortfolioAccou
 import {reviewLoadedLedger,type LedgerAvailability} from '../utils/loadedLedgerReview';
 import SignalScorecardPanel from './SignalScorecardPanel';
 import PortfolioResearchPanel from './PortfolioResearchPanel';
-import { authFetch } from '../utils/apiAuth';
 import { calculatePeerCounterfactual, selectMostRelevantPeer, selectDynamicPeers, type PeerCounterfactual } from '../utils/peerIntelligence';
 import { analystFreshness, normalizeAnalystConsensus } from '../utils/analystConsensus';
 import { calculateExposureWeightedMacroLoad, derivePortfolioExposure } from '../utils/evidenceExposure';
 import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
+import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
+import type { ReviewRecordContext } from '../utils/reviewRecordContext';
+import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
+import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
+import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
+import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
 type Price = {
   price: number;
   changePct: number;
@@ -35,7 +42,6 @@ type Price = {
   stale?: boolean;
   cached?: boolean;
 };
-type PortfolioTab = 'overview' | 'holdings' | 'performance' | 'evidence' | 'research' | 'watchlist' | 'events' | 'rotation' | 'network';
 type PortfolioHistoryPoint = { date: string; price: number };
 type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
 type HistoricalPriceState = {
@@ -61,22 +67,33 @@ type Props = {
   macroRisks?: any[];
   news?: any[];
   politicalSignals?: any[];
+  researchWatchlist?:readonly string[];
+  reviewRecord?:ReviewRecordContext|null;
+  onOpenReviewHref?:(href:string,record?:ReviewRecordContext)=>void;
+  onSectionChange?:(section:PortfolioTab)=>void;
 };
 
 const WATCHLIST = STOCK_UNIVERSE;
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
-export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [] }: Props) {
-  const [tab, setTab] = useState<PortfolioTab>(() => {
-    const value = new URLSearchParams(window.location.search).get('portfolio_tab');
-    return value === 'holdings' || value === 'performance' || value === 'evidence' || value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
-  });
+export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], researchWatchlist=[], reviewRecord=null, onOpenReviewHref, onSectionChange }: Props) {
+  const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
+  useEffect(()=>{onSectionChange?.(tab);},[tab,onSectionChange]);
+  const [managementDraftOpen,setManagementDraftOpen]=useState(false);
+  const sectionHeading=useRef<HTMLHeadingElement>(null);
+  const focusSection=useRef(false);
+  const currentTab=useRef(tab);currentTab.current=tab;
+  const detailOwner=useId();
+  const closingDetail=useRef(false);
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
-  const [holdingFilter, setHoldingFilter] = useState<'All' | 'Up today' | 'Down today' | 'Below your buy price' | 'Needs attention'>('All');
-  const [holdingSort, setHoldingSort] = useState<'Symbol' | 'Return %' | 'Today' | 'Value' | 'Attention'>('Symbol');
-  const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
+  const [holdingFilter, setHoldingFilter] = useState<HoldingFilter>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).filter);
+  const [holdingSort, setHoldingSort] = useState<HoldingSort>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).sort);
+  // The URL owns only the selected read-only view; PortfolioManager keeps any editor draft in memory.
+  const [detailSymbol,setDetailSymbol]=useState(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).detail);
+  const [selected, setSelected] = useState(() => readHoldingNavigation(new URLSearchParams(window.location.search)).detail || new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [tradeAvailability,setTradeAvailability]=useState<LedgerAvailability>('loading');
   const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
@@ -102,7 +119,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [analystLoading, setAnalystLoading] = useState(false);
   const [analystError, setAnalystError] = useState('');
 
-  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency]);
+  useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; if(currency !== 'INR' || !['holdings','performance'].includes(tab))return; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency,tab]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return usd!==0&&Math.abs(usd)<.005?usd.toExponential(4)+' USD':'$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
 
   const historyCacheRef = useRef(new Map<string, { points: PortfolioHistoryPoint[]; fetchedAt: number }>());
@@ -131,7 +148,78 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   };
 
   const changeTab = (nextTab: PortfolioTab) => {
+    if (nextTab === tab) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('portfolio_tab', nextTab);
+    params.delete('portfolio_detail');
+    window.history.pushState({ ...window.history.state, view: 'portfolio' }, '', window.location.pathname + '?' + params.toString() + window.location.hash);
+    setDetailSymbol(null);
+    focusSection.current=true;
     setTab(nextTab);
+  };
+  useEffect(()=>{
+    if(focusSection.current){
+      sectionHeading.current?.focus({preventScroll:true});
+      sectionHeading.current?.scrollIntoView({block:'start'});
+      focusSection.current=false;
+    }
+  },[tab]);
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      const nextTab=portfolioTabFromValue(params.get('portfolio_tab'));
+      const view=readHoldingNavigation(params);
+      focusSection.current=nextTab!==currentTab.current;
+      setTab(nextTab);
+      setDetailSymbol(view.detail);
+      setHoldingFilter(view.filter);
+      setHoldingSort(view.sort);
+      closingDetail.current=false;
+      setQ(params.get('portfolio_q') || '');
+      setGroup(params.get('portfolio_group') || 'All');
+      const symbol=view.detail || params.get('portfolio_symbol');
+      if(symbol && /^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))setSelected(symbol);
+    };
+    window.addEventListener('popstate',restore);
+    return () => window.removeEventListener('popstate',restore);
+  }, []);
+  const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
+    if(!holdings.some(row=>row.symbol===symbol))return;
+    const params=new URLSearchParams(window.location.search);
+    params.set('portfolio_tab','holdings');
+    params.set('portfolio_symbol',symbol);
+    params.delete('portfolio_detail');
+    window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol};
+    params.set('portfolio_detail',symbol);
+    window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    closingDetail.current=false;
+    setSelected(symbol);
+    setDetailSymbol(symbol);
+  };
+  const closeHoldingDetail=()=>{
+    if(closingDetail.current)return;
+    closingDetail.current=true;
+    if(listOrigin.current && window.history.state?.aiwHoldingDetailOwner===detailOwner){
+      window.history.back();
+      return;
+    }
+    const params=new URLSearchParams(window.location.search);
+    params.delete('portfolio_detail');
+    window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    setDetailSymbol(null);
+    closingDetail.current=false;
+  };
+  const restoreHoldingList=()=>{
+    const origin=listOrigin.current;
+    requestAnimationFrame(()=>{
+      const params=new URLSearchParams(window.location.search);
+      if(window.location.pathname!=='/portfolio'||params.get('portfolio_tab')!=='holdings'||readHoldingNavigation(params).detail)return;
+      const fallback=Array.from(document.querySelectorAll<HTMLElement>('[data-holding-symbol]')).find(node=>node.dataset.holdingSymbol===(origin?.symbol||detailSymbol));
+      const target=origin?.trigger?.isConnected?origin.trigger:fallback||sectionHeading.current;
+      target?.focus({preventScroll:true});
+      if(origin)window.scrollTo({top:origin.scrollY,behavior:'auto'});
+    });
   };
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
@@ -150,11 +238,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
     if (selected) params.set('portfolio_symbol', selected);
     else params.delete('portfolio_symbol');
+    const viewParams=writeHoldingNavigation(params,{filter:holdingFilter,sort:holdingSort,detail:detailSymbol});
 
-    const query = params.toString();
+    const query = viewParams.toString();
     const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
     window.history.replaceState(window.history.state, '', url);
-  }, [tab, q, group, selected]);
+  }, [tab, q, group, selected, holdingFilter, holdingSort, detailSymbol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +265,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   }, []);
   useEffect(() => {
     let cancelled = false;
+    if(tab!=='holdings' || !detailSymbol || selected!==detailSymbol || !holdings.some(row=>row.symbol===detailSymbol)) return;
     if (!selected) {
       setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: '' });
       return () => { cancelled = true; };
@@ -203,10 +293,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setHistoricalPrice({ loading: false, high52w: null, high52wDate: null, historicalHigh: null, historicalHighDate: null, error: error instanceof Error ? error.message : 'Historical price data unavailable' });
       });
     return () => { cancelled = true; };
-  }, [selected]);
+  }, [selected, tab, detailSymbol, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     let cancelled = false;
+    if(!['performance','rotation','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed')) return;
     const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
     setPortfolioHistory({ loading: true, histories: {}, error: '' });
@@ -220,7 +311,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
     });
     return () => { cancelled = true; };
-  }, [holdings.map(item => item.symbol).join(',')]);
+  }, [holdings.map(item => item.symbol).join(','), tab, viewMode]);
   const positions = useMemo(() => holdings.length ? mapStoredPortfolioHoldings(holdings) : [], [holdings]);
   const intelligence = useMemo(() => buildIntelligence(livePrices), [livePrices]);
   const [rotationHorizon, setRotationHorizon] = useState<RotationHorizon>('20D');
@@ -240,41 +331,20 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return {...row,averageCost:cost,investedValue:ledger?.openCostBasis??null,costBasisSupported:!!ledger,pnl,whatIfProfitAt10Pct:ledger&&row.currentValue!==null?row.currentValue*1.1-ledger.openCostBasis:null,whatIfProfitAt20Pct:ledger&&row.currentValue!==null?row.currentValue*1.2-ledger.openCostBasis:null,pnlPct:pnl!==null&&ledger!.openCostBasis>0?pnl/ledger!.openCostBasis*100:null,portfolioWeight:weight,minorPosition:weight!==null&&weight<.02};
     });
   },[livePrices,intelligence,positions,loadedReview]);
-  const signalScorecardSentRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (import.meta.env.DEV || import.meta.env.VITE_QA_MODE === 'true' || !analyses.length) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const hash = (value: string) => Array.from(value).reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0).toString(36);
-    const pending = analyses.filter(item => item.state !== 'INSUFFICIENT DATA').filter(item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      return sessionStorage.getItem('aiw_scorecard_sent:' + signalKey) !== '1' && !signalScorecardSentRef.current.has(signalKey);
-    });
-    if (!pending.length) return;
-    void Promise.allSettled(pending.map(async item => {
-      const signalKey = hash(['position_state', item.symbol, item.state, today].join('|'));
-      signalScorecardSentRef.current.add(signalKey);
-      try {
-        await authFetch('/api/signal-scorecard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signalKey, symbol: item.symbol, signalType: 'position_state', signalState: item.state, confidence: 0.60, signalPrice: item.livePrice, observedAt: new Date().toISOString(), evidence: { dailyChangePct: item.dailyChangePct, pnlPct: item.pnlPct, groupScore: item.groupScore, groupBreadth: item.groupBreadth, relativeToUniverse: item.relativeToUniverse, vsPeers: item.vsPeers } }),
-        });
-        sessionStorage.setItem('aiw_scorecard_sent:' + signalKey, '1');
-      } catch {
-        signalScorecardSentRef.current.delete(signalKey);
-      }
-    }));
-  }, [analyses]);
+  // Passive portfolio review must not POST observations; scorecard history is read-only.
   const selectedAnalysis = analyses.find(x => x.symbol === selected) ?? analyses[0];
   const selectedPeerSet = useMemo(() => selectedAnalysis ? selectDynamicPeers(STOCK_UNIVERSE.find(item => item.symbol === selectedAnalysis.symbol) ?? selectedAnalysis as any, livePrices) : { primary: null, core: [], extended: [] }, [selectedAnalysis?.symbol, livePrices]);
 
   useEffect(() => {
     let cancelled = false;
+    if(!['holdings','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed'))return;
+    if(tab==='holdings' && (!detailSymbol || selectedAnalysis?.symbol!==detailSymbol || !holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!selectedAnalysis?.symbol) {
       setAnalystConsensus(null);
       return () => { cancelled = true; };
     }
     setAnalystLoading(true);
+    setAnalystConsensus(null);
     setAnalystError('');
     fetch('/api/company-scale?action=analyst&symbol=' + encodeURIComponent(selectedAnalysis.symbol), { cache: 'no-store' })
       .then(async response => {
@@ -286,7 +356,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       .catch(error => { if (!cancelled) { setAnalystConsensus(null); setAnalystError(error instanceof Error ? error.message : 'Analyst consensus unavailable'); } })
       .finally(() => { if (!cancelled) setAnalystLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol]);
+  }, [selectedAnalysis?.symbol, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     if (!holdings.length) return;
@@ -295,11 +365,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
+    if(!(tab==='overview'&&viewMode==='detailed') && !(tab==='holdings'&&detailSymbol&&selected===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!selected) {
       setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
       return () => { cancelled = true; };
     }
-    setSelectedChart(prev => ({ ...prev, loading: true, range: chartRange, error: '' }));
+    setSelectedChart({ loading: true, points: [], range: chartRange, error: '', retrievedAt: null });
     fetchHistoryCached(selected, chartRange === 'MAX' ? 'max' : '1y')
       .then(points => {
         if (cancelled) return;
@@ -312,14 +383,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
       });
     return () => { cancelled = true; };
-  }, [selected, chartRange]);
+  }, [selected, chartRange, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   useEffect(() => {
     let cancelled = false;
+    if(tab!=='overview' || viewMode!=='detailed')return;
     if (!loadedReview.accountingReconciled) {
       setPeerPortfolioComparisons([]);
       return () => { cancelled = true; };
     }
+    setPeerPortfolioComparisons([]);
     const jobs = analyses.map(async analysis => {
       const meta = STOCK_UNIVERSE.find(item => item.symbol === analysis.symbol);
       if (!meta) return null;
@@ -350,10 +423,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       if (!cancelled) setPeerPortfolioComparisons(results.filter((item): item is PeerCounterfactual => Boolean(item)).map((item, index) => ({ ...item, holdingSymbol: analyses[index]?.symbol || '—' })) as Array<PeerCounterfactual & { holdingSymbol: string }>);
     });
     return () => { cancelled = true; };
-  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
+  }, [analyses.map(item => item.symbol + ':' + item.purchaseDate + ':' + item.investedValue).join('|'), livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, viewMode]);
 
   useEffect(() => {
     let cancelled = false;
+    if(!(tab==='overview'&&viewMode==='detailed') && !(tab==='holdings'&&detailSymbol&&selectedAnalysis?.symbol===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
     if (!loadedReview.accountingReconciled || !selectedAnalysis) {
       setPeerComparison(null);
       return () => { cancelled = true; };
@@ -369,6 +443,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return () => { cancelled = true; };
     }
     setPeerLoading(true);
+    setPeerComparison(null);
     fetchHistoryCached(peer.symbol, 'max')
       .then(history => {
         if (cancelled) return;
@@ -392,7 +467,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       })
       .finally(() => { if (!cancelled) setPeerLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(',')]);
+  }, [selectedAnalysis?.symbol, selectedAnalysis?.purchaseDate, selectedAnalysis?.investedValue, selectedAnalysis?.quantity, selectedAnalysis?.livePrice, livePrices, portfolioTransactions.length, portfolioTransactions.map(item => item.sourceRow).join(','), tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
 
   const filtered: PositionAnalysis[] = useMemo(() => {
     const result = analyses.filter((h: PositionAnalysis) => {
@@ -417,6 +492,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     });
   }, [analyses, q, group, holdingFilter, holdingSort]);
 
+  const detailAnalysis=detailSymbol ? analyses.find(row=>row.symbol===detailSymbol) || null : null;
+
   const breadthMoves = analyses
     .filter(h => typeof h.dailyChangePct === 'number' && Number.isFinite(h.dailyChangePct))
     .map(h => h.dailyChangePct as number);
@@ -433,6 +510,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     ? analyses.reduce((sum, h) => sum + (h.currentValue ?? 0), 0)
     : null;
   const tradePerformance=useMemo(()=>calculateLoadedTradingPerformance({holdings,transactions:portfolioTransactions,holdingsAvailability:holdingAvailability,transactionsAvailability:tradeAvailability,assessedAt:new Date().toISOString()},analyses.map(row=>({symbol:row.symbol,quantity:row.quantity,currentPrice:row.livePrice}))),[holdings,portfolioTransactions,holdingAvailability,tradeAvailability,analyses]);
+  // Only existing deterministic engine output and validated market observations may populate this review queue.
+  // If ledger, quote or corroborating evidence is unavailable, adapter abstains rather than promoting a trade signal.
+  const decisionCards = useMemo(() => {
+    const assessedAt = Date.now();
+    return analyses.map(position => {
+      const group = intelligence.groups.find(item => item.name === position.group);
+      const supportingSymbols = [...new Set([...(group?.members ?? []), ...position.peers])];
+      const supportingQuotes = supportingSymbols.map(symbol => normalizeDecisionQuote(symbol, livePrices[symbol]));
+      const evidenceValidated = supportingQuotes.length > 0 && supportingQuotes.every(quote =>
+        evaluateDecisionEligibility(quote, true, true, assessedAt).eligibleForDecision);
+      return adaptDecisionCard(position, normalizeDecisionQuote(position.symbol, livePrices[position.symbol]),
+        loadedReview.accountingReconciled, assessedAt, evidenceValidated, supportingQuotes);
+    });
+  }, [analyses, intelligence, livePrices, loadedReview.accountingReconciled]);
+  const commandSummary = useMemo(() => summarizeDecisionCards(decisionCards), [decisionCards]);
   const accountingUnrealized=tradePerformance.unrealizedPnl;
   const accountingUnrealizedPct=accountingUnrealized!==null&&tradePerformance.openCostBasis!==null&&tradePerformance.openCostBasis>0?accountingUnrealized/tradePerformance.openCostBasis*100:null;
   const accountingNote=tradePerformance.status==='conditional-loaded-records'?'Loaded-record calculation · full history unverified':'Accounting inputs or quotes unsupported · P&L withheld';
@@ -663,7 +755,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       </div>
 
-      <PortfolioManager holdings={holdings} onChanged={setHoldings} />
+      <PortfolioNavigation tab={tab} onChange={changeTab} />
+      <h2 ref={sectionHeading} tabIndex={-1} style={{scrollMarginTop:'8rem'}} data-testid="portfolio-section-heading" className="text-xl font-semibold">{PORTFOLIO_SECTIONS.find(item=>item.id===tab)?.label}</h2>
+      {managementDraftOpen && tab!=='holdings' && <p data-testid="portfolio-draft-retained" role="status" className="rounded-xl border border-amber-200/30 bg-amber-200/5 p-3 text-sm text-amber-100">An unsaved holding form is still open in My Holdings. Return there to save or cancel; changing sections does not write to your portfolio.</p>}
+      {tab === 'overview' && <PortfolioCommandCenter
+        summary={commandSummary} positions={decisionCards} loading={portfolioLoading} error={portfolioError}
+        explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'}
+        onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
+        onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }}
+      />}
+      <div hidden={tab!=='holdings'}>
+        <details data-testid="portfolio-management" className="rounded-xl border border-white/15 p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Manage positions and purchases</summary>
+          <div className="mt-4"><PortfolioManager holdings={holdings} onChanged={setHoldings} onDraftOpenChange={setManagementDraftOpen}/></div>
+        </details>
+      </div>
       {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} holdingsAvailability={holdingAvailability} transactionsAvailability={tradeAvailability} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
       {portfolioError && <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/70">{portfolioError}. Persistent portfolio data could not be loaded; check the portfolio API and Supabase connection.</div>}
@@ -800,21 +906,18 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <Metric label="AI infrastructure strength" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        <span className="px-2 py-2 text-[9px] font-mono uppercase tracking-widest text-white/20">Explore</span>
-        {([['overview','Overview'],['holdings','My Holdings'],['performance','Performance'],['evidence','Evidence'],['watchlist','Watchlist'],['events','Events'],['rotation','Money Flow'],['network','Connections'],['research','Portfolio Research']] as const).map(x =>
-          <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
-            {x[1]}
-          </button>
-        )}
-      </div>
 
 
-      {tab === 'research' && <PortfolioResearchPanel />}
+      {tab === 'research' && <div className="space-y-4">
+        <CompanyResearchWorkspace holdings={holdings.map(row=>row.symbol)}
+          watchlist={researchWatchlist} holdingsStatus={portfolioLoading?'loading':portfolioError?'unavailable':'ready'}
+          onOpenReviewHref={onOpenReviewHref} reviewRecord={reviewRecord}/>
+        <PortfolioResearchPanel />
+      </div>}
 
       {tab === 'holdings' && (
         <div className="space-y-4">
-          <Panel title="Holdings" subtitle="Compact portfolio view. Select a row to open the holding context below.">
+          <Panel title="Holdings" subtitle="Select a stock to open read-only details. Editing is available separately under Manage positions and purchases.">
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[760px] text-left">
                 <thead className="bg-black/20">
@@ -831,7 +934,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   {filtered.map(h => (
                     <tr key={h.symbol} className={selected === h.symbol ? 'bg-cyan-300/[.04]' : 'hover:bg-white/[.02]'}>
                       <td className="px-3 py-3">
-                        <button type="button" onClick={() => setSelected(h.symbol)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
+                        <button type="button" data-holding-symbol={h.symbol} aria-label={'Open '+h.symbol+' holding details from table'} aria-haspopup="dialog" onClick={event=>openHoldingDetail(h.symbol,event.currentTarget)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
                         <div className="text-[9px] text-white/30 mt-0.5">{h.name}</div>
                       </td>
                       <td className="px-3 py-3 font-mono text-[10px]">{h.portfolioWeight == null ? '—' : (h.portfolioWeight * 100).toFixed(1) + '%'}</td>
@@ -846,11 +949,22 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {!filtered.length && <div className="p-6 text-center text-[10px] text-white/30">No holdings match the current filters.</div>}
             </div>
           </Panel>
-          {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-          {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-          {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+          <p className="text-xs text-white/55">Holding detail is opened explicitly; portfolio accounting and quote quality gates remain unchanged.</p>
         </div>
       )}
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
+        {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
+          <FreshnessBadge {...(livePrices[detailAnalysis.symbol] || {})} labelOverride={detailAnalysis.liveStale ? 'Last close' : undefined} showAge />
+          <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Market prices, historical comparators, consensus and source coverage are separately qualified; missing evidence cannot be upgraded into a trade instruction.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
+            <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
+          </div>
+          <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange}/>
+          <PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/>
+          <PeerCounterfactualPanel h={detailAnalysis} comparison={peerComparison} loading={peerLoading}/>
+        </>}
+      </HoldingDetailDialog>}
 
       {tab === 'evidence' && (
         <div className="space-y-4">
