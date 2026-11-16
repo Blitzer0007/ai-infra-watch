@@ -26,6 +26,10 @@ import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
 import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
 import type { ReviewRecordContext } from '../utils/reviewRecordContext';
+import PortfolioNavigation, { portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
+import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
+import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
+import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
 type Price = {
   price: number;
   changePct: number;
@@ -36,7 +40,6 @@ type Price = {
   stale?: boolean;
   cached?: boolean;
 };
-type PortfolioTab = 'overview' | 'holdings' | 'performance' | 'evidence' | 'research' | 'watchlist' | 'events' | 'rotation' | 'network';
 type PortfolioHistoryPoint = { date: string; price: number };
 type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
 type HistoricalPriceState = {
@@ -72,10 +75,7 @@ const WATCHLIST = STOCK_UNIVERSE;
 
 // Batch 36 production deploy marker: validated portfolio UX + VIVO history fixes.
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], researchWatchlist=[], reviewRecord=null, onOpenReviewHref, onSectionChange }: Props) {
-  const [tab, setTab] = useState<PortfolioTab>(() => {
-    const value = new URLSearchParams(window.location.search).get('portfolio_tab');
-    return value === 'holdings' || value === 'performance' || value === 'evidence' || value === 'research' || value === 'watchlist' || value === 'events' || value === 'rotation' || value === 'network' ? value : 'overview';
-  });
+  const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
   useEffect(()=>{onSectionChange?.(tab);},[tab,onSectionChange]);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
@@ -136,15 +136,26 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     return request;
   };
 
-  const changeTab = (nextTab: PortfolioTab) => { setTab(nextTab); };
-  useEffect(()=>{
-    const restore=()=>{
-      const v=new URLSearchParams(window.location.search).get('portfolio_tab');
-      setTab(v==='holdings'||v==='performance'||v==='evidence'||v==='research'||v==='watchlist'||v==='events'||v==='rotation'||v==='network'?v:'overview');
+  const changeTab = (nextTab: PortfolioTab) => {
+    if (nextTab === tab) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('portfolio_tab', nextTab);
+    const url = window.location.pathname + '?' + params.toString() + window.location.hash;
+    window.history.pushState({ ...window.history.state, view: 'portfolio' }, '', url);
+    setTab(nextTab);
+  };
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setTab(portfolioTabFromValue(params.get('portfolio_tab')));
+      setQ(params.get('portfolio_q') || '');
+      setGroup(params.get('portfolio_group') || 'All');
+      const symbol = params.get('portfolio_symbol');
+      if (symbol && /^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)) setSelected(symbol);
     };
     window.addEventListener('popstate',restore);
-    return()=>window.removeEventListener('popstate',restore);
-  },[]);
+    return () => window.removeEventListener('popstate',restore);
+  }, []);
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
     localStorage.setItem('aiw-portfolio-view-mode', mode);
@@ -427,6 +438,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     ? analyses.reduce((sum, h) => sum + (h.currentValue ?? 0), 0)
     : null;
   const tradePerformance=useMemo(()=>calculateLoadedTradingPerformance({holdings,transactions:portfolioTransactions,holdingsAvailability:holdingAvailability,transactionsAvailability:tradeAvailability,assessedAt:new Date().toISOString()},analyses.map(row=>({symbol:row.symbol,quantity:row.quantity,currentPrice:row.livePrice}))),[holdings,portfolioTransactions,holdingAvailability,tradeAvailability,analyses]);
+  // Only existing deterministic engine output and validated market observations may populate this review queue.
+  // If ledger, quote or corroborating evidence is unavailable, adapter abstains rather than promoting a trade signal.
+  const decisionCards = useMemo(() => {
+    const assessedAt = Date.now();
+    return analyses.map(position => {
+      const group = intelligence.groups.find(item => item.name === position.group);
+      const supportingSymbols = [...new Set([...(group?.members ?? []), ...position.peers])];
+      const supportingQuotes = supportingSymbols.map(symbol => normalizeDecisionQuote(symbol, livePrices[symbol]));
+      const evidenceValidated = supportingQuotes.length > 0 && supportingQuotes.every(quote =>
+        evaluateDecisionEligibility(quote, true, true, assessedAt).eligibleForDecision);
+      return adaptDecisionCard(position, normalizeDecisionQuote(position.symbol, livePrices[position.symbol]),
+        loadedReview.accountingReconciled, assessedAt, evidenceValidated, supportingQuotes);
+    });
+  }, [analyses, intelligence, livePrices, loadedReview.accountingReconciled]);
+  const commandSummary = useMemo(() => summarizeDecisionCards(decisionCards), [decisionCards]);
   const accountingUnrealized=tradePerformance.unrealizedPnl;
   const accountingUnrealizedPct=accountingUnrealized!==null&&tradePerformance.openCostBasis!==null&&tradePerformance.openCostBasis>0?accountingUnrealized/tradePerformance.openCostBasis*100:null;
   const accountingNote=tradePerformance.status==='conditional-loaded-records'?'Loaded-record calculation · full history unverified':'Accounting inputs or quotes unsupported · P&L withheld';
@@ -657,6 +683,13 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         </div>
       </div>
 
+      <PortfolioNavigation tab={tab} onChange={changeTab} />
+      {tab === 'overview' && <PortfolioCommandCenter
+        summary={commandSummary} positions={decisionCards} loading={portfolioLoading} error={portfolioError}
+        explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'}
+        onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
+        onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }}
+      />}
       <PortfolioManager holdings={holdings} onChanged={setHoldings} />
       {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} holdingsAvailability={holdingAvailability} transactionsAvailability={tradeAvailability} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
@@ -794,14 +827,6 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 <Metric label="AI infrastructure strength" value={infraScore.toString()} suffix="/100" tone={infraScore >= 50 ? "up" : "down"} icon={<Zap/>}/>
                 <Metric label="Strongest group today" value={intelligence.topGroup || '—'} suffix="" tone="warn" icon={<ShieldAlert/>}/>
               </div>      )}
-      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
-        <span className="px-2 py-2 text-[9px] font-mono uppercase tracking-widest text-white/20">Explore</span>
-        {([['overview','Overview'],['holdings','My Holdings'],['performance','Performance'],['evidence','Evidence'],['watchlist','Watchlist'],['events','Events'],['rotation','Money Flow'],['network','Connections'],['research','Portfolio Research']] as const).map(x =>
-          <button type="button" key={x[0]} onClick={() => changeTab(x[0])} aria-pressed={tab === x[0]} className={'px-3 py-2 rounded-lg border text-[11px] font-mono uppercase ' + (tab === x[0] ? 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' : 'border-transparent text-white/45 hover:text-white hover:bg-white/5')}>
-            {x[1]}
-          </button>
-        )}
-      </div>
 
 
       {tab === 'research' && <div className="space-y-4">

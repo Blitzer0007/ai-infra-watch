@@ -135,3 +135,69 @@ def test_null_journal_weekly_and_unavailable_holdings_preserve_app_shell(page):
     page.get_by_test_id("nav-opportunities").click()
     expect(page.get_by_test_id("opportunity-scanner")).to_be_visible()
     assert errors == []
+
+
+def test_command_center_reviews_loaded_holding_without_upgrading_unknown_data(page):
+    """The main-based candidate starts with a review queue, not an inferred trade order."""
+    from test_release2 import fictional_portfolio
+    fictional_portfolio(page)
+    writes = []
+    page.on("request", lambda req: writes.append(req.url)
+            if req.method not in ("GET", "HEAD") else None)
+    page.goto("/portfolio")
+    root = page.get_by_test_id("portfolio-intelligence")
+    expect(root.get_by_test_id("portfolio-navigation")).to_be_visible()
+    center = root.get_by_test_id("portfolio-command-center")
+    expect(center).to_be_visible()
+    card = center.get_by_test_id("position-decision-card")
+    expect(card).to_have_count(1)
+    expect(card).to_contain_text("FICT")
+    expect(card).to_contain_text("Not enough reliable data")
+    assert writes == []
+    card.get_by_role("button", name="Evidence and research", exact=True).click()
+    expect(root.get_by_test_id("portfolio-navigation").get_by_role(
+        "combobox", name="Portfolio section")).to_have_value("evidence")
+    assert "portfolio_tab=evidence" in page.url
+    assert writes == []
+
+
+def test_portfolio_back_forward_restores_section_and_retains_unsubmitted_editor(page):
+    """URL history is navigation state; the unsaved form is never serialized or submitted."""
+    mock_local_apis(page)
+    writes = []
+    page.on("request", lambda req: writes.append(req.url)
+            if req.method not in ("GET", "HEAD") else None)
+    page.goto("/portfolio?portfolio_tab=holdings")
+    root = page.get_by_test_id("portfolio-intelligence")
+    nav = root.get_by_test_id("portfolio-navigation")
+    picker = nav.get_by_role("combobox", name="Portfolio section")
+    expect(picker).to_have_value("holdings")
+    root.get_by_test_id("portfolio-add-holding").click()
+    root.get_by_test_id("portfolio-field-ticker").fill("FICT")
+    root.get_by_test_id("portfolio-field-notes").fill("Unsubmitted local draft")
+    nav.get_by_role("button", name="Evidence", exact=True).click()
+    expect(picker).to_have_value("evidence")
+    page.go_back()
+    expect(picker).to_have_value("holdings")
+    expect(root.get_by_test_id("portfolio-field-ticker")).to_have_value("FICT")
+    expect(root.get_by_test_id("portfolio-field-notes")).to_have_value("Unsubmitted local draft")
+    page.go_forward()
+    expect(picker).to_have_value("evidence")
+    assert "Unsubmitted local draft" not in page.url
+    assert writes == []
+
+
+@pytest.mark.parametrize("width", [360, 768, 1440])
+def test_portfolio_navigation_control_is_responsive_and_restores_overview(page, width):
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 950})
+    page.goto("/portfolio")
+    nav = page.get_by_test_id("portfolio-navigation")
+    picker = nav.get_by_role("combobox", name="Portfolio section")
+    expect(picker).to_have_value("overview")
+    picker.select_option("research")
+    expect(page.get_by_test_id("company-research-workspace")).to_be_visible()
+    page.go_back()
+    expect(picker).to_have_value("overview")
+    expect(page.get_by_test_id("portfolio-command-center")).to_be_visible()
+    assert nav.evaluate("(element) => element.scrollWidth <= element.clientWidth")
