@@ -52,3 +52,12 @@ Dependency-closed port of source PR #168's Python research council: independentl
 4. Add browser, backend, privacy, budget, source-conflict and evaluation fixtures, and verify entire exact-current-SHA CI. Only then consider a separately reviewed Milestone 3 production release.
 
 **Restrictions:** Cloud/GitHub CI only; do not run on the user's Windows PC. Do not merge/deploy, alter Supabase or private rows/secrets, activate schedulers, send Telegram, trade, or call paid/live model providers in this increment.
+
+
+## Production-visible offline research review
+
+The candidate's default production build now adds only **manual zero-request coverage tools**:
+- Opportunities → scan → Source coverage checklist, frozen from already-loaded quote metadata, with explicit uncertainty;
+- JEV Portfolio Lab → manual Bull/Bear/Judge evidence preflight, showing missing source families with zero model requests and automatic Judge abstention;
+- Company Research → a manually requested Company/Catalyst/Daily Review evidence checklist that retains source-record scope and marks unsupported authority unknown.
+These are research-readiness experiences, not a claim that live model inference, publisher authentication or forecast outcomes are available. Development-only authenticating loopback workflows remain separate. Production never activates `COUNCIL_DEV_ENABLED` or `SOURCE_QUALITY_DEV_ENABLED` and no live models/providers were called for development.
