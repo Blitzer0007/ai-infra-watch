@@ -13,6 +13,17 @@ from mcp_servers.stocks.providers import FinnhubProvider, FixtureProvider, Quote
 from mcp_servers.stocks.schemas import Quote, QuoteBatch
 from mcp_servers.stocks.service import StockService
 
+@pytest.fixture(autouse=True)
+def independent_provider_budget(monkeypatch):
+    """Separate fictional cases from other MCP tests' process-global 429 cooldown.
+
+    This does not disable budget enforcement; each case gets a fresh real
+    default coordinator, while cross-client sharing is covered separately.
+    """
+    from mcp_servers import provider_budget
+    monkeypatch.setattr(provider_budget, "_PROCESS_BUDGET", provider_budget.ProviderBudget())
+
+
 NOW = "2026-08-03T20:05:00Z"
 OBSERVED = "2026-08-03T20:00:00Z"
 STAMP = datetime.fromisoformat(OBSERVED.replace("Z", "+00:00")).timestamp()

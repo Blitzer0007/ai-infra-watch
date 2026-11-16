@@ -85,3 +85,7 @@ These schema changes may affect Python consumers; do not claim acceptance until 
 ## Market-data consumer compatibility
 
 After strict quote metadata was ported, the first full MCP tests exposed inherited consumers that synthesized missing moves, currency or observation times into present facts. Ported the narrow upstream, tested dependency closure for `stocks/feed.py`, `app/agents/_convert.py`, `app/agents/mcp_pipeline.py` and `app/agents/market.py`. These keep missing source fields explicitly unavailable, require actual usable quotes before MCP market synthesis, maintain dedupe keyed on actual observation quality (not request retrieval time), and ensure transient feed failures back off. All upstream fictional quote-provenance tests must remain enabled. The stricter source and budget claims remain offline; no new provider poller is activated.
+
+## Shared Python quota test isolation
+
+The first provenance+budget aggregate suite left a real process-wide cooldown from an earlier intentionally rate-limited client test. A later unrelated credential-redaction case then received `BUDGET_COOLDOWN` instead of reaching its fake connection failure. Added an **autouse fixture in the fictional quote-provenance test module** that creates a new default-policy `ProviderBudget` per independently scoped test. It does not bypass budget policy or mute any assertion; the dedicated `test_provider_budget.py` suite still tests shared-client, real cooldown, denial and concurrency behavior. Rerun the full exact-head workflow before accepting.
