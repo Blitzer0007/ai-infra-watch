@@ -35,6 +35,7 @@ import httpx
 
 from .candles import CandleService
 from .providers import QuoteError, _http_retryable
+from mcp_servers.provider_budget import BUDGET_CODES, budgeted_json
 from .schemas import CandleSeries, EarningsEvent, EarningsHistory
 from .earnings_fallback import FmpEarningsProvider
 
@@ -158,30 +159,11 @@ class FinnhubEarningsProvider:
         self._clock = clock
 
     def _get(self, path: str, params: dict) -> dict:
-        url = f"{self.BASE}{path}"
-        params = {**params, "token": self.api_key}
-        last_exc: Exception | None = None
-        for attempt in range(self.max_retries + 1):
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.get(url, params=params)
-                if resp.status_code == 429:
-                    if attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("RATE_LIMIT", "Finnhub rate limit (60/min free tier)")
-                if resp.status_code >= 400:
-                    if _http_retryable(resp.status_code) and attempt < self.max_retries:
-                        time.sleep(self.base_delay * (2 ** attempt))
-                        continue
-                    raise QuoteError("HTTP_ERROR", f"Finnhub returned {resp.status_code}")
-                return resp.json()
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt < self.max_retries:
-                    time.sleep(self.base_delay * (2 ** attempt))
-                    continue
-        raise QuoteError("HTTP_ERROR", f"Finnhub request failed: {last_exc}")
+        if not self.api_key:
+            raise QuoteError("NO_KEY", "FINNHUB_API_KEY is not set")
+        return budgeted_json("finnhub", f"{self.BASE}{path}", error_type=QuoteError,
+            params={**params, "token": self.api_key}, timeout=self.timeout,
+            max_retries=self.max_retries, base_delay=self.base_delay)
 
     def get_earnings(self, symbol: str) -> EarningsHistory:
         if not self.api_key:
@@ -343,6 +325,8 @@ class EarningsService:
                 return self._enrich_reactions(history)
             primary_error = QuoteError("NO_DATA", f"primary earnings data unusable for {symbol}")
         except QuoteError as exc:
+            if exc.code in BUDGET_CODES or exc.code == "RATE_LIMIT":
+                raise  # Do not evade local/provider denial through another vendor.
             primary_error = exc
 
         if self.fallback_provider is not None:

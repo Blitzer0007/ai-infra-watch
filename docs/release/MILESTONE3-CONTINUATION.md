@@ -69,3 +69,9 @@ Added `qa/test_milestone3_candidate.py` and the UI/API/DB validation workflow se
 ## CI environment regression (fixed on candidate branch)
 
 The first integrated UI test workflow hit fixture setup errors because its browser-only dependency install lacked `uvicorn`; the new QA suite deliberately launches a separate loopback FastAPI server to test the actual private relay. The workflow now installs the repository's existing `aitracker-upload/requirements.txt` in **only** the offline mocked UI runner, preserving real backend execution instead of marking source/council tests skipped. The unit-test failures on the first UI-integrated head were also corrected by restoring the fictional SEC fixture and updating the proxy test for explicit trusted backend origins. Exact-head CI must be rerun and all gates green.
+
+## Shared Python provider admission and offline budget verification
+
+Integrated the original review-tested `provider_budget.py` with its existing actual-client adapters for Finnhub quote/research/earnings/candles/news and SEC `LiveEdgarClient`. The coordinator is process-shared: 30 Finnhub attempts and 60 SEC attempts per 60 seconds, default one in-flight request/provider, bounded spacing, three attempts and 8 seconds per operation, shared cooldown on 429 and fixed redacted failures. This does not add polling or perform any new request; existing deliberate provider reads are throttled.
+
+Added `test_provider_budget.py` to the Python Agents CI MCP contract test step. The fictional/test-only suite exercises actual client seams under a synthetic clock, concurrency, token redaction, retry-denial and fail-closed budget behavior. No live HTTP/vendor/key calls are permitted in CI. Limits are **process-local** and are not proof of cross-worker/account-wide spend, source authenticity, actual billing, or license compliance. Do not merge or deploy until all current-main tests and exact SHA workflows succeed.
