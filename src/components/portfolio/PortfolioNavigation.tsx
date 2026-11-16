@@ -16,20 +16,20 @@ export default function PortfolioNavigation({ tab, onChange }: { tab: PortfolioT
   const id=useId();
   const primary=PORTFOLIO_SECTIONS.slice(0,4);
   const advanced=PORTFOLIO_SECTIONS.slice(4);
-  return <>
-    <div data-testid="portfolio-navigation" className="aiw-portfolio-jump flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/20 bg-[#15181e] p-3">
+  return <div data-testid="portfolio-navigation" className="space-y-3">
+    <div className="aiw-portfolio-jump flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/20 bg-[#15181e] p-3">
       <label htmlFor={id} className="text-sm font-semibold">Portfolio section</label>
       <select id={id} value={tab} onChange={event=>onChange(portfolioTabFromValue(event.target.value))} className="min-w-0 w-full rounded-lg border border-white/25 bg-[#15181e] px-3 py-2 text-sm sm:w-auto">
-        <optgroup label="Daily tasks">{primary.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>
-        <optgroup label="Research tools">{advanced.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>
+        <optgroup label="Daily tasks">{primary.map(item=><option key={item.id} value={item.id}>{`Go to ${item.label}`}</option>)}</optgroup>
+        <optgroup label="Research tools">{advanced.map(item=><option key={item.id} value={item.id}>{`Go to ${item.label}`}</option>)}</optgroup>
       </select>
     </div>
     <nav aria-label="Portfolio workspaces" className="hidden space-y-3 md:block">
       <div className="grid grid-cols-4 gap-2">{primary.map(item=><button type="button" key={item.id} onClick={()=>onChange(item.id)} aria-current={tab===item.id?'page':undefined} aria-pressed={tab===item.id} className={'rounded-lg border px-3 py-3 text-sm font-semibold '+(tab===item.id?'border-cyan-200/50 bg-cyan-200/10 text-cyan-100':'border-white/15 text-white/75 hover:bg-white/5')}>{item.label}</button>)}</div>
-      <details open={advanced.some(item=>item.id===tab)||undefined} className="rounded-lg border border-white/10 px-3">
+      <details open className="rounded-lg border border-white/10 px-3">
         <summary className="cursor-pointer text-sm text-white/75">Research tools</summary>
         <div className="flex flex-wrap gap-2 pb-3">{advanced.map(item=><button type="button" key={item.id} onClick={()=>onChange(item.id)} aria-current={tab===item.id?'page':undefined} className={'rounded-lg border px-3 py-2 text-sm '+(tab===item.id?'border-cyan-200/50 text-cyan-100':'border-white/15 text-white/75')}>{item.label}</button>)}</div>
       </details>
     </nav>
-  </>;
+  </div>;
 }
