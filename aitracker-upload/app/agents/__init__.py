@@ -10,6 +10,8 @@ from importlib import import_module
 from typing import Any
 
 _EXPORTS = {
+    "PortfolioCouncil": ("app.agents.portfolio_council", "PortfolioCouncil"),
+    "FictionalCouncilModel": ("app.agents.portfolio_council", "FictionalCouncilModel"),
     "SourceQualityAgent": ("app.agents.source_quality", "SourceQualityAgent"),
     "QualityRequest": ("app.agents.source_quality", "QualityRequest"),
     "QualityResult": ("app.agents.source_quality", "QualityResult"),

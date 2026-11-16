@@ -28,6 +28,13 @@ Initial PR #173 source commit `98c5997` started the relevant CI families. Python
 
 No inherited source-branch CI conclusion certifies this new branch. Run and wait for exact-head Python Agents Tests and all other applicable workflows. If any fail, fix root causes and rerun on a new SHA. Do not remove safety assertions.
 
+
+## Second workstream — bounded Bull / Bear / Judge engine (offline, unexposed)
+
+Dependency-closed port of source PR #168's Python research council: independently initialized Bull and Bear roles, a Judge constrained to inspected/cited evidence, deterministic abstention and fixed-output presentation, independently checked admission-v2, bounded model/tool/time/response limits, and mocked-only optional NVIDIA/TypeSafe adapters. The model adapter module is **not routed or configured** on production. The source `app.jev.council` module is for bounded typed coverage only, never portfolio allocation. Fixtures carry fictional/declared source data; they prove contract consistency, not issuer authenticity, forecast correctness or entitlement. Included offline suites `test_portfolio_council.py` and `test_council_admission.py` in Python Agents CI. No new HTTP route, production feature or live permission was granted.
+
+**Remaining:** connect the staged modules through an authenticated private development-only route with strict environment guards, build manual review UI, complete source/admission adapters, Company/Catalyst/Daily Review user flows, browser acceptance and full release gates. No user-visible production council yet.
+
 ## Next Milestone 3 increments
 
 1. Integrate manual frozen-source quality review into a bounded development/QA user flow and its authenticated local transport, with fail-closed response validation and zero passive writes. Do not expose a live production research endpoint just to demonstrate it.
