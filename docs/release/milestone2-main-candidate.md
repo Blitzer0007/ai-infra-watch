@@ -1,6 +1,6 @@
 # Milestone 2 — isolated main-based candidate and acceptance matrix
 
-**Review date:** 15 November 2026. **Current working PR:** [#172](https://github.com/Blitzer0007/ai-infra-watch/pull/172), draft against production `main`. **No merge or deployment.**
+**Review date:** 16 November 2026. **Current working PR:** [#172](https://github.com/Blitzer0007/ai-infra-watch/pull/172), draft against production `main`. **No merge or deployment.**
 
 ## Pinned sources and verification
 
@@ -8,13 +8,13 @@
 | --- | --- |
 | Shipped Milestone 1 main base | `d678cbe0ada0a329f541273181fb0b7f52ad0f90` |
 | Stacked development reference | Draft PR #168, `d14f5fe57028d3277cc229b704bc126192f42815`; source branch not rewritten |
-| Current verified *source* checkpoint | `62d3884591af5de3dbca2656e21b7270628517aa` |
-| Frontend CI | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691855), 908/908 Node tests, TypeScript lint, build and migration manifest checks |
-| Security audit | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691902) |
-| UI/API/DB Validation | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43742691812), mocked Playwright plus disposable Postgres and offline CI-safety jobs |
-| PR comparison | 75 files changed at source checkpoint, based directly on `main`, mergeable without reported textual conflicts |
+| Current verified *source* checkpoint | `e5a104cd1326e73d2ea344d5378ed5bbbafb2190` |
+| Frontend CI | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43794320253), 908/908 Node tests, TypeScript lint, build and migration manifest checks |
+| Security audit | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43794320265) |
+| UI/API/DB Validation | [Success on the source checkpoint](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/43794320237), mocked Playwright plus disposable Postgres and offline CI-safety jobs |
+| PR comparison | 81 files changed at source checkpoint, based directly on `main`, mergeable without reported textual conflicts |
 
-A future documentation-only commit changes the exact branch SHA and **requires fresh exact-head GitHub conclusions**; these links certify only `62d3884`. The 3 workflow families are the ones triggered by this isolated PR's changed paths. The 4 extra agent/backend/quality workflow families seen on PR #168 are separately path-filtered and were not triggered by this narrower candidate; don't call them passed on this PR.
+A future documentation-only commit changes the exact branch SHA and **requires fresh exact-head GitHub conclusions**; these links certify only `e5a104c`. The 3 workflow families are the ones triggered by this isolated PR's changed paths. The 4 extra agent/backend/quality workflow families seen on PR #168 are separately path-filtered and were not triggered by this narrower candidate; don't call them passed on this PR.
 
 ## Delivered candidate scope
 
@@ -32,6 +32,8 @@ A future documentation-only commit changes the exact branch SHA and **requires f
 | Workstream | Verified fictional/offline coverage | Remaining limitation |
 | --- | --- | --- |
 | Main accounting/data quality | Main TypeScript/Node tests, release/security and disposable database jobs pass; audited main accounting files unchanged | Genuine broker completeness, corporate actions and issuer source accuracy not established |
+| Portfolio daily review & safe queue | `PortfolioCommandCenter.tsx`, `PortfolioReviewQueue.tsx`, `PositionDecisionCard.tsx`, `DecisionEvidencePanel.tsx`, main `decisionCardAdapter.ts` and `decisionEligibility.ts`; new fictional integrated tests | Prioritized risk/missing-data review, withheld quote/ledger states, deterministic explanations, card-to-Holdings/Evidence navigation without passive writes | Not a forecast or broker order; missing actual issuer/ledger provenance remains withheld |
+| Portfolio responsive workspaces & history | `PortfolioNavigation.tsx`, `PortfolioIntelligence.tsx`, main `qa/test_milestone2_candidate.py` additions | Keyboard select at 360/768/1440, desktop buttons, browser Back/Forward restoration and retained unsubmitted editor values | `HoldingDetailDialog`, full detail-history ownership, progressive editor and scroll/focus parity are still unported |
 | Portfolio editor | Draft values persist across section changes; explicit save/cancel; no passive network writes asserted | This is main's existing editor, not the redesigned progressive editor from PR #168; advanced Back/Forward editing UX remains to be reconciled |
 | Opportunities | `qa/test_release2.py` and `qa/test_company_research_navigation.py`: frozen manual scans, status and filters, research selection, failure/empty distinctions, keyboard/responsiveness | Zero verified signal families; no autonomous ranking, new feed, or live-model performance proof |
 | Calendar | `qa/test_catalyst_calendar.py`: existing feed only after manual Watchlist access, date precision/zone, cancellation/revision, stale/simulated/failed sources, small screens | No independent new catalyst feed; snapshot coverage is bounded and session-local |
@@ -42,16 +44,16 @@ A future documentation-only commit changes the exact branch SHA and **requires f
 
 ## Precise candidate file boundaries
 
-- **Main-preserving integrations:** `src/App.tsx`, `src/components/PortfolioIntelligence.tsx`, `PortfolioManager.tsx`, `PortfolioSignalFusion.tsx`, `BuySellWatchlist.tsx`, `EarningsAlerts.tsx`, `DecisionJournalPanel.tsx`.
+- **Main-preserving integrations:** `src/App.tsx`, `src/components/PortfolioIntelligence.tsx`, `PortfolioManager.tsx`, `PortfolioSignalFusion.tsx`, `BuySellWatchlist.tsx`, `EarningsAlerts.tsx`, `DecisionJournalPanel.tsx`. **New UX port:** `src/components/portfolio/{PortfolioCommandCenter,PortfolioReviewQueue,PositionDecisionCard,DecisionEvidencePanel,PortfolioNavigation}.tsx`.
 - **New review surfaces:** `src/components/opportunities/*`, `src/components/calendar/*`, `src/components/alerts/AlertInbox.tsx`, `src/components/portfolio/{CompanyResearchWorkspace,CompanyDossier,ReviewOriginContext,HoldingCompanyDossier}*`, related read-only adapters/utilities.
 - **Protected read API:** `api/market.js`, `vercel.json` (the `/api/alert-inbox` GET route), `server/api/alert-inbox.js`, `server/services/alertInbox.js`, `shared/alertDeliveryEvidence.js` and their offline unit tests.
 - **Deterministic tests and sources:** `qa/test_milestone2_candidate.py`, `qa/test_release2.py`, `qa/test_alert_inbox.py`, `qa/test_catalyst_calendar.py`, `qa/test_company_research_navigation.py`, fictional dossier/SEC fixture files, `.github/workflows/qa-validation.yml`.
 - **Deliberately untouched:** `api/auth.js`, `api/portfolio.js`, `server/api/decision-center.js`, production release workflow, Supabase migrations, cron workflows, production secrets or rows.
-- For the exhaustive 75-file manifest, review [PR #172 Files changed](https://github.com/Blitzer0007/ai-infra-watch/pull/172/files); this table is a scope summary, not a complete manifest.
+- For the exhaustive current candidate manifest, review [PR #172 Files changed](https://github.com/Blitzer0007/ai-infra-watch/pull/172/files); this table is a scope summary, not a complete manifest.
 
 ## Excluded from this isolated candidate / acceptance gaps
 
-The more extensive PR #168 design includes `PortfolioCommandCenter`, `HoldingDetailDialog`, `PortfolioNavigation`, consolidated section/back-stack/focus UX and expanded source/conflict presentation. Those components **were not ported wholesale** into this candidate because doing so would pull large stacked dependencies and risk overwriting shipped Milestone 1 safeguards. Do **not** treat source-branch 7/7 green CI as proof that those features shipped through this candidate.
+The PR #168 `PortfolioCommandCenter` and `PortfolioNavigation` are now integrated on main and have passed the candidate's offline source checks. **Still unported:** `HoldingDetailDialog`, the complete selected-holding detail, progressive editor placement, section/record history ownership, scroll/focus restoration and some source/conflict presentation. They must be ported in small dependency-closed increments rather than wholesale over Milestone 1's financial, auth or release safeguards. Do **not** treat source-branch 7/7 green CI as proof that those features shipped through this candidate.
 
 Likewise, Milestone 3 Bull/Bear/Judge agents and provider budgets, Milestone 4 forecasts/outcome claims, and Milestone 5 broad operational work remain deferred. The current candidate is a **tested integration increment**, not certification that every original Milestone 2 experience is fully replicated, or that any investment forecast is accurate.
 
