@@ -1,12 +1,14 @@
 import DataTable from './DataTable';
 import {formatPrice} from '../utils';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useId, type ReactNode } from 'react';
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
+import HoldingDetailDialog from './portfolio/HoldingDetailDialog';
+import { HOLDING_FILTERS, HOLDING_SORTS, readHoldingNavigation, writeHoldingNavigation, type HoldingFilter, type HoldingSort } from '../utils/holdingDetailNavigation';
 import PortfolioCashFlows from './PortfolioCashFlows';
 import { STOCK_UNIVERSE } from '../utils/stockUniverse';
 import EventImpactExplorer from './EventImpactExplorer';
@@ -26,7 +28,7 @@ import ForecastValidationPanel from './ForecastValidationPanel';
 import FreshnessBadge from './FreshnessBadge';
 import CompanyResearchWorkspace from './portfolio/CompanyResearchWorkspace';
 import type { ReviewRecordContext } from '../utils/reviewRecordContext';
-import PortfolioNavigation, { portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
+import PortfolioNavigation, { PORTFOLIO_SECTIONS, portfolioTabFromValue, type PortfolioTab } from './portfolio/PortfolioNavigation';
 import PortfolioCommandCenter from './portfolio/PortfolioCommandCenter';
 import { adaptDecisionCard, summarizeDecisionCards } from '../utils/decisionCardAdapter';
 import { normalizeDecisionQuote, evaluateDecisionEligibility } from '../utils/decisionEligibility';
@@ -77,12 +79,20 @@ const WATCHLIST = STOCK_UNIVERSE;
 export default function PortfolioIntelligence({ livePrices = {}, contracts = [], congressTrades = [], macroRisks = [], news = [], politicalSignals = [], researchWatchlist=[], reviewRecord=null, onOpenReviewHref, onSectionChange }: Props) {
   const [tab, setTab] = useState<PortfolioTab>(() => portfolioTabFromValue(new URLSearchParams(window.location.search).get('portfolio_tab')));
   useEffect(()=>{onSectionChange?.(tab);},[tab,onSectionChange]);
+  const [managementDraftOpen,setManagementDraftOpen]=useState(false);
+  const sectionHeading=useRef<HTMLHeadingElement>(null);
+  const focusSection=useRef(false);
+  const currentTab=useRef(tab);currentTab.current=tab;
+  const detailOwner=useId();
+  const closingDetail=useRef(false);
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
-  const [holdingFilter, setHoldingFilter] = useState<'All' | 'Up today' | 'Down today' | 'Below your buy price' | 'Needs attention'>('All');
-  const [holdingSort, setHoldingSort] = useState<'Symbol' | 'Return %' | 'Today' | 'Value' | 'Attention'>('Symbol');
-  const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
+  const [holdingFilter, setHoldingFilter] = useState<HoldingFilter>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).filter);
+  const [holdingSort, setHoldingSort] = useState<HoldingSort>(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).sort);
+  const [detailSymbol,setDetailSymbol]=useState(()=>readHoldingNavigation(new URLSearchParams(window.location.search)).detail);
+  const [selected, setSelected] = useState(() => readHoldingNavigation(new URLSearchParams(window.location.search)).detail || new URLSearchParams(window.location.search).get('portfolio_symbol') || 'NVDA');
   const [holdings, setHoldings] = useState<StoredPortfolioHolding[]>([]);
   const [tradeAvailability,setTradeAvailability]=useState<LedgerAvailability>('loading');
   const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
@@ -140,22 +150,76 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     if (nextTab === tab) return;
     const params = new URLSearchParams(window.location.search);
     params.set('portfolio_tab', nextTab);
-    const url = window.location.pathname + '?' + params.toString() + window.location.hash;
-    window.history.pushState({ ...window.history.state, view: 'portfolio' }, '', url);
+    params.delete('portfolio_detail');
+    window.history.pushState({ ...window.history.state, view: 'portfolio' }, '', window.location.pathname + '?' + params.toString() + window.location.hash);
+    setDetailSymbol(null);
+    focusSection.current=true;
     setTab(nextTab);
   };
+  useEffect(()=>{
+    if(focusSection.current){
+      sectionHeading.current?.focus({preventScroll:true});
+      sectionHeading.current?.scrollIntoView({block:'start'});
+      focusSection.current=false;
+    }
+  },[tab]);
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
-      setTab(portfolioTabFromValue(params.get('portfolio_tab')));
+      const nextTab=portfolioTabFromValue(params.get('portfolio_tab'));
+      const view=readHoldingNavigation(params);
+      focusSection.current=nextTab!==currentTab.current;
+      setTab(nextTab);
+      setDetailSymbol(view.detail);
+      setHoldingFilter(view.filter);
+      setHoldingSort(view.sort);
+      closingDetail.current=false;
       setQ(params.get('portfolio_q') || '');
       setGroup(params.get('portfolio_group') || 'All');
-      const symbol = params.get('portfolio_symbol');
-      if (symbol && /^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)) setSelected(symbol);
+      const symbol=view.detail || params.get('portfolio_symbol');
+      if(symbol && /^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))setSelected(symbol);
     };
     window.addEventListener('popstate',restore);
     return () => window.removeEventListener('popstate',restore);
   }, []);
+  const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
+    if(!holdings.some(row=>row.symbol===symbol))return;
+    const params=new URLSearchParams(window.location.search);
+    params.set('portfolio_tab','holdings');
+    params.set('portfolio_symbol',symbol);
+    params.delete('portfolio_detail');
+    window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol};
+    params.set('portfolio_detail',symbol);
+    window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    closingDetail.current=false;
+    setSelected(symbol);
+    setDetailSymbol(symbol);
+  };
+  const closeHoldingDetail=()=>{
+    if(closingDetail.current)return;
+    closingDetail.current=true;
+    if(listOrigin.current && window.history.state?.aiwHoldingDetailOwner===detailOwner){
+      window.history.back();
+      return;
+    }
+    const params=new URLSearchParams(window.location.search);
+    params.delete('portfolio_detail');
+    window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    setDetailSymbol(null);
+    closingDetail.current=false;
+  };
+  const restoreHoldingList=()=>{
+    const origin=listOrigin.current;
+    requestAnimationFrame(()=>{
+      const params=new URLSearchParams(window.location.search);
+      if(window.location.pathname!=='/portfolio'||params.get('portfolio_tab')!=='holdings'||readHoldingNavigation(params).detail)return;
+      const fallback=Array.from(document.querySelectorAll<HTMLElement>('[data-holding-symbol]')).find(node=>node.dataset.holdingSymbol===(origin?.symbol||detailSymbol));
+      const target=origin?.trigger?.isConnected?origin.trigger:fallback||sectionHeading.current;
+      target?.focus({preventScroll:true});
+      if(origin)window.scrollTo({top:origin.scrollY,behavior:'auto'});
+    });
+  };
   const changeViewMode = (mode: 'simple' | 'detailed') => {
     setViewMode(mode);
     localStorage.setItem('aiw-portfolio-view-mode', mode);
@@ -173,11 +237,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
     if (selected) params.set('portfolio_symbol', selected);
     else params.delete('portfolio_symbol');
+    const viewParams=writeHoldingNavigation(params,{filter:holdingFilter,sort:holdingSort,detail:detailSymbol});
 
-    const query = params.toString();
+    const query = viewParams.toString();
     const url = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
     window.history.replaceState(window.history.state, '', url);
-  }, [tab, q, group, selected]);
+  }, [tab, q, group, selected, holdingFilter, holdingSort, detailSymbol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -421,6 +486,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       return a.symbol.localeCompare(b.symbol);
     });
   }, [analyses, q, group, holdingFilter, holdingSort]);
+
+  const detailAnalysis=detailSymbol ? analyses.find(row=>row.symbol===detailSymbol) || null : null;
 
   const breadthMoves = analyses
     .filter(h => typeof h.dailyChangePct === 'number' && Number.isFinite(h.dailyChangePct))
@@ -684,13 +751,20 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       </div>
 
       <PortfolioNavigation tab={tab} onChange={changeTab} />
+      <h2 ref={sectionHeading} tabIndex={-1} style={{scrollMarginTop:'8rem'}} data-testid="portfolio-section-heading" className="text-xl font-semibold">{PORTFOLIO_SECTIONS.find(item=>item.id===tab)?.label}</h2>
+      {managementDraftOpen && tab!=='holdings' && <p data-testid="portfolio-draft-retained" role="status" className="rounded-xl border border-amber-200/30 bg-amber-200/5 p-3 text-sm text-amber-100">An unsaved holding form is still open in My Holdings. Return there to save or cancel; changing sections does not write to your portfolio.</p>}
       {tab === 'overview' && <PortfolioCommandCenter
         summary={commandSummary} positions={decisionCards} loading={portfolioLoading} error={portfolioError}
         explanationLevel={viewMode === 'detailed' ? 'advanced' : 'simple'}
         onSelectPosition={symbol => { setSelected(symbol); changeTab('holdings'); }}
         onOpenEvidence={symbol => { setSelected(symbol); changeTab('evidence'); }}
       />}
-      <PortfolioManager holdings={holdings} onChanged={setHoldings} />
+      <div hidden={tab!=='holdings'}>
+        <details data-testid="portfolio-management" className="rounded-xl border border-white/15 p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Manage positions and purchases</summary>
+          <div className="mt-4"><PortfolioManager holdings={holdings} onChanged={setHoldings} onDraftOpenChange={setManagementDraftOpen}/></div>
+        </details>
+      </div>
       {(tab === 'performance' || (tab === 'overview' && viewMode === 'detailed')) && <PortfolioCashFlows holdings={holdings} transactions={portfolioTransactions} livePrices={livePrices} holdingsAvailability={holdingAvailability} transactionsAvailability={tradeAvailability} />}
       {portfolioLoading && <div className="text-[10px] font-mono text-white/30">Loading persistent holdings…</div>}
       {portfolioError && <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[10px] text-amber-200/70">{portfolioError}. Persistent portfolio data could not be loaded; check the portfolio API and Supabase connection.</div>}
@@ -838,7 +912,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
       {tab === 'holdings' && (
         <div className="space-y-4">
-          <Panel title="Holdings" subtitle="Compact portfolio view. Select a row to open the holding context below.">
+          <Panel title="Holdings" subtitle="Select a stock to open read-only details. Editing is available separately under Manage positions and purchases.">
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[760px] text-left">
                 <thead className="bg-black/20">
@@ -855,7 +929,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   {filtered.map(h => (
                     <tr key={h.symbol} className={selected === h.symbol ? 'bg-cyan-300/[.04]' : 'hover:bg-white/[.02]'}>
                       <td className="px-3 py-3">
-                        <button type="button" onClick={() => setSelected(h.symbol)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
+                        <button type="button" data-holding-symbol={h.symbol} aria-label={'Open '+h.symbol+' holding details from table'} aria-haspopup="dialog" onClick={event=>openHoldingDetail(h.symbol,event.currentTarget)} className="font-black text-sm text-white hover:text-cyan-200">{h.symbol}</button>
                         <div className="text-[9px] text-white/30 mt-0.5">{h.name}</div>
                       </td>
                       <td className="px-3 py-3 font-mono text-[10px]">{h.portfolioWeight == null ? '—' : (h.portfolioWeight * 100).toFixed(1) + '%'}</td>
@@ -870,11 +944,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               {!filtered.length && <div className="p-6 text-center text-[10px] text-white/30">No holdings match the current filters.</div>}
             </div>
           </Panel>
-          {selectedAnalysis && <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange} />}
-          {selectedAnalysis && <PositionDetail h={selectedAnalysis} historicalPrice={historicalPrice}/>}
-          {selectedAnalysis && <PeerCounterfactualPanel h={selectedAnalysis} comparison={peerComparison} loading={peerLoading} />}
+          <p className="text-xs text-white/55">Holding detail is opened explicitly; portfolio accounting and quote quality gates remain unchanged.</p>
         </div>
       )}
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
+        {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
+          <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Source and accounting gaps remain unchanged; this is not a trade instruction.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
+            <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
+          </div>
+          <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange}/>
+          <PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/>
+          <PeerCounterfactualPanel h={detailAnalysis} comparison={peerComparison} loading={peerLoading}/>
+        </>}
+      </HoldingDetailDialog>}
 
       {tab === 'evidence' && (
         <div className="space-y-4">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Pencil, Plus, Save, Trash2, X, ShieldAlert } from 'lucide-react';
 import {
   addPortfolioPurchase,
@@ -10,11 +10,11 @@ import {
   type StoredPortfolioHolding,
 } from '../utils/portfolioApi';
 
-type Props = { holdings: StoredPortfolioHolding[]; onChanged: (holdings: StoredPortfolioHolding[]) => void };
+type Props = { holdings: StoredPortfolioHolding[]; onChanged: (holdings: StoredPortfolioHolding[]) => void; onDraftOpenChange?: (open: boolean)=>void };
 const emptyForm = { symbol: '', quantity: '', averageCost: '', purchaseDate: '', notes: '', targetAllocationPct: '', maxAllocationPct: '' };
 const emptyPurchase = { investedAmount: '', executionPrice: '', purchaseDate: '', notes: '' };
 
-export default function PortfolioManager({ holdings, onChanged }: Props) {
+export default function PortfolioManager({ holdings, onChanged, onDraftOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StoredPortfolioHolding | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -27,6 +27,7 @@ export default function PortfolioManager({ holdings, onChanged }: Props) {
   const [purchaseBusy, setPurchaseBusy] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
   const [lotChecks, setLotChecks] = useState<Record<string, { status: 'ok' | 'warn' | 'missing'; message: string }>>({});
+  useEffect(()=>{onDraftOpenChange?.(open || purchaseOpen!==null);},[open,purchaseOpen,onDraftOpenChange]);
 
   const edit = (h: StoredPortfolioHolding) => {
     setEditing(h);

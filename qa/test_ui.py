@@ -187,6 +187,8 @@ def test_portfolio_manager_create_flow(page):
     page.get_by_test_id("nav-portfolio").click()
     portfolio = page.get_by_test_id("portfolio-intelligence")
     portfolio.wait_for(state="attached", timeout=30000)
+    portfolio.get_by_role("combobox", name="Portfolio section").select_option("holdings")
+    portfolio.get_by_test_id("portfolio-management").locator("summary").click()
     page.get_by_test_id("portfolio-add-holding").click()
     page.get_by_test_id("portfolio-field-ticker").fill("AMD")
     page.get_by_test_id("portfolio-field-quantity").fill("2")

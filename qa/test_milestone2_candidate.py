@@ -104,6 +104,7 @@ def test_portfolio_editor_draft_survives_section_switch_without_saving(page):
             if req.method not in ("GET", "HEAD") else None)
     page.goto("/portfolio?portfolio_tab=holdings")
     portfolio = page.get_by_test_id("portfolio-intelligence")
+    portfolio.get_by_test_id("portfolio-management").locator("summary").click()
     portfolio.get_by_test_id("portfolio-add-holding").click()
     portfolio.get_by_test_id("portfolio-field-ticker").fill("FICT")
     portfolio.get_by_test_id("portfolio-field-notes").fill("Fictional unsubmitted draft")
@@ -172,6 +173,7 @@ def test_portfolio_back_forward_restores_section_and_retains_unsubmitted_editor(
     nav = root.get_by_test_id("portfolio-navigation")
     picker = nav.get_by_role("combobox", name="Portfolio section")
     expect(picker).to_have_value("holdings")
+    root.get_by_test_id("portfolio-management").locator("summary").click()
     root.get_by_test_id("portfolio-add-holding").click()
     root.get_by_test_id("portfolio-field-ticker").fill("FICT")
     root.get_by_test_id("portfolio-field-notes").fill("Unsubmitted local draft")
@@ -201,3 +203,62 @@ def test_portfolio_navigation_control_is_responsive_and_restores_overview(page, 
     expect(picker).to_have_value("overview")
     expect(page.get_by_test_id("portfolio-command-center")).to_be_visible()
     assert nav.evaluate("(element) => element.scrollWidth <= element.clientWidth")
+
+
+
+def test_holding_detail_is_modal_and_back_forward_preserves_identity(page):
+    import json
+    mock_local_apis(page)
+    rows = [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 2, "averageCost": 100, "purchaseDate": "2026-01-02"},
+            {"id": "fictional-amd", "symbol": "AMD", "quantity": 1, "averageCost": 80, "purchaseDate": "2026-01-05"}]
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": rows})))
+    page.goto("/portfolio?portfolio_tab=holdings")
+    trigger = page.get_by_role("button", name="Open NVDA holding details from table")
+    expect(trigger).to_be_visible()
+    trigger.click()
+    dialog = page.get_by_role("dialog", name="NVDA holding details")
+    expect(dialog).to_be_visible()
+    assert dialog.evaluate('(node)=>node.matches(":modal")')
+    assert "portfolio_detail=NVDA" in page.url
+    page.go_back()
+    expect(dialog).to_have_count(0)
+    page.go_forward()
+    expect(dialog).to_be_visible()
+    dialog.get_by_role("button", name="Back to holdings").click()
+    expect(dialog).to_have_count(0)
+    expect(trigger).to_be_focused()
+    assert "portfolio_detail=" not in page.url
+
+
+@pytest.mark.parametrize("width", [360, 768, 1440])
+def test_holding_detail_mobile_keyboard_and_no_passive_writes(page, width):
+    import json
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 2, "averageCost": 100}]})))
+    writes = []
+    page.on("request", lambda req: writes.append(req.url) if req.method not in ("GET", "HEAD") and ("/api/portfolio" in req.url or "/api/signal-scorecard" in req.url) else None)
+    page.goto("/portfolio?portfolio_tab=holdings")
+    page.get_by_role("button", name="Open NVDA holding details from table").click()
+    dialog = page.get_by_role("dialog", name="NVDA holding details")
+    expect(dialog.get_by_role("button", name="Back to holdings")).to_be_focused()
+    for _ in range(10):
+        page.keyboard.press("Tab")
+        assert dialog.evaluate("(node)=>node.contains(document.activeElement)")
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    assert dialog.evaluate("(node)=>node.scrollWidth <= node.clientWidth")
+    page.keyboard.press("Escape")
+    expect(dialog).to_have_count(0)
+    assert writes == []
+
+
+def test_missing_direct_holding_never_substitutes_another_position(page):
+    import json
+    mock_local_apis(page)
+    page.route("**/api/portfolio?includeLots=true", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"holdings": [{"id": "fictional-nvda", "symbol": "NVDA", "quantity": 1, "averageCost": 100}]})))
+    page.goto("/portfolio?portfolio_tab=holdings&portfolio_detail=ZZZZ")
+    dialog = page.get_by_role("dialog", name="ZZZZ holding details")
+    expect(dialog.get_by_role("alert")).to_contain_text("No substitute position is shown")
+    assert dialog.get_by_role("button", name="Open Evidence workspace").count() == 0
+    dialog.press("Escape")
+    expect(dialog).to_have_count(0)
