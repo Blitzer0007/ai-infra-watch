@@ -65,3 +65,7 @@ These are research-readiness experiences, not a claim that live model inference,
 ## Acceptance hardening — manual research without transport
 
 Added `qa/test_milestone3_candidate.py` and the UI/API/DB validation workflow selection. Browser acceptance at 360, 768 and 1440px uses fictional holdings/watchlist inputs and enforces zero non-GET requests. The manual Opportunities source coverage view, JEV research-evidence preflight, and Company/Catalyst/Daily Review checklist must not fetch a provider, run a model, save portfolio data or issue Telegram sends. Tests also verify missing original alert/calendar context is not fabricated. Source Quality and Council separate loopback integrations remain covered by the upstream fictional browser suites.
+
+## CI environment regression (fixed on candidate branch)
+
+The first integrated UI test workflow hit fixture setup errors because its browser-only dependency install lacked `uvicorn`; the new QA suite deliberately launches a separate loopback FastAPI server to test the actual private relay. The workflow now installs the repository's existing `aitracker-upload/requirements.txt` in **only** the offline mocked UI runner, preserving real backend execution instead of marking source/council tests skipped. The unit-test failures on the first UI-integrated head were also corrected by restoring the fictional SEC fixture and updating the proxy test for explicit trusted backend origins. Exact-head CI must be rerun and all gates green.
