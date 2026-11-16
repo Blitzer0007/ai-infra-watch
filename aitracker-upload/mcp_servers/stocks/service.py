@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 
 from .providers import FinnhubProvider, FixtureProvider, QuoteError, QuoteProvider, _utc_now_iso
-from .schemas import Quote, QuoteBatch, ServerHealth
+from .schemas import Quote, QuoteBatch, ServerHealth, observation_time
+from mcp_servers.provider_budget import BUDGET_CODES
 
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "data" / "stock_watchlist.json"
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "quotes.json"
@@ -84,21 +86,32 @@ class StockService:
             self._consecutive_errors += 1
             raise
         self._consecutive_errors = 0
-        self._last_poll_as_of = q.as_of
+        self._last_poll_as_of = q.retrieved_at
         return q
 
     def get_quotes(self, symbols: list[str]) -> QuoteBatch:
         """Best-effort batch; fail only when every requested symbol fails."""
+        requested = list(dict.fromkeys(sym.strip().upper() for sym in symbols if sym.strip()))
         quotes: list[Quote] = []
-        errors = 0
-        for sym in symbols:
+        errors: dict[str, str] = {}
+        for sym in requested:
             try:
                 quotes.append(self.get_quote(sym))
-            except QuoteError:
-                errors += 1
-        if symbols and errors == len(symbols):
-            raise QuoteError("NO_DATA", f"all {len(symbols)} symbols failed")
-        return QuoteBatch(quotes=quotes, as_of=self._clock(), source=self.provider.source)
+            except QuoteError as exc:
+                errors[sym] = exc.code if exc.code in {"NO_KEY", "NO_DATA", "HTTP_ERROR", "RATE_LIMIT", *BUDGET_CODES} else "PROVIDER_ERROR"
+        if requested and len(errors) == len(requested):
+            raise QuoteError("NO_DATA", f"all {len(requested)} symbols failed")
+        retrieved_at = self._clock()
+        observed = [observation_time(q.as_of) for q in quotes]
+        common_time = None
+        if quotes and not errors and all(observed):
+            times = [datetime.fromisoformat(value.replace("Z", "+00:00")) for value in observed]
+            retrieval = observation_time(retrieved_at)
+            if retrieval and all((value - datetime.fromisoformat(retrieval.replace("Z", "+00:00"))).total_seconds() <= 120 for value in times):
+                common_time = min(times).isoformat().replace("+00:00", "Z")
+        return QuoteBatch(quotes=quotes, as_of=common_time, retrieved_at=retrieved_at,
+                          source=self.provider.source, requested_symbols=requested,
+                          missing_symbols=list(errors), errors=errors)
 
     def get_snapshot(self) -> QuoteBatch:
         """Return the current quote snapshot for the configured universe."""
