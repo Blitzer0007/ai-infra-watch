@@ -14,16 +14,26 @@ export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,
     // paints, so the saved viewport matches what the user actually sees.
     delete node.dataset.scrollReady;
     let secondFrame=0;
+    let lockY:number|null=null;
+    const keepListStill=()=>{
+      if(lockY!==null && node.open && window.scrollY!==lockY){
+        window.scrollTo({top:lockY,behavior:'instant'});
+      }
+    };
     const firstFrame=requestAnimationFrame(()=>{
       secondFrame=requestAnimationFrame(()=>{
         if(!node.open)return;
         opened.current?.();
+        lockY=window.scrollY;
+        window.addEventListener('scroll',keepListStill,{passive:true});
         node.dataset.scrollReady='true';
       });
     });
     return()=>{
       cancelAnimationFrame(firstFrame);
       if(secondFrame)cancelAnimationFrame(secondFrame);
+      window.removeEventListener('scroll',keepListStill);
+      lockY=null;
       delete node.dataset.scrollReady;
       node.close();
       document.body.style.overflow=overflow;
