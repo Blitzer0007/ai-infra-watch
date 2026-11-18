@@ -79,3 +79,24 @@ def test_market_health_unavailable_is_unknown_not_zero_evidence(page):
     summary=page.get_by_test_id('market-observation-review')
     expect(summary).to_contain_text('Source lag & quota observations · unknown')
     expect(summary).to_contain_text('Remaining provider quota: unknown')
+
+def test_provenance_ready_label_never_certifies_accuracy_or_exposes_paths(page):
+    mock_local_apis(page)
+    fixture={'ok':True,'jobs':[],'historicalArchive':{
+        'inventoryWindow':{'returnedRows':1,'totalIndexedRows':20,'capped':True},
+        'historicalGate':{'status':'READY'},
+        'recentArtifacts':[{'provider':'ohlc','retrievedAt':'2026-11-18T12:00:00Z',
+            'sourceAsOf':'2026-11-19T12:00:00Z','sha256':'a'*64,
+            'objectPath':'private/sensitive-object-path'}],
+        'providers':[]
+    }}
+    page.route('**/api/job-health*',lambda route: route.fulfill(
+        status=200,content_type='application/json',body=json.dumps(fixture)))
+    page.goto('/health')
+    review=page.get_by_test_id('historical-provenance-review')
+    expect(review).to_contain_text('Independent historical accuracy eligibility: blocked')
+    expect(review).to_contain_text('conflicting metadata')
+    expect(review).to_contain_text('Source after capture: 1')
+    expect(review).to_contain_text('Publisher receipts: not verified')
+    expect(review).to_contain_text('Prospective holdout: not verified')
+    assert 'sensitive-object-path' not in review.inner_text()
