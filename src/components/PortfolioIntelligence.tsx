@@ -1034,6 +1034,14 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         // Only the original explicit opening may reset the saved viewport.
         // Re-entering via browser Back must preserve that original position.
         if(origin && !origin.openedCaptured){
+          // Freeze the current document's full scroll range before any later
+          // native-dialog scrollbar/layout contraction can clamp this view.
+          // Previously the extra ~24px became unreachable until close.
+          if(savedListMinHeight.current===null)
+            savedListMinHeight.current=document.documentElement.style.minHeight;
+          const root=document.documentElement;
+          const height=Math.ceil(Math.max(root.scrollHeight,window.scrollY+window.innerHeight));
+          root.style.minHeight=height+'px';
           origin.scrollY=window.scrollY;
           origin.openedCaptured=true;
         }
