@@ -58,7 +58,7 @@ test('CI requests page through exact-sha evidence and forbid redirects; no deplo
     requests.push({url,options});
     const body=url.includes('/branches/main') ? {commit:{sha:SHA},protected:true} : url.endsWith('page=1')
       ? {workflow_runs:rows,total_count:102} : {workflow_runs:candidate().runs,total_count:102};
-    return new Response(JSON.stringify(body),{status:200});
+    return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json; charset=utf-8'}});
   };
   assert.deepEqual(await checkCandidate({GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token'},fetcher),[1,2,8]);
   assert.equal(requests.length,3);
@@ -69,4 +69,26 @@ test('release request failures never echo remote bodies or token values', async 
   const remote=new Response('fictional private response must never be echoed',{status:403});
   await assert.rejects(()=>jsonGet('https://example.invalid','fictional-secret',async()=>remote),/^Error: Release evidence request failed \(HTTP 403\)\.$/);
   await assert.rejects(()=>jsonGet('https://example.invalid','',async()=>{throw Error('must not call');}),/not configured/);
+});
+
+test('release evidence must be a complete HTTP 200 JSON response',async()=>{
+  for (const status of [202,204,206]) {
+    const body = status === 204 ? null : JSON.stringify({protected:true,workflow_runs:[]});
+    const response = new Response(body,{status,headers:{'content-type':'application/json'}});
+    await assert.rejects(
+      ()=>jsonGet('https://api.github.com/repos/Blitzer0007/ai-infra-watch/branches/main',
+        'fictional-test-token',async()=>response),
+      /Release evidence request failed/
+    );
+  }
+  for (const type of ['text/html','text/plain','']) {
+    const response=new Response('{"protected":true}',{
+      status:200,headers:type?{'content-type':type}:{},
+    });
+    await assert.rejects(
+      ()=>jsonGet('https://api.github.com/repos/Blitzer0007/ai-infra-watch/branches/main',
+        'fictional-test-token',async()=>response),
+      /Release evidence response is not JSON/
+    );
+  }
 });
