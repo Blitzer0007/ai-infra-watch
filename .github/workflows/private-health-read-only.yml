@@ -1,0 +1,52 @@
+name: Private Health Read-only Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_read_only:
+        description: "Manually approve private GET-only production health contract checks"
+        required: true
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        default: "NO"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-health-read-only-smoke
+  cancel-in-progress: false
+
+jobs:
+  private-health:
+    name: Authorized scheduler and forecast API contract checks
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_read_only == 'YES' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: Checkout reviewed main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Require separately configured private access
+        shell: bash
+        env:
+          AIW_ACCESS_TOKEN: ${{ secrets.AIW_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AIW_ACCESS_TOKEN:-}" ]; then
+            echo "::error::AIW_ACCESS_TOKEN must be configured in this approved CI environment; no requests were made."
+            exit 1
+          fi
+          echo "Approved secret is configured; diagnostic output is contract-only."
+      - name: Run fixed-origin read-only private health diagnostic
+        env:
+          AIW_ACCESS_TOKEN: ${{ secrets.AIW_ACCESS_TOKEN }}
+        run: node scripts/private-health-smoke.mjs run
