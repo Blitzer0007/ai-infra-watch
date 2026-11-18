@@ -173,6 +173,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       const params = new URLSearchParams(window.location.search);
       const nextTab=portfolioTabFromValue(params.get('portfolio_tab'));
       const view=readHoldingNavigation(params);
+      // Re-entering the dialog through browser Back does not invoke the
+      // original open button, so re-apply manual restoration to this entry.
+      if(view.detail && listOrigin.current && savedHistoryScrollRestoration.current!==null){
+        window.history.scrollRestoration='manual';
+      }
       focusSection.current=nextTab!==currentTab.current;
       setTab(nextTab);
       setDetailSymbol(view.detail);
@@ -253,8 +258,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
         }
         const previous=savedHistoryScrollRestoration.current;
         if(previous!==null){
+          // Evidence/workspace navigation unmounts the dialog too. Do not
+          // clear the original mode until the actual holdings list is
+          // visible after the final Back/Escape close. Preserve it across a
+          // browser Back that re-opens the same detail entry.
           window.history.scrollRestoration=previous;
-          savedHistoryScrollRestoration.current=null;
+          if(isBackOnHoldings())savedHistoryScrollRestoration.current=null;
         }
       });
     });
