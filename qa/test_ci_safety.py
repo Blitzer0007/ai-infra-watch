@@ -115,3 +115,23 @@ def test_workflow_yaml_is_valid():
     for path in (ROOT / ".github/workflows").glob("*.yml"):
         workflow = yaml.safe_load(path.read_text())
         assert "jobs" in workflow, path.name
+
+
+def test_private_health_smoke_is_manual_main_only_and_never_runs_on_pr_or_cron():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/private-health-read-only.yml").read_text())
+    triggers = workflow[True]
+    assert set(triggers) == {"workflow_dispatch"}
+    approval = triggers["workflow_dispatch"]["inputs"]["confirm_read_only"]
+    assert approval["default"] == "NO"
+    assert approval["options"] == ["NO", "YES"]
+    assert workflow["permissions"] == {"contents": "read"}
+    job = workflow["jobs"]["private-health"]
+    assert job["if"] == "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_read_only == 'YES' }}"
+    assert job["environment"] == "production"
+    steps = job["steps"]
+    assert all("SUPABASE_SERVICE_ROLE_KEY" not in str(step) for step in steps)
+    assert all("QA_ALLOW_LIVE" not in str(step) for step in steps)
+    assert all("write" not in step.get("name", "").lower() for step in steps)
+    assert steps[-1]["run"] == "node scripts/private-health-smoke.mjs run"
+    assert steps[-1]["env"]["AIW_ACCESS_TOKEN"] == "${{ secrets.AIW_ACCESS_TOKEN }}"
+    assert "secrets.AIW_ACCESS_TOKEN" in str(steps)
