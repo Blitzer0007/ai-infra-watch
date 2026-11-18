@@ -7,6 +7,7 @@ import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
 import { summarizeSchedulerFleet } from '../utils/schedulerFleetHealth';
+import { summarizeMarketObservation } from '../utils/marketObservationReview';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -87,6 +88,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const [marketDataHealth, setMarketDataHealth] = useState<any>(null);
   const [marketDataHealthError, setMarketDataHealthError] = useState('');
   const [marketDataHealthReload, setMarketDataHealthReload] = useState(0);
+  const [marketDataHealthLoaded, setMarketDataHealthLoaded] = useState(false);
   const [forecastValidation, setForecastValidation] = useState<any>(null);
   const [forecastValidationError, setForecastValidationError] = useState('');
   const [jobHealth, setJobHealth] = useState<any[]>([]);
@@ -137,10 +139,12 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         if (cancelled) return;
         setMarketDataHealth(body);
         setMarketDataHealthError('');
+        setMarketDataHealthLoaded(true);
       })
       .catch(error => {
         if (!cancelled) {
           setMarketDataHealth(null);
+          setMarketDataHealthLoaded(true);
           setMarketDataHealthError(error instanceof Error ? error.message : 'Market provider health unavailable');
         }
       });
@@ -174,6 +178,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const forecastEvidence = summarizeForecastEvidenceAdmissibility(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const schedulerFleet = summarizeSchedulerFleet(jobHealth, { error: jobHealthError, loading: !jobHealthLoaded });
+  const marketObservation = summarizeMarketObservation(marketDataHealth?.rows, { loading: !marketDataHealthLoaded, error: marketDataHealthError });
 
   return (
     <div className="space-y-6">
@@ -216,6 +221,13 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           </div>
         </div>
         {marketDataHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{marketDataHealthError}</div>}
+        <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3 text-[9px] text-white/60" data-testid="market-observation-review" role="status">
+          <div className="text-[10px] font-semibold text-white/80">Source lag & quota observations · {marketObservation.state.replaceAll('-', ' ')}</div>
+          <div className="mt-1">Sampled: {marketObservation.sampleRows} · Quote missing: {marketObservation.quoteUnavailable} · Time unknown: {marketObservation.quoteTimeUnknown} · Quote aged &gt;15m: {marketObservation.quoteAged}</div>
+          <div className="mt-1">History missing: {marketObservation.historyUnavailable} · Date unknown: {marketObservation.historyDateUnknown} · Calendar age &gt;5d: {marketObservation.historyAged} · Adjusted incomplete: {marketObservation.adjustedIncomplete}</div>
+          <div className="mt-1">Fallback rows: {marketObservation.fallbackRows} · Rate-limited attempts: {marketObservation.rateLimitedAttempts} · Remaining provider quota: unknown</div>
+          <div className="mt-1 text-white/35">Ages are observational thresholds, not US trading-session freshness certification. Rate-limit attempts do not reveal plan limits or remaining quota. No new provider request is made for this summary.</div>
+        </div>
         <div className="mt-3 space-y-2">
           {(marketDataHealth?.rows || []).map((row: any) => {
             const quote = row.quote || {};
