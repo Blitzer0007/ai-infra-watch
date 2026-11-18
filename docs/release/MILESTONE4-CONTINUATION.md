@@ -57,3 +57,9 @@ No new backend fetch, poller, cron, database write, model/provider usage, Telegr
 ## Browser acceptance added for operational transparency
 
 The existing Milestone 4 Playwright suite now asserts the read-only operations panel at 360/768/1440px, verifying the due count, no fabricated scheduler success and no extra writes. Additional fictional browser cases provide a `completed/success` forecast scheduler with **real due/unscorable records** and require a visible review warning; a second exercises both missing telemetry streams and requires explicit `unavailable`, never zero/success. No tests were skipped or weakened.
+
+## Historical evidence admissibility checklist (candidate)
+
+Added a pure zero-request historical study readiness observer and read-only Data Health panel. It compares **only already fetched** forecast lifecycle aggregates with the existing private metadata archive inventory. It makes the missing proofs explicit: original publication as-of decision time, adjusted-close/corporate-action validity, point-in-time index membership, and prospective holdout/leakage evaluation. Even a reported `historicalGate.status=READY` or indexed SHA-256 **cannot independently certify** these facts. Unknown metadata is not converted into zero records. The panel never downloads private archives and never emits raw object paths, symbols or secrets.
+
+Fictional unit tests cover absent and truncated sources, spoofed archive success, non-zero verified sample counts without source proof, and secret exclusion; browser coverage includes the readiness checklist and zero extra writes.

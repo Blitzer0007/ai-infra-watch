@@ -37,6 +37,11 @@ def test_health_explains_due_pending_invalid_and_scores_without_writes(page,widt
     expect(ops.get_by_test_id('forecast-due-observation')).to_contain_text('Due in returned window: 2')
     expect(ops.get_by_test_id('forecast-evaluation-window-observation')).to_contain_text('Non-overlapping scorable: 1')
     expect(ops.get_by_test_id('forecast-scheduler-observation')).to_contain_text('Status: unavailable')
+    archive=page.get_by_test_id('forecast-historical-admissibility')
+    expect(archive).to_contain_text('Not admissible for accuracy claims')
+    expect(archive.get_by_test_id('historical-evaluation-admission')).to_contain_text('Non-overlapping scorable in returned window: 1')
+    archive.locator('summary').click()
+    expect(archive).to_contain_text('publication time at or before each forecast decision')
     assert extra==[] and writes==[] and errors==[]
 
 def test_unavailable_lifecycle_is_not_presented_as_zero_pending_or_verified(page):
@@ -81,3 +86,21 @@ def test_unavailable_scheduler_and_evaluation_never_display_zero_or_success(page
     expect(ops.get_by_test_id('forecast-scheduler-observation')).to_contain_text('Status: unavailable')
     expect(ops.get_by_test_id('forecast-due-observation')).to_contain_text('Due in returned window: unavailable')
     expect(ops.get_by_test_id('forecast-evaluation-window-observation')).to_contain_text('Rows reviewed: unavailable')
+
+def test_archived_metadata_cannot_clear_prospective_evaluation_gate(page):
+    mock_local_apis(page)
+    page.route('**/api/forecast-validation*',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps(FIXTURE)))
+    archive={
+        'ok':True,'jobs':[],
+        'historicalArchive':{
+            'inventoryWindow':{'returnedRows':14,'totalIndexedRows':14,'capped':False},
+            'historicalGate':{'status':'READY'},
+            'providers':[],
+        },
+    }
+    page.route('**/api/job-health*',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps(archive)))
+    page.goto('/health')
+    summary=page.get_by_test_id('forecast-historical-admissibility')
+    expect(summary.get_by_test_id('historical-archive-admission')).to_contain_text('Recorded archive gate: READY')
+    expect(summary).to_contain_text('Not admissible for accuracy claims')
+    expect(summary.get_by_test_id('historical-evaluation-admission')).to_contain_text('Prospective holdout: not established')

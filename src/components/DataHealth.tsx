@@ -5,6 +5,7 @@ import { authFetch } from '../utils/apiAuth';
 import FreshnessBadge from './FreshnessBadge';
 import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
+import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -167,6 +168,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const validationOverall = forecastValidation?.overall || null;
   const validationGate = forecastValidation?.validationGate || null;
   const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
+  const forecastEvidence = summarizeForecastEvidenceAdmissibility(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
 
   return (
     <div className="space-y-6">
@@ -340,6 +342,40 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           })}
           {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">Loading scheduled job health…</div> : null}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-amber-300/20 bg-amber-400/[.025] p-4" data-testid="forecast-historical-admissibility">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-amber-100">Historical evaluation evidence gate</h3>
+            <p className="mt-1 text-[11px] text-white/55">Read-only checklist. Stored forecast results and archived files are not independent point-in-time research proof.</p>
+          </div>
+          <span className="rounded border border-amber-300/25 px-2 py-1 text-[10px] text-amber-100">Not admissible for accuracy claims</span>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div data-testid="historical-archive-admission" className="rounded-lg border border-white/10 p-3">
+            <p className="text-xs font-semibold">Historical source inventory</p>
+            <p className="mt-1 text-xs text-white/65">Archive status: {forecastEvidence.archive.state.replaceAll('-',' ')} · Indexed metadata rows: {forecastEvidence.archive.indexedMetadataRows ?? 'unknown'}</p>
+            <p className="mt-1 text-xs text-white/65">Recorded archive gate: {forecastEvidence.archive.recordedHistoricalGate} · Indexed inventory complete: {forecastEvidence.archive.windowCapped?'no; capped':'not independently proven'}</p>
+            <p className="mt-2 text-[10px] text-white/45">Hashes confirm neither publication time nor the original historical market universe. Original private objects are never loaded by this checklist.</p>
+          </div>
+          <div data-testid="historical-evaluation-admission" className="rounded-lg border border-white/10 p-3">
+            <p className="text-xs font-semibold">Forecast study sample</p>
+            <p className="mt-1 text-xs text-white/65">Non-overlapping scorable in returned window: {forecastEvidence.evaluation.independentScorable ?? 'unknown'}</p>
+            <p className="mt-1 text-xs text-white/65">Pending due: {forecastEvidence.evaluation.dueForReview ?? 'unknown'} · Verified but unscorable: {forecastEvidence.evaluation.unscorable ?? 'unknown'}</p>
+            <p className="mt-2 text-[10px] text-white/45">Full history: not established · Prospective holdout: not established · No proof of future investment skill.</p>
+          </div>
+        </div>
+        <details className="mt-3 rounded border border-white/10 p-3 text-xs">
+          <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">Required independent evidence before historical accuracy claims</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-white/65">
+            <li>Source publication time at or before each forecast decision: not independently established.</li>
+            <li>Adjusted market outcomes and corporate-action treatment: not independently established.</li>
+            <li>Historical universe and index membership at each decision: not independently established.</li>
+            <li>Independent prospective holdout and leakage evaluation: not independently established.</li>
+          </ul>
+          <p className="mt-2 text-amber-100">{forecastEvidence.note}</p>
+        </details>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="historical-evidence-archives">
