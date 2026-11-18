@@ -77,3 +77,24 @@ def test_release_guard_changes_run_both_required_workflows():
         assert 'workflow_dispatch' in triggers
         for event in ('push', 'pull_request'):
             assert 'scripts/release-candidate.mjs' in triggers[event]['paths']
+
+
+def test_milestone5_protection_exception_is_explicit_and_default_denied():
+    workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
+    inputs = workflow[True]['workflow_dispatch']['inputs']
+    waiver = inputs['confirm_milestone5_unprotected_main_exception']
+    assert waiver['required'] is True
+    assert waiver['default'] == 'NO'
+    assert waiver['options'] == ['NO', 'YES']
+    deploy = workflow['jobs']['deploy']
+    assert deploy['environment'] == 'production'
+    assert deploy['env']['AIW_MAIN_PROTECTION_WAIVER'] == (
+        '${{ inputs.confirm_milestone5_unprotected_main_exception }}'
+    )
+    checks = [step for step in deploy['steps']
+              if 'node scripts/release-candidate.mjs candidate' in step.get('run','')]
+    assert len(checks) == 3
+    assert all(deploy['steps'].index(step) < next(
+        i for i, entry in enumerate(deploy['steps'])
+        if entry['name'] == 'Promote the tested production build'
+    ) for step in checks)
