@@ -44,3 +44,6 @@ The initial Milestone 4 Frontend CI failed *before* running TypeScript/unit/buil
 PR #174 `343c659` passed the complete mocked UI/API/DB browser workflow and the repository security script. Frontend CI failed before typecheck at the newly disclosed, as-yet-unpatched transitive picomatch advisory (GHSA-fc5q-39xc-vjpf). The next head `b19e454` added independent TypeScript/unit/build verification without modifying that audit. TypeScript passed; 995/996 unit tests passed; the single failure was a mistaken fictional test expectation: one recorded -2% outcome was **not** inside its copied +1% to +9% middle interval. The correct coverage is 1/2, not 2/2. Updated only that assertion, leaving actual scoring logic and all security gates unchanged.
 
 No production merge or deployment is authorized by this checkpoint; the inherited npm advisory still blocks signoff.
+
+## Standard Codex continuation updated
+The root release handoff `docs/release/CODEX-CONTINUATION.md` now begins with the current Milestone 4 PR #174 and distinguishes the archived Milestone 2 instructions, the already released Milestone 3 baseline, and the new unpatched advisory. It preserves all historical context below a divider. Added a unit regression proving 5D/20D horizon overlap is handled independently *within* horizon but does not justify cross-horizon market independence.

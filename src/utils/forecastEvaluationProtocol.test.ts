@@ -100,6 +100,23 @@ describe('Milestone 4 forecast-evaluation lifecycle contract', () => {
     assert.equal(result.metrics.middle50.coveragePct, 100);
   });
 
+  it('separates 5D and 20D cohorts without claiming cross-horizon market independence', () => {
+    const five = {
+      ...base, horizon: 5, created_at: '2026-10-01T09:00:00Z',
+      target_date: '2026-10-09', verified_at: '2026-10-10T09:00:00Z',
+    };
+    const twenty = {
+      ...base, horizon: 20, created_at: '2026-10-01T09:00:00Z',
+      target_date: '2026-10-29', verified_at: '2026-10-30T09:00:00Z',
+    };
+    const report = evaluate([five,twenty]);
+    assert.equal(report.lifecycle.independentScorable, 2);
+    assert.equal(report.horizons['5D'].independentScorable, 1);
+    assert.equal(report.horizons['20D'].independentScorable, 1);
+    assert.match(report.limitations.join(' '), /across symbols and horizons are not independent/);
+    assert.equal(report.decisionEligible, false);
+  });
+
   it('declines fabricated dates, future verification, invalid horizons and malformed outcome types', () => {
     const report = evaluate([
       { ...base, ticker: 'A', horizon: 'nope' },
