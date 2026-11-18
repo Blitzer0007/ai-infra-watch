@@ -28,5 +28,14 @@ The original five-release plan characterizes Milestone 5 as broader operational 
 - `qa/test_milestone5_candidate.py`: real mocked browser checks at 360/768/1440, no passive writes or browser errors, and empty-endpoint UNKNOWN state. Included in `.github/workflows/qa-validation.yml`.
 - These are candidate features, not evidence that Telegram messages were sent, source feeds were timely or historical forecasts were accurate. All exact-final-head CI must conclude success before advancing.
 
+## Third candidate increment — bounded market source lag and quota-unknown evidence
+- `src/utils/marketObservationReview.js` computes an observation-only summary from the **existing** /api/market?route=market-data-health response; no added provider/API requests or timers.
+- Separates unavailable quotes, unknown observation timestamps, quotes older than a diagnostic 15-minute threshold, unavailable/datetime-unknown history, history older than five UTC calendar days, incomplete adjusted-close metadata, fallbacks and provider rate-limited **attempts**. Thresholds are for triage, **not** exchange-session, quota or source-publication certification.
+- Explicit `quotaRemaining: null`: HTTP 429 classification is a rate-limit attempt, not proof of a provider's overall quota usage, hard limit, exhaustion or remaining calls. No provider limits or pricing are manufactured.
+- `src/components/DataHealth.tsx` surfaces observed/partial/attention/unknown state; a network failure remains UNKNOWN, not zero provider issues. No tokens, raw prices or private response payloads are added to this summary.
+- `src/utils/marketObservationReview.test.ts` covers missing, aging, malformed age, actual attempts, fallback and non-leaking output.
+- `qa/test_milestone5_candidate.py` includes fictional responsive 360/768/1440 acceptance, no writes and unavailable API behavior.
+- Require exact-head full CI on the resulting commit. No release/production change authorized by this increment.
+
 ## Working rules
 Use connected GitHub/GitHub Actions only (do not run on the user's Windows PC). Read current PR head and all CI runs. Fix genuine failures on a new commit and verify the NEW exact head. Don't merge or deploy Milestone 5 merely because an initial small patch passes. Branch protection remains deferred by the owner's explicit instruction; never silently amend release-gate policy. Retain prior rollback deployment and production protections.
