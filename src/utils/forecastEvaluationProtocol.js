@@ -97,7 +97,7 @@ export function buildForecastEvaluationProtocol(rows = [], {
     if (!(Number.isSafeInteger(horizonNumber) && horizonNumber > 0)) reason = 'invalidHorizon';
     else if (!created || !target || target <= created) reason = 'missingOrInvalidWindow';
     else if (target > today) reason = 'futureTargetMarkedVerified';
-    else if (!verified || verified < target) reason = 'invalidVerificationTime';
+    else if (!verified || verified < target || verified > today) reason = 'invalidVerificationTime';
     else if (outcome === null || outcome < -100) reason = 'missingOrInvalidOutcome';
     else if (predicted === null || predicted < -100) reason = 'missingOrInvalidMedian';
     if (reason) {
