@@ -1,13 +1,17 @@
 import { useEffect, useId, useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,children}:{symbol:string;name?:string;onClose:()=>void;onRestoreFocus:()=>void;children:ReactNode}) {
+export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,onOpened,children}:{symbol:string;name?:string;onClose:()=>void;onRestoreFocus:()=>void;onOpened?:()=>void;children:ReactNode}) {
   const dialog=useRef<HTMLDialogElement>(null);const close=useRef<HTMLButtonElement>(null);const heading=useId();const description=useId();
   const restore=useRef(onRestoreFocus);restore.current=onRestoreFocus;
+  const opened=useRef(onOpened);opened.current=onOpened;
   useEffect(()=>{
     const node=dialog.current;if(!node)return;
     const overflow=document.body.style.overflow;
     node.showModal();document.body.style.overflow='hidden';close.current?.focus({preventScroll:true});
+    // Capture the real viewport once the native dialog and focus are active.
+    // The triggering click can shift the document before showModal completes.
+    opened.current?.();
     return()=>{
       node.close();
       document.body.style.overflow=overflow;
