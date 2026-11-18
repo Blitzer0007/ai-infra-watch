@@ -21,5 +21,12 @@ The original five-release plan characterizes Milestone 5 as broader operational 
 - `src/utils/forecastEvaluationProtocol.test.ts` exercises rejection of malformed horizon/outcome/median/quantiles while preserving valid numeric strings and real zero observations.
 - This is an integrity correction on already-read bounded forecast records. It does not query new rows, run jobs, change server contracts, expose private data, or claim trading-grade prediction accuracy.
 
+## Second candidate increment — scheduler fleet triage
+- `src/utils/schedulerFleetHealth.js`: deterministic, no-network summary of the existing loaded scheduler array; distinguishes recorded successful jobs from failures/stuck, skipped/disabled, and unknown (including no jobs, absent success time or an unavailable endpoint). This is a summary of observations, not a job-completion attestation.
+- `src/components/DataHealth.tsx`: explicit fleet readout with observed success, attention, skipped/disabled and unknown counts. A valid empty response is marked UNKNOWN, not an infinite loading spinner. No new HTTP request, polling, remote call, or job dispatch is introduced.
+- `src/utils/schedulerFleetHealth.test.ts`: fictional failure, skips, missing timestamp, valid success, malformed record, and privacy cases.
+- `qa/test_milestone5_candidate.py`: real mocked browser checks at 360/768/1440, no passive writes or browser errors, and empty-endpoint UNKNOWN state. Included in `.github/workflows/qa-validation.yml`.
+- These are candidate features, not evidence that Telegram messages were sent, source feeds were timely or historical forecasts were accurate. All exact-final-head CI must conclude success before advancing.
+
 ## Working rules
 Use connected GitHub/GitHub Actions only (do not run on the user's Windows PC). Read current PR head and all CI runs. Fix genuine failures on a new commit and verify the NEW exact head. Don't merge or deploy Milestone 5 merely because an initial small patch passes. Branch protection remains deferred by the owner's explicit instruction; never silently amend release-gate policy. Retain prior rollback deployment and production protections.
