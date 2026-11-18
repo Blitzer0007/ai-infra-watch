@@ -14,8 +14,11 @@ const sha256 = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value
 const utc = value => {
   if (typeof value !== 'string' || !STRICT_UTC.test(value)) return null;
   const ms = Date.parse(value);
-  return Number.isFinite(ms) && new Date(ms).toISOString() ===
-    new Date(value).toISOString() ? ms : null;
+  // Date.parse may normalize impossible dates (e.g. February 30).
+  // Compare to the strictly formatted input rather than to a second parse.
+  const normalized = value.replace(/(?:\.(\d{1,3}))?Z$/, (_match, fraction) =>
+    '.' + (fraction ?? '').padEnd(3, '0') + 'Z');
+  return Number.isFinite(ms) && new Date(ms).toISOString() === normalized ? ms : null;
 };
 const plain = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype ||
