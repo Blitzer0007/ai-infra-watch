@@ -1,0 +1,35 @@
+name: Experimental Vite-free dependency audit
+
+on:
+  push:
+    branches:
+      - experiment/m4-vite-free-build-security
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-proof:
+    name: Verify Vite removal clears audited dependency graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the exact Milestone 4 baseline
+        run: npm ci
+      - name: Test replacing Vite toolchain in disposable runner only
+        run: |
+          npm uninstall vite @vitejs/plugin-react @tailwindcss/vite
+          npm install --save-dev @tailwindcss/cli
+          npm ls vite picomatch || true
+      - name: Required unmodified npm vulnerability gate
+        run: npm audit --audit-level=low
+      - name: Validate Tailwind standalone compilation
+        run: npx @tailwindcss/cli --input src/index.css --output /tmp/aiw-experimental.css --minify
+      - name: Validate esbuild browser bundle
+        run: |
+          npx esbuild src/main.tsx --bundle --platform=browser --format=esm --target=es2022 --jsx=automatic --outfile=/tmp/aiw-experimental.js --loader:.svg=file --loader:.png=file --loader:.woff2=file --define:import.meta.env.DEV=false --define:import.meta.env.PROD=true
+          test -s /tmp/aiw-experimental.js
