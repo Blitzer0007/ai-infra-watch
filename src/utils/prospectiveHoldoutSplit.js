@@ -8,8 +8,8 @@ const strictUtc = v => {
   if (typeof v !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v)) return null;
   const ms=Date.parse(v);
-  return Number.isFinite(ms) && new Date(ms).toISOString() ===
-    new Date(v).toISOString() ? ms : null;
+  const normalized=v.replace(/(?:\.(\d{1,3}))?Z$/,(_match,fraction)=>'.'+(fraction??'').padEnd(3,'0')+'Z');
+  return Number.isFinite(ms) && new Date(ms).toISOString()===normalized ? ms : null;
 };
 const validId = v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 const plain = x => !!x && typeof x === 'object' && !Array.isArray(x) &&
