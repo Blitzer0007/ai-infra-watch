@@ -51,7 +51,11 @@ export async function jsonGet(url, token, fetcher = fetch) {
   if (!token) throw Error('Required CI authentication is not configured.');
   const response = await fetcher(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
     redirect: 'error', signal: AbortSignal.timeout(15000) });
-  if (!response.ok) throw Error('Release evidence request failed (HTTP ' + response.status + ').');
+  // Only a full JSON API response can certify exact-commit release evidence.
+  // HTTP 202/204/206 are not complete candidate/target attestations.
+  if (response.status !== 200 || response.ok !== true) throw Error('Release evidence request failed (HTTP ' + response.status + ').');
+  const type = String(response.headers?.get?.('content-type') || '');
+  if (!/^application\/json(?:\s*;|\s*$)/i.test(type)) throw Error('Release evidence response is not JSON.');
   return response.json();
 }
 
