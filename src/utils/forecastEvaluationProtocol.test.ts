@@ -69,7 +69,9 @@ describe('Milestone 4 forecast-evaluation lifecycle contract', () => {
     assert.equal(result.metrics.medianAbsoluteErrorPctPoints, 1.5);
     assert.equal(result.metrics.direction.accuracyPct, 100);
     assert.equal(result.metrics.middle50.n, 2);
-    assert.equal(result.metrics.middle50.hits, 2);
+    // The first fictional interval contains +7%; the second does not contain -2%.
+    // A denominator of two is correct, but the number of hits is one.
+    assert.equal(result.metrics.middle50.hits, 1);
     assert.equal(result.metrics.declaredCreationSourceCount, 2);
     assert.equal(result.metrics.independentlyAuthenticatedSourceCount, null);
     assert.doesNotMatch(JSON.stringify(result), /should-not-escape|FICT|fictional/);
