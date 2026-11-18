@@ -8,6 +8,7 @@ import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
 import { summarizeSchedulerFleet } from '../utils/schedulerFleetHealth';
 import { summarizeMarketObservation } from '../utils/marketObservationReview';
+import { summarizeHistoricalProvenance } from '../utils/historicalProvenanceReview';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -177,6 +178,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const validationGate = forecastValidation?.validationGate || null;
   const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const forecastEvidence = summarizeForecastEvidenceAdmissibility(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
+  const historicalProvenance = summarizeHistoricalProvenance(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const schedulerFleet = summarizeSchedulerFleet(jobHealth, { error: jobHealthError, loading: !jobHealthLoaded });
   const marketObservation = summarizeMarketObservation(marketDataHealth?.rows, { loading: !marketDataHealthLoaded, error: marketDataHealthError });
 
@@ -397,6 +399,22 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           </ul>
           <p className="mt-2 text-amber-100">{forecastEvidence.note}</p>
         </details>
+      </section>
+
+      <section className="rounded-2xl border border-amber-300/15 p-4" data-testid="historical-provenance-review" aria-label="Historical provenance readiness">
+        <h3 className="text-sm font-semibold">Historical provenance and holdout readiness</h3>
+        <div className="mt-2 text-xs text-amber-200/80">Independent historical accuracy eligibility: blocked · {historicalProvenance.state.replaceAll('-', ' ')}</div>
+        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] text-white/60">
+          <span>Sampled metadata: {historicalProvenance.sampledArtifacts}</span>
+          <span>Recorded SHA-256: {historicalProvenance.recordedHash}</span>
+          <span>Capture time known: {historicalProvenance.captureTimeKnown}</span>
+          <span>Source-as-of claimed: {historicalProvenance.claimedSourceDateKnown}</span>
+          <span>Source after capture: {historicalProvenance.sourceAfterCapture}</span>
+          <span>Archive index capped: {historicalProvenance.windowCapped ? 'yes' : 'not proven complete'}</span>
+          <span>Publisher receipts: not verified</span>
+          <span>Prospective holdout: not verified</span>
+        </div>
+        <p className="mt-2 text-[10px] text-white/40">{historicalProvenance.note}</p>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="historical-evidence-archives">
