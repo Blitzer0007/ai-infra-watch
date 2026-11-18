@@ -9,10 +9,22 @@ export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,
     const node=dialog.current;if(!node)return;
     const overflow=document.body.style.overflow;
     node.showModal();document.body.style.overflow='hidden';close.current?.focus({preventScroll:true});
-    // Capture the real viewport once the native dialog and focus are active.
-    // The triggering click can shift the document before showModal completes.
-    opened.current?.();
+    // Native showModal, scrollbar lock, focus and layout can settle on different
+    // frames at narrow viewports. Publish a stable opening point only AFTER two
+    // paints, so the saved viewport matches what the user actually sees.
+    delete node.dataset.scrollReady;
+    let secondFrame=0;
+    const firstFrame=requestAnimationFrame(()=>{
+      secondFrame=requestAnimationFrame(()=>{
+        if(!node.open)return;
+        opened.current?.();
+        node.dataset.scrollReady='true';
+      });
+    });
     return()=>{
+      cancelAnimationFrame(firstFrame);
+      if(secondFrame)cancelAnimationFrame(secondFrame);
+      delete node.dataset.scrollReady;
       node.close();
       document.body.style.overflow=overflow;
       // React StrictMode replays effect cleanup/setup during initial mount.
