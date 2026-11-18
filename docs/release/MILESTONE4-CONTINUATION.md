@@ -83,3 +83,7 @@ Exact-head run `44282494224` still showed `history.scrollRestoration='auto'` imm
 ## Evidence → Back cross-entry scroll restoration (18 November 2026)
 
 Exact-head browser run `44283711030` passed the initial `history.scrollRestoration='manual'` assertion on all viewports after the StrictMode cleanup fix. It then timed out after the Evidence round-trip because the dialog cleanup had cleared the saved original history mode when **navigating to Evidence** instead of closing back to the holdings list. Reconciled these separate transitions: during Evidence navigation, restore that entry's native history mode temporarily **without clearing** the original saved value; on `popstate` back into the detail, set manual again; only clear the saved restoration mode when on the real closed holdings-list entry. Underlying strict <3px scroll, focus, no-write and browser-history restoration assertions remain, not weakened. This needs a fresh full mock-browser exact-head run.
+
+## Out-of-order browser Back guard
+
+If the user returns from Evidence before a prior dialog cleanup's two animation frames finish, the pending cleanup must not reset a newly reopened detail entry from `manual` back to `auto`. The final restoration handler now re-reads the live URL at the time of the last frame and restores the previous native mode only if the holdings list is genuinely closed or if the user is in a distinct no-detail Evidence workspace. The manual mode is retained while a detail is open. The same original strict Playwright round-trip assertions remain enabled.

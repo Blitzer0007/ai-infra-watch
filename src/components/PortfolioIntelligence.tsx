@@ -262,8 +262,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           // clear the original mode until the actual holdings list is
           // visible after the final Back/Escape close. Preserve it across a
           // browser Back that re-opens the same detail entry.
-          window.history.scrollRestoration=previous;
-          if(isBackOnHoldings())savedHistoryScrollRestoration.current=null;
+          const currentView=readHoldingNavigation(new URLSearchParams(window.location.search));
+          if(isBackOnHoldings()){
+            window.history.scrollRestoration=previous;
+            savedHistoryScrollRestoration.current=null;
+          } else if(!currentView.detail){
+            // An Evidence tab (no dialog) can use native scroll behavior,
+            // but never override a dialog reopened by Back during this RAF.
+            window.history.scrollRestoration=previous;
+          }
         }
       });
     });
