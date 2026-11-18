@@ -3,6 +3,7 @@ import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2, Database, 
 import type { ReactNode } from 'react';
 import { authFetch } from '../utils/apiAuth';
 import FreshnessBadge from './FreshnessBadge';
+import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -410,6 +411,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           {validationOverall?.newestVerifiedAt ? ' · last verified ' + new Date(validationOverall.newestVerifiedAt).toLocaleString() : ''}
           {forecastValidation?.scope?.truncated ? ' · latest ' + forecastValidation.scope.rowLimit + ' rows shown' : ''}
         </div>
+        {!forecastValidationError && <ForecastEvaluationLifecycle report={forecastValidation?.evaluationProtocol ?? null} status={forecastValidation?.evaluationProtocolStatus === 'ready' ? 'ready' : 'unavailable'} />}
       </section>
 
       <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden" aria-label="Evidence channel health">

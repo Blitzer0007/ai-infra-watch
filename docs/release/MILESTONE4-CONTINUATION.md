@@ -21,3 +21,8 @@ Updated: 18 November 2026
 - Add stable operational observability for forecast scheduler, data lag, quota and job outcomes using existing read-only access gates, keeping sender and model activation separate.
 - Extend browser and API tests with fictional due/verified/unknown cohorts, incomplete result windows, and no-private-data/no-write claims.
 - Complete exact-head CI and review again before production merge. Milestone 4 deployment is a separate release decision; Milestone 3 remains rollback.
+
+## Authenticated lifecycle API and UI integrated
+- The existing private `GET /api/forecast-validation` adds an independently bounded read-only SELECT of recent pending/verified rows. The protocol uses at most 1,000 rows; any transport/data failure yields `evaluationProtocolStatus: unavailable` without changing the existing verified-history metrics.
+- The shared presentation-only `ForecastEvaluationLifecycle` component appears in Data Health and the per-ticker Forecast Validation panel, with due/pending/unknown, reported/scorable/non-overlap counts and explicit score denominators. It performs **zero additional browser requests**, writes, model/provider calls or background work.
+- Counts are *window observations*, never all-time population counts. Imported reports expose no raw forecast/evidence rows or tokens.
