@@ -320,9 +320,11 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     trigger = page.get_by_role("button", name="Open NVDA holding details from table")
     expect(trigger).to_be_visible()
     trigger.scroll_into_view_if_needed()
+    original_history_scroll_mode = page.evaluate("history.scrollRestoration")
     trigger.click()
     dialog = page.get_by_role("dialog", name="NVDA holding details")
     expect(dialog).to_be_visible()
+    assert page.evaluate("history.scrollRestoration") == "manual"
     # The browser may move the trigger while dispatching the click. The list
     # restoration contract is the actual event-time view, not an earlier
     # scrollIntoView position before click's own focus/visibility adjustments.
@@ -336,5 +338,8 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     dialog.press("Escape")
     expect(dialog).to_have_count(0)
     expect(trigger).to_be_focused()
+    # Wait until both layout/scroll frames and history scroll mode cleanup finish.
+    # This prevents falsely passing before a later browser-history scroll jump.
+    page.wait_for_function("(mode) => history.scrollRestoration === mode", arg=original_history_scroll_mode)
     assert abs(page.evaluate("scrollY") - opening_scroll) < 3
     assert writes == []

@@ -1,9 +1,11 @@
 import { requireAccess } from '../../api/_access-auth.js';
 import { buildForecastValidationSummary, buildForecastLearningSummary } from '../utils/forecastValidation.js';
+import { buildForecastEvaluationProtocol } from '../../src/utils/forecastEvaluationProtocol.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const MAX_ROWS = 2000;
+const PROTOCOL_ROWS = 1000;
 
 function headers() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -39,6 +41,28 @@ async function loadVerifiedForecasts({ ticker, horizon, createdSource = null } =
   return Array.isArray(data) ? data : [];
 }
 
+
+/** Read at most a recent window of status and numerical fields.
+ * No private evidence snapshots, ticker list or raw row gets returned.
+ */
+async function loadEvaluationWindow({ ticker, horizon } = {}) {
+  const params = new URLSearchParams();
+  params.set('select', 'ticker,horizon,status,created_at,target_date,verified_at,median,actual_return,p25,p75,p10,p90,created_source');
+  params.set('order', 'created_at.desc');
+  params.set('limit', String(PROTOCOL_ROWS + 1));
+  if (ticker) params.set('ticker', 'eq.' + String(ticker).trim().toUpperCase());
+  if (horizon !== null && horizon !== undefined && Number.isFinite(Number(horizon))) {
+    params.set('horizon', 'eq.' + String(Number(horizon)));
+  }
+  const response = await fetch(SUPABASE_URL + '/rest/v1/forecast_snapshots?' + params.toString(), {
+    headers: headers(),
+  });
+  if (!response.ok) throw new Error('Forecast lifecycle window unavailable');
+  const result = await response.json().catch(() => null);
+  if (!Array.isArray(result)) throw new Error('Malformed forecast lifecycle window');
+  return result;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
   if (!requireAccess(req, res)) return;
@@ -65,6 +89,21 @@ export default async function handler(req, res) {
       globalValidationGate = buildForecastValidationSummary(globalRows).validationGate;
     }
 
+    let evaluationProtocol = null;
+    let evaluationProtocolStatus = 'unavailable';
+    try {
+      const recent = await loadEvaluationWindow({ ticker: ticker || null, horizon });
+      evaluationProtocol = buildForecastEvaluationProtocol(recent.slice(0, PROTOCOL_ROWS), {
+        asOfDate: new Date().toISOString().slice(0, 10),
+        rowLimit: PROTOCOL_ROWS,
+        truncated: recent.length > PROTOCOL_ROWS,
+      });
+      evaluationProtocolStatus = 'ready';
+    } catch {
+      // Existing verified-history metrics remain available. An unavailable
+      // lifecycle window is not a zero-count or an authenticated outcome.
+    }
+
     return res.status(200).json({
       ok: true,
       scope: {
@@ -76,6 +115,8 @@ export default async function handler(req, res) {
       ...summary,
       learning,
       globalValidationGate,
+      evaluationProtocolStatus,
+      evaluationProtocol,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {

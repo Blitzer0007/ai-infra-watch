@@ -8,7 +8,16 @@ export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,
     const node=dialog.current;if(!node)return;
     const overflow=document.body.style.overflow;
     node.showModal();document.body.style.overflow='hidden';close.current?.focus({preventScroll:true});
-    return()=>{node.close();document.body.style.overflow=overflow;restore.current();};
+    return()=>{
+      node.close();
+      document.body.style.overflow=overflow;
+      // React StrictMode replays effect cleanup/setup during initial mount.
+      // Restore the underlying list only after a real dialog close, not the
+      // transient replay (which immediately re-opens this same dialog node).
+      requestAnimationFrame(()=>{
+        if(!node.open)restore.current();
+      });
+    };
   },[]);
   return createPortal(<dialog ref={dialog} aria-labelledby={heading} aria-describedby={description} data-testid="holding-detail-dialog" className="aiw-holding-dialog" onCancel={event=>{event.preventDefault();onClose();}} onKeyDown={(event:KeyboardEvent<HTMLDialogElement>)=>{
     if(event.key!=='Tab')return;

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
+import ForecastEvaluationLifecycle, { type ForecastEvaluationProtocol } from './ForecastEvaluationLifecycle';
 
 type ValidationSummary = {
   count: number;
@@ -28,6 +29,8 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
   const [summary, setSummary] = useState<ValidationSummary | null>(null);
   const [globalGate, setGlobalGate] = useState<{ verifiedCount: number; minimumRequired: number; ready: boolean } | null>(null);
   const [learning, setLearning] = useState<Learning | null>(null);
+  const [evaluationProtocol, setEvaluationProtocol] = useState<ForecastEvaluationProtocol|null>(null);
+  const [evaluationProtocolStatus, setEvaluationProtocolStatus] = useState<'ready'|'unavailable'>('unavailable');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,11 +52,16 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
         setSummary(body?.overall?.count ? body.overall : null);
         setGlobalGate(body?.globalValidationGate || body?.validationGate || null);
         setLearning(body?.learning || null);
+        setEvaluationProtocol(body?.evaluationProtocol ?? null);
+        setEvaluationProtocolStatus(body?.evaluationProtocolStatus === 'ready' ? 'ready' : 'unavailable');
       })
       .catch(err => {
         if (!cancelled) {
           setSummary(null);
           setGlobalGate(null);
+          setLearning(null);
+          setEvaluationProtocol(null);
+          setEvaluationProtocolStatus('unavailable');
           setError(err instanceof Error ? err.message : 'Forecast validation unavailable');
         }
       })
@@ -89,9 +97,11 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
       )}
 
       <div className="mt-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-3 py-2 text-[8px] leading-4 text-white/35">
-        Auto tracking is on: each weekday AI Infra Watch records separate <b className="text-cyan-200/70">5D and 20D forecasts</b> for each held stock when that horizon has no pending forecast already waiting to mature.
-        The 5D and 20D streams are validated separately. A forecast only counts toward this horizon's <b className="text-white/60">50 verified sample</b> after its target date is reached and the actual market result is recorded. You do not need to add these manually.
+        When the forecast scheduler is configured and runs successfully, it can record separate <b className="text-cyan-200/70">5D and 20D forecasts</b> for held stocks without an existing pending forecast for that horizon. Check Data Health for observed scheduler outcomes; a configured schedule alone is not proof that a forecast was recorded.
+        The horizons are evaluated separately. A forecast only counts toward this horizon's <b className="text-white/60">verified sample</b> after its due market outcome has actually been recorded and passed eligibility checks.
       </div>
+
+      {!loading && !error && <ForecastEvaluationLifecycle report={evaluationProtocol} status={evaluationProtocolStatus} />}
 
       {summary && (
         <>

@@ -1,3 +1,16 @@
+# CURRENT AI Infra Watch continuation — Milestone 4 (18 November 2026)
+
+**Read this first:** The content below the divider is the historical Milestone 2 handoff, retained to preserve its research audit trail. Its old release status (`1/5`), branch and deployment restrictions are **not** the current state.
+
+- Production `main` released Milestone 3 of 5 at `77db3ca4f7f55b032935f20b7fde131f40caf940`. [PR #173](https://github.com/Blitzer0007/ai-infra-watch/pull/173) was merged and the production Vercel alias was independently verified. Do not conflate old draft PR #172/168 instructions with the new active release.
+- **Current active work:** [Milestone 4 draft PR #174](https://github.com/Blitzer0007/ai-infra-watch/pull/174), branch `feature/milestone4-forecast-evaluation-20261118`. Read the live PR head, latest exact-head CI, and [Milestone 4 checkpoint](MILESTONE4-CONTINUATION.md) **before changes**.
+- Milestone 4 is **not deployed**. Its first slice is a read-only, bounded Forecast Evaluation lifecycle protocol and existing endpoint/UI extension: pending vs due vs unknown target, verified/scorable vs invalid/overlapping, 5D/20D cohorts, valid interval coverage and explicit non-independent/source-limitation warnings. All tests use fictional data; no source/provider/model/Telegram/DB mutation has been authorized or performed.
+- **Release blocker as of 18 November:** The unchanged `npm audit --audit-level=low` in Frontend CI fails on GHSA-fc5q-39xc-vjpf/CVE-2026-112366 (picomatch, Vite transitive tree) with no official patched upstream version identified yet. Do not bypass the gate, pull in unreviewed forks or claim Milestone 4 production acceptance. A separate, existing offline QA workflow now runs TypeScript/unit/build even though the independent security gate remains blocked.
+- Inspect genuine CI logs and address all code failures on new exact heads. No changes on the user's Windows machine. Retain production Milestone 3, private access controls, current auth/portfolio/accounting gates, scheduled jobs, and the previous rollback deployment.
+- Continue evaluating point-in-time adjusted history, forecast cohort leakage/holdouts, and operational job-health reporting. Do not claim predictive accuracy, issuer identity or complete historical coverage based only on fixture tests or 50 validated rows. Keep PR #174 draft and do not merge or deploy without all existing release gates green and fresh authorization.
+
+---
+
 # AI Infra Watch — Codex Cloud continuation (Milestone 2 isolated candidate)
 
 **Current handoff:** 16 November 2026. This is the candidate-specific checkpoint on branch `release/milestone2-integrated-candidate-20261115` / [draft PR #172](https://github.com/Blitzer0007/ai-infra-watch/pull/172). It intentionally differs from the older checkpoint on `feature/release2-opportunity-research` (PR #168), which holds the unshipped multi-milestone stack.

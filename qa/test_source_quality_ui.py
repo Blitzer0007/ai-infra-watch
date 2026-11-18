@@ -38,7 +38,8 @@ def source_gateway(tmp_path_factory):
             gateway_env={**env,'AIW_ACCESS_TOKEN':'fictional-source-session','AI_INFRA_AGENT_URL':f'http://127.0.0.1:{port}','VITE_QA_MODE':'true'}
             with socket.socket() as reserve:
                 reserve.bind(('127.0.0.1',0));frontend_port=reserve.getsockname()[1]
-            gateway=subprocess.Popen(['node',str(ROOT/'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',str(frontend_port),'--strictPort'],cwd=ROOT,env=gateway_env,stdout=output,stderr=output)
+            gateway_env['PORT']=str(frontend_port)
+            gateway=subprocess.Popen(['node',str(ROOT/'scripts/serve-static.mjs')],cwd=ROOT,env=gateway_env,stdout=output,stderr=output)
             address=f'http://127.0.0.1:{frontend_port}'
             assert is_loopback_url(address)
             with httpx.Client(trust_env=False) as client:

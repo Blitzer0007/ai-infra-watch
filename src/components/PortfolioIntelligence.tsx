@@ -86,6 +86,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const detailOwner=useId();
   const closingDetail=useRef(false);
   const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
+  // While traversing a holding's detail → Evidence → Back history entries,
+  // restore the exact list viewport ourselves rather than racing the browser's
+  // automatic native history scroll restoration with modal focus restoration.
+  const savedHistoryScrollRestoration=useRef<ScrollRestoration|null>(null);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
@@ -169,6 +173,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       const params = new URLSearchParams(window.location.search);
       const nextTab=portfolioTabFromValue(params.get('portfolio_tab'));
       const view=readHoldingNavigation(params);
+      // Re-entering the dialog through browser Back does not invoke the
+      // original open button, so re-apply manual restoration to this entry.
+      if(view.detail && listOrigin.current && savedHistoryScrollRestoration.current!==null){
+        window.history.scrollRestoration='manual';
+      }
       focusSection.current=nextTab!==currentTab.current;
       setTab(nextTab);
       setDetailSymbol(view.detail);
@@ -183,8 +192,18 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     window.addEventListener('popstate',restore);
     return () => window.removeEventListener('popstate',restore);
   }, []);
+  useEffect(()=>()=> {
+    if(savedHistoryScrollRestoration.current!==null){
+      window.history.scrollRestoration=savedHistoryScrollRestoration.current;
+      savedHistoryScrollRestoration.current=null;
+    }
+  },[]);
   const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
     if(!holdings.some(row=>row.symbol===symbol))return;
+    if(savedHistoryScrollRestoration.current===null){
+      savedHistoryScrollRestoration.current=window.history.scrollRestoration;
+      window.history.scrollRestoration='manual';
+    }
     const params=new URLSearchParams(window.location.search);
     params.set('portfolio_tab','holdings');
     params.set('portfolio_symbol',symbol);
@@ -193,6 +212,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     listOrigin.current={scrollY:window.scrollY,trigger,symbol};
     params.set('portfolio_detail',symbol);
     window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    // scrollRestoration belongs to the active history entry. pushState can
+    // activate a new entry with "auto" even if the list entry was manual.
+    window.history.scrollRestoration='manual';
     closingDetail.current=false;
     setSelected(symbol);
     setDetailSymbol(symbol);
@@ -212,19 +234,45 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   };
   const restoreHoldingList=()=>{
     const origin=listOrigin.current;
-    // Restore synchronously as the native modal closes so focus/scroll is stable
-    // even before the next animation frame (including on narrow screens).
-    const paramsNow=new URLSearchParams(window.location.search);
-    if(origin && window.location.pathname==='/portfolio' && paramsNow.get('portfolio_tab')==='holdings' && !readHoldingNavigation(paramsNow).detail){
-      window.scrollTo({top:origin.scrollY,behavior:'instant'});
-    }
-    requestAnimationFrame(()=>{
+    const isBackOnHoldings=()=>{
       const params=new URLSearchParams(window.location.search);
-      if(window.location.pathname!=='/portfolio'||params.get('portfolio_tab')!=='holdings'||readHoldingNavigation(params).detail)return;
-      const fallback=Array.from(document.querySelectorAll<HTMLElement>('[data-holding-symbol]')).find(node=>node.dataset.holdingSymbol===(origin?.symbol||detailSymbol));
-      const target=origin?.trigger?.isConnected?origin.trigger:fallback||sectionHeading.current;
-      target?.focus({preventScroll:true});
-      if(origin)window.scrollTo({top:origin.scrollY,behavior:'auto'});
+      return window.location.pathname==='/portfolio' && params.get('portfolio_tab')==='holdings' && !readHoldingNavigation(params).detail;
+    };
+    const restoreScroll=()=>{
+      if(origin && isBackOnHoldings()){
+        window.scrollTo({top:origin.scrollY,behavior:'instant'});
+      }
+    };
+    // Native dialog close, route popstate, layout and focus restoration may be
+    // ordered differently in each viewport. Keep native history restoration
+    // paused until the holdings list has reflowed across two paint frames.
+    restoreScroll();
+    requestAnimationFrame(()=>{
+      restoreScroll();
+      requestAnimationFrame(()=>{
+        if(isBackOnHoldings()){
+          const fallback=Array.from(document.querySelectorAll<HTMLElement>('[data-holding-symbol]')).find(node=>node.dataset.holdingSymbol===(origin?.symbol||detailSymbol));
+          const target=origin?.trigger?.isConnected?origin.trigger:fallback||sectionHeading.current;
+          target?.focus({preventScroll:true});
+          restoreScroll();
+        }
+        const previous=savedHistoryScrollRestoration.current;
+        if(previous!==null){
+          // Evidence/workspace navigation unmounts the dialog too. Do not
+          // clear the original mode until the actual holdings list is
+          // visible after the final Back/Escape close. Preserve it across a
+          // browser Back that re-opens the same detail entry.
+          const currentView=readHoldingNavigation(new URLSearchParams(window.location.search));
+          if(isBackOnHoldings()){
+            window.history.scrollRestoration=previous;
+            savedHistoryScrollRestoration.current=null;
+          } else if(!currentView.detail){
+            // An Evidence tab (no dialog) can use native scroll behavior,
+            // but never override a dialog reopened by Back during this RAF.
+            window.history.scrollRestoration=previous;
+          }
+        }
+      });
     });
   };
   const changeViewMode = (mode: 'simple' | 'detailed') => {
