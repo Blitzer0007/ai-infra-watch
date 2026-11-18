@@ -1,6 +1,6 @@
 # Milestone 5 — operational and data integrity
 
-Updated: 18 November 2026 (Asia/Kolkata)
+Updated: 19 November 2026 (Asia/Kolkata)
 
 ## Source of truth and release state
 - Milestone 4 released to production from `main` commit `4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772`, via PR #174 and Vercel deployment `dpl_4YxxXt5CcZ4J5b7L24pTwtr4AgVa`.
@@ -87,6 +87,15 @@ The original five-release plan characterizes Milestone 5 as broader operational 
 - `src/utils/offlineEvidenceBundleReview.test.ts` uses fictional ephemeral Ed25519 keys and four distinct temporary artifacts to verify valid structural combinations, digest tampering, missing signatures, chronology mismatch, training/holdout leakage and incomplete holdout windows. `server/api/verify-evidence-receipts.test.js` checks that the CLI reads each source separately and ignores untrusted claimed success fields.
 - A `structural-evidence-observed` result is **NOT independent historical accuracy validation**; identity, original publisher timestamps, actual market adjustment, feature contamination, and prospective holdout representativeness remain unresolved. `historicalAccuracyEligible` and `investmentDecisionEligible` stay false in all outcomes.
 - Production remains Milestone 4; draft PR #176 and exact-head CI are the source of truth for this candidate. Browser navigation and security checks must pass before considering any merge or deployment.
+
+
+## Tenth candidate increment — production smoke strict HTTP contract and readiness evidence (19 November 2026)
+- `scripts/private-health-smoke.mjs` now requires exact HTTP **200 OK** and valid JSON contracts for both authenticated health endpoints. A 202, 204 or 206 response is **not** an attestation of a complete health payload, even when an injected test transport supplies a plausible `ok: true` body.
+- `server/api/private-health-smoke.test.js` includes fictional regressions ensuring those incomplete 2xx statuses fail closed without reading their bodies. The script remains fixed-origin, GET-only, manual, redacted and without provider refresh.
+- Release-readiness review separates three independent proofs: (1) candidate PR exact-head CI, (2) separately approved exact-main release checks after merge, and (3) authenticated production GET-only smoke plus deployment/rollback verification by an authorized operator. Green mock CI proves only (1).
+- **Not established:** real independently authenticated source publishers, original timestamps, reconciled price adjustments, point-in-time universe, audited prospective holdout, authentic forecast accuracy, live private endpoint success, or operational production credentials. No fictional evidence may satisfy these gates.
+- **Do not automatically merge or deploy.** Production is still Milestone 4; the manual production health workflow is not dispatchable from this draft PR. Branch-protection configuration remains deferred, but release checks and deployment protection must not be bypassed silently.
+- On any subsequent implementation commit, repeat all applicable exact-new-head workflows before labeling this candidate green.
 
 ## Working rules
 Use connected GitHub/GitHub Actions only (do not run on the user's Windows PC). Read current PR head and all CI runs. Fix genuine failures on a new commit and verify the NEW exact head. Don't merge or deploy Milestone 5 merely because an initial small patch passes. Branch protection remains deferred by the owner's explicit instruction; never silently amend release-gate policy. Retain prior rollback deployment and production protections.
