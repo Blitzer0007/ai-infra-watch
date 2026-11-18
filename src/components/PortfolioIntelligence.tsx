@@ -1054,8 +1054,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <FreshnessBadge {...(livePrices[detailAnalysis.symbol] || {})} labelOverride={detailAnalysis.liveStale ? 'Last close' : undefined} showAge />
           <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Market prices, historical comparators, consensus and source coverage are separately qualified; missing evidence cannot be upgraded into a trade instruction.</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
-            <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
+            <button type="button" onClick={()=>{ if(listOrigin.current)listOrigin.current.scrollY=window.scrollY; changeTab('evidence'); }} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
+            <button type="button" onClick={()=>{ if(listOrigin.current)listOrigin.current.scrollY=window.scrollY; changeTab('performance'); }} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
           </div>
           <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange}/>
           <PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/>
