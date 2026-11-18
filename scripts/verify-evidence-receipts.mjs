@@ -9,6 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { auditIndependentReceipts } from '../src/utils/independentReceiptAudit.js';
 import { auditArtifactFiles } from '../src/utils/offlineArtifactIntegrity.js';
+import { reviewOfflineEvidenceBundle } from '../src/utils/offlineEvidenceBundleReview.js';
 
 export async function verifyReceiptFiles(receiptsPath, anchorsPath, read = readFile) {
   if (typeof receiptsPath !== 'string' || !receiptsPath ||
@@ -45,20 +46,44 @@ export async function verifyReceiptArtifacts(receiptsPath, anchorsPath, artifact
   });
 }
 
+/** Offline operator bundle review: receipt, independently approved keys, artifact paths
+ * and separately supplied holdout split. Never trust embedded anchor files.
+ */
+export async function verifyFullEvidenceBundle(receiptsPath, anchorsPath, artifactMapPath, holdoutPath, read = readFile) {
+  if (![receiptsPath, anchorsPath, artifactMapPath, holdoutPath].every(p => typeof p === 'string' && p))
+    throw Error('Four separately supplied evidence inputs are required');
+  const [rawReceipts, rawAnchors, rawFiles, rawHoldout] = await Promise.all([
+    read(receiptsPath,'utf8'), read(anchorsPath,'utf8'),
+    read(artifactMapPath,'utf8'), read(holdoutPath,'utf8'),
+  ]);
+  const manifest=JSON.parse(String(rawReceipts));
+  return reviewOfflineEvidenceBundle({
+    decisionAt:manifest?.decisionAt,
+    receipts:manifest?.receipts,
+    trustAnchors:JSON.parse(String(rawAnchors)),
+    files:JSON.parse(String(rawFiles)),
+    commitment:JSON.parse(String(rawHoldout)),
+  });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode=process.argv[2];
   if (!((mode==='verify' && process.argv.length===5) ||
-    (mode==='verify-artifacts' && process.argv.length===6))) {
-    console.error('Usage: node scripts/verify-evidence-receipts.mjs verify-artifacts <receipts.json> <approved-trust-anchors.json> <artifact-map.json>');
+    (mode==='verify-artifacts' && process.argv.length===6) ||
+    (mode==='verify-bundle' && process.argv.length===7))) {
+    console.error('Usage: node scripts/verify-evidence-receipts.mjs verify-bundle <receipts.json> <approved-trust-anchors.json> <artifact-map.json> <holdout.json> (or verify / verify-artifacts)');
     process.exitCode=2;
   } else {
     const action=mode==='verify'
       ? verifyReceiptFiles(process.argv[3],process.argv[4])
-      : verifyReceiptArtifacts(process.argv[3],process.argv[4],process.argv[5]);
+      : mode==='verify-artifacts'
+        ? verifyReceiptArtifacts(process.argv[3],process.argv[4],process.argv[5])
+        : verifyFullEvidenceBundle(process.argv[3],process.argv[4],process.argv[5],process.argv[6]);
     action.then(result=>{
       console.log(JSON.stringify(result));
       if ((mode==='verify' && result.state!=='signatures-and-timing-observed') ||
-          (mode==='verify-artifacts' && result.state!=='signed-digests-observed'))
+          (mode==='verify-artifacts' && result.state!=='signed-digests-observed') ||
+          (mode==='verify-bundle' && result.state!=='structural-evidence-observed'))
         process.exitCode=1;
     }).catch(()=>{
       console.error('Offline evidence verification failed; inspect independently supplied files and trust policy.');
