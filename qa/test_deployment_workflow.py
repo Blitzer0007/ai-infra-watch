@@ -77,3 +77,42 @@ def test_release_guard_changes_run_both_required_workflows():
         assert 'workflow_dispatch' in triggers
         for event in ('push', 'pull_request'):
             assert 'scripts/release-candidate.mjs' in triggers[event]['paths']
+
+
+def test_milestone5_protection_exception_is_explicit_and_default_denied():
+    workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
+    inputs = workflow[True]['workflow_dispatch']['inputs']
+    waiver = inputs['confirm_milestone5_unprotected_main_exception']
+    assert waiver['required'] is True
+    assert waiver['default'] == 'NO'
+    assert waiver['options'] == ['NO', 'YES']
+    deploy = workflow['jobs']['deploy']
+    assert deploy['environment'] == 'production'
+    assert deploy['env']['AIW_MAIN_PROTECTION_WAIVER'] == (
+        '${{ inputs.confirm_milestone5_unprotected_main_exception }}'
+    )
+    checks = [step for step in deploy['steps']
+              if 'node scripts/release-candidate.mjs candidate' in step.get('run','')]
+    assert len(checks) == 3
+    assert all(deploy['steps'].index(step) < next(
+        i for i, entry in enumerate(deploy['steps'])
+        if entry['name'] == 'Promote the tested production build'
+    ) for step in checks)
+
+
+def test_protected_staged_vercel_smoke_preserves_app_auth_checks():
+    workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
+    steps = workflow['jobs']['deploy']['steps']
+    staged = next(step for step in steps if step['name'] == 'Check staged homepage and access gates')
+    assert staged['env']['BASE_URL'] == '${{ steps.stage.outputs.url }}'
+    assert staged['env']['VERCEL_TOKEN'] == '${{ secrets.VERCEL_TOKEN }}'
+    commands = staged['run']
+    # Authenticate only at the Vercel protection layer, never disable SSO or
+    # substitute a successful platform response for app-owned HTTP 401 gates.
+    assert commands.count('$(vercel curl --silent') == 3
+    assert 'vercel protection' not in commands.lower()
+    assert 'vercel promote' not in commands
+    assert 'test "$auth_status"' not in commands  # Existing explicit branch/exit gates below.
+    assert 'if [ "$auth_status" != "401" ]' in commands
+    assert 'if [ "$portfolio_status" != "401" ]' in commands
+    assert 'cmp --silent .vercel/output/static/index.html /tmp/staged-home.html' in commands

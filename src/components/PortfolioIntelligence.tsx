@@ -85,11 +85,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const currentTab=useRef(tab);currentTab.current=tab;
   const detailOwner=useId();
   const closingDetail=useRef(false);
-  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string;openedCaptured:boolean}|null>(null);
   // While traversing a holding's detail → Evidence → Back history entries,
   // restore the exact list viewport ourselves rather than racing the browser's
   // automatic native history scroll restoration with modal focus restoration.
   const savedHistoryScrollRestoration=useRef<ScrollRestoration|null>(null);
+  // A narrow viewport can lose a few pixels of scrollable document height when
+  // a native detail dialog closes. Preserve enough scroll range to restore the
+  // exact user-observed list position; clean up when leaving the list.
+  const savedListMinHeight=useRef<string|null>(null);
+  const restoreDocumentMinHeight=()=>{
+    if(savedListMinHeight.current!==null){
+      document.documentElement.style.minHeight=savedListMinHeight.current;
+      savedListMinHeight.current=null;
+    }
+  };
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
@@ -197,7 +207,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       window.history.scrollRestoration=savedHistoryScrollRestoration.current;
       savedHistoryScrollRestoration.current=null;
     }
+    restoreDocumentMinHeight();
   },[]);
+  useEffect(()=>{
+    // The Evidence workspace is an intermediate stop in an active holding
+    // detail → Evidence → browser Back journey. Keep its scroll range frozen
+    // until the user returns and closes the detail. Clear for unrelated tabs.
+    if(tab!=='holdings' && savedHistoryScrollRestoration.current===null)
+      restoreDocumentMinHeight();
+  },[tab]);
   const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
     if(!holdings.some(row=>row.symbol===symbol))return;
     if(savedHistoryScrollRestoration.current===null){
@@ -209,7 +227,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     params.set('portfolio_symbol',symbol);
     params.delete('portfolio_detail');
     window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
-    listOrigin.current={scrollY:window.scrollY,trigger,symbol};
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol,openedCaptured:false};
     params.set('portfolio_detail',symbol);
     window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
     // scrollRestoration belongs to the active history entry. pushState can
@@ -240,6 +258,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     };
     const restoreScroll=()=>{
       if(origin && isBackOnHoldings()){
+        // Restore the real event-time viewport, not a clamped scrollY after
+        // removing the modal. This floor is only applied when the document
+        // becomes shorter than the captured scroll position + viewport.
+        const requiredHeight=Math.ceil(origin.scrollY+window.innerHeight);
+        if(document.documentElement.scrollHeight<requiredHeight){
+          if(savedListMinHeight.current===null)
+            savedListMinHeight.current=document.documentElement.style.minHeight;
+          document.documentElement.style.minHeight=requiredHeight+'px';
+        }
         window.scrollTo({top:origin.scrollY,behavior:'instant'});
       }
     };
@@ -1006,10 +1033,29 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <p className="text-xs text-white/55">Holding detail is opened explicitly; portfolio accounting and quote quality gates remain unchanged.</p>
         </div>
       )}
-      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList} onOpened={()=>{
+        const origin=listOrigin.current;
+        // Only the original explicit opening may reset the saved viewport.
+        // Re-entering via browser Back must preserve that original position.
+        if(origin && !origin.openedCaptured){
+          // Freeze the current document's full scroll range before any later
+          // native-dialog scrollbar/layout contraction can clamp this view.
+          // Previously the extra ~24px became unreachable until close.
+          if(savedListMinHeight.current===null)
+            savedListMinHeight.current=document.documentElement.style.minHeight;
+          const root=document.documentElement;
+          const height=Math.ceil(Math.max(root.scrollHeight,window.scrollY+window.innerHeight));
+          root.style.minHeight=height+'px';
+          origin.scrollY=window.scrollY;
+          origin.openedCaptured=true;
+        }
+      }}>
         {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
           <FreshnessBadge {...(livePrices[detailAnalysis.symbol] || {})} labelOverride={detailAnalysis.liveStale ? 'Last close' : undefined} showAge />
           <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Market prices, historical comparators, consensus and source coverage are separately qualified; missing evidence cannot be upgraded into a trade instruction.</p>
+          {/* Keep the onOpened paint-stabilized list origin intact. Dialog
+              button focus/scroll can move the underlying viewport transiently,
+              especially at 768px; it must not replace the saved list position. */}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
             <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>

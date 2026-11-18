@@ -12,6 +12,14 @@ on:
           - "YES"
         required: true
         default: "NO"
+      confirm_milestone5_unprotected_main_exception:
+        description: "One-time PR #176 waiver only; verified merge-commit parents and exact-main CI remain required"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        required: true
+        default: "NO"
       expected_main_sha:
         description: "Reviewed full 40-character main commit SHA; must match dispatch and current main"
         type: string
@@ -44,6 +52,7 @@ jobs:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      AIW_MAIN_PROTECTION_WAIVER: ${{ inputs.confirm_milestone5_unprotected_main_exception }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
       # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.
       VERCEL_CLI_VERSION: "58.4.4"
@@ -141,24 +150,28 @@ jobs:
         shell: bash
         env:
           BASE_URL: ${{ steps.stage.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
+          # Vercel SSO can protect --skip-domain production URLs. Authenticate to
+          # the Vercel platform using the protected CI token, then assert the
+          # application's independent anonymous 401 responses and exact bytes.
 
-          home_status="$(curl --silent --show-error --max-time 20 -w '%{http_code}' "$BASE_URL/" -o /tmp/staged-home.html)"
+          home_status="$(vercel curl --silent --show-error --max-time 20 -w '%{http_code}' "$BASE_URL/" -o /tmp/staged-home.html)"
           if [ "$home_status" != "200" ]; then
             echo "::error::Staged homepage must return 200 without a redirect or protection page."
             exit 1
           fi
           cmp --silent .vercel/output/static/index.html /tmp/staged-home.html
 
-          auth_status="$(curl --silent --show-error --max-time 20 -o /tmp/production-auth.json -w '%{http_code}' \
+          auth_status="$(vercel curl --silent --show-error --max-time 20 -o /tmp/production-auth.json -w '%{http_code}' \
             -H "Content-Type: application/json" -X POST "$BASE_URL/api/auth" --data '{"token":""}')"
           if [ "$auth_status" != "401" ]; then
             echo "::error::Expected anonymous auth check to return 401, got $auth_status"
             exit 1
           fi
 
-          portfolio_status="$(curl --silent --show-error --max-time 20 -o /tmp/production-portfolio.json -w '%{http_code}' \
+          portfolio_status="$(vercel curl --silent --show-error --max-time 20 -o /tmp/production-portfolio.json -w '%{http_code}' \
             "$BASE_URL/api/portfolio")"
           if [ "$portfolio_status" != "401" ]; then
             echo "::error::Expected protected portfolio API to return 401, got $portfolio_status"

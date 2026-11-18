@@ -6,6 +6,9 @@ import FreshnessBadge from './FreshnessBadge';
 import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
+import { summarizeSchedulerFleet } from '../utils/schedulerFleetHealth';
+import { summarizeMarketObservation } from '../utils/marketObservationReview';
+import { summarizeHistoricalProvenance } from '../utils/historicalProvenanceReview';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -86,10 +89,12 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const [marketDataHealth, setMarketDataHealth] = useState<any>(null);
   const [marketDataHealthError, setMarketDataHealthError] = useState('');
   const [marketDataHealthReload, setMarketDataHealthReload] = useState(0);
+  const [marketDataHealthLoaded, setMarketDataHealthLoaded] = useState(false);
   const [forecastValidation, setForecastValidation] = useState<any>(null);
   const [forecastValidationError, setForecastValidationError] = useState('');
   const [jobHealth, setJobHealth] = useState<any[]>([]);
   const [jobHealthError, setJobHealthError] = useState('');
+  const [jobHealthLoaded, setJobHealthLoaded] = useState(false);
   const [historicalArchive, setHistoricalArchive] = useState<any>(null);
   const [historicalArchiveError, setHistoricalArchiveError] = useState('');
   const [archiveReload, setArchiveReload] = useState(0);
@@ -106,6 +111,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         if (cancelled) return;
         setJobHealth(Array.isArray(body?.jobs) ? body.jobs : []);
         setJobHealthError('');
+        setJobHealthLoaded(true);
         setHistoricalArchive(body?.historicalArchive || null);
         setHistoricalArchiveError(body?.historicalArchiveError || '');
       })
@@ -114,6 +120,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           const message = error instanceof Error ? error.message : 'Scheduled job health unavailable';
           setJobHealth([]);
           setJobHealthError(message);
+          setJobHealthLoaded(true);
           setHistoricalArchive(null);
           setHistoricalArchiveError(message);
         }
@@ -133,10 +140,12 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         if (cancelled) return;
         setMarketDataHealth(body);
         setMarketDataHealthError('');
+        setMarketDataHealthLoaded(true);
       })
       .catch(error => {
         if (!cancelled) {
           setMarketDataHealth(null);
+          setMarketDataHealthLoaded(true);
           setMarketDataHealthError(error instanceof Error ? error.message : 'Market provider health unavailable');
         }
       });
@@ -169,6 +178,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const validationGate = forecastValidation?.validationGate || null;
   const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const forecastEvidence = summarizeForecastEvidenceAdmissibility(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
+  const historicalProvenance = summarizeHistoricalProvenance(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
+  const schedulerFleet = summarizeSchedulerFleet(jobHealth, { error: jobHealthError, loading: !jobHealthLoaded });
+  const marketObservation = summarizeMarketObservation(marketDataHealth?.rows, { loading: !marketDataHealthLoaded, error: marketDataHealthError });
 
   return (
     <div className="space-y-6">
@@ -211,6 +223,13 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           </div>
         </div>
         {marketDataHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{marketDataHealthError}</div>}
+        <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3 text-[9px] text-white/60" data-testid="market-observation-review" role="status">
+          <div className="text-[10px] font-semibold text-white/80">Source lag & quota observations · {marketObservation.state.replaceAll('-', ' ')}</div>
+          <div className="mt-1">Sampled: {marketObservation.sampleRows} · Quote missing: {marketObservation.quoteUnavailable} · Time unknown: {marketObservation.quoteTimeUnknown} · Quote aged &gt;15m: {marketObservation.quoteAged}</div>
+          <div className="mt-1">History missing: {marketObservation.historyUnavailable} · Date unknown: {marketObservation.historyDateUnknown} · Calendar age &gt;5d: {marketObservation.historyAged} · Adjusted incomplete: {marketObservation.adjustedIncomplete}</div>
+          <div className="mt-1">Fallback rows: {marketObservation.fallbackRows} · Rate-limited attempts: {marketObservation.rateLimitedAttempts} · Remaining provider quota: unknown</div>
+          <div className="mt-1 text-white/35">Ages are observational thresholds, not US trading-session freshness certification. Rate-limit attempts do not reveal plan limits or remaining quota. No new provider request is made for this summary.</div>
+        </div>
         <div className="mt-3 space-y-2">
           {(marketDataHealth?.rows || []).map((row: any) => {
             const quote = row.quote || {};
@@ -286,9 +305,13 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
             <div className="text-sm font-black mt-1">Scheduled job health</div>
             <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures/skips, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
           </div>
-          <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs checked' : 'unavailable'}</span>
+          <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs observed' : 'observations unavailable'}</span>
         </div>
         {jobHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{jobHealthError}</div>}
+        <div data-testid="scheduler-fleet-summary" className="mt-3 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[10px] text-white/65" role="status">
+          Fleet: <b className="text-white/85">{schedulerFleet.state}</b> · Recorded success: {schedulerFleet.healthy} · Attention: {schedulerFleet.attention} · Skipped / disabled: {schedulerFleet.incomplete} · Unknown: {schedulerFleet.unknown}
+          <div className="mt-1 text-[9px] text-white/35">Summarizes already loaded records only. Missing timestamps or skipped runs never prove a successful scan, Telegram delivery or verified forecast.</div>
+        </div>
         <div className="mt-3 space-y-2">
           {jobHealth.map(job => {
             const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.conclusion === 'skipped' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0 || Number(job.recentSkippedCount) > 0;
@@ -340,7 +363,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
               ) : null}
             </div>;
           })}
-          {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">Loading scheduled job health…</div> : null}
+          {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">{jobHealthLoaded ? 'No scheduler observations returned; health remains unknown.' : 'Loading scheduled job health…'}</div> : null}
         </div>
       </section>
 
@@ -376,6 +399,22 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           </ul>
           <p className="mt-2 text-amber-100">{forecastEvidence.note}</p>
         </details>
+      </section>
+
+      <section className="rounded-2xl border border-amber-300/15 p-4" data-testid="historical-provenance-review" aria-label="Historical provenance readiness">
+        <h3 className="text-sm font-semibold">Historical provenance and holdout readiness</h3>
+        <div className="mt-2 text-xs text-amber-200/80">Independent historical accuracy eligibility: blocked · {historicalProvenance.state.replaceAll('-', ' ')}</div>
+        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] text-white/60">
+          <span>Sampled metadata: {historicalProvenance.sampledArtifacts}</span>
+          <span>Recorded SHA-256: {historicalProvenance.recordedHash}</span>
+          <span>Capture time known: {historicalProvenance.captureTimeKnown}</span>
+          <span>Source-as-of claimed: {historicalProvenance.claimedSourceDateKnown}</span>
+          <span>Source after capture: {historicalProvenance.sourceAfterCapture}</span>
+          <span>Archive index capped: {historicalProvenance.windowCapped ? 'yes' : 'not proven complete'}</span>
+          <span>Publisher receipts: not verified</span>
+          <span>Prospective holdout: not verified</span>
+        </div>
+        <p className="mt-2 text-[10px] text-white/40">{historicalProvenance.note}</p>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="historical-evidence-archives">

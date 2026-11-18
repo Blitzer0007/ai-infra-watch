@@ -6,11 +6,40 @@ const REQUIRED = ['frontend-ci.yml', 'qa-validation.yml', 'security-audit.yml'];
 const CHECKS = [...REQUIRED, 'vercel-python-ci.yml', 'agents-python-tests.yml',
   'ai-quality-gate.yml', 'continuous-quality-eval.yml', 'backend-container-ci.yml'];
 
-export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, currentMainSha, mainProtected, runs }) {
+// A one-release exception is limited to the exact merge of reviewed PR #176.
+// The checked-in code cannot self-certify its PR head or final merge SHA:
+// those values must come from authenticated GitHub API evidence.
+const M5_PR = 176;
+const M5_BASE_SHA = '4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772';
+const M5_HEAD_BRANCH = 'feature/milestone5-operational-integrity-20261118';
+export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
+
+export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
+  if (waiver !== M5_PROTECTION_EXCEPTION ||
+      pr?.number !== M5_PR || pr?.merged !== true ||
+      pr?.state !== 'closed' ||
+      pr?.base?.ref !== 'main' || pr?.head?.ref !== M5_HEAD_BRANCH ||
+      pr?.head?.repo?.full_name !== RELEASE_REPOSITORY ||
+      pr?.merge_commit_sha !== expectedSha ||
+      commit?.sha !== expectedSha ||
+      !Array.isArray(commit.parents) || commit.parents.length !== 2 ||
+      commit.parents[0]?.sha !== M5_BASE_SHA ||
+      commit.parents[1]?.sha !== pr.head.sha ||
+      !/^[a-f0-9]{40}$/.test(pr.head.sha || '')) {
+    throw Error('Unprotected-main waiver does not match the one reviewed Milestone 5 merge.');
+  }
+  return true;
+}
+
+export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, currentMainSha, mainProtected, runs,
+  waiver = null, waiverPr = null, waiverCommit = null }) {
   if (repository !== RELEASE_REPOSITORY || ref !== 'refs/heads/main') throw Error('Release requires the intended repository and main branch.');
-  if (mainProtected !== true) throw Error('Production main must have enforced branch protection.');
   if (!/^[a-f0-9]{40}$/.test(expectedSha || '') || dispatchSha !== expectedSha || currentMainSha !== expectedSha) {
     throw Error('Reviewed candidate, dispatch commit and current main must match.');
+  }
+  if (mainProtected !== true) {
+    if (mainProtected !== false) throw Error('Main branch protection state is unknown.');
+    verifyMilestone5Exception({ expectedSha, waiver, pr: waiverPr, commit: waiverCommit });
   }
   if (!Array.isArray(runs)) throw Error('CI evidence is unavailable.');
   const latest = new Map();
@@ -51,7 +80,11 @@ export async function jsonGet(url, token, fetcher = fetch) {
   if (!token) throw Error('Required CI authentication is not configured.');
   const response = await fetcher(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
     redirect: 'error', signal: AbortSignal.timeout(15000) });
-  if (!response.ok) throw Error('Release evidence request failed (HTTP ' + response.status + ').');
+  // Only a full JSON API response can certify exact-commit release evidence.
+  // HTTP 202/204/206 are not complete candidate/target attestations.
+  if (response.status !== 200 || response.ok !== true) throw Error('Release evidence request failed (HTTP ' + response.status + ').');
+  const type = String(response.headers?.get?.('content-type') || '');
+  if (!/^application\/json(?:\s*;|\s*$)/i.test(type)) throw Error('Release evidence response is not JSON.');
   return response.json();
 }
 
@@ -67,8 +100,17 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (runs.length >= body.total_count) break;
     if (!body.workflow_runs.length || page === 10) throw Error('CI evidence is incomplete.');
   }
+  // Only explicitly confirmed, single-PR post-merge evidence can waive protection.
+  // Obtain it independently from GitHub; environment values never substitute for API evidence.
+  let waiverPr = null, waiverCommit = null;
+  const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
+  if (main?.protected === false && waiver) {
+    waiverPr = await jsonGet(base + '/pulls/' + M5_PR, env.GH_TOKEN, fetcher);
+    waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
+  }
   return verifyCandidate({ repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF, dispatchSha: env.GITHUB_SHA,
-    expectedSha: env.EXPECTED_MAIN_SHA, currentMainSha: main?.commit?.sha, mainProtected: main?.protected, runs });
+    expectedSha: env.EXPECTED_MAIN_SHA, currentMainSha: main?.commit?.sha, mainProtected: main?.protected, runs,
+    waiver, waiverPr, waiverCommit });
 }
 
 async function main() {

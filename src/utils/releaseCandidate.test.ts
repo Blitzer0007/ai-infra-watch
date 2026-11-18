@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyCandidate, verifyVercelTarget, deploymentUrl, checkCandidate, jsonGet } from '../../scripts/release-candidate.mjs';
+import { verifyCandidate, verifyMilestone5Exception, M5_PROTECTION_EXCEPTION, verifyVercelTarget, deploymentUrl, checkCandidate, jsonGet } from '../../scripts/release-candidate.mjs';
 
 const SHA = 'a'.repeat(40), OTHER = 'b'.repeat(40);
 const run = (file:string, id:number, overrides:any = {}) => ({ id, path:'.github/workflows/' + file,
@@ -58,7 +58,7 @@ test('CI requests page through exact-sha evidence and forbid redirects; no deplo
     requests.push({url,options});
     const body=url.includes('/branches/main') ? {commit:{sha:SHA},protected:true} : url.endsWith('page=1')
       ? {workflow_runs:rows,total_count:102} : {workflow_runs:candidate().runs,total_count:102};
-    return new Response(JSON.stringify(body),{status:200});
+    return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json; charset=utf-8'}});
   };
   assert.deepEqual(await checkCandidate({GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token'},fetcher),[1,2,8]);
   assert.equal(requests.length,3);
@@ -69,4 +69,88 @@ test('release request failures never echo remote bodies or token values', async 
   const remote=new Response('fictional private response must never be echoed',{status:403});
   await assert.rejects(()=>jsonGet('https://example.invalid','fictional-secret',async()=>remote),/^Error: Release evidence request failed \(HTTP 403\)\.$/);
   await assert.rejects(()=>jsonGet('https://example.invalid','',async()=>{throw Error('must not call');}),/not configured/);
+});
+
+test('release evidence must be a complete HTTP 200 JSON response',async()=>{
+  for (const status of [202,204,206]) {
+    const body = status === 204 ? null : JSON.stringify({protected:true,workflow_runs:[]});
+    const response = new Response(body,{status,headers:{'content-type':'application/json'}});
+    await assert.rejects(
+      ()=>jsonGet('https://api.github.com/repos/Blitzer0007/ai-infra-watch/branches/main',
+        'fictional-test-token',async()=>response),
+      /Release evidence request failed/
+    );
+  }
+  for (const type of ['text/html','text/plain','']) {
+    const response=new Response('{"protected":true}',{
+      status:200,headers:type?{'content-type':type}:{},
+    });
+    await assert.rejects(
+      ()=>jsonGet('https://api.github.com/repos/Blitzer0007/ai-infra-watch/branches/main',
+        'fictional-test-token',async()=>response),
+      /Release evidence response is not JSON/
+    );
+  }
+});
+
+const M5_BASE = '4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772';
+const M5_HEAD = 'c'.repeat(40);
+const mergedM5 = () => ({
+  waiver: M5_PROTECTION_EXCEPTION,
+  waiverPr: { number: 176, merged: true, state: 'closed',
+    merge_commit_sha: SHA, base: { ref: 'main' },
+    head: { ref:'feature/milestone5-operational-integrity-20261118',
+      sha:M5_HEAD, repo: { full_name:'Blitzer0007/ai-infra-watch' } } },
+  waiverCommit: { sha: SHA, parents:[{sha:M5_BASE},{sha:M5_HEAD}] },
+});
+
+test('unprotected main is allowed only for the exact verified Milestone 5 merge',()=>{
+  const scoped={...candidate({mainProtected:false}),...mergedM5()};
+  assert.deepEqual(verifyCandidate(scoped),[1,2,8]);
+  assert.equal(verifyMilestone5Exception({
+    expectedSha:SHA, waiver:scoped.waiver, pr:scoped.waiverPr, commit:scoped.waiverCommit,
+  }),true);
+  for(const change of [
+    {waiver:null}, {waiver:'YES'}, {waiverPr:{...scoped.waiverPr,number:177}},
+    {waiverPr:{...scoped.waiverPr,merged:false}},
+    {waiverPr:{...scoped.waiverPr,state:'open'}},
+    {waiverPr:{...scoped.waiverPr,merge_commit_sha:OTHER}},
+    {waiverPr:{...scoped.waiverPr,base:{ref:'develop'}}},
+    {waiverPr:{...scoped.waiverPr,head:{...scoped.waiverPr.head,ref:'other'}}},
+    {waiverPr:{...scoped.waiverPr,head:{...scoped.waiverPr.head,repo:{full_name:'evil/fork'}}}},
+    {waiverCommit:{...scoped.waiverCommit,sha:OTHER}},
+    {waiverCommit:{...scoped.waiverCommit,parents:[{sha:OTHER},{sha:M5_HEAD}]}},
+    {waiverCommit:{...scoped.waiverCommit,parents:[{sha:M5_BASE},{sha:OTHER}]}},
+    {waiverCommit:{...scoped.waiverCommit,parents:[{sha:M5_BASE}]}},
+  ]) assert.throws(()=>verifyCandidate({...scoped,...change}));
+  assert.throws(()=>verifyCandidate({...scoped,currentMainSha:OTHER}));
+  assert.throws(()=>verifyCandidate({...scoped,runs:[]}));
+  assert.throws(()=>verifyCandidate({...scoped,runs:[
+    run('frontend-ci.yml',1),run('qa-validation.yml',2),run('security-audit.yml',8,{conclusion:'failure'}),
+  ]}));
+  assert.throws(()=>verifyCandidate({...scoped,mainProtected:undefined}));
+});
+
+test('manual waiver causes independent GitHub PR and merge-parent verification',async()=>{
+  const requests:string[]=[];
+  const fetcher:typeof fetch=async(url)=>{
+    const value=String(url);
+    requests.push(value);
+    let payload:any;
+    if(value.endsWith('/branches/main')) payload={commit:{sha:SHA},protected:false};
+    else if(value.includes('/actions/runs?')) payload={workflow_runs:candidate().runs,total_count:3};
+    else if(value.endsWith('/pulls/176')) payload=mergedM5().waiverPr;
+    else if(value.endsWith('/commits/'+SHA)) payload=mergedM5().waiverCommit;
+    else throw Error('Unexpected release evidence request');
+    return new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json'}});
+  };
+  const env={GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',
+    GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token'};
+  await assert.rejects(()=>checkCandidate(env,fetcher),/waiver/);
+  assert.equal(requests.length,2);
+  requests.length=0;
+  assert.deepEqual(await checkCandidate({...env,AIW_MAIN_PROTECTION_WAIVER:'YES'},fetcher),[1,2,8]);
+  assert.equal(requests.length,4);
+  assert(requests[2].endsWith('/pulls/176'));
+  assert(requests[3].endsWith('/commits/'+SHA));
 });

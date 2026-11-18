@@ -1,14 +1,40 @@
 import { useEffect, useId, useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,children}:{symbol:string;name?:string;onClose:()=>void;onRestoreFocus:()=>void;children:ReactNode}) {
+export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,onOpened,children}:{symbol:string;name?:string;onClose:()=>void;onRestoreFocus:()=>void;onOpened?:()=>void;children:ReactNode}) {
   const dialog=useRef<HTMLDialogElement>(null);const close=useRef<HTMLButtonElement>(null);const heading=useId();const description=useId();
   const restore=useRef(onRestoreFocus);restore.current=onRestoreFocus;
+  const opened=useRef(onOpened);opened.current=onOpened;
   useEffect(()=>{
     const node=dialog.current;if(!node)return;
     const overflow=document.body.style.overflow;
     node.showModal();document.body.style.overflow='hidden';close.current?.focus({preventScroll:true});
+    // Native showModal, scrollbar lock, focus and layout can settle on different
+    // frames at narrow viewports. Publish a stable opening point only AFTER two
+    // paints, so the saved viewport matches what the user actually sees.
+    delete node.dataset.scrollReady;
+    let secondFrame=0;
+    let lockY:number|null=null;
+    const keepListStill=()=>{
+      if(lockY!==null && node.open && window.scrollY!==lockY){
+        window.scrollTo({top:lockY,behavior:'instant'});
+      }
+    };
+    const firstFrame=requestAnimationFrame(()=>{
+      secondFrame=requestAnimationFrame(()=>{
+        if(!node.open)return;
+        opened.current?.();
+        lockY=window.scrollY;
+        window.addEventListener('scroll',keepListStill,{passive:true});
+        node.dataset.scrollReady='true';
+      });
+    });
     return()=>{
+      cancelAnimationFrame(firstFrame);
+      if(secondFrame)cancelAnimationFrame(secondFrame);
+      window.removeEventListener('scroll',keepListStill);
+      lockY=null;
+      delete node.dataset.scrollReady;
       node.close();
       document.body.style.overflow=overflow;
       // React StrictMode replays effect cleanup/setup during initial mount.

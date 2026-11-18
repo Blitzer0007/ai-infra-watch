@@ -130,6 +130,35 @@ describe('Milestone 4 forecast-evaluation lifecycle contract', () => {
     assert.equal(report.decisionEligible, false);
   });
 
+  it('rejects JS coercion of arrays, objects, whitespace and booleans in forecast values', () => {
+    const malformed = [
+      { ...base, ticker: 'ARRAY_OUTCOME', actual_return: [] },
+      { ...base, ticker: 'ARRAY_MEDIAN', median: ['5'] },
+      { ...base, ticker: 'WHITESPACE_OUTCOME', actual_return: '   ' },
+      { ...base, ticker: 'OBJECT_OUTCOME', actual_return: { valueOf: () => 7 } },
+      { ...base, ticker: 'ARRAY_HORIZON', horizon: [20] },
+      { ...base, ticker: 'ARRAY_INTERVAL', p25: [1], p75: 9 },
+    ];
+    const result = evaluate(malformed);
+    assert.equal(result.lifecycle.verifiedReported, 6);
+    assert.equal(result.exclusions.missingOrInvalidOutcome, 3);
+    assert.equal(result.exclusions.missingOrInvalidMedian, 1);
+    assert.equal(result.exclusions.invalidHorizon, 1);
+    assert.equal(result.lifecycle.independentScorable, 1);
+    assert.equal(result.metrics.middle50.n, 0);
+    assert.equal(result.metrics.middle50.coveragePct, null);
+    assert.equal(result.decisionEligible, false);
+  });
+
+  it('preserves genuine zero and finite numeric strings without inventing observations', () => {
+    const result = evaluate([{ ...base, ticker: 'DECIMAL', horizon: '20', median: '0', actual_return: '0', p25: '0', p75: '0' }]);
+    assert.equal(result.lifecycle.independentScorable, 1);
+    assert.equal(result.metrics.medianAbsoluteErrorPctPoints, 0);
+    assert.equal(result.metrics.middle50.n, 1);
+    assert.equal(result.metrics.middle50.coveragePct, 100);
+    assert.equal(result.metrics.direction.n, 0);
+  });
+
   it('declines fabricated dates, future verification, invalid horizons and malformed outcome types', () => {
     const report = evaluate([
       { ...base, ticker: 'A', horizon: 'nope' },
