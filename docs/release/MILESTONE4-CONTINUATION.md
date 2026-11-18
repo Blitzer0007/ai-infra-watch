@@ -32,3 +32,9 @@ Updated: 18 November 2026
 - Added `src/utils/forecastEvaluationProtocol.test.ts` with pending/due/future, invalid/overlap, missing outcome, confidence denominator and source-data exclusion cases.
 - Added a 360/768/1440px mocked browser journey in `qa/test_milestone4_candidate.py`: rendering, zero passive writes, no network on inspection, transparent uncertainty, invalid source outcome and unavailable fallback.
 - CI acceptance includes the new browser test in the existing mocked UI API DB workflow. The main source tree and production deployment stay unchanged until separately approved.
+
+## Newly published transitive security advisory — launch blocker
+
+The initial Milestone 4 Frontend CI failed *before* running TypeScript/unit/build, at its unchanged `npm audit --audit-level=low` step. As of 18 November 2026, GHSA-fc5q-39xc-vjpf / CVE-2026-112366 affects picomatch through 4.0.7; the official package's published latest is 4.0.7 and no official patched release was identified. It is inherited through the existing Vite/fdir/tinyglobby dependency tree and is not caused by Milestone 4 code.
+
+**Do not** waive `npm audit`, use unreviewed forks, perform production deployment or claim security CI green. To still identify correctness defects, the existing isolated **mocked UI/API/DB** GitHub workflow now runs `npm run lint`, `npm run test:unit` and `npm run build` *before* launching its browser and disposable DB jobs. The independent Frontend CI advisory gate remains unchanged, required and failing until safely remediated.
