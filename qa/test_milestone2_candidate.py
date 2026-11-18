@@ -324,6 +324,9 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     trigger.click()
     dialog = page.get_by_role("dialog", name="NVDA holding details")
     expect(dialog).to_be_visible()
+    # The native dialog publishes a paint-stabilized opening marker. Do not
+    # sample an intermediate scroll position while CSS and focus settle.
+    expect(dialog).to_have_attribute("data-scroll-ready", "true")
     assert page.evaluate("history.scrollRestoration") == "manual"
     # The browser may move the trigger while dispatching the click. The list
     # restoration contract is the actual event-time view, not an earlier
