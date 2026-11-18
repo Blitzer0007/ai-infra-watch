@@ -23,7 +23,7 @@ jobs:
       - name: Test replacing Vite toolchain in disposable runner only
         run: |
           npm uninstall vite @vitejs/plugin-react @tailwindcss/vite
-          npm install --save-dev @tailwindcss/cli
+          npm install --save-dev --save-exact @tailwindcss/cli@4.3.3
           npm ls vite picomatch || true
       - name: Required unmodified npm vulnerability gate
         run: npm audit --audit-level=low
