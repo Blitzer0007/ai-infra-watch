@@ -121,5 +121,11 @@ The original five-release plan characterizes Milestone 5 as broader operational 
 - `qa/test_deployment_workflow.py` ensures Vercel-authenticated staged requests, token scoping and existing app authorization assertions remain present. Real staged production deployment and authenticated smoke were **not** performed in this draft; the CLI access assumption must still be proven by a separately authorized release run.
 - This does not grant a generic deployment protection bypass or weaken post-promotion verification, and it does not replace exact-head CI and the one-commit main-protection waiver review.
 
+## Fourteenth candidate increment — exact-head browser regression repair (19 November 2026)
+- The initial CI for the waiver/staged-SSO checkpoint failed one **real** mocked Playwright browser case: `qa/test_milestone2_candidate.py::test_detail_evidence_back_and_close_restore_holding_focus_and_scroll[768]` observed 667px after close versus 634px at the stabilized dialog opening (33px mismatch against the unchanged <3px contract). Frontend/Security and all other QA jobs passed.
+- Root cause: `PortfolioIntelligence` captured the correct list position after dialog paints, then the Evidence/Performance button handlers **overwrote** that snapshot with a later `window.scrollY` value moved by dialog interaction. The close path faithfully restored the **wrong** updated value.
+- Fixed by preserving the original `onOpened` paint-stabilized scroll position across Evidence/Performance transitions; no test assertions were removed, relaxed, or skipped. The retained 360px/768px/1440px browser cases cover modal → workspace → Back → Escape, exact scroll/focus and no background writes.
+- **Do not claim this repair verified until new exact-head Frontend CI, Security audit, and full UI/API/DB browser workflow have all concluded success.** Production remains unchanged.
+
 ## Working rules
 Use connected GitHub/GitHub Actions only (do not run on the user's Windows PC). Read current PR head and all CI runs. Fix genuine failures on a new commit and verify the NEW exact head. Don't merge or deploy Milestone 5 merely because an initial small patch passes. Branch protection remains deferred by the owner's explicit instruction; never silently amend release-gate policy. Retain prior rollback deployment and production protections.
