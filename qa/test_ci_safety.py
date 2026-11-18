@@ -107,7 +107,7 @@ def test_mocked_ui_serves_static_app_without_backend_providers():
     workflow = yaml.safe_load((ROOT / ".github/workflows/qa-validation.yml").read_text())
     steps = workflow["jobs"]["ui-local"]["steps"]
     start = next(step for step in steps if step.get("name") == "Start local app")
-    assert "npm exec vite -- --host 127.0.0.1 --port 3000" in start["run"]
+    assert "npm run serve:static" in start["run"]
     assert "secrets." not in str(workflow["jobs"]["ui-local"])
 
 
