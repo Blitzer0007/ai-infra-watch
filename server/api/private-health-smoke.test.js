@@ -47,3 +47,18 @@ test('denied, platform HTML, transport and malformed bodies do not pass',async()
   const malformed=await inspectPrivateHealth({token:'test',fetcher:async()=>response(200,{ok:true,jobs:'not-an-array'})});
   assert.equal(malformed.ready,false);
 });
+
+test('partial success and no-content statuses cannot certify private health',async()=>{
+  for (const status of [202,204,206]) {
+    let jsonCalls=0;
+    const result=await inspectPrivateHealth({token:'fictional-test-token',
+      fetcher:async()=>({
+        ...response(status,{ok:true,jobs:[],overall:{},validationGate:{},evaluationProtocolStatus:'ready'}),
+        json:async()=>{jsonCalls++;return {ok:true,jobs:[],overall:{},validationGate:{},evaluationProtocolStatus:'ready'};},
+      }),
+    });
+    assert.equal(result.ready,false);
+    assert.deepEqual(Object.values(result.checks),['endpoint-unavailable','endpoint-unavailable']);
+    assert.equal(jsonCalls,0);
+  }
+});
