@@ -210,7 +210,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     restoreDocumentMinHeight();
   },[]);
   useEffect(()=>{
-    if(tab!=='holdings')restoreDocumentMinHeight();
+    // The Evidence workspace is an intermediate stop in an active holding
+    // detail → Evidence → browser Back journey. Keep its scroll range frozen
+    // until the user returns and closes the detail. Clear for unrelated tabs.
+    if(tab!=='holdings' && savedHistoryScrollRestoration.current===null)
+      restoreDocumentMinHeight();
   },[tab]);
   const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
     if(!holdings.some(row=>row.symbol===symbol))return;
