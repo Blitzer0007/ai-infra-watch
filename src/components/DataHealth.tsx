@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { authFetch } from '../utils/apiAuth';
 import FreshnessBadge from './FreshnessBadge';
 import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
+import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -165,6 +166,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
 
   const validationOverall = forecastValidation?.overall || null;
   const validationGate = forecastValidation?.validationGate || null;
+  const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
 
   return (
     <div className="space-y-6">
@@ -239,6 +241,40 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">Loading market provider health…</div> : null}
         </div>
         {marketDataHealth?.retrievedAt && <div className="mt-2 text-[7px] font-mono text-white/20">Sample retrieved: {new Date(marketDataHealth.retrievedAt).toLocaleString()} · {marketDataHealth.cached ? 'cached summary' : 'live provider check'}</div>}
+      </section>
+
+      <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.025] p-4" data-testid="forecast-operations-review" aria-label="Forecast operations review">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Milestone 4 · operational transparency</div>
+            <h3 className="mt-1 text-sm font-bold">Forecast recording vs outcome review</h3>
+            <p className="mt-1 text-xs text-white/50">Separate scheduler observations from due forecasts and verifiable results. No new background checks or writes are performed.</p>
+          </div>
+          <span className={'rounded border px-2 py-1 text-[9px] font-mono uppercase ' + (forecastOperations.conclusion==='attention'?'border-amber-300/30 text-amber-200':'border-white/10 text-white/50')}>
+            {forecastOperations.conclusion==='attention'?'Review needed':forecastOperations.conclusion==='incomplete'?'Incomplete evidence':'Observed only'}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-3" data-testid="forecast-scheduler-observation">
+            <div className="text-xs font-semibold">Forecast tracker</div>
+            <div className="mt-1 text-xs text-white/65">Status: {forecastOperations.scheduler.state.replaceAll('-',' ')}</div>
+            <div className="mt-1 text-[10px] text-white/45">Last recorded: {forecastOperations.scheduler.lastRunAt?new Date(forecastOperations.scheduler.lastRunAt).toLocaleString():'unknown'}</div>
+            <div className="mt-1 text-[10px] text-white/45">Recent failures: {forecastOperations.scheduler.recentFailures ?? 'unknown'} · Skips: {forecastOperations.scheduler.recentSkips ?? 'unknown'} · Stuck: {forecastOperations.scheduler.stuckRuns ?? 'unknown'}</div>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-3" data-testid="forecast-due-observation">
+            <div className="text-xs font-semibold">Pending outcome review</div>
+            <div className="mt-1 text-xs text-white/65">Due in returned window: {forecastOperations.evaluation.dueForReview ?? 'unavailable'}</div>
+            <div className="mt-1 text-[10px] text-white/45">Not due: {forecastOperations.evaluation.pendingNotDue ?? 'unavailable'} · Date unknown: {forecastOperations.evaluation.pendingUnknownDate ?? 'unavailable'}</div>
+            <div className="mt-1 text-[10px] text-white/45">Invalid verified outcomes: {forecastOperations.evaluation.verifiedUnscorable ?? 'unavailable'}</div>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-3" data-testid="forecast-evaluation-window-observation">
+            <div className="text-xs font-semibold">Evaluation coverage</div>
+            <div className="mt-1 text-xs text-white/65">Non-overlapping scorable: {forecastOperations.evaluation.independentScorable ?? 'unavailable'}</div>
+            <div className="mt-1 text-[10px] text-white/45">Rows reviewed: {forecastOperations.evaluation.returnedRows ?? 'unavailable'} · Window: {forecastOperations.evaluation.windowTruncated===null?'unknown':forecastOperations.evaluation.windowTruncated?'limit reached':'not confirmed complete'}</div>
+            <div className="mt-1 text-[10px] text-white/45">As of: {forecastOperations.evaluation.asOfUtcDate || 'unknown'} UTC · Overlaps excluded: {forecastOperations.evaluation.overlappingExcluded ?? 'unavailable'}</div>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] text-white/45">{forecastOperations.note}</p>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="scheduled-job-health">

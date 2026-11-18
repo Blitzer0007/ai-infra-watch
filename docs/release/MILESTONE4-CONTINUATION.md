@@ -47,3 +47,9 @@ No production merge or deployment is authorized by this checkpoint; the inherite
 
 ## Standard Codex continuation updated
 The root release handoff `docs/release/CODEX-CONTINUATION.md` now begins with the current Milestone 4 PR #174 and distinguishes the archived Milestone 2 instructions, the already released Milestone 3 baseline, and the new unpatched advisory. It preserves all historical context below a divider. Added a unit regression proving 5D/20D horizon overlap is handled independently *within* horizon but does not justify cross-horizon market independence.
+
+## Read-only forecast operations reconciliation (18 November 2026)
+
+Added a *pure*, source-limited `summarizeForecastOperations` observer and a mobile-first Data Health panel that combines already loaded job-health telemetry with the bounded forecast-evaluation lifecycle. It distinguishes the last recorded forecast scheduler result, unverified/missing scheduler telemetry, due/pending/unknown target counts, unusable verified outcomes and recent-window truncation. A successful scheduler run is **not** an assertion of valid outcomes, current data, complete DB coverage, cross-worker budget enforcement or prediction accuracy.
+
+No new backend fetch, poller, cron, database write, model/provider usage, Telegram message or trade path was introduced. Hardened the Forecast Validation text so it does not claim auto tracking is running merely because the UI can display the scheduler. Pure unit tests cover absence, skipped/stuck runs, due-but-unverified reports, truncation and secret-bearing inputs. Exact-current-SHA CI is required after this commit. The known unfixed picomatch audit remains a release blocker.

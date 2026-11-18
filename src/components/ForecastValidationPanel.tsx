@@ -97,8 +97,8 @@ export default function ForecastValidationPanel({ symbol, horizon = 20 }: { symb
       )}
 
       <div className="mt-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[.025] px-3 py-2 text-[8px] leading-4 text-white/35">
-        Auto tracking is on: each weekday AI Infra Watch records separate <b className="text-cyan-200/70">5D and 20D forecasts</b> for each held stock when that horizon has no pending forecast already waiting to mature.
-        The 5D and 20D streams are validated separately. A forecast only counts toward this horizon's <b className="text-white/60">50 verified sample</b> after its target date is reached and the actual market result is recorded. You do not need to add these manually.
+        When the forecast scheduler is configured and runs successfully, it can record separate <b className="text-cyan-200/70">5D and 20D forecasts</b> for held stocks without an existing pending forecast for that horizon. Check Data Health for observed scheduler outcomes; a configured schedule alone is not proof that a forecast was recorded.
+        The horizons are evaluated separately. A forecast only counts toward this horizon's <b className="text-white/60">verified sample</b> after its due market outcome has actually been recorded and passed eligibility checks.
       </div>
 
       {!loading && !error && <ForecastEvaluationLifecycle report={evaluationProtocol} status={evaluationProtocolStatus} />}
