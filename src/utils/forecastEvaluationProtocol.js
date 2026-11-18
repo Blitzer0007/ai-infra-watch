@@ -3,7 +3,14 @@ import { coverageInterval } from '../../server/utils/forecastCalibration.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK_RE = /T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i;
-const finite = value => (value == null || value === '' || typeof value === 'boolean' || !Number.isFinite(Number(value))) ? null : Number(value);
+// A Supabase number may arrive as a finite JS number or a decimal string.
+// Never coerce arrays, objects, booleans or whitespace into a synthetic 0.
+const finite = value => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 const round = value => Number(value.toFixed(2));
 
 function validDate(value) {
