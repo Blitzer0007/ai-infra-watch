@@ -73,3 +73,12 @@ test('invalid or malformed payloads do not crash, leak or certify investments',(
     assert.equal(result.state==='signatures-and-timing-observed',false);
   }
 });
+
+test('impossible UTC calendar dates fail closed even with genuine signatures',()=>{
+  const invalidObserved=receipt('source-publication','source-published','2026-02-30T10:00:00Z');
+  assert.equal(audit({...input,receipts:[invalidObserved,...receipts.slice(1)]}).state,'invalid-or-conflicting-receipts');
+  const invalidDecision='2026-02-30T10:00:00Z';
+  const result=audit({...input,decisionAt:invalidDecision});
+  assert.equal(result.state,'blocked');
+  assert.equal(result.historicalAccuracyEligible,false);
+});
