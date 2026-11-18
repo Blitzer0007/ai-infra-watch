@@ -6,6 +6,7 @@ import FreshnessBadge from './FreshnessBadge';
 import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
+import { summarizeSchedulerFleet } from '../utils/schedulerFleetHealth';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -90,6 +91,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const [forecastValidationError, setForecastValidationError] = useState('');
   const [jobHealth, setJobHealth] = useState<any[]>([]);
   const [jobHealthError, setJobHealthError] = useState('');
+  const [jobHealthLoaded, setJobHealthLoaded] = useState(false);
   const [historicalArchive, setHistoricalArchive] = useState<any>(null);
   const [historicalArchiveError, setHistoricalArchiveError] = useState('');
   const [archiveReload, setArchiveReload] = useState(0);
@@ -106,6 +108,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         if (cancelled) return;
         setJobHealth(Array.isArray(body?.jobs) ? body.jobs : []);
         setJobHealthError('');
+        setJobHealthLoaded(true);
         setHistoricalArchive(body?.historicalArchive || null);
         setHistoricalArchiveError(body?.historicalArchiveError || '');
       })
@@ -114,6 +117,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           const message = error instanceof Error ? error.message : 'Scheduled job health unavailable';
           setJobHealth([]);
           setJobHealthError(message);
+          setJobHealthLoaded(true);
           setHistoricalArchive(null);
           setHistoricalArchiveError(message);
         }
@@ -169,6 +173,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
   const validationGate = forecastValidation?.validationGate || null;
   const forecastOperations = summarizeForecastOperations(jobHealth, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
   const forecastEvidence = summarizeForecastEvidenceAdmissibility(historicalArchive, forecastValidation?.evaluationProtocol, forecastValidation?.evaluationProtocolStatus);
+  const schedulerFleet = summarizeSchedulerFleet(jobHealth, { error: jobHealthError, loading: !jobHealthLoaded });
 
   return (
     <div className="space-y-6">
@@ -286,9 +291,13 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
             <div className="text-sm font-black mt-1">Scheduled job health</div>
             <div className="text-[9px] text-white/30 mt-1">Real scheduler status, recent failures/skips, progress and next expected run. Forecasts are checked from Supabase Cron directly.</div>
           </div>
-          <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs checked' : 'unavailable'}</span>
+          <span className="text-[8px] font-mono uppercase text-white/25">{jobHealth.length ? jobHealth.length + ' jobs observed' : 'observations unavailable'}</span>
         </div>
         {jobHealthError && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">{jobHealthError}</div>}
+        <div data-testid="scheduler-fleet-summary" className="mt-3 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[10px] text-white/65" role="status">
+          Fleet: <b className="text-white/85">{schedulerFleet.state}</b> · Recorded success: {schedulerFleet.healthy} · Attention: {schedulerFleet.attention} · Skipped / disabled: {schedulerFleet.incomplete} · Unknown: {schedulerFleet.unknown}
+          <div className="mt-1 text-[9px] text-white/35">Summarizes already loaded records only. Missing timestamps or skipped runs never prove a successful scan, Telegram delivery or verified forecast.</div>
+        </div>
         <div className="mt-3 space-y-2">
           {jobHealth.map(job => {
             const degraded = job.status === 'unavailable' || job.conclusion === 'failure' || job.conclusion === 'skipped' || job.recentFailureCount > 0 || Number(job.stuckRunCount) > 0 || Number(job.recentSkippedCount) > 0;
@@ -340,7 +349,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
               ) : null}
             </div>;
           })}
-          {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">Loading scheduled job health…</div> : null}
+          {!jobHealth.length && !jobHealthError ? <div className="text-[9px] font-mono text-white/30">{jobHealthLoaded ? 'No scheduler observations returned; health remains unknown.' : 'Loading scheduled job health…'}</div> : null}
         </div>
       </section>
 
