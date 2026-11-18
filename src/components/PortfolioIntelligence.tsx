@@ -85,7 +85,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const currentTab=useRef(tab);currentTab.current=tab;
   const detailOwner=useId();
   const closingDetail=useRef(false);
-  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string}|null>(null);
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string;openedCaptured:boolean}|null>(null);
   // While traversing a holding's detail → Evidence → Back history entries,
   // restore the exact list viewport ourselves rather than racing the browser's
   // automatic native history scroll restoration with modal focus restoration.
@@ -209,7 +209,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     params.set('portfolio_symbol',symbol);
     params.delete('portfolio_detail');
     window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
-    listOrigin.current={scrollY:window.scrollY,trigger,symbol};
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol,openedCaptured:false};
     params.set('portfolio_detail',symbol);
     window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
     // scrollRestoration belongs to the active history entry. pushState can
@@ -1006,7 +1006,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <p className="text-xs text-white/55">Holding detail is opened explicitly; portfolio accounting and quote quality gates remain unchanged.</p>
         </div>
       )}
-      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList}>
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList} onOpened={()=>{
+        const origin=listOrigin.current;
+        // Only the original explicit opening may reset the saved viewport.
+        // Re-entering via browser Back must preserve that original position.
+        if(origin && !origin.openedCaptured){
+          origin.scrollY=window.scrollY;
+          origin.openedCaptured=true;
+        }
+      }}>
         {portfolioLoading?<p role="status">Loading this holding…</p>:!detailAnalysis?<p role="alert">{portfolioError?'Holdings are unavailable. This detail cannot be verified.':'This symbol is not in the loaded holdings. No substitute position is shown.'}</p>:<>
           <FreshnessBadge {...(livePrices[detailAnalysis.symbol] || {})} labelOverride={detailAnalysis.liveStale ? 'Last close' : undefined} showAge />
           <p className="text-sm text-white/75">Existing review state: {detailAnalysis.state}. Market prices, historical comparators, consensus and source coverage are separately qualified; missing evidence cannot be upgraded into a trade instruction.</p>
