@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyReceiptFiles, verifyReceiptArtifacts } from '../../scripts/verify-evidence-receipts.mjs';
+import { verifyReceiptFiles, verifyReceiptArtifacts, verifyFullEvidenceBundle } from '../../scripts/verify-evidence-receipts.mjs';
 
 test('the command reads receipt and trust anchors from separate paths',async()=>{
   const paths=[];
@@ -44,4 +44,32 @@ test('artifact CLI boundary reads three separately supplied inputs and remains b
   assert.equal(result.historicalAccuracyEligible,false);
   assert.doesNotMatch(JSON.stringify(result),/\/private\/|never-trusted/);
   await assert.rejects(verifyReceiptArtifacts('receipt.json','anchor.json','',read),/required/);
+});
+
+test('full offline review reads four separate inputs and refuses injected trusted-status claims',async()=>{
+  const seen=[];
+  const read=async p=>{
+    seen.push(p);
+    if(p==='receipts.json')return JSON.stringify({
+      decisionAt:'2026-11-17T10:00:00Z',receipts:[],
+      trustAnchors:{untrusted:'MUST_NOT_LEAK'}});
+    if(p==='keys.json')return JSON.stringify({});
+    if(p==='artifacts.json')return JSON.stringify({'source-publication':'private-path'});
+    if(p==='holdout.json')return JSON.stringify({
+      decisionAt:'2026-11-17T10:00:00Z',
+      trainingThrough:'2026-11-10T10:00:00Z',frozenAt:'2026-11-11T10:00:00Z',
+      holdoutStart:'2026-11-17T10:00:00Z',holdoutEnd:'2026-11-18T10:00:00Z',
+      trainingSampleDigests:['a'.repeat(64)],holdoutSampleDigests:['b'.repeat(64)],
+      independentlyTimestamped:true,holdoutAccuracyEligible:true,
+    });
+    throw Error('Unexpected path');
+  };
+  const result=await verifyFullEvidenceBundle('receipts.json','keys.json','artifacts.json','holdout.json',read);
+  assert.deepEqual(seen,['receipts.json','keys.json','artifacts.json','holdout.json']);
+  assert.equal(result.state,'artifact-blocked');
+  assert.equal(result.artifactState,'receipt-verification-blocked');
+  assert.equal(result.historicalAccuracyEligible,false);
+  assert.equal(result.investmentDecisionEligible,false);
+  assert.doesNotMatch(JSON.stringify(result),/private-path|MUST_NOT_LEAK|a{64}/);
+  await assert.rejects(verifyFullEvidenceBundle('receipts.json','keys.json','artifacts.json','',read),/required/);
 });
