@@ -90,6 +90,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   // restore the exact list viewport ourselves rather than racing the browser's
   // automatic native history scroll restoration with modal focus restoration.
   const savedHistoryScrollRestoration=useRef<ScrollRestoration|null>(null);
+  // A narrow viewport can lose a few pixels of scrollable document height when
+  // a native detail dialog closes. Preserve enough scroll range to restore the
+  // exact user-observed list position; clean up when leaving the list.
+  const savedListMinHeight=useRef<string|null>(null);
+  const restoreDocumentMinHeight=()=>{
+    if(savedListMinHeight.current!==null){
+      document.documentElement.style.minHeight=savedListMinHeight.current;
+      savedListMinHeight.current=null;
+    }
+  };
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>(() => localStorage.getItem('aiw-portfolio-view-mode') === 'detailed' ? 'detailed' : 'simple');
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search).get('portfolio_q') || '');
   const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get('portfolio_group') || 'All');
@@ -197,7 +207,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       window.history.scrollRestoration=savedHistoryScrollRestoration.current;
       savedHistoryScrollRestoration.current=null;
     }
+    restoreDocumentMinHeight();
   },[]);
+  useEffect(()=>{
+    if(tab!=='holdings')restoreDocumentMinHeight();
+  },[tab]);
   const openHoldingDetail=(symbol:string,trigger:HTMLElement|null)=>{
     if(!holdings.some(row=>row.symbol===symbol))return;
     if(savedHistoryScrollRestoration.current===null){
@@ -240,6 +254,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     };
     const restoreScroll=()=>{
       if(origin && isBackOnHoldings()){
+        // Restore the real event-time viewport, not a clamped scrollY after
+        // removing the modal. This floor is only applied when the document
+        // becomes shorter than the captured scroll position + viewport.
+        const requiredHeight=Math.ceil(origin.scrollY+window.innerHeight);
+        if(document.documentElement.scrollHeight<requiredHeight){
+          if(savedListMinHeight.current===null)
+            savedListMinHeight.current=document.documentElement.style.minHeight;
+          document.documentElement.style.minHeight=requiredHeight+'px';
+        }
         window.scrollTo({top:origin.scrollY,behavior:'instant'});
       }
     };
