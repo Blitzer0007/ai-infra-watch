@@ -45,5 +45,12 @@ The original five-release plan characterizes Milestone 5 as broader operational 
 - `src/components/DataHealth.tsx` shows this provenance state in the existing authenticated Data Health page. Fictional unit and mocked browser tests cover contradictory timestamps and claimed READY metadata; no new remote fetch or database changes.
 - Limitations: does not perform independent archive downloads/re-hashing or real issuer-source validation. Manual production access verification must be operator-approved and is not equivalent to an observed success until actually run.
 
+## Fifth candidate increment — gated operator-run private health workflow
+- `.github/workflows/private-health-read-only.yml` wraps the existing authenticated private-health script in a **workflow_dispatch-only** job, requiring an explicit `YES`, `refs/heads/main`, the protected GitHub `production` environment, a GitHub Actions/production environment secret named `AIW_ACCESS_TOKEN`, and read-only contents permission.
+- On an absent secret, the job fails before any remote requests. If Vercel deployment protection blocks the intended API responses, the diagnostic fails closed. It never uses `QA_ALLOW_LIVE`, provider refresh parameters, Supabase credentials, POST writes or a scheduled trigger. The existing release CI and branch-protection policy are untouched.
+- `qa/test_ci_safety.py` asserts the workflow trigger and permission boundaries, checks that it cannot run from a PR or schedule, and verifies the operator-approved command and secret injection.
+- This workflow is **not executable as a dispatch from draft PR #176** because GitHub requires a manual-dispatch workflow on the default branch. It becomes available only after a separately authorized merge to `main`; do not attempt to bypass the default-branch rule.
+- This is a prepared operator verification path, **not** an actual authenticated production smoke result. No secret is available in the PR testing context, and no production requests are performed by routine CI.
+
 ## Working rules
 Use connected GitHub/GitHub Actions only (do not run on the user's Windows PC). Read current PR head and all CI runs. Fix genuine failures on a new commit and verify the NEW exact head. Don't merge or deploy Milestone 5 merely because an initial small patch passes. Branch protection remains deferred by the owner's explicit instruction; never silently amend release-gate policy. Retain prior rollback deployment and production protections.
