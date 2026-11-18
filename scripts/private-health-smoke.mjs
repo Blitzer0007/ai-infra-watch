@@ -27,7 +27,12 @@ export async function inspectPrivateHealth({ token, fetcher = fetch, origin = PR
     }
     if (response.status === 401 || response.status === 403) { checks[key] = 'access-denied'; continue; }
     if (response.status === 503) { checks[key] = 'not-configured'; continue; }
-    if (!response.ok) { checks[key] = 'endpoint-unavailable'; continue; }
+    // A partial/accepted/no-content response cannot attest the full contract.
+    // Require an exact 200, not merely any 2xx `ok` status.
+    if (response.status !== 200 || response.ok !== true) {
+      checks[key] = 'endpoint-unavailable';
+      continue;
+    }
     const contentType = String(response.headers?.get?.('content-type') || '');
     if (!/\bapplication\/json\b/i.test(contentType)) { checks[key] = 'unexpected-content'; continue; }
     // The routes return bounded internal metadata; read for contract only.
