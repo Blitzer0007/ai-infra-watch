@@ -23,12 +23,14 @@ jobs:
       - name: Test replacing Vite toolchain in disposable runner only
         run: |
           npm uninstall vite @vitejs/plugin-react @tailwindcss/vite
-          npm install --save-dev --save-exact @tailwindcss/cli@4.3.3
+          npm install --save-dev @tailwindcss/postcss
           npm ls vite picomatch || true
       - name: Required unmodified npm vulnerability gate
         run: npm audit --audit-level=low
-      - name: Validate Tailwind standalone compilation
-        run: npx @tailwindcss/cli --input src/index.css --output /tmp/aiw-experimental.css --minify
+      - name: Validate Tailwind PostCSS compilation
+        run: |
+          node --input-type=module -e "import fs from 'node:fs/promises'; import postcss from 'postcss'; import tailwind from '@tailwindcss/postcss'; const css=await fs.readFile('src/index.css','utf8'); const result=await postcss([tailwind()]).process(css,{from:'src/index.css',to:'/tmp/aiw-experimental.css'}); await fs.writeFile('/tmp/aiw-experimental.css',result.css);"
+          test -s /tmp/aiw-experimental.css
       - name: Validate esbuild browser bundle
         run: |
           npx esbuild src/main.tsx --bundle --platform=browser --format=esm --target=es2022 --jsx=automatic --outfile=/tmp/aiw-experimental.js --loader:.svg=file --loader:.png=file --loader:.woff2=file --define:import.meta.env.DEV=false --define:import.meta.env.PROD=true
