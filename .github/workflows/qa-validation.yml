@@ -68,6 +68,8 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
       - name: Verify TypeScript, unit and production build without weakening the separate npm advisory gate
+        env:
+          VITE_QA_MODE: "true"
         run: |
           npm run lint
           npm run test:unit
