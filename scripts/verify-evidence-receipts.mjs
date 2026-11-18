@@ -19,7 +19,6 @@ export async function verifyReceiptFiles(receiptsPath, anchorsPath, read = readF
   // exclusively from a separately maintained operator-reviewed file.
   const result=auditIndependentReceipts({
     decisionAt: manifest?.decisionAt,
-    now: manifest?.now,
     receipts: manifest?.receipts,
     trustAnchors: anchors,
   });
