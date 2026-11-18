@@ -207,6 +207,9 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     listOrigin.current={scrollY:window.scrollY,trigger,symbol};
     params.set('portfolio_detail',symbol);
     window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
+    // scrollRestoration belongs to the active history entry. pushState can
+    // activate a new entry with "auto" even if the list entry was manual.
+    window.history.scrollRestoration='manual';
     closingDetail.current=false;
     setSelected(symbol);
     setDetailSymbol(symbol);

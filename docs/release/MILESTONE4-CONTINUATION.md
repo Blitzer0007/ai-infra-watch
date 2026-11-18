@@ -71,3 +71,7 @@ The earlier integrated browser run `44262185941` finished with one actual regres
 ## Explicit mobile history restoration regression assertion
 
 The previously failing 360/768/1440px Holding Detail → Evidence → browser Back → Escape test now additionally asserts that `history.scrollRestoration` switches to `manual` only while the modal/history journey is active, then returns to its saved previous value after the two-frame stabilization. It measures the original strict <3px viewport contract **after** that cleanup, rather than before a pending browser animation can override it. All existing focus, identity and zero-write assertions remain intact.
+
+## Real mobile history-entry restore regression repair
+
+Exact-head full browser run `44263445628` caught the manual history-mode assertion at every viewport: `scrollRestoration` was `auto` immediately after opening the dialog. Setting the property only *before* `history.pushState` was insufficient because each new active browser history entry can restore its own default. The opening path now explicitly sets `history.scrollRestoration='manual'` **after** pushState as well, while the original mode is restored at the modal cleanup and unmount. The strict 3px focus/scroll test remains unchanged. This hypothesis requires exact-head browser proof; do not claim it fixed until CI confirms.
