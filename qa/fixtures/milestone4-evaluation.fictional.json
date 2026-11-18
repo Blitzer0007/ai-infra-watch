@@ -1,0 +1,16 @@
+{
+  "ok":true,
+  "overall":{"count":2,"sampleStatus":"insufficient","directionalAccuracyPct":null,"medianAbsoluteError":null,"p25p75CoveragePct":null},
+  "validationGate":{"ready":false,"verifiedCount":2,"minimumRequired":50},
+  "evaluationProtocolStatus":"ready",
+  "evaluationProtocol":{
+    "version":"forecast-evaluation-v1",
+    "coverage":{"asOfUtcDate":"2026-11-18","returnedRows":9,"rowLimit":1000,"truncated":false,"completeUniverse":false,"note":"window only"},
+    "lifecycle":{"total":9,"pendingNotDue":2,"pendingDueForReview":2,"pendingUnknownTarget":1,"verifiedReported":3,"verifiedScorable":2,"verifiedUnscorable":1,"unknownStatus":1,"independentScorable":1,"overlappingExcluded":1},
+    "horizons":{"5D":{"total":5,"pendingDueForReview":1,"independentScorable":1},"20D":{"total":4,"pendingDueForReview":1,"independentScorable":0},"other":{"total":0,"pendingDueForReview":0,"independentScorable":0}},
+    "exclusions":{"missingOrInvalidOutcome":1},
+    "metrics":{"scoredNonoverlapping":1,"medianAbsoluteErrorPctPoints":2,"medianNoChangeBaselineErrorPctPoints":7,"direction":{"n":1,"hits":1,"accuracyPct":100},"middle50":{"n":1,"hits":1,"coveragePct":100,"wilson95Pct":[20.65,100]},"wide80":{"n":0,"hits":0,"coveragePct":null,"wilson95Pct":null},"declaredCreationSourceCount":0,"independentlyAuthenticatedSourceCount":null},
+    "interpretation":"insufficient","decisionEligible":false,
+    "limitations":["Dates are UTC calendar cutoffs, not proof of market data availability.","Source authenticity and forecast accuracy remain unverified."]
+  }
+}

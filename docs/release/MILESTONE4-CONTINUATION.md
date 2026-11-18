@@ -26,3 +26,9 @@ Updated: 18 November 2026
 - The existing private `GET /api/forecast-validation` adds an independently bounded read-only SELECT of recent pending/verified rows. The protocol uses at most 1,000 rows; any transport/data failure yields `evaluationProtocolStatus: unavailable` without changing the existing verified-history metrics.
 - The shared presentation-only `ForecastEvaluationLifecycle` component appears in Data Health and the per-ticker Forecast Validation panel, with due/pending/unknown, reported/scorable/non-overlap counts and explicit score denominators. It performs **zero additional browser requests**, writes, model/provider calls or background work.
 - Counts are *window observations*, never all-time population counts. Imported reports expose no raw forecast/evidence rows or tokens.
+
+## Fictional acceptance / CI integration
+- Added a real access-gated endpoint contract test under `server/api/` to check private token protection, GET-only behavior, bounded second SELECT, zero raw evidence DTO leakage, and fail-closed lifecycle status without disrupting verified metrics.
+- Added `src/utils/forecastEvaluationProtocol.test.ts` with pending/due/future, invalid/overlap, missing outcome, confidence denominator and source-data exclusion cases.
+- Added a 360/768/1440px mocked browser journey in `qa/test_milestone4_candidate.py`: rendering, zero passive writes, no network on inspection, transparent uncertainty, invalid source outcome and unavailable fallback.
+- CI acceptance includes the new browser test in the existing mocked UI API DB workflow. The main source tree and production deployment stay unchanged until separately approved.
