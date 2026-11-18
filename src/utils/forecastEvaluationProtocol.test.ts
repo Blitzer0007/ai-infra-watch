@@ -100,6 +100,19 @@ describe('Milestone 4 forecast-evaluation lifecycle contract', () => {
     assert.equal(result.metrics.middle50.coveragePct, 100);
   });
 
+  it('rejects future-dated verification rather than including unobserved outcomes in accuracy', () => {
+    const report = evaluate([
+      { ...base, ticker: 'FUTURE_VERIFICATION', verified_at: '2026-11-19T00:01:00Z' },
+      { ...base, ticker: 'VALID_VERIFICATION' },
+    ]);
+    assert.equal(report.lifecycle.verifiedReported, 2);
+    assert.equal(report.lifecycle.verifiedUnscorable, 1);
+    assert.equal(report.exclusions.invalidVerificationTime, 1);
+    assert.equal(report.lifecycle.independentScorable, 1);
+    assert.equal(report.metrics.direction.n, 1);
+    assert.equal(report.decisionEligible, false);
+  });
+
   it('separates 5D and 20D cohorts without claiming cross-horizon market independence', () => {
     const five = {
       ...base, horizon: 5, created_at: '2026-10-01T09:00:00Z',
