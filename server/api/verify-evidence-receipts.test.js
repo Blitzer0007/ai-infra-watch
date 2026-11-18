@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyReceiptFiles } from '../../scripts/verify-evidence-receipts.mjs';
+import { verifyReceiptFiles, verifyReceiptArtifacts } from '../../scripts/verify-evidence-receipts.mjs';
 
 test('the command reads receipt and trust anchors from separate paths',async()=>{
   const paths=[];
@@ -24,4 +24,24 @@ test('missing paths, corrupt contents and arbitrary private fields fail closed',
       receipts:[{privateObjectPath:'DO_NOT_ECHO'}],now:'2100-11-19T00:00:00Z'}));
   assert.equal(result.historicalAccuracyEligible,false);
   assert.doesNotMatch(JSON.stringify(result),/DO_NOT_ECHO/);
+});
+
+test('artifact CLI boundary reads three separately supplied inputs and remains blocked',async()=>{
+  const readPaths=[];
+  const read=async path=>{
+    readPaths.push(path);
+    if(path==='receipt.json') return JSON.stringify({decisionAt:'2026-11-17T10:00:00Z',receipts:[],trustAnchors:{evil:'never-trusted'}});
+    if(path==='anchor.json') return '{}';
+    if(path==='artifact-map.json') return JSON.stringify({
+      'source-publication':'/private/source','adjusted-outcome':'/private/prices',
+      'universe-membership':'/private/universe','prospective-holdout':'/private/holdout',
+    });
+    throw Error('not expected');
+  };
+  const result=await verifyReceiptArtifacts('receipt.json','anchor.json','artifact-map.json',read);
+  assert.deepEqual(readPaths,['receipt.json','anchor.json','artifact-map.json']);
+  assert.equal(result.state,'receipt-verification-blocked');
+  assert.equal(result.historicalAccuracyEligible,false);
+  assert.doesNotMatch(JSON.stringify(result),/\/private\/|never-trusted/);
+  await assert.rejects(verifyReceiptArtifacts('receipt.json','anchor.json','',read),/required/);
 });
