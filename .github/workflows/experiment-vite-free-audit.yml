@@ -33,5 +33,5 @@ jobs:
           test -s /tmp/aiw-experimental.css
       - name: Validate esbuild browser bundle
         run: |
-          npx esbuild src/main.tsx --bundle --platform=browser --format=esm --target=es2022 --jsx=automatic --outfile=/tmp/aiw-experimental.js --loader:.svg=file --loader:.png=file --loader:.woff2=file --define:import.meta.env.DEV=false --define:import.meta.env.PROD=true
+          npx esbuild src/main.tsx --bundle --platform=browser --format=esm --target=es2022 --jsx=automatic --outfile=/tmp/aiw-experimental.js --loader:.svg=file --loader:.png=file --loader:.woff2=file --loader:.css=empty --define:import.meta.env.DEV=false --define:import.meta.env.PROD=true
           test -s /tmp/aiw-experimental.js
