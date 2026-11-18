@@ -6,7 +6,7 @@
  */
 const strictUtc = v => {
   if (typeof v !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v)) return null;
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v)) return null;
   const ms=Date.parse(v);
   const normalized=v.replace(/(?:\.(\d{1,3}))?Z$/,(_match,fraction)=>'.'+(fraction??'').padEnd(3,'0')+'Z');
   return Number.isFinite(ms) && new Date(ms).toISOString()===normalized ? ms : null;
