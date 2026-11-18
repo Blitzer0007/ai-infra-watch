@@ -67,3 +67,7 @@ Fictional unit tests cover absent and truncated sources, spoofed archive success
 ## Real browser regression — holding-detail mobile history scroll restoration
 
 The earlier integrated browser run `44262185941` finished with one actual regression at 768px in the inherited Milestone 2 detail → Evidence → Back → Escape journey: 33px viewport drift, while focus and URL identity stayed correct. The application had been racing native browser history scroll restoration against the custom synchronous/RAF modal-focus restoration. Updated the *actual application* to temporarily set `history.scrollRestoration='manual'` during explicit holding detail navigation, restore the captured list scroll at close and after two render frames, then restore the prior browser history mode. Cleanup also restores the mode on component unmount. The original strict <3px test and keyboard/focus assertions remain unchanged; no fake tolerance increase or test skip. Exact-head browser CI must prove the fix.
+
+## Explicit mobile history restoration regression assertion
+
+The previously failing 360/768/1440px Holding Detail → Evidence → browser Back → Escape test now additionally asserts that `history.scrollRestoration` switches to `manual` only while the modal/history journey is active, then returns to its saved previous value after the two-frame stabilization. It measures the original strict <3px viewport contract **after** that cleanup, rather than before a pending browser animation can override it. All existing focus, identity and zero-write assertions remain intact.
