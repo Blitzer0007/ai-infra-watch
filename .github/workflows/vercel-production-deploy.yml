@@ -12,6 +12,14 @@ on:
           - "YES"
         required: true
         default: "NO"
+      confirm_milestone5_unprotected_main_exception:
+        description: "One-time PR #176 waiver only; verified merge-commit parents and exact-main CI remain required"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        required: true
+        default: "NO"
       expected_main_sha:
         description: "Reviewed full 40-character main commit SHA; must match dispatch and current main"
         type: string
@@ -44,6 +52,7 @@ jobs:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      AIW_MAIN_PROTECTION_WAIVER: ${{ inputs.confirm_milestone5_unprotected_main_exception }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
       # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.
       VERCEL_CLI_VERSION: "58.4.4"
