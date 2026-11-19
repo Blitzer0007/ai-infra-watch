@@ -453,7 +453,16 @@ export async function buildDigest(decisionJournal) {
     actionItems:(Array.isArray(result.decision.actionItems)?result.decision.actionItems:[]).filter(item=>actual.admittedQuotes[item.symbol])} : null;
   const sunday = new Intl.DateTimeFormat('en-US',{timeZone:process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata',weekday:'short'}).format(new Date()) === 'Sun';
   const weekly = sunday && decisionJournal?.getWeeklyDecisionReview ? await decisionJournal.getWeeklyDecisionReview().catch(()=>null) : null;
-  const telegramBrief = buildTelegramDecisionBrief(decision,date,weekly);
+  // The digest has already loaded these records in this request. Preserve an
+  // honest, useful read-only coverage summary even when the independent
+  // Decision Center service cannot be reached with its server-side credential.
+  const telegramBrief = buildTelegramDecisionBrief(decision,date,weekly,{
+    holdingsCount: holdings.length,
+    quotesAccepted: rows.filter(row => row.quoteStatus === 'fresh').length,
+    quotesTotal: rows.length,
+    quoteStatus: actual.quoteCoverage.status,
+    accountingStatus: actual.accountingStatus,
+  });
   return {date,text:telegramBrief.text,telegramBrief,rows,totalValue:fullValue,totalPnl:actual.totalTradingPnl,
     totalPnlPct:actual.returnVsGrossPurchaseCostPct,accountingStatus:actual.accountingStatus,accountingReconciled:false,
     historyCoverage:'unverified',accountingIssues:actual.accountingIssues,
