@@ -322,3 +322,44 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   background: #0f1115; color: white; overscroll-behavior: contain;
 }
 .aiw-holding-dialog::backdrop { background: #000b; }
+
+
+/* Milestone 6: evidence-first portfolio workspace.
+   These styles are local to the new command surface and never alter data gates. */
+.aiw-command-center {
+  background:
+    radial-gradient(ellipse at 98% 0%, rgba(34, 211, 238, .085), transparent 36%),
+    linear-gradient(145deg, #111c28 0%, #0f151e 64%, #0f1115 100%);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, .14);
+}
+
+.aiw-stat-tile {
+  position: relative;
+  isolation: isolate;
+  transition: border-color .18s ease, background-color .18s ease;
+}
+
+.aiw-stat-tile::before {
+  content: "";
+  position: absolute;
+  inset: -1px auto -1px -1px;
+  width: 3px;
+  border-radius: 1rem 0 0 1rem;
+  background: linear-gradient(to bottom, rgba(103, 232, 249, .78), rgba(16, 185, 129, .08));
+  pointer-events: none;
+}
+
+.aiw-stat-tile:hover {
+  border-color: rgba(103, 232, 249, .27);
+  background: rgba(26, 40, 57, .84);
+}
+
+.aiw-command-center :is(button, a, select):focus-visible,
+#root [data-testid="portfolio-navigation"] :is(button, select, summary):focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiw-stat-tile { transition: none; }
+}
