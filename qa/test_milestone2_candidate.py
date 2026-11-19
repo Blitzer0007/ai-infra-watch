@@ -364,6 +364,12 @@ def test_portfolio_revamp_keeps_evidence_navigation_accessible_at_all_sizes(page
     expect(picker).to_be_visible()
     expect(picker).to_have_value("overview")
     expect(nav.get_by_test_id("portfolio-current-section")).to_contain_text("Daily Review")
+    # Preserve exact-name button navigation used by existing workspaces/tests.
+    if width >= 768:
+        expect(nav.get_by_role("button", name="Performance", exact=True)).to_be_visible()
+        expect(nav.get_by_role("button", name="Evidence", exact=True)).to_be_visible()
+        expect(nav.get_by_role("button", name="Events", exact=True)).to_be_visible()
+
     expect(center).to_be_visible()
     expect(center.get_by_role("heading", name="Portfolio Command Center")).to_be_visible()
     expect(center.get_by_role("combobox", name="Review timezone")).to_be_visible()
