@@ -122,3 +122,22 @@ testFn('Telegram brief displays a complete admitted marked value but never a val
   });
   assert.doesNotMatch(malformed.text,/Marked holdings value/);
 });
+
+testFn('Telegram fallback shows only bounded, validated quote movements rather than fake rule alerts', () => {
+  const brief=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:4,quotesAccepted:2,quotesTotal:4,quoteStatus:'partial',
+    accountingStatus:'quotes-incomplete',
+    observations:[
+      {symbol:'NVDA',price:145.35,changePct:-2.45},
+      {symbol:'BAD\nNAME',price:2,changePct:1},
+      {symbol:'DGXX',price:2.15,changePct:3.1},
+      {symbol:'MU',price:'3',changePct:1.5},
+      {symbol:'AMD',price:100,changePct:2001},
+    ],
+  });
+  assert.match(brief.text,/SOURCE-REPORTED QUOTE MOVES · NOT RULE ALERTS/);
+  assert.match(brief.text,/NVDA · \$145\.35 · -2\.45%/);
+  assert.match(brief.text,/DGXX · \$2\.15 · \+3\.10%/);
+  assert.doesNotMatch(brief.text,/BAD NAME|MU ·|AMD ·|URGENT REVIEW|Target reached/);
+  assert.ok(brief.text.length<=3600);
+});
