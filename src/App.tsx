@@ -489,7 +489,7 @@ export default function App() {
               observedAt={liveData?.timestamp ?? null} buildCommit={liveData?.build?.commit}
               environment={liveData?.build?.environment}
               quoteCount={Object.keys(tickerPrices).length}
-              quotesNotFlaggedStale={Object.values(tickerPrices).filter(quote => !quote.stale).length}
+              quotesNotFlaggedStale={(Object.values(tickerPrices) as LivePrice[]).filter(quote => !quote.stale).length}
               lastQuoteRefresh={lastQuoteRefresh}
               onRefresh={() => { void handleFetchLiveData(true); }}/>
           </div>
