@@ -59,7 +59,12 @@ test('mocked existing Telegram transport uses compact text, accepted-ID semantic
   const result = exercise('POST'); assert.match(result.text, /URGENT REVIEW/);
 });
 
-test('failed decision layer creates a warning preview rather than an all-clear fallback', () => {
-  const result = exercise('GET', false); assert.match(result.text, /DECISION LAYER UNAVAILABLE/);
-  assert.doesNotMatch(result.text, /0 urgent|0 watch|all holdings/);
+test('failed decision layer retains real, bounded holdings and quote coverage instead of empty filler', () => {
+  const result = exercise('GET', false);
+  assert.match(result.text, /DECISION LAYER UNAVAILABLE/);
+  assert.match(result.text, /WHAT WE CAN CONFIRM/);
+  assert.match(result.text, /Recorded holdings: 1/);
+  assert.match(result.text, /Fresh quote coverage: [01]\/1/);
+  assert.match(result.text, /NEXT STEP/);
+  assert.doesNotMatch(result.text, /0 urgent|0 watch|all holdings|Trading P&L: \+\$0/);
 });
