@@ -463,6 +463,11 @@ export async function buildDigest(decisionJournal) {
     quoteStatus: actual.quoteCoverage.status,
     currentValueUsd: actual.currentValue,
     accountingStatus: actual.accountingStatus,
+    observations: rows.filter(row => row.quoteStatus === 'fresh' &&
+      typeof row.price === 'number' && Number.isFinite(row.price) &&
+      typeof row.changePct === 'number' && Number.isFinite(row.changePct))
+      .sort((left,right) => Math.abs(right.changePct) - Math.abs(left.changePct))
+      .slice(0, 3).map(row => ({symbol:row.symbol,price:row.price,changePct:row.changePct})),
   });
   return {date,text:telegramBrief.text,telegramBrief,rows,totalValue:fullValue,totalPnl:actual.totalTradingPnl,
     totalPnlPct:actual.returnVsGrossPurchaseCostPct,accountingStatus:actual.accountingStatus,accountingReconciled:false,
