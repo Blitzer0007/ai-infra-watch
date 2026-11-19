@@ -1,6 +1,6 @@
 # Milestone 6 — REA-informed UI/UX revamp for AI Infra Watch
 
-**Status:** Draft candidate, 19 November 2026. **No production deploy, merge or data migration authorized by this document.**
+**Status:** PR #179 release candidate, 19 November 2026. Owner requested fix and deploy **the implemented first Portfolio UI/UX slice only**. A complete cross-app revamp remains follow-on work; no data migration, financial logic, or source ingestion is authorized.
 
 ## Source and method
 
@@ -45,3 +45,11 @@ Do not merge all three slices in one unreviewed UI patch. Avoid new application 
 - New browser contract verifies the redesigned Command Center and navigation at all three widths, accessible headings and timezone, zero container horizontal overflow, and browser Back to the current workspace.
 - Color conveys state *in addition to text*. Focus states, semantic landmarks, touch targets and reduced-motion CSS remain available.
 - Real production screenshots, qualitative UX testing and genuine REA browser findings are still needed before claiming a complete cross-app UI revamp.
+
+## Production release boundary and verified navigation compatibility
+
+The first CI run of PR #179 passed Frontend CI and Security audit but failed UI/API/DB mocked Playwright tests. The observed cause was **incompatible accessible button names** (descriptive child text turned `Evidence`, `Performance`, etc. into long names), plus collapsed Research buttons (the previous interface kept those controls expanded). The fix adds explicit accessible names equal to each original label, and initially exposes the Research buttons. It retains responsive two-column and four-column groupings, the select, semantic labels, source eligibility, and browser history. The new browser test explicitly checks the exact navigation buttons at tablet and desktop widths.
+
+The owner has authorized the Portfolio UI first-slice production release subject to fresh exact-head and exact-main passing CI, not a wholesale product redesign. The existing GitHub `production` environment, staged Vercel protected access, exact homepage bytes and anonymous API 401 checks remain mandatory. A **single** post-CI handoff is pinned to PR **#179**, with the already-live Milestone 5 commit `6827cce1a323949e1b36c06a0a1dca030e63c127` as first merge parent, and Vercel's currently READY Milestone 5 deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU` as tested rollback target. Other future main changes cannot reuse that exception.
+
+Do not claim the deployment succeeded until the exact commit's handoff and Vercel release workflow actually finish, the new production domain aliases match the reviewed SHA, and runtime errors are checked. No live provider polling or authenticated private-health action is authorized.
