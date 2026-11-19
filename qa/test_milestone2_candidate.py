@@ -349,3 +349,38 @@ def test_detail_evidence_back_and_close_restore_holding_focus_and_scroll(page, w
     page.wait_for_function("(mode) => history.scrollRestoration === mode", arg=original_history_scroll_mode)
     assert abs(page.evaluate("scrollY") - opening_scroll) < 3
     assert writes == []
+
+
+@pytest.mark.parametrize("width", [360, 768, 1440])
+def test_portfolio_revamp_keeps_evidence_navigation_accessible_at_all_sizes(page, width):
+    """The redesigned review surface must keep the same source and route semantics."""
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto("/portfolio")
+    nav = page.get_by_test_id("portfolio-navigation")
+    center = page.get_by_test_id("portfolio-command-center")
+    expect(nav).to_be_visible()
+    picker = nav.get_by_role("combobox", name="Portfolio section")
+    expect(picker).to_be_visible()
+    expect(picker).to_have_value("overview")
+    expect(nav.get_by_test_id("portfolio-current-section")).to_contain_text("Daily Review")
+    # Preserve exact-name button navigation used by existing workspaces/tests.
+    if width >= 768:
+        expect(nav.get_by_role("button", name="Performance", exact=True)).to_be_visible()
+        expect(nav.get_by_role("button", name="Evidence", exact=True)).to_be_visible()
+        expect(nav.get_by_role("button", name="Events", exact=True)).to_be_visible()
+
+    expect(center).to_be_visible()
+    expect(center.get_by_role("heading", name="Portfolio Command Center")).to_be_visible()
+    expect(center.get_by_role("combobox", name="Review timezone")).to_be_visible()
+    expect(center).to_contain_text("Research classifications, not trade orders.")
+    assert nav.evaluate("(element) => element.scrollWidth <= element.clientWidth")
+    assert center.evaluate("(element) => element.scrollWidth <= element.clientWidth")
+
+    picker.select_option("evidence")
+    expect(picker).to_have_value("evidence")
+    expect(nav.get_by_test_id("portfolio-current-section")).to_contain_text("Evidence")
+    assert "portfolio_tab=evidence" in page.url
+    page.go_back()
+    expect(picker).to_have_value("overview")
+    expect(center).to_be_visible()
