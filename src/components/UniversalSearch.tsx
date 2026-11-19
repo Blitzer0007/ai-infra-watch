@@ -120,7 +120,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
         type="button"
         aria-label="Open universal search"
         onClick={() => setOpen(true)}
-        className="w-full md:w-[360px] lg:w-[440px] h-10 rounded-xl border border-white/10 bg-white/[.03] hover:bg-white/[.06] text-left px-3 flex items-center justify-between gap-3 transition"
+        className="aiw-search-trigger flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left transition md:w-[360px] lg:w-[440px]"
       >
         <span className="flex items-center gap-2 text-xs text-white/45 min-w-0">
           <Search className="w-4 h-4 shrink-0" />
@@ -132,10 +132,10 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm p-4 md:p-10" role="dialog" aria-modal="true" aria-label="Universal search">
-          <div className="max-w-2xl mx-auto mt-[8vh] overflow-hidden rounded-2xl border border-white/10 bg-[#15181E] shadow-2xl">
+        <div className="aiw-search-backdrop fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-4 md:p-10" role="dialog" aria-modal="true" aria-label="Universal search">
+          <div className="aiw-search-dialog mx-auto mt-[8vh] max-w-2xl overflow-hidden rounded-2xl border border-white/15 shadow-2xl">
             <div className="flex items-center gap-3 border-b border-white/10 px-4">
-              <Search className="w-5 h-5 text-emerald-400 shrink-0" />
+              <Search className="w-5 h-5 shrink-0 text-cyan-300" />
               <input
                 ref={inputRef}
                 value={query}
@@ -170,7 +170,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
                   onClick={() => item.kind === 'page' ? (onNavigate(item.view || 'overview'), setOpen(false)) : item.symbol ? openTicker(item.symbol) : undefined}
                   className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/5 transition"
                 >
-                  <span className="w-9 h-9 rounded-lg border border-white/10 bg-white/[.03] flex items-center justify-center text-[10px] font-mono font-black text-emerald-400">
+                  <span className="w-9 h-9 rounded-lg border border-white/10 bg-white/[.03] flex items-center justify-center text-[10px] font-mono font-black text-cyan-300">
                     {item.kind === 'ticker' ? item.symbol : <ArrowRight className="w-4 h-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
