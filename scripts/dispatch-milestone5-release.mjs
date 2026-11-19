@@ -2,7 +2,7 @@
 // existing environment-gated manual release. Does not deploy or read Vercel
 // credentials itself. Never log tokens or remote API bodies.
 import { pathToFileURL } from 'node:url';
-import { RELEASE_REPOSITORY, checkCandidate, jsonGet } from './release-candidate.mjs';
+import { RELEASE_REPOSITORY, M5_PROTECTION_EXCEPTION, verifyMilestone5Exception, checkCandidate, jsonGet } from './release-candidate.mjs';
 
 export const M5_HANDOFF_PARENT = 'b4397929332dc8f87815e117f976d3aa929856f0';
 export const M5_HANDOFF_PR = 178;
@@ -37,6 +37,12 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
   const base = 'https://api.github.com/repos/' + RELEASE_REPOSITORY;
   const sourceRun = await jsonGet(base + '/actions/runs/' + env.CI_RUN_ID, token, fetcher);
   const sha = verifyCompletion(env, sourceRun);
+  // Authorize PR #178's pinned two-parent merge even if the branch later
+  // becomes protected; never rely on main.protected to permit a broader
+  // successful-CI commit to dispatch a release.
+  const pr = await jsonGet(base + '/pulls/' + M5_HANDOFF_PR, token, fetcher);
+  const commit = await jsonGet(base + '/commits/' + sha, token, fetcher);
+  verifyMilestone5Exception({ expectedSha: sha, waiver: M5_PROTECTION_EXCEPTION, pr, commit });
 
   // checkCandidate performs an independent branch + paged CI check and only
   // permits the exact two-parent PR #178 merge (first parent b439792,
