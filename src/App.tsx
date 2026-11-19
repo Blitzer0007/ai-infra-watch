@@ -66,11 +66,16 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   useEffect(() => {
     if (!isMobileMenuOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setIsMobileMenuOpen(false);
     };
     window.addEventListener('keydown', onEscape);
-    return () => window.removeEventListener('keydown', onEscape);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', onEscape);
+    };
   }, [isMobileMenuOpen]);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
@@ -386,6 +391,7 @@ export default function App() {
 
   return (
     <div className="aiw-application min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white">
+      <a href="#main-content" className="aiw-skip-link">Skip to main content</a>
 {/* 1. FINITE, ACCESSIBLE MARKET OBSERVATION STRIP */}
       <div role="region" aria-label="Observed market quotes"
         className="aiw-market-strip relative z-50 flex h-8 w-full min-w-0 items-center gap-3 overflow-hidden border-b border-white/10 px-3 sm:px-5">
