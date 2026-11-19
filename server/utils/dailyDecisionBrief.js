@@ -43,7 +43,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
       lines.push('Recorded holdings: ' + loaded.holdingsCount);
       if (count(loaded?.quotesAccepted) && count(loaded?.quotesTotal) &&
           loaded.quotesAccepted <= loaded.quotesTotal) {
-        lines.push('Admitted quote coverage: ' + loaded.quotesAccepted + '/' + loaded.quotesTotal +
+        lines.push('Fresh quote coverage: ' + loaded.quotesAccepted + '/' + loaded.quotesTotal +
           ' holdings · ' + clean(loaded.quoteStatus, 32));
       }
       if (loaded.accountingStatus === 'conditional-loaded-records') {
@@ -65,7 +65,8 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   const warnings = [];
   if (coverage.status === 'partial') warnings.push('Quote coverage partial; verify price-dependent prompts.');
   else if (coverage.status === 'stale-fallback') warnings.push('Quotes use stale fallbacks; verify current prices first.');
-  else if (coverage.status !== 'complete') warnings.push('Quote coverage unavailable; freshness is not established.');
+  else if (coverage.status === 'last-close') warnings.push('Only last-close quotes are available; do not assume intraday prices.');
+  else if (coverage.status !== 'complete') warnings.push('Fresh quote coverage not verified; price-based conclusions are withheld.');
   if (accounting === 'conditional-loaded-records')
     warnings.push('Accounting is based on loaded records only; verified P&L and trade eligibility are not established.');
   else if (!['complete', 'review-transactions'].includes(accounting))
@@ -85,8 +86,8 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   if (trustedSummary(summary, returned)) {
     lines.push(summary.act + ' urgent review · ' + summary.watch + ' watch · showing ' + actions.length + '/' + summary.total + ' prompts');
   } else if (Array.isArray(decision.actionItems)) {
-    lines.push('Returned prompts: ' + returned.filter(item => item.severity === 'ACT').length + ' urgent review · ' +
-      returned.filter(item => item.severity === 'WATCH').length + ' watch; full totals unavailable.');
+    lines.push('Usable prompts in this snapshot: ' + returned.filter(item => item.severity === 'ACT').length + ' urgent review · ' +
+      returned.filter(item => item.severity === 'WATCH').length + ' watch. Other rule results require in-app review.');
   } else lines.push('Review queue unavailable.');
   if (Array.isArray(decision.actionItems) && returned.length !== decision.actionItems.length)
     lines.push('Some returned prompts are unsupported or incomplete; inspect Daily Review.');
