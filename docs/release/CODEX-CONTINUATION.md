@@ -1,14 +1,17 @@
-# CURRENT AI Infra Watch continuation — Milestone 5 (18 November 2026)
+# CURRENT AI Infra Watch continuation — Milestone 5 staged-release repair (19 November 2026)
 
-- **Released production baseline:** Milestone 4 of 5, `main` SHA `4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772` (PR #174), Vercel production ID `dpl_4YxxXt5CcZ4J5b7L24pTwtr4AgVa`. All three exact-main CI workflows passed. Production `ai-infra-watch-theta.vercel.app` serves the new assets. Authenticated API smoke was not proven by the direct release. Older Milestone 4 notes below are historical.
-- **Active Milestone 5 work:** branch `feature/milestone5-operational-integrity-20261118`. Read [MILESTONE5-CONTINUATION.md](MILESTONE5-CONTINUATION.md), the current branch/PR SHA and its exact-head CI before continuing.
-- **First bounded increment:** hardened forecast scoring against array/object/whitespace numeric coercion, with fictional regressions. This is read-only data quality; no automatic trade eligibility, external-source verification or silently repaired historical outcomes.
-- **Milestone 5 next work:** fail-closed scheduler/outcome/source-lag and quota operational status; correct missing/unknown distinction; authenticated read-only post-release verification and rollback evidence; provenance/holdout qualification for any accuracy claims. No production provider/polling/send activation, no Supabase writes, no Windows local execution.
-- **Release discipline:** Fix real CI regressions on exact heads; wait until every relevant workflow is green. Do not merge or deploy this Milestone 5 candidate without a separate release decision. The owner explicitly waived main branch protection *for the one Milestone 5 PR #176 merge commit only*. The default-NO release workflow input and independently fetched PR/commit ancestry validation implement this exception; all exact-main CI, security, rollback, production environment and staged deployment checks still apply. Read the Twelfth increment in [MILESTONE5-CONTINUATION.md](MILESTONE5-CONTINUATION.md) before touching the release workflow. Do not enable branch protection or grant a reusable/generic waiver.
+- **Current live production:** Milestone 4 main commit `4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772`, Vercel production deployment `dpl_4YxxXt5CcZ4J5b7L24pTwtr4AgVa`. No authenticated private-health smoke has been demonstrated.
+- **Milestone 5 merged code:** PR #176 regular merge `a8f61d6d5e8f41349574345cd666065d2d6d04b1`. All three exact-main CI workflows passed. The owner authorized one-time protected-main exception but not removal of any other deployment, trading, CI or auth safeguards.
+- **Actual production release attempt:** <https://github.com/Blitzer0007/ai-infra-watch/actions/runs/44451868548> passed exact-main/rollback/build gates. Vercel staged `dpl_AdnrtnVHZVp6jNWF39GhQdcn5Wj1` READY with no production alias. Staged smoke step failed at Vercel CLI `curl --max-time` argument forwarding before HTTP assertions; production promotion **was skipped**.
+- **Active repair:** [draft PR #177](https://github.com/Blitzer0007/ai-infra-watch/pull/177), branch `fix/milestone5-staged-curl-20261119`. Fix URL-first `vercel curl "$BASE_URL/..." -- --silent --show-error --max-time=20`; keep exact HTML output bytes, expected app HTTP 200/401, Vercel SSO and scoped CI token. `scripts/release-candidate.mjs` limits the waiver to the exact original merge or PR #177's two-parent follow-up from pinned Milestone 5 merge `a8f61d6` with independently fetched GitHub PR/commit evidence and exact-main successful CI.
+- **Next:** finish PR #177 exact-head Frontend, Security and UI/API/Database + mocked browser checks, fix real failures, use a regular merge (no squash or rebase), verify all three *new exact-main* runs. Manual dispatch of the reviewed `Vercel Production Deploy` workflow is required again with new SHA, explicit YES to deployment and one-time exception, rollback `dpl_EDKqq53hqUutLwvA5kY9CaUUBjgY`, and live checks false. The failed old run cannot be fixed by rerunning its pinned code. Confirm the staged smoke and promotion, prod alias, runtime errors and preserve rollback.
+- **Constraints:** Do not silently bypass staged checks, main SHA CI, production environment gate or Vercel SSO; do not enable live provider polling/SEC refresh, Telegram send, trading, production Supabase changes, or run on the user's Windows PC.
+- **Detailed checkpoint:** [MILESTONE5-CONTINUATION.md](MILESTONE5-CONTINUATION.md).
 
 **The text below this divider is historical and does not describe the current deployed or active milestone.**
 
 ---
+
 
 # AI Infra Watch — Codex Cloud continuation (Milestone 2 isolated candidate)
 

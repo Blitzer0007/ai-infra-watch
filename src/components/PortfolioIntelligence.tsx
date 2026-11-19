@@ -85,7 +85,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const currentTab=useRef(tab);currentTab.current=tab;
   const detailOwner=useId();
   const closingDetail=useRef(false);
-  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string;openedCaptured:boolean}|null>(null);
+  const listOrigin=useRef<{scrollY:number;trigger:HTMLElement|null;symbol:string;openedCaptured:boolean;frozen:boolean}|null>(null);
   // While traversing a holding's detail → Evidence → Back history entries,
   // restore the exact list viewport ourselves rather than racing the browser's
   // automatic native history scroll restoration with modal focus restoration.
@@ -227,7 +227,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     params.set('portfolio_symbol',symbol);
     params.delete('portfolio_detail');
     window.history.replaceState(window.history.state,'',window.location.pathname+'?'+params.toString()+window.location.hash);
-    listOrigin.current={scrollY:window.scrollY,trigger,symbol,openedCaptured:false};
+    listOrigin.current={scrollY:window.scrollY,trigger,symbol,openedCaptured:false,frozen:false};
     params.set('portfolio_detail',symbol);
     window.history.pushState({...window.history.state,aiwHoldingDetailOwner:detailOwner},'',window.location.pathname+'?'+params.toString()+window.location.hash);
     // scrollRestoration belongs to the active history entry. pushState can
@@ -239,6 +239,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   };
   const closeHoldingDetail=()=>{
     if(closingDetail.current)return;
+    if(listOrigin.current)listOrigin.current.frozen=true;
     closingDetail.current=true;
     if(listOrigin.current && window.history.state?.aiwHoldingDetailOwner===detailOwner){
       window.history.back();
@@ -291,8 +292,16 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           // browser Back that re-opens the same detail entry.
           const currentView=readHoldingNavigation(new URLSearchParams(window.location.search));
           if(isBackOnHoldings()){
-            window.history.scrollRestoration=previous;
-            savedHistoryScrollRestoration.current=null;
+            // Release manual history control only after a final layout paint.
+            // Native browser history can otherwise scroll the focused holding
+            // 24-33px between closing the modal and the restored list frame.
+            requestAnimationFrame(()=>{
+              if(!isBackOnHoldings())return;
+              restoreScroll();
+              window.history.scrollRestoration=previous;
+              savedHistoryScrollRestoration.current=null;
+              restoreScroll();
+            });
           } else if(!currentView.detail){
             // An Evidence tab (no dialog) can use native scroll behavior,
             // but never override a dialog reopened by Back during this RAF.
@@ -1033,7 +1042,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           <p className="text-xs text-white/55">Holding detail is opened explicitly; portfolio accounting and quote quality gates remain unchanged.</p>
         </div>
       )}
-      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList} onOpened={()=>{
+      {tab==='holdings'&&detailSymbol&&<HoldingDetailDialog symbol={detailSymbol} name={detailAnalysis?.name} onClose={closeHoldingDetail} onRestoreFocus={restoreHoldingList} onScrollReady={(stableY)=>{
+        const origin=listOrigin.current;
+        // Record the exact viewport exposed by data-scroll-ready, after
+        // dialog min-height settles. Never overwrite it when Back reopens.
+        if(origin && !origin.frozen)origin.scrollY=stableY;
+      }} onOpened={()=>{
         const origin=listOrigin.current;
         // Only the original explicit opening may reset the saved viewport.
         // Re-entering via browser Back must preserve that original position.
@@ -1057,8 +1071,8 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               button focus/scroll can move the underlying viewport transiently,
               especially at 768px; it must not replace the saved list position. */}
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={()=>changeTab('evidence')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
-            <button type="button" onClick={()=>changeTab('performance')} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
+            <button type="button" onClick={()=>{if(listOrigin.current)listOrigin.current.frozen=true;changeTab('evidence');}} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Evidence workspace</button>
+            <button type="button" onClick={()=>{if(listOrigin.current)listOrigin.current.frozen=true;changeTab('performance');}} className="rounded-lg border border-white/25 px-3 py-2 text-sm">Open Performance workspace</button>
           </div>
           <SelectedHoldingChart h={detailAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange}/>
           <PositionDetail h={detailAnalysis} historicalPrice={historicalPrice}/>

@@ -109,7 +109,13 @@ def test_protected_staged_vercel_smoke_preserves_app_auth_checks():
     commands = staged['run']
     # Authenticate only at the Vercel protection layer, never disable SSO or
     # substitute a successful platform response for app-owned HTTP 401 gates.
-    assert commands.count('$(vercel curl --silent') == 3
+    assert commands.count('$(vercel curl "$BASE_URL/') == 3
+    assert commands.count(' -- --silent --show-error --max-time=20 ') == 3
+    assert 'vercel curl --silent --show-error --max-time 20' not in commands
+    assert 'vercel curl "$BASE_URL/" --' in commands
+    assert 'vercel curl "$BASE_URL/api/auth" --' in commands
+    assert 'vercel curl "$BASE_URL/api/portfolio" --' in commands
+    assert '--data' in commands
     assert 'vercel protection' not in commands.lower()
     assert 'vercel promote' not in commands
     assert 'test "$auth_status"' not in commands  # Existing explicit branch/exit gates below.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from test_ui import goto_app, mock_local_apis
+from playwright.sync_api import expect
 
 
 def _table_with_header(page, label: str):
@@ -77,10 +78,12 @@ def test_contracts_page_surfaces_multi_source_discovery_leads(page):
 
     panel = page.get_by_test_id("contract-announcement-discovery")
     panel.wait_for(state="visible", timeout=30000)
-    assert "Latest contract and infrastructure announcements" in panel.inner_text()
-    assert "Digi Power X provides a construction update for Phase 1" in panel.inner_text()
-    assert "Primary source" in panel.inner_text()
-    assert "not proof of a signed agreement" in panel.inner_text()
+    # The panel shell renders before its mocked discovery request settles.
+    # Auto-wait for the exact lead; do not drop or loosen source claims.
+    expect(panel).to_contain_text("Latest contract and infrastructure announcements")
+    expect(panel).to_contain_text("Digi Power X provides a construction update for Phase 1", timeout=30000)
+    expect(panel).to_contain_text("Primary source")
+    expect(panel).to_contain_text("not proof of a signed agreement")
     panel.get_by_role("link", name="Open source").wait_for(state="visible", timeout=30000)
 
 
