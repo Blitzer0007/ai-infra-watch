@@ -53,3 +53,54 @@ def test_openai_model_override_is_sent_to_provider(tmp_path, monkeypatch):
     assert captured["timeout"] == 5
     assert captured["body"]["model"] == "openai/gpt-oss-20b"
     assert captured["body"]["reasoning_effort"] == "low"
+
+
+def test_openai_compatible_router_requires_only_existing_client_contract(tmp_path, monkeypatch):
+    """No FreeLLMAPI package, Docker service, real key, or network is needed."""
+    from app.config import settings
+
+    captured = {}
+    monkeypatch.setattr(settings, "STUB_MODE", False)
+    monkeypatch.setattr(settings, "CACHE_ENABLED", False)
+    monkeypatch.setattr(settings, "OPENAI_BASE_URL", "https://router.fixture.invalid/v1")
+
+    class Response:
+        status_code = 200
+        text = "fixture"
+
+        @staticmethod
+        def json():
+            return {
+                "choices": [{"message": {"content": "Research draft; verify sources."}}],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 6},
+            }
+
+    class Client:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def post(self, url, json, headers):
+            captured.update({"url": url, "body": json, "headers": headers})
+            return Response()
+
+    monkeypatch.setattr("app.llm.client.httpx.Client", Client)
+    client = LLMClient(
+        provider="openai", model="experimental-router-model",
+        api_key="fixture-only-not-a-real-secret", cache_dir=tmp_path,
+    )
+    result = client.generate(
+        "Draft a sourced research question.", max_tokens=64,
+        timeout_sec=4, max_retries=0, temperature=0.0,
+    )
+    assert result == "Research draft; verify sources."
+    assert captured["url"] == "https://router.fixture.invalid/v1/chat/completions"
+    assert captured["headers"]["authorization"] == "Bearer fixture-only-not-a-real-secret"
+    assert captured["body"]["model"] == "experimental-router-model"
+    assert captured["body"]["temperature"] == 0.0
+    assert captured["timeout"] == 4
