@@ -37,6 +37,9 @@ const TICKER_ALIASES: Record<string, string[]> = {
 
 const PAGE_ITEMS: SearchItem[] = [
   { id: 'overview', kind: 'page', title: 'Overview', subtitle: 'Dashboard summary and live intelligence', view: 'overview', aliases: ['home', 'dashboard'] },
+  { id: 'opportunities', kind: 'page', title: 'Opportunities', subtitle: 'Evidence-scored research candidates', view: 'opportunities', aliases: ['candidate scanner', 'discover', 'ideas'] },
+  { id: 'calendar', kind: 'page', title: 'Catalyst Calendar', subtitle: 'Confirmed company events and review dates', view: 'calendar', aliases: ['catalyst', 'events', 'upcoming'] },
+  { id: 'alerts', kind: 'page', title: 'Alert Inbox', subtitle: 'Source-backed notifications and delivery history', view: 'alerts', aliases: ['notification inbox', 'delivery', 'alerts'] },
   { id: 'contracts', kind: 'page', title: 'Contracts', subtitle: 'Infrastructure contracts and filings', view: 'contracts', aliases: ['filings', 'agreements'] },
   { id: 'tracker', kind: 'page', title: 'Progress Tracker', subtitle: 'Ticker milestones, history and SEC events', view: 'tracker', aliases: ['milestones', 'progress'] },
   { id: 'congress', kind: 'page', title: 'Congress Trades', subtitle: 'Disclosed congressional transactions', view: 'congress', aliases: ['politicians', 'trades'] },
@@ -75,6 +78,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
 
   const results = useMemo(() => {
     const q = query.trim();
+    // Start with daily workspaces instead of the previous arbitrary page order.
     if (!q) return [...PAGE_ITEMS.slice(0, 6), ...tickerItems.filter(item => shortcuts.includes(item.symbol || '')).slice(0, 6)];
     return rankSearchResults([...PAGE_ITEMS, ...tickerItems], q).slice(0, 10);
   }, [query, tickerItems, shortcuts]);
