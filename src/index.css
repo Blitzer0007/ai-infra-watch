@@ -572,3 +572,14 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .aiw-market-strip-scroll { scroll-behavior: auto; }
 }
+
+
+/* Keep feed metadata at a stable mobile height while independently admitted
+   quotes arrive; otherwise a late source-count line can move the holdings
+   list during modal History Back/Close, even if its scrollY was restored. */
+@media (max-width: 640px) {
+  .aiw-feed-toolbar > div:first-child > div:last-child > .mt-2.flex {
+    min-height: 3.75rem;
+    align-content: flex-start;
+  }
+}
