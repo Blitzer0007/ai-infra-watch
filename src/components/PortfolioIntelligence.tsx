@@ -297,10 +297,31 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             // 24-33px between closing the modal and the restored list frame.
             requestAnimationFrame(()=>{
               if(!isBackOnHoldings())return;
+              // A shared app header or quote-status response can reflow the
+              // page just after native history mode is restored. For a short,
+              // finite paint window, preserve the exact event-time list Y.
+              // Never keep the listener beyond five frames, and never apply
+              // it outside the holdings list after a route transition.
+              const onNativeScroll=()=>{
+                if(origin && isBackOnHoldings() && Math.abs(window.scrollY-origin.scrollY)>2)
+                  restoreScroll();
+              };
+              window.addEventListener('scroll',onNativeScroll,{passive:true});
               restoreScroll();
               window.history.scrollRestoration=previous;
               savedHistoryScrollRestoration.current=null;
               restoreScroll();
+              let passes=0;
+              const finish=()=>{
+                if(!isBackOnHoldings()){
+                  window.removeEventListener('scroll',onNativeScroll);
+                  return;
+                }
+                restoreScroll();
+                if(++passes<5)requestAnimationFrame(finish);
+                else window.removeEventListener('scroll',onNativeScroll);
+              };
+              requestAnimationFrame(finish);
             });
           } else if(!currentView.detail){
             // An Evidence tab (no dialog) can use native scroll behavior,
