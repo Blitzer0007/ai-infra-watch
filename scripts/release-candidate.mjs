@@ -19,6 +19,11 @@ const M5_REPAIR_BRANCH = 'fix/milestone5-staged-curl-20261119';
 const M5_ONE_SHOT_PR = 178;
 const M5_REPAIR_MERGE_SHA = 'b4397929332dc8f87815e117f976d3aa929856f0';
 const M5_ONE_SHOT_BRANCH = 'fix/milestone5-one-time-ci-release-20261119';
+// Owner-approved Milestone 6 portfolio UI release: one exact, reviewed merge
+// directly following the successfully deployed Milestone 5 main.
+const M6_UI_PR = 179;
+const M6_UI_FIRST_PARENT = '6827cce1a323949e1b36c06a0a1dca030e63c127';
+const M6_UI_HEAD_BRANCH = 'feature/milestone6-rea-informed-ui-20261119';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
@@ -28,7 +33,9 @@ export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
       ? { parent: M5_MERGE_SHA, branch: M5_REPAIR_BRANCH }
       : pr?.number === M5_ONE_SHOT_PR
         ? { parent: M5_REPAIR_MERGE_SHA, branch: M5_ONE_SHOT_BRANCH }
-        : null;
+        : pr?.number === M6_UI_PR
+          ? { parent: M6_UI_FIRST_PARENT, branch: M6_UI_HEAD_BRANCH }
+          : null;
   if (waiver !== M5_PROTECTION_EXCEPTION || !expected ||
       pr?.merged !== true || pr?.state !== 'closed' ||
       pr?.base?.ref !== 'main' || pr?.head?.ref !== expected.branch ||
@@ -114,14 +121,16 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (!body.workflow_runs.length || page === 10) throw Error('CI evidence is incomplete.');
   }
   // The waiver is opt-in and independently attested by the exact merged PR
-  // and commit ancestry. Only PR #176, #177, and the bounded #178 CI handoff
-  // can meet the pinned-parent checks; never a generic release bypass.
+  // and commit ancestry. Only PRs #176–#179, each with its own pinned
+  // first parent and exact source branch, can meet the waiver; never a
+  // generic main-branch release bypass.
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
     const prNumber = env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
       : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR
-      : M5_ONE_SHOT_PR;
+      : env.EXPECTED_MAIN_SHA === M6_UI_FIRST_PARENT ? M5_ONE_SHOT_PR
+      : M6_UI_PR;
     waiverPr = await jsonGet(base + '/pulls/' + prNumber, env.GH_TOKEN, fetcher);
     waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
   }
