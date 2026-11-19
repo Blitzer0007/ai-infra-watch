@@ -122,3 +122,31 @@ def test_protected_staged_vercel_smoke_preserves_app_auth_checks():
     assert 'if [ "$auth_status" != "401" ]' in commands
     assert 'if [ "$portfolio_status" != "401" ]' in commands
     assert 'cmp --silent .vercel/output/static/index.html /tmp/staged-home.html' in commands
+
+
+def test_one_time_milestone5_handoff_waits_for_main_ci_and_preserves_manual_release():
+    handoff = yaml.safe_load(
+        (ROOT / ".github/workflows/milestone5-one-time-release-handoff.yml").read_text()
+    )
+    assert handoff[True]["workflow_run"] == {
+        "workflows": ["UI API DB Validation"], "types": ["completed"]
+    }
+    assert handoff["permissions"] == {"contents": "read", "actions": "write"}
+    assert handoff["concurrency"]["cancel-in-progress"] is False
+    job = handoff["jobs"]["handoff"]
+    assert "workflow_run.conclusion == 'success'" in job["if"]
+    assert "workflow_run.event == 'push'" in job["if"]
+    assert "workflow_run.head_branch == 'main'" in job["if"]
+    assert "head_repository.full_name == 'Blitzer0007/ai-infra-watch'" in job["if"]
+    assert job["steps"][0]["with"]["persist-credentials"] is False
+    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
+    assert job["steps"][-1]["env"]["GH_TOKEN"] == "${{ github.token }}"
+    assert job["steps"][-1]["run"] == "node scripts/dispatch-milestone5-release.mjs"
+    assert "VERCEL_TOKEN" not in repr(handoff)
+    assert "secrets." not in repr(handoff)
+    release = yaml.safe_load(
+        (ROOT / ".github/workflows/vercel-production-deploy.yml").read_text()
+    )
+    assert list(release[True]) == ["workflow_dispatch"]
+    assert release["jobs"]["deploy"]["environment"] == "production"
+    assert release[True]["workflow_dispatch"]["inputs"]["run_live_checks"]["default"] is False
