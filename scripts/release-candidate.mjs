@@ -6,16 +6,19 @@ const REQUIRED = ['frontend-ci.yml', 'qa-validation.yml', 'security-audit.yml'];
 const CHECKS = [...REQUIRED, 'vercel-python-ci.yml', 'agents-python-tests.yml',
   'ai-quality-gate.yml', 'continuous-quality-eval.yml', 'backend-container-ci.yml'];
 
-// This release-specific exception permits only the audited PR #176 merge,
-// or the immediately following PR #177 fix for its failed staged smoke. Each
-// requires an independently fetched, exact 2-parent merge from a pinned main
-// commit. It cannot authorize a future or unrelated main release.
+// Exactly three related Milestone 5 merges, each with independently fetched
+// GitHub PR and two-parent commit evidence. PR #178 only adds a one-shot CI
+// handoff for the already authorized production release. Future main changes
+// cannot reuse these fixed parent-commit checks.
 const M5_PR = 176;
 const M5_BASE_SHA = '4449fa2dbbcff5aacb1c328ccd09e4fba8fcc772';
 const M5_HEAD_BRANCH = 'feature/milestone5-operational-integrity-20261118';
 const M5_REPAIR_PR = 177;
 const M5_MERGE_SHA = 'a8f61d6d5e8f41349574345cd666065d2d6d04b1';
 const M5_REPAIR_BRANCH = 'fix/milestone5-staged-curl-20261119';
+const M5_ONE_SHOT_PR = 178;
+const M5_REPAIR_MERGE_SHA = 'b4397929332dc8f87815e117f976d3aa929856f0';
+const M5_ONE_SHOT_BRANCH = 'fix/milestone5-one-time-ci-release-20261119';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
@@ -23,7 +26,9 @@ export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
     ? { parent: M5_BASE_SHA, branch: M5_HEAD_BRANCH }
     : pr?.number === M5_REPAIR_PR
       ? { parent: M5_MERGE_SHA, branch: M5_REPAIR_BRANCH }
-      : null;
+      : pr?.number === M5_ONE_SHOT_PR
+        ? { parent: M5_REPAIR_MERGE_SHA, branch: M5_ONE_SHOT_BRANCH }
+        : null;
   if (waiver !== M5_PROTECTION_EXCEPTION || !expected ||
       pr?.merged !== true || pr?.state !== 'closed' ||
       pr?.base?.ref !== 'main' || pr?.head?.ref !== expected.branch ||
@@ -109,12 +114,14 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (!body.workflow_runs.length || page === 10) throw Error('CI evidence is incomplete.');
   }
   // The waiver is opt-in and independently attested by the exact merged PR
-  // and commit ancestry. Only PR #176 and its immediate PR #177 smoke fix can
-  // ever meet the pinned-parent checks; no generic branch-protection bypass.
+  // and commit ancestry. Only PR #176, #177, and the bounded #178 CI handoff
+  // can meet the pinned-parent checks; never a generic release bypass.
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
-    const prNumber = env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR : M5_REPAIR_PR;
+    const prNumber = env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
+      : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR
+      : M5_ONE_SHOT_PR;
     waiverPr = await jsonGet(base + '/pulls/' + prNumber, env.GH_TOKEN, fetcher);
     waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
   }
