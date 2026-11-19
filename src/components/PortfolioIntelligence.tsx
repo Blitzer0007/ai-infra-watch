@@ -299,6 +299,10 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
             window.history.scrollRestoration=previous;
           }
         }
+        // Re-enabling automatic browser-history restoration can itself nudge
+        // the viewport after a modal closes at narrow widths. Reinstate the
+        // captured list viewport after restoring history mode, not only before.
+        restoreScroll();
       });
     });
   };
