@@ -28,15 +28,34 @@ function trustedSummary(summary, returned) {
     summary.watch >= returned.filter(item => item.severity === 'WATCH').length;
 }
 
-export function buildTelegramDecisionBrief(decision, date, weekly = null) {
+export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded = null) {
   const footer = 'Review prompts, not trade instructions. Open Daily Review for full context.';
   const lines = ['AI Infra Watch · Daily Decision Brief', clean(date, 40) || 'Date unavailable'];
   const snapshot = typeof decision?.checkedAt === 'string' && Number.isFinite(Date.parse(decision.checkedAt))
-    ? new Date(decision.checkedAt).toISOString() : 'unavailable';
-  lines.push('Snapshot time: ' + snapshot, '');
+    ? new Date(decision.checkedAt).toISOString() : null;
+  if (snapshot) lines.push('Decision snapshot: ' + snapshot);
+  lines.push('');
   if (!decision || decision.ok === false) {
-    lines.push('DECISION LAYER UNAVAILABLE', 'Review queue, rule coverage and earnings cannot be verified.',
-      'This is not a clean bill of health. Check Daily Review before changing exposure.');
+    lines.push('DECISION LAYER UNAVAILABLE',
+      'Rule breaches, price targets and the earnings queue were not verified. Do not infer a clean day.', '',
+      'WHAT WE CAN CONFIRM');
+    if (count(loaded?.holdingsCount)) {
+      lines.push('Recorded holdings: ' + loaded.holdingsCount);
+      if (count(loaded?.quotesAccepted) && count(loaded?.quotesTotal) &&
+          loaded.quotesAccepted <= loaded.quotesTotal) {
+        lines.push('Admitted quote coverage: ' + loaded.quotesAccepted + '/' + loaded.quotesTotal +
+          ' holdings · ' + clean(loaded.quoteStatus, 32));
+      }
+      if (loaded.accountingStatus === 'conditional-loaded-records') {
+        lines.push('Portfolio accounting: loaded records only; trade-ready P&L is not established.');
+      } else {
+        lines.push('Portfolio accounting: requires verification before using a P&L.');
+      }
+    } else {
+      lines.push('Stored holdings and quote coverage were not provided to this brief.');
+    }
+    lines.push('', 'NEXT STEP', 'Open Daily Review to inspect source freshness, active rules and any missing ledger evidence.',
+      'A missing Decision Center result is a service/data-quality issue, not an investment recommendation.');
     return { version: 1, text: [...lines, '', footer].join('\n'), reviewSymbols: [] };
   }
 
@@ -47,11 +66,14 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null) {
   if (coverage.status === 'partial') warnings.push('Quote coverage partial; verify price-dependent prompts.');
   else if (coverage.status === 'stale-fallback') warnings.push('Quotes use stale fallbacks; verify current prices first.');
   else if (coverage.status !== 'complete') warnings.push('Quote coverage unavailable; freshness is not established.');
-  if (!['complete', 'review-transactions'].includes(accounting)) warnings.push('Accounting incomplete or unknown; return comparisons withheld.');
+  if (accounting === 'conditional-loaded-records')
+    warnings.push('Accounting is based on loaded records only; verified P&L and trade eligibility are not established.');
+  else if (!['complete', 'review-transactions'].includes(accounting))
+    warnings.push('Accounting requires verification before using return comparisons.');
   else if (accounting === 'review-transactions') warnings.push('Accounting uses derived transactions; displayed P&L is provisional.');
   if (Array.isArray(portfolio.quantityMismatchSymbols) && portfolio.quantityMismatchSymbols.length)
     warnings.push('Transaction quantities do not reconcile; verify the ledger.');
-  if (decision.earningsStatus !== 'ok') warnings.push('EARNINGS CALENDAR UNAVAILABLE; upcoming-event coverage is unknown.');
+  if (decision.earningsStatus !== 'ok') warnings.push('Earnings feed not verified; upcoming-event coverage is unknown.');
   if (Array.isArray(decision.rules?.configurationIssues) && decision.rules.configurationIssues.length)
     warnings.push('Rule settings need review; invalid allocation fields were ignored.');
   if (warnings.length) lines.push('VERIFY DATA FIRST', ...warnings.map(value => '• ' + value), '');
@@ -81,28 +103,33 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null) {
   lines.push('', 'PORTFOLIO & RISK');
   const quantitiesReconcile = !Array.isArray(portfolio.quantityMismatchSymbols) || !portfolio.quantityMismatchSymbols.length;
   const usableAccounting = ['complete', 'review-transactions'].includes(accounting) && quantitiesReconcile && coverage.status === 'complete';
-  lines.push(usableAccounting
+  lines.push(usableAccounting && [portfolio.totalTradingPnl, portfolio.realizedPnl, portfolio.unrealizedPnl].every(finite)
     ? 'Trading P&L: ' + money(portfolio.totalTradingPnl) + ' · realized ' + money(portfolio.realizedPnl) + ' · unrealized ' + money(portfolio.unrealizedPnl)
-    : 'Portfolio P&L unavailable for decision use; verify accounting.');
+    : 'P&L withheld until quote coverage and transaction accounting are verified.');
   const concentration = portfolio.concentrationTop3Pct;
-  lines.push('Top 3 concentration: ' + (coverage.status === 'complete' && finite(concentration) && concentration >= 0 && concentration <= 100 ? concentration.toFixed(1) + '%' : 'unavailable'));
+  if (coverage.status === 'complete' && finite(concentration) && concentration >= 0 && concentration <= 100)
+    lines.push('Top 3 concentration: ' + concentration.toFixed(1) + '%');
+  else lines.push('Concentration withheld: holdings value coverage not established.');
   const scenarios = portfolio.riskScenarios;
   const stress = portfolio.scenarioShockTotal ?? portfolio.semiconductorShock15Pct;
   const reconciledStress = finite(stress) && Array.isArray(scenarios) && scenarios.length > 0 &&
     scenarios.every(item => finite(item?.shock)) && Math.abs(scenarios.reduce((sum, item) => sum + item.shock, 0) - stress) < 0.01;
-  lines.push('Scenario stress: ' + (reconciledStress ? money(stress) + ' · illustrative, not a prediction.' : 'unavailable or unreconciled; not a zero-risk estimate.'));
+  if (reconciledStress) lines.push('Scenario stress: ' + money(stress) + ' · illustrative, not a prediction.');
+  else lines.push('Scenario stress not reconciled; no low-risk conclusion can be drawn.');
   const benchmark = ['SPY', 'SOXX'].map(ticker => {
     const item = decision.benchmark?.[ticker];
     const eligible = accounting === 'complete' && quantitiesReconcile && coverage.status === 'complete' &&
       item?.coverage?.status === 'complete' && finite(portfolio.cashFlowPnl) && finite(item?.pnl);
-    return ticker + ': ' + (eligible ? money(portfolio.cashFlowPnl - item.pnl) + ' vs same dated cash flows' : 'comparison unavailable');
-  });
-  lines.push(benchmark.join(' · '));
+    return eligible ? ticker + ': ' + money(portfolio.cashFlowPnl - item.pnl) + ' vs dated cash flows' : null;
+  }).filter(Boolean);
+  if (benchmark.length) lines.push(...benchmark);
+  if (benchmark.length < 2) lines.push('Other SPY/SOXX comparisons withheld: equivalent cash-flow history not verified.');
 
   lines.push('', 'NEXT 7 DAYS');
   const events = Array.isArray(decision.earnings) ? decision.earnings.filter(item => symbol(item?.symbol) &&
     calendarDate(item.date) && count(item.daysUntil) && item.daysUntil <= 7) : [];
-  if (decision.earningsStatus !== 'ok' || !Array.isArray(decision.earnings)) lines.push('Earnings coverage unavailable; absence is not confirmed.');
+  if (decision.earningsStatus !== 'ok' || !Array.isArray(decision.earnings))
+    lines.push('Earnings dates not verified. Check the calendar before making a timing decision.');
   else if (events.length) {
     lines.push(...events.slice(0, 3).map(item => item.symbol + ' earnings · ' + item.date + ' · ' + (item.daysUntil === 0 ? 'today' : 'in ' + item.daysUntil + 'd')));
     lines.push('Provider-reported dates; confirmation is not independently verified.');
@@ -110,8 +137,11 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null) {
   if (events.length > 3) lines.push((events.length - 3) + ' additional returned events in Daily Review.');
 
   const forecast = decision.forecast;
-  lines.push('', 'EVIDENCE CHECK', 'Forecasts: ' + number(forecast?.independentVerified) + ' independent verified · ' +
-    number(forecast?.pending) + ' pending. Counts alone do not establish decision eligibility.');
+  lines.push('', 'EVIDENCE CHECK');
+  if (count(forecast?.independentVerified) && count(forecast?.pending))
+    lines.push('Forecasts: ' + forecast.independentVerified + ' independent verified · ' +
+      forecast.pending + ' pending. Counts alone do not establish decision eligibility.');
+  else lines.push('Independent forecast verification counts not supplied; do not infer accuracy.');
   if (weekly) lines.push('Weekly journal: ' + number(weekly.decisions) + ' decisions · ' + number(weekly.outcomes) + ' outcome reviews.');
   let body = lines.join('\n');
   const budget = TELEGRAM_BRIEF_LIMIT - footer.length - 2;
