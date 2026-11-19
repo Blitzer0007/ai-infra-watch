@@ -241,27 +241,88 @@ test('Milestone 6 UI release waiver accepts only PR #179 regular merge from pinn
   ])assert.throws(()=>verifyCandidate({...scoped,...modifications}));
 });
 
-test('UI waiver fetches exactly PR #179 and GitHub-attested two-parent commit',async()=>{
+test('UI waiver fetches only real PR #179 and its exact merge commit',async()=>{
   const queried:string[]=[];
+  const originalMerge='3bae7b12b567f669c93c859f68fae5d5a5c84cca';
   const source={
-    number:179,merged:true,state:'closed',base:{ref:'main'},merge_commit_sha:SHA,
+    number:179,merged:true,state:'closed',base:{ref:'main'},merge_commit_sha:originalMerge,
     head:{ref:'feature/milestone6-rea-informed-ui-20261119',sha:M5_HEAD,
       repo:{full_name:'Blitzer0007/ai-infra-watch'}},
   };
   const api:typeof fetch=async(url)=>{
     const target=String(url);queried.push(target);let body:any;
-    if(target.endsWith('/branches/main'))body={protected:false,commit:{sha:SHA}};
-    else if(target.includes('/actions/runs?'))body={total_count:3,workflow_runs:candidate().runs};
+    if(target.endsWith('/branches/main'))body={protected:false,commit:{sha:originalMerge}};
+    else if(target.includes('/actions/runs?'))body={
+      total_count:3,workflow_runs:candidate().runs.map(run=>({...run,head_sha:originalMerge})),
+    };
     else if(target.endsWith('/pulls/179'))body=source;
-    else if(target.endsWith('/commits/'+SHA))body={sha:SHA,parents:[
+    else if(target.endsWith('/commits/'+originalMerge))body={sha:originalMerge,parents:[
       {sha:'6827cce1a323949e1b36c06a0a1dca030e63c127'},{sha:M5_HEAD}]};
     else throw Error('Unexpected endpoint');
     return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
   };
   const env={GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',
-    GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token',
+    GITHUB_SHA:originalMerge,EXPECTED_MAIN_SHA:originalMerge,GH_TOKEN:'fictional-test-token',
     AIW_MAIN_PROTECTION_WAIVER:'YES'};
   assert.deepEqual(await checkCandidate(env,api),[1,2,8]);
+  assert.equal(queried.length,4);
   assert(queried[2].endsWith('/pulls/179'));
-  assert(queried[3].endsWith('/commits/'+SHA));
+  assert(queried[3].endsWith('/commits/'+originalMerge));
+});
+
+
+test('Milestone 7 app-wide UI waiver accepts only reviewed PR #182 direct regular merge',()=>{
+  const parent='3bae7b12b567f669c93c859f68fae5d5a5c84cca';
+  const pr={
+    number:182,merged:true,state:'closed',merge_commit_sha:SHA,
+    base:{ref:'main'},
+    head:{ref:'feature/milestone7-application-wide-ui-20261119',sha:M5_HEAD,
+      repo:{full_name:'Blitzer0007/ai-infra-watch'}},
+  };
+  const commit={sha:SHA,parents:[{sha:parent},{sha:M5_HEAD}]};
+  const attested={...candidate({mainProtected:false}),
+    waiver:M5_PROTECTION_EXCEPTION,waiverPr:pr,waiverCommit:commit};
+  assert.deepEqual(verifyCandidate(attested),[1,2,8]);
+  for(const changed of [
+    {waiver:null},
+    {waiverPr:{...pr,number:183}},
+    {waiverPr:{...pr,merged:false}},
+    {waiverPr:{...pr,state:'open'}},
+    {waiverPr:{...pr,merge_commit_sha:OTHER}},
+    {waiverPr:{...pr,base:{ref:'feature'}}},
+    {waiverPr:{...pr,head:{...pr.head,ref:'other-branch'}}},
+    {waiverPr:{...pr,head:{...pr.head,repo:{full_name:'other/repo'}}}},
+    {waiverCommit:{...commit,sha:OTHER}},
+    {waiverCommit:{...commit,parents:[{sha:OTHER},{sha:M5_HEAD}]}},
+    {waiverCommit:{...commit,parents:[{sha:parent},{sha:OTHER}]}},
+    {waiverCommit:{...commit,parents:[{sha:parent},{sha:M5_HEAD},{sha:OTHER}]}},
+    {waiverCommit:{...commit,parents:[{sha:parent}]}},
+    {runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2),run('security-audit.yml',8,{conclusion:'failure'})]},
+  ])assert.throws(()=>verifyCandidate({...attested,...changed}));
+});
+
+test('app-wide UI waiver fetches only PR #182 and exact direct-merge commit',async()=>{
+  const queries:string[]=[];
+  const pr={
+    number:182,merged:true,state:'closed',merge_commit_sha:SHA,base:{ref:'main'},
+    head:{ref:'feature/milestone7-application-wide-ui-20261119',sha:M5_HEAD,
+      repo:{full_name:'Blitzer0007/ai-infra-watch'}},
+  };
+  const fetcher:typeof fetch=async(url)=>{
+    const value=String(url);queries.push(value);let body:any;
+    if(value.endsWith('/branches/main'))body={commit:{sha:SHA},protected:false};
+    else if(value.includes('/actions/runs?'))body={workflow_runs:candidate().runs,total_count:3};
+    else if(value.endsWith('/pulls/182'))body=pr;
+    else if(value.endsWith('/commits/'+SHA))body={
+      sha:SHA,parents:[{sha:'3bae7b12b567f669c93c859f68fae5d5a5c84cca'},{sha:M5_HEAD}]};
+    else throw Error('Unexpected release attestation endpoint');
+    return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
+  };
+  const env={GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',
+    GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token',
+    AIW_MAIN_PROTECTION_WAIVER:'YES'};
+  assert.deepEqual(await checkCandidate(env,fetcher),[1,2,8]);
+  assert.equal(queries.length,4);
+  assert(queries[2].endsWith('/pulls/182'));
+  assert(queries[3].endsWith('/commits/'+SHA));
 });
