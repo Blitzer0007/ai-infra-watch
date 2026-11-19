@@ -541,3 +541,34 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .aiw-workspace-shortcut { transition: none; }
 }
+
+
+/* Screen-reader/keyboard route skip and unified Cmd+K search. */
+.aiw-skip-link {
+  position: fixed;
+  z-index: 150;
+  top: -6rem;
+  left: 1rem;
+  border: 2px solid #67e8f9;
+  border-radius: .7rem;
+  padding: .8rem 1rem;
+  background: #102334;
+  color: white;
+  font-size: .875rem;
+  font-weight: 700;
+}
+.aiw-skip-link:focus-visible { top: .5rem; }
+.aiw-search-trigger {
+  border-color: rgba(151,182,205,.2);
+  background: rgba(19, 32, 47, .8);
+  color: #bad6e6;
+}
+.aiw-search-trigger:hover { border-color: rgba(103,232,249,.42); background: rgba(28, 47, 64, .82); }
+.aiw-search-dialog { background: #112033; }
+.aiw-search-dialog :where(button):hover { background: rgba(103,232,249,.065); }
+.aiw-application :where(input:not([type="checkbox"]), textarea, select) {
+  accent-color: #67e8f9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aiw-market-strip-scroll { scroll-behavior: auto; }
+}
