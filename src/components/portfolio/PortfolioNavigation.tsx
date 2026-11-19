@@ -44,7 +44,7 @@ export default function PortfolioNavigation({tab, onChange}:{
         id={id}
         value={tab}
         onChange={event => onChange(portfolioTabFromValue(event.target.value))}
-        className="min-h-11 w-full min-w-0 rounded-xl border border-white/25 bg-[#0e1721] px-3 py-2 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 md:hidden"
+        className="min-h-11 w-full min-w-0 rounded-xl border border-white/25 bg-[#0e1721] px-3 py-2 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
       >
         <optgroup label="Daily tasks">
           {primary.map(item=><option key={item.id} value={item.id}>{`Go to ${item.label}`}</option>)}
