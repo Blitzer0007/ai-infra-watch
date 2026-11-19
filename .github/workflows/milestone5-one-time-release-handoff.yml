@@ -1,0 +1,51 @@
+name: Milestone 5 One-Time Release Handoff
+run-name: One-time CI release handoff • ${{ github.event.workflow_run.head_sha }}
+
+# The GitHub connector cannot start workflow_dispatch. For this explicitly
+# authorized Milestone 5 release only, a successful exact-main QA run can
+# dispatch the existing manual guarded production workflow. This workflow
+# itself has no Vercel credentials and no production environment access.
+on:
+  workflow_run:
+    workflows:
+      - UI API DB Validation
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: aiw-milestone5-one-time-handoff
+  cancel-in-progress: false
+
+jobs:
+  handoff:
+    name: Attest one-time release and dispatch guarded workflow
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'Blitzer0007/ai-infra-watch' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact default-branch commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configure Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+
+      - name: Verify exact merged PR, all CI, and dispatch only once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CI_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/dispatch-milestone5-release.mjs
