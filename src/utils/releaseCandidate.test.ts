@@ -185,23 +185,31 @@ test('failed staged smoke may only be repaired by the exact PR #177 two-parent m
   ]}));
 });
 
-test('repair waiver fetches only PR #177 and the exact candidate commit',async()=>{
+test('repair waiver fetches only PR #177 and its real merge commit',async()=>{
   const requests:string[]=[];
+  const exactRepairSha='b4397929332dc8f87815e117f976d3aa929856f0';
   const fetcher:typeof fetch=async(url)=>{
     const target=String(url);requests.push(target);
     let body:any;
-    if(target.endsWith('/branches/main'))body={commit:{sha:SHA},protected:false};
-    else if(target.includes('/actions/runs?'))body={workflow_runs:candidate().runs,total_count:3};
-    else if(target.endsWith('/pulls/177'))body=mergedM5SmokeRepair().waiverPr;
-    else if(target.endsWith('/commits/'+SHA))body=mergedM5SmokeRepair().waiverCommit;
+    if(target.endsWith('/branches/main'))body={commit:{sha:exactRepairSha},protected:false};
+    else if(target.includes('/actions/runs?'))body={
+      workflow_runs:candidate().runs.map(r=>({...r,head_sha:exactRepairSha})),
+      total_count:3,
+    };
+    else if(target.endsWith('/pulls/177'))body={
+      ...mergedM5SmokeRepair().waiverPr,merge_commit_sha:exactRepairSha,
+    };
+    else if(target.endsWith('/commits/'+exactRepairSha))body={
+      ...mergedM5SmokeRepair().waiverCommit,sha:exactRepairSha,
+    };
     else throw Error('Unexpected GitHub attestation endpoint');
     return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
   };
   const env={GITHUB_REPOSITORY:'Blitzer0007/ai-infra-watch',GITHUB_REF:'refs/heads/main',
-    GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-test-token',
+    GITHUB_SHA:exactRepairSha,EXPECTED_MAIN_SHA:exactRepairSha,GH_TOKEN:'fictional-test-token',
     AIW_MAIN_PROTECTION_WAIVER:'YES'};
   assert.deepEqual(await checkCandidate(env,fetcher),[1,2,8]);
   assert.equal(requests.length,4);
   assert(requests[2].endsWith('/pulls/177'));
-  assert(requests[3].endsWith('/commits/'+SHA));
+  assert(requests[3].endsWith('/commits/'+exactRepairSha));
 });
