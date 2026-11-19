@@ -27,6 +27,11 @@ const M6_UI_HEAD_BRANCH = 'feature/milestone6-rea-informed-ui-20261119';
 const M7_APP_UI_PR = 182;
 const M7_APP_UI_FIRST_PARENT = '3bae7b12b567f669c93c859f68fae5d5a5c84cca';
 const M7_APP_UI_HEAD_BRANCH = 'feature/milestone7-application-wide-ui-20261119';
+// The immediate post-merge fix restores exact 360px Holding Details scroll.
+// It is restricted to the main commit that failed UI validation.
+const M7_SCROLL_REPAIR_PR = 183;
+const M7_SCROLL_REPAIR_PARENT = '69921f7a9022af5187ac2206aa5b688b11c855a1';
+const M7_SCROLL_REPAIR_BRANCH = 'fix/milestone7-mobile-holding-scroll-20261119';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
@@ -40,7 +45,9 @@ export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
           ? { parent: M6_UI_FIRST_PARENT, branch: M6_UI_HEAD_BRANCH }
           : pr?.number === M7_APP_UI_PR
             ? { parent: M7_APP_UI_FIRST_PARENT, branch: M7_APP_UI_HEAD_BRANCH }
-            : null;
+            : pr?.number === M7_SCROLL_REPAIR_PR
+              ? { parent: M7_SCROLL_REPAIR_PARENT, branch: M7_SCROLL_REPAIR_BRANCH }
+              : null;
   if (waiver !== M5_PROTECTION_EXCEPTION || !expected ||
       pr?.merged !== true || pr?.state !== 'closed' ||
       pr?.base?.ref !== 'main' || pr?.head?.ref !== expected.branch ||
@@ -126,9 +133,9 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (!body.workflow_runs.length || page === 10) throw Error('CI evidence is incomplete.');
   }
   // The waiver is opt-in and independently attested by the exact merged PR
-  // and commit ancestry. Only the bounded reviewed PRs #176–#179 and #182
-  // can meet this exception. Every candidate must match the pinned immediate
-  // main parent; never a generic branch-protection bypass.
+  // and commit ancestry. Only the bounded reviewed PRs #176–#179, #182
+  // and immediate UI-restore PR #183 can meet this exception. Every candidate
+  // must match its pinned direct main parent; never a generic bypass.
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
@@ -136,7 +143,8 @@ export async function checkCandidate(env, fetcher = fetch) {
       : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR
       : env.EXPECTED_MAIN_SHA === M6_UI_FIRST_PARENT ? M5_ONE_SHOT_PR
       : env.EXPECTED_MAIN_SHA === M7_APP_UI_FIRST_PARENT ? M6_UI_PR
-      : M7_APP_UI_PR;
+      : env.EXPECTED_MAIN_SHA === M7_SCROLL_REPAIR_PARENT ? M7_APP_UI_PR
+      : M7_SCROLL_REPAIR_PR;
     waiverPr = await jsonGet(base + '/pulls/' + prNumber, env.GH_TOKEN, fetcher);
     waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
   }
