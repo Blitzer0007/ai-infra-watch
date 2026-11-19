@@ -157,22 +157,21 @@ jobs:
           # the Vercel platform using the protected CI token, then assert the
           # application's independent anonymous 401 responses and exact bytes.
 
-          home_status="$(vercel curl --silent --show-error --max-time 20 -w '%{http_code}' "$BASE_URL/" -o /tmp/staged-home.html)"
+          home_status="$(vercel curl "$BASE_URL/" -- --silent --show-error --max-time=20 -w '%{http_code}' -o /tmp/staged-home.html)"
           if [ "$home_status" != "200" ]; then
             echo "::error::Staged homepage must return 200 without a redirect or protection page."
             exit 1
           fi
           cmp --silent .vercel/output/static/index.html /tmp/staged-home.html
 
-          auth_status="$(vercel curl --silent --show-error --max-time 20 -o /tmp/production-auth.json -w '%{http_code}' \
-            -H "Content-Type: application/json" -X POST "$BASE_URL/api/auth" --data '{"token":""}')"
+          auth_status="$(vercel curl "$BASE_URL/api/auth" -- --silent --show-error --max-time=20 -o /tmp/production-auth.json -w '%{http_code}' \
+            -H "Content-Type: application/json" -X POST --data '{"token":""}')"
           if [ "$auth_status" != "401" ]; then
             echo "::error::Expected anonymous auth check to return 401, got $auth_status"
             exit 1
           fi
 
-          portfolio_status="$(vercel curl --silent --show-error --max-time 20 -o /tmp/production-portfolio.json -w '%{http_code}' \
-            "$BASE_URL/api/portfolio")"
+          portfolio_status="$(vercel curl "$BASE_URL/api/portfolio" -- --silent --show-error --max-time=20 -o /tmp/production-portfolio.json -w '%{http_code}')"
           if [ "$portfolio_status" != "401" ]; then
             echo "::error::Expected protected portfolio API to return 401, got $portfolio_status"
             exit 1
