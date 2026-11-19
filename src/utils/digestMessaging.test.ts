@@ -99,3 +99,26 @@ testFn('Telegram brief retains actual evidence and time when decision inputs are
   assert.match(result.text,/Forecasts: 0 independent verified · 1 pending/);
   assert.deepEqual(result.reviewSymbols,['NVDA']);
 });
+
+testFn('Telegram brief displays a complete admitted marked value but never a value from partial quotes', () => {
+  const complete=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:2,quotesTotal:2,
+    quoteStatus:'complete',currentValueUsd:1250.5,
+    accountingStatus:'conditional-loaded-records',
+  });
+  assert.match(complete.text,/Marked holdings value: \$1250\.50/);
+  assert.match(complete.text,/not a verified trading return/);
+  assert.doesNotMatch(complete.text,/Trading P&L:/);
+  const partial=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:1,quotesTotal:2,
+    quoteStatus:'partial',currentValueUsd:1250.5,
+    accountingStatus:'quotes-incomplete',
+  });
+  assert.doesNotMatch(partial.text,/1250\.50|Marked holdings value/);
+  const malformed=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:2,quotesTotal:2,
+    quoteStatus:'complete',currentValueUsd:'1250.5',
+    accountingStatus:'conditional-loaded-records',
+  });
+  assert.doesNotMatch(malformed.text,/Marked holdings value/);
+});
