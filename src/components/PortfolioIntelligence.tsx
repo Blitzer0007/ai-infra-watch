@@ -292,18 +292,22 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
           // browser Back that re-opens the same detail entry.
           const currentView=readHoldingNavigation(new URLSearchParams(window.location.search));
           if(isBackOnHoldings()){
-            window.history.scrollRestoration=previous;
-            savedHistoryScrollRestoration.current=null;
+            // Release manual history control only after a final layout paint.
+            // Native browser history can otherwise scroll the focused holding
+            // 24-33px between closing the modal and the restored list frame.
+            requestAnimationFrame(()=>{
+              if(!isBackOnHoldings())return;
+              restoreScroll();
+              window.history.scrollRestoration=previous;
+              savedHistoryScrollRestoration.current=null;
+              restoreScroll();
+            });
           } else if(!currentView.detail){
             // An Evidence tab (no dialog) can use native scroll behavior,
             // but never override a dialog reopened by Back during this RAF.
             window.history.scrollRestoration=previous;
           }
         }
-        // Re-enabling automatic browser-history restoration can itself nudge
-        // the viewport after a modal closes at narrow widths. Reinstate the
-        // captured list viewport after restoring history mode, not only before.
-        restoreScroll();
       });
     });
   };
