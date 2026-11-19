@@ -461,6 +461,7 @@ export async function buildDigest(decisionJournal) {
     quotesAccepted: rows.filter(row => row.quoteStatus === 'fresh').length,
     quotesTotal: rows.length,
     quoteStatus: actual.quoteCoverage.status,
+    currentValueUsd: actual.currentValue,
     accountingStatus: actual.accountingStatus,
   });
   return {date,text:telegramBrief.text,telegramBrief,rows,totalValue:fullValue,totalPnl:actual.totalTradingPnl,
