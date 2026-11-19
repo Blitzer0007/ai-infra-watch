@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Menu, X, TrendingUp, Grid, FileText, Calendar, ShieldAlert, BadgePercent, Settings as SettingsIcon, Bot, BookOpen, Search
-} from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { AppConfig, loadConfig, saveConfig, formatPrice, formatPct, fetchLiveQuote } from './utils';
 import { STOCK_METADATA } from './data';
 import { STOCK_UNIVERSE_SYMBOLS } from './utils/stockUniverse';
@@ -11,6 +9,9 @@ import { evaluateFeedAlerts, evaluateQuoteAlerts, notifyBrowser, notifyTelegram 
 import { fetchPortfolioHoldings } from './utils/portfolioApi';
 import { authFetch, getAccessToken } from './utils/apiAuth';
 import FreshnessBadge from './components/FreshnessBadge';
+import WorkspaceNavigation from './components/shell/WorkspaceNavigation';
+import WorkspaceHeader from './components/shell/WorkspaceHeader';
+import FeedStatusBar from './components/shell/FeedStatusBar';
 import UniversalSearch from './components/UniversalSearch';
 import OpportunityScanner from './components/opportunities/OpportunityScanner';
 import CatalystCalendar from './components/calendar/CatalystCalendar';
@@ -63,6 +64,14 @@ export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [isMobileMenuOpen]);
   const [lastQuoteRefresh, setLastQuoteRefresh] = useState<number | null>(null);
   const [portfolioSymbols, setPortfolioSymbols] = useState<string[]>([]);
   const [portfolioSymbolsKnown,setPortfolioSymbolsKnown]=useState(false);
@@ -373,243 +382,110 @@ export default function App() {
     );
   }
 
-  // Sidebar link details
-  // The summary is the default landing surface: overview is intentionally the first route.
-  const navigationItems = [
-    { id: 'overview', label: 'Overview', index: '01', icon: Grid },
-    { id: 'opportunities', label: 'Opportunities', index: 'R2', icon: Search },
-    { id: 'calendar', label: 'Catalyst Calendar', index: 'R2', icon: Calendar },
-    { id: 'alerts', label: 'Alert Inbox', index: 'R2', icon: ShieldAlert },
-    { id: 'contracts', label: 'Contracts', index: '02', icon: FileText },
-    { id: 'tracker', label: 'Progress Tracker', index: '03', icon: Calendar },
-    { id: 'congress', label: 'Congress Trades', index: '04', icon: BadgePercent },
-    { id: 'macro', label: 'Macro & Politics', index: '05', icon: ShieldAlert },
-    { id: 'portfolio', label: 'Portfolio Intelligence', index: '06', icon: TrendingUp },
-    { id: 'watchlist', label: 'Watchlist', index: '07', icon: TrendingUp },
-    { id: 'research', label: 'AI Research', index: '08', icon: Bot },
-    { id: 'jev-lab', label: 'JEV Portfolio Lab', index: '09', icon: Bot },
-    { id: 'quality', label: 'AI Quality Lab', index: '10', icon: Bot },
-    { id: 'outlook', label: 'Forward Outlook', index: '11', icon: TrendingUp },
-    { id: 'health', label: 'Data Health', index: '12', icon: ShieldAlert },
-    { id: 'guide', label: 'How to Use', index: '?', icon: BookOpen },
-    { id: 'settings', label: 'Settings', index: '⚙', icon: SettingsIcon }
-  ];
+
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-[#F3F4F6] flex flex-col font-sans selection:bg-emerald-500/35 selection:text-white">
-      {/* 1. TOP LIVE FINANCIAL TICKER MARQUEE */}
-      <div className="bg-[#0F1115] border-b border-white/10 h-8 flex items-center overflow-hidden relative z-50">
-        <div className="flex whitespace-nowrap animate-[marquee_50s_linear_infinite] hover:[animation-play-state:paused] cursor-pointer">
-          {Object.keys(STOCK_METADATA).map((sym) => {
-            const p = tickerPrices[sym];
-            const isUp = p ? p.changePct >= 0 : true;
-            return (
-              <span key={sym} className="mx-6 text-[10px] font-mono inline-flex items-center space-x-1.5 select-none">
-                <span className="text-white/40 font-bold uppercase tracking-wider">{sym}</span>
-                <span className="text-[#F3F4F6] font-bold">
-                  {p ? `$${formatPrice(p.price)}` : '—'}
-                </span>
-                <span className={isUp ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
-                  {p ? `${isUp ? '▲' : '▼'} ${formatPct(p.changePct)}` : '—'}
-                </span>
-                {p && <FreshnessBadge marketTime={p.marketTime} retrievedAt={p.retrievedAt} asOf={p.asOf} stale={p.stale} showAge={false} />}
-              </span>
-            );
-          })}
-          {/* Repeat for seamless loop */}
-          {Object.keys(STOCK_METADATA).map((sym) => {
-            const p = tickerPrices[sym];
-            const isUp = p ? p.changePct >= 0 : true;
-            return (
-              <span key={`dup-${sym}`} className="mx-6 text-[10px] font-mono inline-flex items-center space-x-1.5 select-none">
-                <span className="text-white/40 font-bold uppercase tracking-wider">{sym}</span>
-                <span className="text-[#F3F4F6] font-bold">
-                  {p ? `$${formatPrice(p.price)}` : '—'}
-                </span>
-                <span className={isUp ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
-                  {p ? `${isUp ? '▲' : '▼'} ${formatPct(p.changePct)}` : '—'}
-                </span>
-                {p && <FreshnessBadge marketTime={p.marketTime} retrievedAt={p.retrievedAt} asOf={p.asOf} stale={p.stale} showAge={false} />}
-              </span>
-            );
+    <div className="aiw-application min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white">
+{/* 1. FINITE, ACCESSIBLE MARKET OBSERVATION STRIP */}
+      <div role="region" aria-label="Observed market quotes"
+        className="aiw-market-strip relative z-50 flex h-8 w-full min-w-0 items-center gap-3 overflow-hidden border-b border-white/10 px-3 sm:px-5">
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-200/80">Quotes</span>
+        <div tabIndex={0} aria-label="Scroll market quote observations"
+          className="aiw-market-strip-scroll flex min-w-0 flex-1 items-center gap-6 overflow-x-auto whitespace-nowrap">
+          {Object.keys(STOCK_METADATA).map(sym => {
+            const quote = tickerPrices[sym];
+            const valid = quote && Number.isFinite(quote.price) && Number.isFinite(quote.changePct);
+            const up = valid ? quote.changePct >= 0 : null;
+            return <span key={sym} className="inline-flex shrink-0 items-center gap-1.5 text-[11px]">
+              <span className="font-semibold tracking-wide text-slate-400">{sym}</span>
+              <span className="font-semibold text-white">{valid ? '$' + formatPrice(quote.price) : '—'}</span>
+              {valid && <span className={up ? 'font-semibold text-emerald-300' : 'font-semibold text-rose-300'}>
+                {formatPct(quote.changePct)}
+              </span>}
+              {valid && <FreshnessBadge marketTime={quote.marketTime} retrievedAt={quote.retrievedAt}
+                asOf={quote.asOf} stale={quote.stale} showAge={false}/>}
+            </span>;
           })}
         </div>
       </div>
 
       {/* 2. BODY LAYOUT */}
       <div className="flex flex-col xl:flex-row flex-1 relative w-full min-w-0 max-w-full overflow-x-hidden">
-        {/* DESKTOP SIDEBAR */}
-        <aside className="aiw-desktop-sidebar fixed top-8 bottom-0 left-0 z-40 flex-col w-64 bg-[#0F1115] border-r border-white/10 p-6 space-y-8 overflow-y-auto">
-          {/* Brand header */}
-          <div className="space-y-1 border-b border-white/10 pb-4">
-            <div className="flex items-center space-x-2 text-white">
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-              <span className="font-black tracking-tighter text-lg uppercase italic">AI INFRA WATCH</span>
+{/* DESKTOP SIDEBAR: EVERY ROUTE IS PRESENT AND GROUPED BY JOB */}
+        <aside className="aiw-desktop-sidebar fixed bottom-0 left-0 top-8 z-40 w-64 flex-col overflow-y-auto border-r border-white/10 p-5">
+          <div className="aiw-brand-block mb-5 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
+            <span aria-hidden="true" className="aiw-brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black">A</span>
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold tracking-tight text-white">AI INFRA WATCH</p>
+              <p className="mt-1 text-[11px] text-slate-400">Portfolio research platform</p>
             </div>
-            <p className="text-[10px] text-white/40 font-mono tracking-widest uppercase">Self-hosted monitor</p>
           </div>
-
-          {/* Navigation Links */}
-          <nav className="flex-1 flex flex-col space-y-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Dashboard Hub</span>
-{navigationItems.map((item) => {
-              const IconComp = item.icon;
-              const isActive = activeView === item.id;
-              return (
-                <button
-                  key={item.id}
-                  data-testid={"nav-" + item.id}
-                  onClick={() => handleNavigate(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
-                    isActive
-                      ? 'bg-white/10 text-emerald-400 border border-white/15'
-                      : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <IconComp className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-white/40'}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  <span className="text-[9px] font-mono opacity-50">{item.index}</span>
-                </button>
-              );
-            })}
-
-                      </nav>
-
-          {/* Sidebar Footer */}
-          <div className="border-t border-white/10 pt-4 text-[10px] font-mono text-white/40 space-y-1">
-            <p>System Ver: 1.2.4</p>
-            <p className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              <span>Core Online</span>
-            </p>
+          <WorkspaceNavigation activeView={activeView} onNavigate={handleNavigate} variant="desktop"/>
+          <div className="aiw-sidebar-footer mt-5 border-t border-white/10 px-3 py-4 text-xs leading-relaxed text-slate-400">
+            <p>Evidence-first research · No automatic trades</p>
+            <p className="mt-1">Verify source freshness on Data Health.</p>
           </div>
         </aside>
 
-        {/* MOBILE TOP NAV HEADER */}
-        <div className="aiw-mobile-header w-full min-w-0 max-w-full shrink-0 bg-[#0F1115] border-b border-white/10 px-4 py-3 flex items-center justify-between sticky top-8 z-40">
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-            <span className="font-black text-sm tracking-tight text-white uppercase italic">AI INFRA WATCH</span>
+{/* MOBILE HEADER */}
+        <div className="aiw-mobile-header sticky top-8 z-40 flex w-full max-w-full shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span aria-hidden="true" className="aiw-brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black">A</span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-extrabold tracking-tight text-white">AI INFRA WATCH</p>
+              <p className="text-[11px] text-slate-400">Research workspaces</p>
+            </div>
           </div>
-
-          <button
-            type="button"
-            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+          <button type="button" aria-expanded={isMobileMenuOpen} aria-controls="aiw-mobile-workspace-menu"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-1.5 bg-white/5 border border-white/10 text-white rounded-lg cursor-pointer"
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            className="aiw-mobile-menu-button inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/15">
+            {isMobileMenuOpen ? <X aria-hidden="true" size={21}/> : <Menu aria-hidden="true" size={21}/>}
           </button>
         </div>
 
-        {/* MOBILE SIDEBAR DRAWERS */}
+{/* MOBILE NAVIGATION DRAWER */}
         <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.25 }}
-              className="aiw-mobile-drawer fixed inset-y-16 left-0 w-72 bg-[#0F1115] border-r border-white/10 p-6 z-40 flex flex-col space-y-8"
-            >
-              <nav className="flex-1 flex flex-col space-y-1.5 pt-4">
-                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Dashboard Hub</span>
-                {navigationItems.map((item) => {
-                  const IconComp = item.icon;
-                  const isActive = activeView === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-current={isActive ? "page" : undefined}
-                      onClick={() => handleNavigate(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-tight transition cursor-pointer ${
-                        isActive
-                          ? 'bg-white/10 text-emerald-400 border border-white/15'
-                          : 'text-[#F3F4F6]/60 hover:text-white hover:bg-white/5 border border-transparent'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <IconComp className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-white/40'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      <span className="text-[10px] font-mono opacity-50">{item.index}</span>
-                    </button>
-                  );
-                })}
-
-                              </nav>
-
-              <div className="border-t border-white/10 pt-4 text-[10px] font-mono text-white/40 space-y-1">
-                <p>System Ver: 1.2.4</p>
-                <p>Network status: Online</p>
+          {isMobileMenuOpen && <>
+            <motion.button type="button" aria-label="Close menu overlay"
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              transition={{duration:0.15}} onClick={() => setIsMobileMenuOpen(false)}
+              className="aiw-mobile-backdrop fixed inset-0 z-30 cursor-default bg-[#050b12]/75"/>
+            <motion.div id="aiw-mobile-workspace-menu"
+              initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
+              transition={{type:'tween',duration:0.2}}
+              className="aiw-mobile-drawer fixed bottom-0 left-0 z-40 flex w-[min(21rem,92vw)] flex-col overflow-y-auto border-r border-white/15 p-5"
+              aria-label="Mobile application navigation">
+              <div className="mb-5 border-b border-white/10 pb-4">
+                <p className="text-sm font-bold text-white">Workspaces</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">Select a destination to continue your research.</p>
               </div>
+              <WorkspaceNavigation activeView={activeView} onNavigate={handleNavigate} variant="mobile"/>
             </motion.div>
-          )}
+          </>}
         </AnimatePresence>
 
-        {/* 3. MAIN DASHBOARD MAINSPACE CONTAINER */}
-        <main className="aiw-main flex-1 w-full min-w-0 max-w-full bg-[#0F1115] p-4 md:p-6 lg:p-8 overflow-x-hidden min-h-[calc(100vh-2rem)]">
-          <div className="max-w-7xl mx-auto mb-4 flex justify-end">
-            <UniversalSearch onNavigate={handleNavigate} />
+{/* 3. APPLICATION-WIDE WORKSPACE */}
+        <main id="main-content"
+          className="aiw-main flex-1 w-full min-w-0 max-w-full overflow-x-hidden px-4 pb-8 pt-5 md:px-6 lg:px-8">
+          <div className="aiw-top-actions mx-auto mb-4 flex max-w-7xl flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-400">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-cyan-300"/>
+              Evidence before decisions
+            </div>
+            <UniversalSearch onNavigate={handleNavigate}/>
           </div>
-          {/* Universal Live AI Sync Controller Panel */}
-          <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#15181E]/40 border border-white/10 rounded-2xl p-4 gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="relative flex-shrink-0">
-                <span className={`w-2.5 h-2.5 rounded-full block ${isLiveLoading ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">Live Market Intelligence</span>
-                  <span className="text-[8px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    {isLiveLoading ? 'SYNCHRONIZING' : 'ACTIVE FEED'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-white/60 leading-normal mt-0.5">
-                  {isLiveLoading 
-                    ? "Compiling live market quotes from Yahoo Finance and AI-infrastructure headlines from GDELT..." 
-                    : liveData?.marketSentiment 
-                      ? `Global AI Market: "${liveData.marketSentiment}"`
-                      : "Live market quotes and AI-infrastructure news from the configured public data feeds."}
-                </p>
-                <div className="mt-1 text-[9px] font-mono text-white/25 uppercase tracking-wider">
-                  BUILD {liveData?.build?.commit ? liveData.build.commit.slice(0, 7) : 'LOCAL'} · {liveData?.build?.environment || 'unknown'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end border-t border-white/5 pt-3 md:pt-0 md:border-0">
-              {liveData && liveData.timestamp && (
-                <span className="text-[9px] font-mono text-white/40 uppercase tracking-wider">
-                  SYNCED: {new Date(liveData.timestamp).toLocaleTimeString()}
-                </span>
-              )}
-              {(() => {
-                const quoteValues = Object.values(tickerPrices) as LivePrice[];
-                const fresh = quoteValues.filter(item => !item.stale).length;
-                const stale = quoteValues.filter(item => item.stale).length;
-                return quoteValues.length ? (
-                  <span className="text-[8px] font-mono uppercase tracking-wider text-white/35">
-                    QUOTE FRESHNESS · {fresh} current · {stale} last close
-                  </span>
-                ) : null;
-              })()}
-              <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
-                AUTO: FEED 5M · QUOTES 60S{lastQuoteRefresh ? ' · LAST QUOTE ' + new Date(lastQuoteRefresh).toLocaleTimeString() : ''}
-              </span>
-              <button
-                onClick={() => handleFetchLiveData(true)}
-                disabled={isLiveLoading}
-                aria-label={isLiveLoading ? 'SYNCHRONIZING...' : 'REFRESH FEED'}
-                className="bg-emerald-500 hover:bg-emerald-600 text-black px-4 py-2 rounded-lg text-xs font-mono font-black uppercase tracking-wider flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer shadow-[0_4px_12px_rgba(16,185,129,0.15)]"
-              >
-                <span aria-hidden="true" className={isLiveLoading ? "animate-spin" : ""}>🔄</span>
-                <span>{isLiveLoading ? "SYNCHRONIZING..." : "REFRESH FEED"}</span>
-              </button>
-            </div>
+          <div className="mx-auto mb-4 max-w-7xl">
+            <WorkspaceHeader view={activeView} onNavigate={handleNavigate}/>
+          </div>
+          <div className="mx-auto mb-6 max-w-7xl">
+            <FeedStatusBar loading={isLiveLoading} error={liveError}
+              observedAt={liveData?.timestamp ?? null} buildCommit={liveData?.build?.commit}
+              environment={liveData?.build?.environment}
+              quoteCount={Object.keys(tickerPrices).length}
+              quotesNotFlaggedStale={Object.values(tickerPrices).filter(quote => !quote.stale).length}
+              lastQuoteRefresh={lastQuoteRefresh}
+              onRefresh={() => { void handleFetchLiveData(true); }}/>
           </div>
 
           <AnimatePresence mode="wait">
@@ -620,7 +496,7 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
               onAnimationComplete={reloadSettings}
-              className="max-w-7xl mx-auto"
+              className="aiw-view-stage max-w-7xl mx-auto min-w-0" data-testid="application-workspace"
             >
               {activeView === 'overview' && <Overview config={config} onNavigate={handleNavigate} livePrices={{ ...(liveData?.stockPrices || {}), ...tickerPrices }} news={liveData?.news} timestamp={liveData?.timestamp} evidenceAvailability={liveData?.evidenceAvailability} />}
               {activeView === 'contracts' && <ContractsLedger liveContracts={liveData?.contracts} portfolioSymbols={portfolioSymbols} />}
@@ -643,7 +519,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* App Footer */}
-          <footer className="max-w-7xl mx-auto border-t border-white/10 mt-12 pt-6 pb-4 text-[10px] font-mono text-white/40 leading-normal space-y-1">
+          <footer className="aiw-app-footer max-w-7xl mx-auto border-t border-white/10 mt-12 pt-6 pb-4 text-xs text-slate-400 leading-relaxed space-y-1">
             <p>
               Browser-side quote customization uses locally stored Finnhub authorization tokens. Server-side earnings alerts use Vercel environment credentials when configured; no customer details are transferred.
             </p>
