@@ -447,10 +447,13 @@ export async function buildDigest(decisionJournal) {
   const sorted = [...valid].sort((a,b)=>b.value-a.value);
   const date = new Intl.DateTimeFormat('en-CA',{timeZone:process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const result = await fetchDecisionCenter();
-  const decision = result.decision ? {...result.decision, portfolio:{...result.decision.portfolio,
-    ...actual,admittedQuotes:undefined,positionMarks:undefined,positionOpenCostBasis:undefined,positionUnrealizedPnl:undefined,
-    accountingStatus:actual.accountingStatus,cashFlowPnl:null,accountingReconciled:false},benchmark:{},
-    actionItems:(Array.isArray(result.decision.actionItems)?result.decision.actionItems:[]).filter(item=>actual.admittedQuotes[item.symbol])} : null;
+  // The decision center owns the authoritative review evidence and its eligibility
+  // gates. Do not overwrite that result with a second, independently fetched
+  // accounting snapshot: doing so loses concentration/risk calculations and can
+  // silently discard otherwise valid review prompts.
+  // The separately calculated "actual" snapshot is still used for the legacy
+  // digest fields below, where its provisional status remains explicit.
+  const decision = result.decision || null;
   const sunday = new Intl.DateTimeFormat('en-US',{timeZone:process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata',weekday:'short'}).format(new Date()) === 'Sun';
   const weekly = sunday && decisionJournal?.getWeeklyDecisionReview ? await decisionJournal.getWeeklyDecisionReview().catch(()=>null) : null;
   const telegramBrief = buildTelegramDecisionBrief(decision,date,weekly);
