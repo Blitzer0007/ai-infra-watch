@@ -179,7 +179,7 @@ def test_ai_quality_lab_mounts(page):
     page.get_by_test_id("nav-quality").click()
     lab = page.get_by_test_id("ai-quality-lab")
     lab.wait_for(state="attached", timeout=30000)
-    assert "AI QUALITY LAB" in lab.inner_text()
+    lab.get_by_role("heading", name="AI Quality Lab", exact=True).wait_for(state="visible", timeout=30000)
 
 def test_portfolio_manager_create_flow(page):
     mock_local_apis(page)
@@ -311,6 +311,10 @@ def test_decision_impact_center_mounts_and_prioritizes_reviews(page):
     assert "What matters for you now" in center.inner_text()
     assert "Same cash-flow benchmark" in center.inner_text()
     assert "verified" in center.inner_text()
+    gate = center.get_by_test_id("pre-trade-gate")
+    gate.get_by_text("Portfolio review is incomplete", exact=True).wait_for(state="visible", timeout=30000)
+    gate.get_by_text("Review data readiness", exact=True).click()
+    gate.get_by_text("Forecast evidence", exact=True).wait_for(state="visible", timeout=30000)
     assert "/50" in center.inner_text()
     assert "NVDA" in center.inner_text()
 

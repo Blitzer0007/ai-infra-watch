@@ -28,6 +28,7 @@ These are actual Chromium renders at desktop 1440px and mobile 390px, using **fi
 - Focused mocked Chromium suite: 57 passed across shared navigation, Portfolio/history/modal, decision accounting and glossary.
 - Final header-overlap correction: 10/10 application workspace tests passed, including all 17 routes at 390px and 1440px, light-canvas/title contrast, zero browser exceptions, zero overflow, zero passive API writes and keyboard-operated disclosures.
 - Offline CI/deployment safety tests: 32 passed. The existing UI workflow now includes `qa/test_application_workspace.py`; no release workflow or deployment gate is changed.
+- Legacy smoke-test compatibility: assert the Quality Lab semantic heading instead of CSS-generated uppercase text, and expand readiness before asserting its unchanged forecast /50 evidence. The incomplete-review warning is independently asserted while visible.
 - Security audit, production build and staged diff whitespace check: passed. Exact-head GitHub workflow results are authoritative in the draft PR checks; local results are not a substitute for CI.
 
 React review: no added effects, fetching, dependencies, calculations or state duplication. Existing accessible names and route controls are retained; native disclosures use keyboard-accessible summaries; portal theme and focus visibility are explicit.
