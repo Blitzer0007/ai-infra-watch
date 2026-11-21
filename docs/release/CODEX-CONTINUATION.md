@@ -1,4 +1,6 @@
-# Production data review · 21 November 2026
+# Product plan and production data review · 21 November 2026
+
+Read [the reconciled product backlog](PLAN-RECONCILIATION-2026-11-21.md) before continuing. The current increment isolates transaction-service outages in Decision Center and the digest. Preserve usable marks with explicit unavailable transaction evidence, and keep financial returns withheld. Run current-commit CI after pushing.
 
 The public hostname `ai-infra-watch-theta.vercel.app` resolved in Vercel to READY deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU`, commit `6827cce` (Milestone 5). The newer READY redesign `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` is on `347240c7`. GitHub release run 44480264314 records successful promotion on November 19. Current alias metadata establishes a different target today. The reason for the change is unverified. Confirm intended release and rollback history before changing production routing.
 

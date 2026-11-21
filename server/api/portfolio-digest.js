@@ -420,14 +420,17 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
 
 export async function buildDigest(decisionJournal) {
   const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&quantity=gt.0&order=symbol.asc');
-  const transactions = await supabase('portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc');
-  if (!Array.isArray(holdings) || holdings.length > 150 || !Array.isArray(transactions) || transactions.length > 1000) throw new Error('Loaded records exceed the supported accounting review scope.');
+  const transactions = await supabase('portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc').catch(() => null);
+  if (!Array.isArray(holdings) || holdings.length > 150 || (Array.isArray(transactions) && transactions.length > 1000)) throw new Error('Loaded records exceed the supported accounting review scope.');
   const entries = await Promise.all(holdings.map(async row => {
     try { return [String(row.symbol).trim().toUpperCase(), await routedQuote(row.symbol)]; }
     catch { return [String(row.symbol).trim().toUpperCase(), null]; }
   }));
   const rawQuotes = Object.fromEntries(entries);
-  const actual = calculateReviewedServerPortfolio(holdings,transactions,rawQuotes,Date.now());
+  const actual = calculateReviewedServerPortfolio(
+    holdings, Array.isArray(transactions) ? transactions : [], rawQuotes, Date.now(),
+    { holdings: 'ready', transactions: Array.isArray(transactions) ? 'ready' : 'unavailable' },
+  );
   const rows = holdings.map(holding => {
     const original = storedHoldingInputs(holding), symbol = original.symbol;
     const q = actual.admittedQuotes[symbol], mark = actual.positionMarks.find(item => item.symbol === symbol);

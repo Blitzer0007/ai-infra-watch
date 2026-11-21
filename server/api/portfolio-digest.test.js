@@ -4,13 +4,14 @@ import { execFileSync } from 'node:child_process';
 
 // A fresh process receives fictional credentials only. Every fetch is intercepted;
 // unknown URLs/methods throw, so no database, provider or Telegram service is used.
-function exercise(method, decisionAvailable = true, digestQuoteAvailable = true) {
+function exercise(method, decisionAvailable = true, digestQuoteAvailable = true, ledgerAvailable = true) {
   const script = `
     import assert from 'node:assert/strict';
     const calls=[]; let telegramPayload=null;
     globalThis.fetch=async (input, options={})=>{
       const url=String(input); const method=options.method||'GET'; calls.push({url,method});
       if(url.startsWith('https://digest-fixture.invalid/rest/v1/portfolio_holdings') && method==='GET') return new Response(JSON.stringify([{symbol:'NVDA',quantity:1,average_cost:999}]));
+      if(url.startsWith('https://digest-fixture.invalid/rest/v1/portfolio_transactions') && !${ledgerAvailable}) return new Response('{}',{status:503});
       if(url.startsWith('https://digest-fixture.invalid/rest/v1/') && method==='GET') return new Response('[]');
       if(url.startsWith('https://query1.finance.yahoo.com/v8/finance/chart/NVDA?') && method==='GET') {
         if (!${digestQuoteAvailable}) return new Response('{}',{status:503});
@@ -76,4 +77,12 @@ test('an independent digest quote failure cannot erase an assessed Decision Cent
   assert.match(result.text, /NVDA · URGENT REVIEW/);
   assert.match(result.text, /Fictional rule evidence/);
   assert.doesNotMatch(result.text, /NVDA · \$100/);
+});
+
+
+test('digest preview retains quotes through an unavailable transaction service', () => {
+  const result = exercise('GET', false, true, false);
+  assert.match(result.text, /Recorded holdings: 1/);
+  assert.match(result.text, /Marked holdings value: \$100.00/);
+  assert.doesNotMatch(result.text, /Trading P&L:/);
 });

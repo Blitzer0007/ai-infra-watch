@@ -2,6 +2,8 @@
 
 Last reconciled: 2026-10-15
 
+Current delivery comparison and outstanding Release 2 requirements are recorded in [the November 21 reconciliation](release/PLAN-RECONCILIATION-2026-11-21.md). The historical checklist below retains its original evidence.
+
 This is the canonical **product and engineering** checklist for AI Infra Watch. The separate `AI_Engineering_Roadmap.md` and `AI_Engineering_Roadmap-1.md` are learning/career plans; they are not product delivery backlogs and should not be used to infer product completion. `AI_INFRA_WATCH_AGENT_CONTEXT.md` is architecture/context reference material.
 
 ## Non-negotiable operating constraints

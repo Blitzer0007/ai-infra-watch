@@ -1,6 +1,6 @@
 // Offline fictional handler replay. Every transport is replaced before import.
 const mode = process.argv[2] || 'valid';
-if (!['valid','unknown-fee','partial','simulated','tiny','zero','loss','evidence-outage'].includes(mode)) throw Error('Unknown fictional case');
+if (!['valid','unknown-fee','partial','simulated','tiny','zero','loss','evidence-outage','ledger-outage','earnings-malformed'].includes(mode)) throw Error('Unknown fictional case');
 const now = Date.parse('2026-11-13T18:00:00Z');
 const NativeDate = Date;
 globalThis.Date = class extends NativeDate {
@@ -13,6 +13,7 @@ const testAccess = 'fictional-only-access';
 process.env.AIW_ACCESS_TOKEN = testAccess;
 delete process.env.FINNHUB_API_KEY;
 delete process.env.ALPHA_VANTAGE_API_KEY;
+if (mode === 'earnings-malformed') process.env.FINNHUB_API_KEY = 'fictional-only-finnhub';
 const cost = mode === 'tiny' ? 1e-10 : 100;
 const price = mode === 'tiny' ? 2e-10 : mode === 'zero' ? 100 : mode === 'loss' ? 80 : 150;
 const symbols = mode === 'partial' ? ['FICT','DEMO'] : ['FICT'];
@@ -30,12 +31,14 @@ globalThis.fetch = async (input, options={}) => {
   if (url.origin === 'https://fictional-decision-db.invalid') {
     if (url.pathname.endsWith('/portfolio_holdings')) return reply(holdings);
     if (url.pathname.endsWith('/portfolio_transactions')) {
+      if (mode === 'ledger-outage') return new Response('{}',{status:503});
       for (const field of ['id','order_executed_at','price']) if (!url.searchParams.get('select').split(',').includes(field)) throw Error('Required original field was not requested');
       return reply(trades);
     }
     if (mode === 'evidence-outage' && url.pathname.endsWith('/forecast_snapshots')) return new Response('{}',{status:503});
     if (['/forecast_snapshots','/portfolio_signal_family_scorecard'].some(path=>url.pathname.endsWith(path))) return reply([]);
   }
+  if (url.origin === 'https://finnhub.io') return reply({error:'Fictional malformed calendar'});
   if (url.origin === 'https://query1.finance.yahoo.com' && url.pathname.startsWith('/v8/finance/chart/')) {
     const symbol = decodeURIComponent(url.pathname.split('/').at(-1));
     if (mode === 'partial' && symbol === 'DEMO' && url.searchParams.get('range') === '5d') return new Response('{}',{status:503});

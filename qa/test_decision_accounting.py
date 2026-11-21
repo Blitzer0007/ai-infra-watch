@@ -68,3 +68,23 @@ def test_forecast_service_failure_preserves_portfolio_and_rule_review(page):
     center = page.get_by_test_id('decision-impact-center')
     expect(center).to_contain_text('Forecast history could not be verified')
     expect(center.get_by_text('Trading P&L',exact=True).locator('..')).to_contain_text('+$50.00')
+
+
+@pytest.mark.parametrize('mode', ['ledger-outage', 'earnings-malformed'])
+def test_partial_service_failures_keep_holdings_readable(page, mode):
+    body = replay(mode)
+    assert body['ok'] and body['portfolio']['holdings'] == 1
+    assert body['portfolio']['currentValue'] == 150
+    if mode == 'ledger-outage':
+        assert body['portfolio']['totalTradingPnl'] is None
+        assert any(issue['code'] == 'RECORDS_UNAVAILABLE' for issue in body['portfolio']['accountingIssues'])
+    else:
+        assert body['earningsStatus'] == 'unavailable'
+    mock_local_apis(page)
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    expect(page.get_by_test_id('decision-impact-center')).to_be_visible()
+    expect(page.get_by_test_id('pre-trade-gate')).to_be_visible()
+    assert errors == []

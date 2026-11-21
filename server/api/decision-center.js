@@ -371,14 +371,18 @@ export default async function handler(req, res) {
     );
     const transactionRows = await supabase(
       'portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,source_row,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc',
-    );
+    ).catch(() => null);
 
     const symbols = holdingRows.map(row => String(row.symbol).toUpperCase());
     const quoteEntries = await Promise.all(symbols.map(async symbol => {
       try { return [symbol, await routedQuote(symbol)]; } catch { return [symbol, null]; }
     }));
     const ruleAssessmentTime = new Date();
-    const actual = calculateReviewedServerPortfolio(holdingRows, transactionRows, Object.fromEntries(quoteEntries), ruleAssessmentTime.getTime());
+    const actual = calculateReviewedServerPortfolio(
+      holdingRows, Array.isArray(transactionRows) ? transactionRows : [],
+      Object.fromEntries(quoteEntries), ruleAssessmentTime.getTime(),
+      { holdings: 'ready', transactions: Array.isArray(transactionRows) ? 'ready' : 'unavailable' },
+    );
     const quotes = actual.admittedQuotes;
     const profitReviewSymbols = holdingRows.filter(holding => {
       const symbol = String(holding.symbol).toUpperCase();
