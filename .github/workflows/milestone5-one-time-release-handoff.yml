@@ -1,8 +1,8 @@
-name: Milestone 5 One-Time Release Handoff
-run-name: One-time CI release handoff • ${{ github.event.workflow_run.head_sha }}
+name: Milestone 7 App-wide UI Release Handoff
+run-name: One-time Milestone 7 UI release handoff • ${{ github.event.workflow_run.head_sha }}
 
 # The GitHub connector cannot start workflow_dispatch. For this explicitly
-# authorized Milestone 5 release only, a successful exact-main QA run can
+# authorized Milestone 7 full-application UI release only, a successful exact-main QA run can
 # dispatch the existing manual guarded production workflow. This workflow
 # itself has no Vercel credentials and no production environment access.
 on:

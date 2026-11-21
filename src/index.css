@@ -322,3 +322,264 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
   background: #0f1115; color: white; overscroll-behavior: contain;
 }
 .aiw-holding-dialog::backdrop { background: #000b; }
+
+
+/* Milestone 6: evidence-first portfolio workspace.
+   These styles are local to the new command surface and never alter data gates. */
+.aiw-command-center {
+  background:
+    radial-gradient(ellipse at 98% 0%, rgba(34, 211, 238, .085), transparent 36%),
+    linear-gradient(145deg, #111c28 0%, #0f151e 64%, #0f1115 100%);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, .14);
+}
+
+.aiw-stat-tile {
+  position: relative;
+  isolation: isolate;
+  transition: border-color .18s ease, background-color .18s ease;
+}
+
+.aiw-stat-tile::before {
+  content: "";
+  position: absolute;
+  inset: -1px auto -1px -1px;
+  width: 3px;
+  border-radius: 1rem 0 0 1rem;
+  background: linear-gradient(to bottom, rgba(103, 232, 249, .78), rgba(16, 185, 129, .08));
+  pointer-events: none;
+}
+
+.aiw-stat-tile:hover {
+  border-color: rgba(103, 232, 249, .27);
+  background: rgba(26, 40, 57, .84);
+}
+
+.aiw-command-center :is(button, a, select):focus-visible,
+#root [data-testid="portfolio-navigation"] :is(button, select, summary):focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiw-stat-tile { transition: none; }
+}
+
+
+/* Milestone 7 — unified application shell. All seventeen routes share this
+   surface; no provider, portfolio, alert, or decision behavior is changed. */
+:root {
+  color-scheme: dark;
+  --aiw-ink: #e8eff7;
+  --aiw-subtle: #9cacc2;
+  --aiw-outline: rgba(148, 171, 195, .2);
+  --aiw-focus: #67e8f9;
+  --aiw-card: rgba(20, 32, 47, .8);
+}
+.aiw-application {
+  background:
+    radial-gradient(ellipse at 80% -16%, rgba(22, 133, 174, .085), transparent 37%),
+    linear-gradient(180deg, #0d151f 0%, #0c121a 62%, #0b1119 100%);
+}
+.aiw-market-strip {
+  background: #101c29;
+  box-shadow: 0 2px 12px rgba(0,0,0,.12);
+}
+.aiw-market-strip-scroll {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.aiw-market-strip-scroll::-webkit-scrollbar { display: none; }
+.aiw-market-strip-scroll:focus-visible {
+  outline: 2px solid var(--aiw-focus);
+  outline-offset: -2px;
+  border-radius: .35rem;
+}
+.aiw-desktop-sidebar,
+.aiw-mobile-drawer {
+  background: linear-gradient(170deg, #111e2c 0%, #0c151f 70%, #0c121a 100%);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(149, 187, 207, .25) transparent;
+}
+.aiw-brand-block { background: rgba(119, 189, 213, .04); }
+.aiw-brand-mark {
+  color: #a5f3fc;
+  background: linear-gradient(130deg, #15394e, #0f2734);
+  border: 1px solid rgba(103,232,249,.3);
+  box-shadow: inset 0 1px rgba(255,255,255,.05);
+}
+.aiw-nav-group-label {
+  color: #869cb4;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.aiw-nav-group-label span:last-child { color: #54708b; }
+.aiw-nav-entry {
+  color: #b7c5d6;
+  border: 1px solid transparent;
+  line-height: 1.35;
+}
+.aiw-nav-entry:hover {
+  border-color: rgba(148,188,209,.18);
+  background: rgba(129,179,209,.065);
+  color: #f4f9ff;
+}
+.aiw-nav-entry--active,
+.aiw-nav-entry--active:hover {
+  border-color: rgba(103,232,249,.23);
+  background: linear-gradient(100deg, rgba(34,211,238,.15), rgba(34,211,238,.045));
+  color: #e9fbff;
+  box-shadow: inset 3px 0 #67e8f9;
+}
+.aiw-mobile-header {
+  background: rgba(12, 22, 32, .96);
+  backdrop-filter: blur(18px);
+}
+.aiw-mobile-menu-button {
+  background: rgba(116, 154, 177, .09);
+  color: #e6f8ff;
+}
+.aiw-mobile-drawer {
+  top: 5.7rem;
+  max-height: calc(100dvh - 5.7rem);
+}
+.aiw-workspace-header {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(156, 190, 213, .15);
+  padding: clamp(1rem, 2.4vw, 1.8rem);
+  background:
+    radial-gradient(ellipse at 100% 5%, rgba(34,211,238,.1), transparent 42%),
+    linear-gradient(145deg, rgba(22,37,53,.94), rgba(14,24,35,.9));
+  box-shadow: 0 12px 40px rgba(0,0,0,.12);
+}
+.aiw-workspace-header::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #67e8f9, rgba(103,232,249,.05));
+  pointer-events: none;
+}
+.aiw-workspace-header--portfolio::before { background: linear-gradient(180deg, #6ee7b7, transparent); }
+.aiw-workspace-header--research::before { background: linear-gradient(180deg, #93c5fd, transparent); }
+.aiw-workspace-header--operations::before { background: linear-gradient(180deg, #c4b5fd, transparent); }
+.aiw-workspace-pill {
+  border: 1px solid rgba(160,186,205,.15);
+  background: rgba(160,186,205,.055);
+}
+.aiw-workspace-title {
+  font-size: clamp(1.5rem, 2.9vw, 2.5rem);
+  letter-spacing: -.035em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.aiw-workspace-shortcut {
+  border-color: rgba(145,178,202,.22);
+  background: rgba(255,255,255,.035);
+  color: #d2e5f1;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.aiw-workspace-shortcut:hover {
+  border-color: rgba(103,232,249,.37);
+  background: rgba(103,232,249,.08);
+  color: white;
+}
+.aiw-feed-toolbar {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  min-width: 0;
+  border: 1px solid rgba(152, 184, 207, .14);
+  border-radius: 1.1rem;
+  padding: 1rem;
+  background: rgba(16, 28, 40, .72);
+}
+.aiw-feed-indicator { background: rgba(103,232,249,.09); }
+.aiw-feed-refresh {
+  border: 1px solid rgba(103,232,249,.23);
+  background: rgba(103,232,249,.11);
+  color: #b9f5ff;
+}
+.aiw-feed-refresh:hover:not(:disabled) {
+  background: rgba(103,232,249,.19);
+  border-color: rgba(103,232,249,.48);
+}
+.aiw-view-stage {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+}
+.aiw-view-stage :where(.aiw-page-header) {
+  border-bottom: 1px solid rgba(148,185,205,.16);
+  background: rgba(12,20,30,.96);
+}
+.aiw-view-stage :where(.aiw-table-shell) {
+  border-color: var(--aiw-outline);
+  background: rgba(18, 29, 42, .6);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.aiw-view-stage :where(.aiw-scroll-region) {
+  border-radius: .75rem;
+}
+.aiw-application :where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--aiw-focus);
+  outline-offset: 3px;
+}
+.aiw-application :where(button:disabled) { cursor: not-allowed; }
+.aiw-app-footer { max-width: 75rem; }
+@media (max-width: 640px) {
+  .aiw-workspace-header { border-radius: 1.15rem; }
+  .aiw-workspace-pill { display: none; }
+  .aiw-workspace-shortcut { font-size: .72rem; }
+  .aiw-feed-toolbar { padding: .85rem; border-radius: .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aiw-workspace-shortcut { transition: none; }
+}
+
+
+/* Screen-reader/keyboard route skip and unified Cmd+K search. */
+.aiw-skip-link {
+  position: fixed;
+  z-index: 150;
+  top: -6rem;
+  left: 1rem;
+  border: 2px solid #67e8f9;
+  border-radius: .7rem;
+  padding: .8rem 1rem;
+  background: #102334;
+  color: white;
+  font-size: .875rem;
+  font-weight: 700;
+}
+.aiw-skip-link:focus-visible { top: .5rem; }
+.aiw-search-trigger {
+  border-color: rgba(151,182,205,.2);
+  background: rgba(19, 32, 47, .8);
+  color: #bad6e6;
+}
+.aiw-search-trigger:hover { border-color: rgba(103,232,249,.42); background: rgba(28, 47, 64, .82); }
+.aiw-search-dialog { background: #112033; }
+.aiw-search-dialog :where(button):hover { background: rgba(103,232,249,.065); }
+.aiw-application :where(input:not([type="checkbox"]), textarea, select) {
+  accent-color: #67e8f9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aiw-market-strip-scroll { scroll-behavior: auto; }
+}
+
+
+/* Keep feed metadata at a stable mobile height while independently admitted
+   quotes arrive; otherwise a late source-count line can move the holdings
+   list during modal History Back/Close, even if its scrollY was restored. */
+@media (max-width: 640px) {
+  .aiw-feed-toolbar > div:first-child > div:last-child > .mt-2.flex {
+    min-height: 3.75rem;
+    align-content: flex-start;
+  }
+}

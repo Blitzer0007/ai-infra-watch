@@ -21,8 +21,8 @@ const ciRun=(file:string,id:number,overrides:any={})=>({
   event:'push', status:'completed', conclusion:'success', ...overrides,
 });
 const pr=()=>({
-  number:178, merged:true, state:'closed', merge_commit_sha:SHA,
-  base:{ref:'main'}, head:{ref:'fix/milestone5-one-time-ci-release-20261119',
+  number:183, merged:true, state:'closed', merge_commit_sha:SHA,
+  base:{ref:'main'}, head:{ref:'fix/milestone7-mobile-holding-scroll-20261119',
     sha:HEAD,repo:{full_name:REPO}},
 });
 const commit=()=>({sha:SHA,parents:[{sha:M5_HANDOFF_PARENT},{sha:HEAD}]});
@@ -40,7 +40,7 @@ function mockGithub(opts:any={}) {
     }
     let value:any;
     if(url.endsWith('/actions/runs/12345'))value=run(opts.triggerOverride);
-    else if(url.endsWith('/pulls/178'))value={...pr(),...opts.prOverride};
+    else if(url.endsWith('/pulls/183'))value={...pr(),...opts.prOverride};
     else if(url.endsWith('/commits/'+SHA))value={...commit(),...opts.commitOverride};
     else if(url.endsWith('/branches/main'))value={commit:{sha:opts.mainSha||SHA},protected:opts.protected??false};
     else if(url.includes('/actions/runs?head_sha='))value={
@@ -96,7 +96,7 @@ test('one-shot dispatch delegates to existing gated production workflow after CI
       expected_main_sha:SHA,rollback_deployment:M5_ROLLBACK,run_live_checks:'false',
     },
   });
-  assert(requests.some(r=>r.url.endsWith('/pulls/178')));
+  assert(requests.some(r=>r.url.endsWith('/pulls/183')));
   assert(requests.some(r=>r.url.endsWith('/commits/'+SHA)));
   assert(requests.some(r=>r.url.includes('/actions/runs?head_sha='+SHA)));
 });
@@ -112,13 +112,13 @@ test('any failed required gate or forged PR ancestry prevents release dispatch',
     {triggerOverride:{status:'in_progress'}},
     {triggerOverride:{conclusion:'failure'}},
     {triggerOverride:{event:'pull_request'}},
-    {prOverride:{number:179}},
+    {prOverride:{number:184}},
     {prOverride:{merged:false}},
     {prOverride:{head:{ref:'some-other-branch',sha:HEAD,repo:{full_name:REPO}}}},
     {prOverride:{merge_commit_sha:HEAD}},
     {commitOverride:{parents:[{sha:'a'.repeat(40)},{sha:HEAD}]}},
     {commitOverride:{parents:[{sha:M5_HANDOFF_PARENT},{sha:'a'.repeat(40)}]}},
-    {protected:true,prOverride:{number:179}},
+    {protected:true,prOverride:{number:180}},
     {qaOverride:{conclusion:'failure'}},
     {securityOverride:{conclusion:'failure'}},
     {mainSha:HEAD},

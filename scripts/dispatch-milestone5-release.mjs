@@ -1,12 +1,12 @@
-// One-time Milestone 5 release handoff: after trusted main CI, dispatch the
+// One-time Milestone 7 application-wide UI release: trusted main CI dispatches the
 // existing environment-gated manual release. Does not deploy or read Vercel
 // credentials itself. Never log tokens or remote API bodies.
 import { pathToFileURL } from 'node:url';
 import { RELEASE_REPOSITORY, M5_PROTECTION_EXCEPTION, verifyMilestone5Exception, checkCandidate, jsonGet } from './release-candidate.mjs';
 
-export const M5_HANDOFF_PARENT = 'b4397929332dc8f87815e117f976d3aa929856f0';
-export const M5_HANDOFF_PR = 178;
-export const M5_ROLLBACK = 'dpl_EDKqq53hqUutLwvA5kY9CaUUBjgY';
+export const M5_HANDOFF_PARENT = '69921f7a9022af5187ac2206aa5b688b11c855a1';
+export const M5_HANDOFF_PR = 183;
+export const M5_ROLLBACK = 'dpl_J45FmeRcw2oHAUCNwzRt4U9ew6nV';
 const SHA = /^[a-f0-9]{40}$/;
 const RUN_ID = /^[1-9][0-9]{0,14}$/;
 
@@ -37,7 +37,7 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
   const base = 'https://api.github.com/repos/' + RELEASE_REPOSITORY;
   const sourceRun = await jsonGet(base + '/actions/runs/' + env.CI_RUN_ID, token, fetcher);
   const sha = verifyCompletion(env, sourceRun);
-  // Authorize PR #178's pinned two-parent merge even if the branch later
+  // Authorize only PR #183's pinned two-parent merge if the branch later
   // becomes protected; never rely on main.protected to permit a broader
   // successful-CI commit to dispatch a release.
   const pr = await jsonGet(base + '/pulls/' + M5_HANDOFF_PR, token, fetcher);
@@ -45,7 +45,7 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
   verifyMilestone5Exception({ expectedSha: sha, waiver: M5_PROTECTION_EXCEPTION, pr, commit });
 
   // checkCandidate performs an independent branch + paged CI check and only
-  // permits the exact two-parent PR #178 merge (first parent b439792,
+  // permits the exact two-parent PR #183 merge (first parent 69921f7,
   // second parent authenticated PR head) while main remains unprotected.
   await checkCandidate({
     GITHUB_REPOSITORY: RELEASE_REPOSITORY, GITHUB_REF: 'refs/heads/main',
@@ -100,9 +100,9 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   dispatchOneTimeRelease(process.env).then(value => {
-    console.log('Milestone 5 one-time release: ' + value.status + ' for ' + value.sha);
+    console.log('Milestone 7 app-wide UI one-time release: ' + value.status + ' for ' + value.sha);
   }).catch(() => {
-    console.error('Milestone 5 one-time release was not dispatched; review exact-main CI and GitHub Actions permissions. No secrets or remote response bodies logged.');
+    console.error('Milestone 7 app-wide UI one-time release was not dispatched; review exact-main CI and GitHub Actions permissions. No secrets or remote response bodies logged.');
     process.exitCode = 1;
   });
 }
