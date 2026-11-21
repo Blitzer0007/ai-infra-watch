@@ -26,7 +26,7 @@ No acquisition route, provider call, timer, credential, financial valuation gate
 - 36 focused Chromium checks passed: 13 new evidence cases, 13 sampled quote/operational cases and 10 application-wide navigation/light-theme checks.
 - The final focus-clipping adjustment also passed 14 browser checks, including the existing Data Health refresh journey.
 - 32 offline CI/deployment safety tests, TypeScript and QA build passed.
-- Production build, staged security scan and whitespace check passed. Record fresh exact-head Frontend CI, Security audit and UI API DB Validation in the draft PR; prior-commit success is not current proof.
+- Production build, staged security scan and whitespace check passed. Record fresh exact-head Frontend CI (which includes the security scan) and UI API DB Validation in this stacked draft PR; prior-commit success is not current proof. The standalone Security audit workflow is restricted to PRs targeting main, so it is not triggered here. Require that workflow as well if this draft is later retargeted to main.
 
 The new tests exercise mixed states at 360/768/1440px, keyboard disclosure, empty/malformed packets, future timestamps, provider failures with old records, explicit retry recovery, bounded initial sample reads, zero browser exceptions/overflow and zero writes. Fixtures and screenshots contain fictional data only.
 

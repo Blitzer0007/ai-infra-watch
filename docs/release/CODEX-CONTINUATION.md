@@ -12,7 +12,7 @@
 
 ## Next steps
 
-1. Verify this draft's exact head, diff and all three applicable CI families. Repair regressions without weakening the financial, quote-privacy, history/focus, source or no-write assertions.
+1. Verify this draft's exact head, diff and the two applicable CI families: Frontend CI (including its security scan) and UI API DB Validation. The standalone Security audit workflow targets main only and must run if this PR is later retargeted to main. Repair regressions without weakening the financial, quote-privacy, history/focus, source or no-write assertions.
 2. Review the rendered Data Health summary/recovery previews and the dependency on #186. Keep both drafts and production unchanged unless the owner explicitly requests a release. Do not reuse #180's one-release exception.
 3. The next data-recovery prerequisite is authenticated, read-only provider diagnostics by symbol, then a bounded fix supported by the provider's actual contract. Missing currency/security/session/time metadata cannot be invented. Authoritative returns still require complete broker/corporate-action/currency records.
 
