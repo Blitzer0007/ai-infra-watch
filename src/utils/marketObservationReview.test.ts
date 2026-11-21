@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { summarizeMarketObservation as review } from './marketObservationReview.js';
 
 const good = {
-  symbol:'FICT', quote: {available:true,ageSeconds:60,stale:false,fallbackUsed:false,providerAttempts:[]},
+  symbol:'FICT', quote: {available:true,valuationAdmission:{eligible:true},ageSeconds:60,stale:false,fallbackUsed:false,providerAttempts:[]},
   history: {available:true,ageDays:1,stale:false,adjustedCloseAvailable:true,providerAttempts:[]},
 };
 
@@ -57,4 +57,16 @@ describe('Milestone 5 read-only market lag and quota evidence', () => {
     assert.equal(result.fallbackRows,1);
     assert.equal(result.state,'attention');
   });
+});
+
+
+it('counts withheld and unknown quote admission separately from successful price transport', () => {
+  const result=review([
+    {...good,quote:{...good.quote,valuationAdmission:{eligible:false}}},
+    {...good,quote:{...good.quote,valuationAdmission:undefined}},
+  ]);
+  assert.equal(result.quoteUnavailable,0);
+  assert.equal(result.quoteWithheld,1);
+  assert.equal(result.quoteAdmissionUnknown,1);
+  assert.equal(result.state,'attention');
 });

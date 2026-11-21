@@ -1,3 +1,15 @@
+# Current quote-admission diagnostics candidate · 21 November 2026
+
+PR #180 is merged and deployed at main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, READY production deployment `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`. Its guarded release and static/access verification passed. Release evidence is in the merged PR description and /workspace/ai-infra-watch-release-evidence/PR180-PRODUCTION.md.
+
+Active development is `feature/quote-admission-diagnostics` in /workspace/ai-infra-watch-quote-health, directly based on that main release. Read [the diagnostic implementation and acceptance](QUOTE-ADMISSION-DIAGNOSTICS.md). The existing Data Health response now explains quote admission using the shared valuation gate, distinguishes withheld/unknown checks and labels last-close/empty samples truthfully. No new acquisition or sender path is added.
+
+Local acceptance passed 1,087 Node tests, 13 focused Chromium tests, TypeScript and production build. Require fresh draft-PR CI on the new commit. Push tested checkpoints on this branch. Keep production, original worktrees and the merged PR #180 branch unchanged.
+
+---
+
+Historical release checkpoint follows. The PR #180 release described below has completed.
+
 # Approved PR 180 release in progress · 21 November 2026
 
 The owner explicitly approved merging and deploying PR #180 using an exception limited to this release. The exception pins its branch and first parent `347240c7657af8a6f830b254e84bedc10f88d785`. The existing handoff will dispatch the guarded production workflow only after all required CI pass on its exact regular two-parent main merge. It retains staging, access gates, repeated commit checks and idempotent dispatch. Rollback is the currently live UI deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. Live checks remain false.
