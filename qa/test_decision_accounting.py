@@ -48,3 +48,23 @@ def test_decision_accounting_from_original_rows_to_visible_review(page,mode,expe
     page.set_viewport_size({'width':360,'height':800})
     assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
     assert errors==[] and writes==[]
+
+
+def test_missing_coverage_percentage_keeps_decision_center_available(page):
+    body = replay('partial')
+    body['portfolio']['quoteCoverage']['coveragePct'] = None
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    expect(page.get_by_test_id('pre-trade-gate')).to_contain_text('Coverage unavailable')
+
+
+def test_forecast_service_failure_preserves_portfolio_and_rule_review(page):
+    body = replay('evidence-outage')
+    assert body['ok'] and body['portfolio']['holdings'] == 1 and body['forecast'] is None
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    center = page.get_by_test_id('decision-impact-center')
+    expect(center).to_contain_text('Forecast history could not be verified')
+    expect(center.get_by_text('Trading P&L',exact=True).locator('..')).to_contain_text('+$50.00')

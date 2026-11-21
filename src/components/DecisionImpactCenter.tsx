@@ -39,7 +39,7 @@ type DecisionData = {
     concentrationTop3Pct: number | null;
     semiconductorShock15Pct: number | null;
     scenarioShockTotal?: number | null;
-    quoteCoverage?: { status: string; coveragePct: number; liveQuotes: number; staleFallbacks: number; missingQuotes: number };
+    quoteCoverage?: { status: string; coveragePct: number | null; liveQuotes: number; staleFallbacks: number; missingQuotes: number };
     riskScenarios?: Array<{ group: string; shock: number; effectiveShockPct: number | null; holdings: number }>;
   };
   benchmark?: Record<string, { value: number | null; netDeposits: number; pnl: number | null; shares: number; coverage?: { status: string; coveragePct: number; tradesUsed: number; totalTrades: number } }>;
@@ -161,7 +161,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
         <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Trading P&L" value={signedMoney(portfolio.accountingStatus === 'conditional-loaded-records' ? portfolio.totalTradingPnl : null)} tone={portfolio.accountingStatus !== 'conditional-loaded-records' || portfolio.totalTradingPnl == null ? 'neutral' : portfolio.totalTradingPnl >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={data.forecast ? data.forecast.independentVerified + '/50' : 'Unknown'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
         <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={evaluatedRuleCount(rules) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
       </div>
 
@@ -229,13 +229,13 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-        <RiskCard title="Signal gate" value={(data.signalGate?.eligible ?? 0) + ' eligible'} detail={(data.signalGate?.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
+        <RiskCard title="Signal gate" value={data.signalGate ? data.signalGate.eligible + ' eligible' : 'Unknown'} detail={!data.signalGate ? 'Signal history could not be verified.' : (data.signalGate.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
-        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
+        <RiskCard title="Forecast evidence" value={data.forecast ? data.forecast.verified + ' verified' : 'Unknown'} detail={!data.forecast ? 'Forecast history could not be verified.' : (data.forecast.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
       </div>
 
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. See accounting coverage and inputs for withheld quotes.</div>}
       {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
       {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
@@ -257,7 +257,7 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     {
       label: 'Fresh portfolio pricing',
       ok: portfolio?.quoteCoverage?.status === 'complete',
-      detail: portfolio?.quoteCoverage ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
+      detail: typeof portfolio?.quoteCoverage?.coveragePct === 'number' ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
     },
     {
       label: 'Accounting reconciliation',

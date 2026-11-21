@@ -1,6 +1,6 @@
 // Offline fictional handler replay. Every transport is replaced before import.
 const mode = process.argv[2] || 'valid';
-if (!['valid','unknown-fee','partial','simulated','tiny','zero','loss'].includes(mode)) throw Error('Unknown fictional case');
+if (!['valid','unknown-fee','partial','simulated','tiny','zero','loss','evidence-outage'].includes(mode)) throw Error('Unknown fictional case');
 const now = Date.parse('2026-11-13T18:00:00Z');
 const NativeDate = Date;
 globalThis.Date = class extends NativeDate {
@@ -33,6 +33,7 @@ globalThis.fetch = async (input, options={}) => {
       for (const field of ['id','order_executed_at','price']) if (!url.searchParams.get('select').split(',').includes(field)) throw Error('Required original field was not requested');
       return reply(trades);
     }
+    if (mode === 'evidence-outage' && url.pathname.endsWith('/forecast_snapshots')) return new Response('{}',{status:503});
     if (['/forecast_snapshots','/portfolio_signal_family_scorecard'].some(path=>url.pathname.endsWith(path))) return reply([]);
   }
   if (url.origin === 'https://query1.finance.yahoo.com' && url.pathname.startsWith('/v8/finance/chart/')) {

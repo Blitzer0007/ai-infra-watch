@@ -46,7 +46,7 @@ testFn('Telegram fallback preserves real coverage but refuses fabricated alerts 
   });
   assert.match(result.text,/DECISION LAYER UNAVAILABLE/);
   assert.match(result.text,/Recorded holdings: 3/);
-  assert.match(result.text,/Fresh quote coverage: 1\/3 holdings · partial/);
+  assert.match(result.text,/Admitted intraday quotes: 1\/3 holdings · partial/);
   assert.match(result.text,/loaded records only/);
   assert.match(result.text,/NEXT STEP/);
   assert.doesNotMatch(result.text,/0 urgent|0 watch|Trading P&L:|No monitored earnings/);
@@ -70,7 +70,7 @@ testFn('Telegram review with conditional accounting groups missing comparisons w
   };
   const result=buildTelegramDecisionBrief(decision,'2026-11-19');
   assert.match(result.text,/TODAY’S REVIEW/);
-  assert.match(result.text,/Only last-close quotes/);
+  assert.match(result.text,/includes last-close quotes/);
   assert.match(result.text,/P&L withheld/);
   assert.match(result.text,/SPY\/SOXX comparisons withheld/);
   assert.match(result.text,/Earnings dates not verified/);
@@ -140,4 +140,19 @@ testFn('Telegram fallback shows only bounded, validated quote movements rather t
   assert.match(brief.text,/DGXX · \$2\.15 · \+3\.10%/);
   assert.doesNotMatch(brief.text,/BAD NAME|MU ·|AMD ·|URGENT REVIEW|Target reached/);
   assert.ok(brief.text.length<=3600);
+});
+
+testFn('partial decision snapshot shows admitted observations and actual rule coverage', () => {
+  const brief = buildTelegramDecisionBrief({
+    ok:true, rules:{total:10,evaluated:2,noData:8,noRule:0},
+    actionItems:[], actionSummary:{version:1,act:0,watch:0,total:0,shown:0,omitted:0},
+    portfolio:{holdings:10,quoteCoverage:{status:'partial',totalHoldings:10,liveQuotes:1,lastCloseQuotes:1,missingQuotes:8},
+      accountingIssues:[{symbol:'MISS',code:'QUOTE_WITHHELD',message:'Market session provenance is unavailable.'}],
+      scenarioShockTotal:999,riskScenarios:[{shock:999}]},
+  },'2026-11-20',null,{observations:[{symbol:'TEST',marketTime:'2026-11-19T21:00:00Z',price:42,lastClose:true,changePct:null}]});
+  assert.match(brief.text,/1 intraday · 1 last close · 8 missing/);
+  assert.match(brief.text,/TEST · \$42.00 · 2026-11-19 21:00 UTC \(last close\)/);
+  assert.match(brief.text,/evaluated for 2\/10 holdings/);
+  assert.match(brief.text,/MISS — Market session provenance/);
+  assert.doesNotMatch(brief.text,/999|showing 0\/0|10 rules/);
 });

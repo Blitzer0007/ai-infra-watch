@@ -315,8 +315,9 @@ async function fetchEarnings(symbols) {
     const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
     if (!response.ok) return { status: 'unavailable', events: [], reason: 'HTTP ' + response.status };
     const body = await response.json();
+    if (!Array.isArray(body?.earningsCalendar)) return { status: 'unavailable', events: [], reason: 'Missing earnings calendar in provider response.' };
     const wanted = new Set(symbols.map(s => s.toUpperCase()));
-    const events = (Array.isArray(body?.earningsCalendar) ? body.earningsCalendar : [])
+    const events = body.earningsCalendar
       .filter(row => wanted.has(String(row?.symbol || '').toUpperCase()))
       .map(row => ({ symbol:String(row.symbol).toUpperCase(), date:String(row.date), daysUntil:daysBetween(today,String(row.date)), hour:row.hour||null }))
       .filter(row => row.daysUntil >= 0 && row.daysUntil <= 7)
@@ -597,8 +598,11 @@ export default async function handler(req, res) {
       states: ruleStates,
     };
 
-    const forecast = await fetchForecastProgress();
-    const signalGate = await fetchSignalGate();
+    // Optional evidence services cannot invalidate successfully loaded positions and rules.
+    const [forecast, signalGate] = await Promise.all([
+      fetchForecastProgress().catch(() => null),
+      fetchSignalGate().catch(() => null),
+    ]);
 
     return res.status(200).json({
       ok: true,

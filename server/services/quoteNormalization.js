@@ -46,6 +46,10 @@ export function normalizeYahooQuote(result, nowMs = Date.now(), expectedSymbol =
     source:'Yahoo Finance',provider:'yahoo',sourceMode:meta.simulated === true ? 'simulated' : 'live',returnedSymbol:typeof meta.symbol==='string'?meta.symbol.trim().toUpperCase():null,
     currency:typeof meta.currency==='string'&&meta.currency.trim()?meta.currency:null,
     marketTimePrecision:session.marketTime === null ? 'unknown' : 'instant',
+    // A provider-declared upcoming session can coexist with an older regular-market
+    // observation. Preserve the boundary for dated display only.
+    nextRegularOpen: session.isMarketSessionOpen === false && nowMs < meta.currentTradingPeriod?.regular?.start * 1000
+      ? timestamp(meta.currentTradingPeriod.regular.start) : null,
     retrievedAt:new Date(nowMs).toISOString(),adjustedBasis:'raw',...session,asOf:session.marketTime,
     stale:meta.stale ?? false,simulated:meta.simulated ?? false };
 }

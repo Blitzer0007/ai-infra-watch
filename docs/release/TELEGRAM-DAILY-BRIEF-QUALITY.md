@@ -1,6 +1,6 @@
 # Telegram Daily Decision Brief — availability and usefulness hardening
 
-Updated: 19 November 2026 (Asia/Kolkata). Status: draft candidate, no production send/deploy.
+Initial review: 19 November 2026 (Asia/Kolkata). Status: draft candidate, no production send/deploy.
 
 ## Observed issue
 
@@ -32,3 +32,14 @@ A read-only GitHub audit found:
 - New pure tests cover null Decision Center with 3 holdings and partial quote data, a complete marked holding value, failure to show a partial or type-coerced valuation, a conditional ledger with nonzero unverified P&L that must **not** appear, and malformed quote observations that cannot masquerade as rule alerts.
 - Require exact PR-head Frontend CI, Security audit, and UI/API/Database validation, including mocked browser and disposable PostgreSQL checks. Do not merge or deploy without a reviewed release decision.
 - Later live diagnosis, **only with explicit owner authorization and a read-only endpoint**, should inspect a redacted summary of `decisionLayerStatus`, `decisionLayerError`, `quoteCoverage`, `accountingStatus` and actual digest slot state. Avoid printing private holdings or bearer tokens in CI logs, and do not resend an old slot.
+
+
+## November 21 production investigation
+
+The November 20 screenshot shows a successful Decision Center response with partial coverage, ten rule-state rows, zero prompts, 65 independent verified forecasts and 18 pending. Those fields cannot identify the missing tickers, prove ten rules actually ran, establish predictive accuracy or diagnose a provider outage. The 18:05 India slot precedes the US regular open in November.
+
+Production `6827cce` and the newer main `347240c7` share the same digest and Decision Center code. The production formatter discarded admissible per-symbol observations, treated total rule-state rows as evaluated rules, and printed unavailable totals even when specific failure reasons were present. The digest also overwrote the decision snapshot with a second read and removed actions absent from the second quote set. Benchmarks require compatible dated cash flows and historical prices. Full-history reconciliation is unverified.
+
+The combined candidate preserves the Decision Center assessment. Telegram shows usable observed prices, timestamps, quote coverage, evaluated rule counts and bounded issuer-specific checks. Pre-open Yahoo references require a matching returned ticker, raw USD price, recent provider observation and retrieval, and a provider-declared upcoming regular open. They never enter valuation, rules or return alerts. Missing daily moves stay missing. The web review accepts null coverage percentages. Optional forecast or signal service failures leave the rest of the decision response readable. Malformed earnings responses report a source failure.
+
+Verification used the locked production build, fictional GET previews with intercepted transports, a mocked Telegram transport, Chromium accounting/navigation cases and a 17-route smoke check. No private production row or live sender was used. For release review, compare candidate and live alias IDs, inspect the earlier alias change through project history, and use the guarded release flow for the reviewed commit.

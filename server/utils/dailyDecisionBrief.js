@@ -28,6 +28,49 @@ function trustedSummary(summary, returned) {
     summary.watch >= returned.filter(item => item.severity === 'WATCH').length;
 }
 
+// A historical price label does not feed the quote-admission or valuation paths.
+export function previousSessionReferences(rows, nowMs) {
+  const result = [];
+  for (const row of rows) {
+    const q = row.quote;
+    if (row.quoteStatus !== 'unavailable' || !symbol(row.symbol) || q?.provider !== 'yahoo' ||
+        q.returnedSymbol !== row.symbol || q.currency !== 'USD' || q.adjustedBasis !== 'raw' ||
+        q.sourceMode !== 'live' || q.simulated !== false || q.stale !== false || q.status !== 'missing' ||
+        q.isMarketSessionOpen !== false || q.marketTimePrecision !== 'instant' ||
+        !finite(q.price) || q.price <= 0 || q.price > 1e9) continue;
+    const observed = Date.parse(q.marketTime), retrieved = Date.parse(q.retrievedAt), opens = Date.parse(q.nextRegularOpen);
+    if (!(nowMs < opens && observed < retrieved && retrieved <= nowMs &&
+        nowMs - retrieved <= 120 * 60000 && nowMs - observed <= 96 * 3600000)) continue;
+    result.push({symbol: row.symbol, price: q.price, marketTime: new Date(observed).toISOString()});
+    if (result.length === 3) break;
+  }
+  return result;
+}
+
+function historicalReferenceLines(loaded) {
+  const rows = Array.isArray(loaded?.previousObservations) ? loaded.previousObservations : [];
+  const lines = rows.slice(0, 3).filter(row => symbol(row?.symbol) && finite(row.price) && row.price > 0 &&
+    typeof row.marketTime === 'string' && Number.isFinite(Date.parse(row.marketTime)))
+    .map(row => row.symbol + ' · $' + (row.price < 0.005 ? row.price.toPrecision(3) : row.price.toFixed(2)) +
+      ' · ' + row.marketTime.slice(0, 16).replace('T', ' ') + ' UTC');
+  return lines.length ? ['PRE-OPEN REFERENCE · prior Yahoo observations, excluded from rules and valuation', ...lines] : [];
+}
+
+function quoteObservationLines(loaded) {
+  const observations = (Array.isArray(loaded?.observations) ? loaded.observations : [])
+    .filter(item => symbol(item?.symbol) && finite(item.price) && item.price > 0 && item.price <= 1e9 &&
+      (item.changePct === null || (finite(item.changePct) && item.changePct >= -100 && item.changePct <= 1000)))
+    .slice(0, 3);
+  if (!observations.length) return [];
+  return ['SOURCE-REPORTED QUOTE MOVES · NOT RULE ALERTS', ...observations.map(item => {
+    const change = item.changePct === null ? '' : ' · ' + (item.changePct >= 0 ? '+' : '') + item.changePct.toFixed(2) + '%';
+    const price = item.price < 0.005 ? item.price.toPrecision(3) : item.price.toFixed(2);
+    const time = typeof item.marketTime === 'string' && Number.isFinite(Date.parse(item.marketTime))
+      ? ' · ' + new Date(item.marketTime).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '';
+    return item.symbol + ' · $' + price + change + time + (item.lastClose ? ' (last close)' : '');
+  })];
+}
+
 export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded = null) {
   const footer = 'Review prompts, not trade instructions. Open Daily Review for full context.';
   const lines = ['AI Infra Watch · Daily Decision Brief', clean(date, 40) || 'Date unavailable'];
@@ -43,7 +86,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
       lines.push('Recorded holdings: ' + loaded.holdingsCount);
       if (count(loaded?.quotesAccepted) && count(loaded?.quotesTotal) &&
           loaded.quotesAccepted <= loaded.quotesTotal) {
-        lines.push('Fresh quote coverage: ' + loaded.quotesAccepted + '/' + loaded.quotesTotal +
+        lines.push('Admitted intraday quotes: ' + loaded.quotesAccepted + '/' + loaded.quotesTotal +
           ' holdings · ' + clean(loaded.quoteStatus, 32));
       }
       if (loaded.quoteStatus === 'complete' && count(loaded.quotesTotal) &&
@@ -57,18 +100,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
       } else {
         lines.push('Portfolio accounting: requires verification before using a P&L.');
       }
-      const observations = (Array.isArray(loaded.observations) ? loaded.observations : [])
-        .filter(item => symbol(item?.symbol) && finite(item?.price) && item.price > 0 &&
-          item.price <= 1e9 && finite(item?.changePct) && item.changePct >= -100 &&
-          item.changePct <= 1000)
-        .slice(0, 3);
-      if (observations.length) {
-        lines.push('', 'SOURCE-REPORTED QUOTE MOVES · NOT RULE ALERTS');
-        for (const item of observations) {
-          lines.push(item.symbol + ' · $' + item.price.toFixed(2) + ' · ' +
-            (item.changePct >= 0 ? '+' : '') + item.changePct.toFixed(2) + '%');
-        }
-      }
+      lines.push(...quoteObservationLines(loaded), ...historicalReferenceLines(loaded));
     } else {
       lines.push('Stored holdings and quote coverage were not provided to this brief.');
     }
@@ -83,7 +115,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   const warnings = [];
   if (coverage.status === 'partial') warnings.push('Quote coverage partial; verify price-dependent prompts.');
   else if (coverage.status === 'stale-fallback') warnings.push('Quotes use stale fallbacks; verify current prices first.');
-  else if (coverage.status === 'last-close') warnings.push('Only last-close quotes are available; do not assume intraday prices.');
+  else if (coverage.status === 'last-close') warnings.push('Coverage includes last-close quotes; check observation times.');
   else if (coverage.status !== 'complete') warnings.push('Fresh quote coverage not verified; price-based conclusions are withheld.');
   if (accounting === 'conditional-loaded-records')
     warnings.push('Accounting is based on loaded records only; verified P&L and trade eligibility are not established.');
@@ -95,13 +127,26 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   if (decision.earningsStatus !== 'ok') warnings.push('Earnings feed not verified; upcoming-event coverage is unknown.');
   if (Array.isArray(decision.rules?.configurationIssues) && decision.rules.configurationIssues.length)
     warnings.push('Rule settings need review; invalid allocation fields were ignored.');
-  if (warnings.length) lines.push('VERIFY DATA FIRST', ...warnings.map(value => '• ' + value), '');
+  const {liveQuotes, lastCloseQuotes, missingQuotes, totalHoldings} = coverage;
+  if ([liveQuotes, lastCloseQuotes, missingQuotes, totalHoldings].every(count)) {
+    lines.push('Decision snapshot prices across ' + totalHoldings + ' recorded holdings: ' + liveQuotes +
+      ' intraday · ' + lastCloseQuotes + ' last close · ' + missingQuotes + ' missing or withheld.');
+  }
+  const observedLines = [...quoteObservationLines(loaded), ...historicalReferenceLines(loaded)];
+  if (observedLines.length) lines.push('Separate digest observations', ...observedLines);
+  const withheld = Array.isArray(portfolio.accountingIssues)
+    ? portfolio.accountingIssues.filter(issue => issue?.code === 'QUOTE_WITHHELD' && symbol(issue.symbol)) : [];
+  if (withheld.length) {
+    lines.push('Check quote evidence: ' + withheld.slice(0, 3).map(issue => issue.symbol + ' — ' + clean(issue.message, 100)).join(' / '));
+  }
 
   const returned = Array.isArray(decision.actionItems) ? decision.actionItems.filter(isPrompt) : [];
   const actions = [...returned].sort((a, b) => (a.severity === 'ACT' ? 0 : 1) - (b.severity === 'ACT' ? 0 : 1)).slice(0, 3);
   const summary = decision.actionSummary;
   lines.push('TODAY’S REVIEW');
-  if (trustedSummary(summary, returned)) {
+  if (trustedSummary(summary, returned) && summary.total === 0) {
+    lines.push('No urgent or watch prompts in the returned queue.');
+  } else if (trustedSummary(summary, returned)) {
     lines.push(summary.act + ' urgent review · ' + summary.watch + ' watch · showing ' + actions.length + '/' + summary.total + ' prompts');
   } else if (Array.isArray(decision.actionItems)) {
     lines.push('Usable prompts in this snapshot: ' + returned.filter(item => item.severity === 'ACT').length + ' urgent review · ' +
@@ -109,14 +154,18 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   } else lines.push('Review queue unavailable.');
   if (Array.isArray(decision.actionItems) && returned.length !== decision.actionItems.length)
     lines.push('Some returned prompts are unsupported or incomplete; inspect Daily Review.');
-  if (!actions.length) lines.push('No usable review prompts returned. This does not establish a clean day.');
+  if (!actions.length && !trustedSummary(summary, returned)) lines.push('No usable review prompts returned. This does not establish a clean day.');
   actions.forEach((item, index) => lines.push(
     (index + 1) + '. ' + item.symbol + ' · ' + (item.severity === 'ACT' ? 'URGENT REVIEW' : 'WATCH') + ' · ' + clean(item.title, 70),
     'Why: ' + clean(item.detail, 220),
     'Next: ' + (item.severity === 'ACT' ? 'Verify the rule, current quote and thesis before deciding.' : 'Check the evidence and set your next review condition.'),
   ));
-  lines.push('Rule coverage: ' + number(decision.rules?.total) + ' rules / ' + number(portfolio.holdings) +
-    ' holdings · ' + number(decision.rules?.noRule) + ' without active rules.');
+  const rules = decision.rules;
+  if (count(rules?.evaluated) && count(rules?.total) && rules.evaluated <= rules.total) {
+    lines.push('Rules evaluated for ' + rules.evaluated + '/' + rules.total + ' holdings.' +
+      (count(rules.noData) && rules.noData ? ' Missing rule inputs for ' + rules.noData + '.' : ''));
+  } else lines.push('Holdings reviewed: ' + number(portfolio.holdings) + '. Evaluated rule count unconfirmed.');
+  if (warnings.length) lines.push('', 'VERIFY DATA FIRST', ...warnings.map(value => '• ' + value));
   if (coverage.status === 'complete') {
     if (finite(portfolio.currentValue) && portfolio.currentValue >= 0 && portfolio.currentValue <= 1e12)
       lines.push('Marked holdings value: $' + portfolio.currentValue.toFixed(2) +
@@ -130,13 +179,21 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   lines.push(usableAccounting && [portfolio.totalTradingPnl, portfolio.realizedPnl, portfolio.unrealizedPnl].every(finite)
     ? 'Trading P&L: ' + money(portfolio.totalTradingPnl) + ' · realized ' + money(portfolio.realizedPnl) + ' · unrealized ' + money(portfolio.unrealizedPnl)
     : 'P&L withheld until quote coverage and transaction accounting are verified.');
+  if (['conditional-loaded-records', 'quotes-incomplete'].includes(accounting) &&
+      quantitiesReconcile && finite(portfolio.openCostBasis) && portfolio.openCostBasis >= 0) {
+    lines.push('Open cost basis from matched transaction rows: $' + portfolio.openCostBasis.toFixed(2));
+  } else {
+    const issue = Array.isArray(portfolio.accountingIssues) && portfolio.accountingIssues.find(item =>
+      item?.code !== 'QUOTE_WITHHELD' && clean(item?.message, 120));
+    if (issue) lines.push('Ledger check: ' + (symbol(issue.symbol) ? issue.symbol + ' · ' : '') + clean(issue.message, 120));
+  }
   const concentration = portfolio.concentrationTop3Pct;
   if (coverage.status === 'complete' && finite(concentration) && concentration >= 0 && concentration <= 100)
     lines.push('Top 3 concentration: ' + concentration.toFixed(1) + '%');
   else lines.push('Concentration withheld: holdings value coverage not established.');
   const scenarios = portfolio.riskScenarios;
   const stress = portfolio.scenarioShockTotal ?? portfolio.semiconductorShock15Pct;
-  const reconciledStress = finite(stress) && Array.isArray(scenarios) && scenarios.length > 0 &&
+  const reconciledStress = coverage.status === 'complete' && finite(stress) && Array.isArray(scenarios) && scenarios.length > 0 &&
     scenarios.every(item => finite(item?.shock)) && Math.abs(scenarios.reduce((sum, item) => sum + item.shock, 0) - stress) < 0.01;
   if (reconciledStress) lines.push('Scenario stress: ' + money(stress) + ' · illustrative, not a prediction.');
   else lines.push('Scenario stress not reconciled; no low-risk conclusion can be drawn.');
@@ -166,6 +223,9 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
     lines.push('Forecasts: ' + forecast.independentVerified + ' independent verified · ' +
       forecast.pending + ' pending. Counts alone do not establish decision eligibility.');
   else lines.push('Independent forecast verification counts not supplied; do not infer accuracy.');
+  if (count(forecast?.independent5D) && count(forecast?.independent20D)) {
+    lines.push('Independent outcomes by horizon: 5-day ' + forecast.independent5D + '/25 · 20-day ' + forecast.independent20D + '/25 minimum samples.');
+  }
   if (weekly) lines.push('Weekly journal: ' + number(weekly.decisions) + ' decisions · ' + number(weekly.outcomes) + ' outcome reviews.');
   let body = lines.join('\n');
   const budget = TELEGRAM_BRIEF_LIMIT - footer.length - 2;

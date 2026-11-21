@@ -1,3 +1,13 @@
+# Production data review · 21 November 2026
+
+The public hostname `ai-infra-watch-theta.vercel.app` resolved in Vercel to READY deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU`, commit `6827cce` (Milestone 5). The newer READY redesign `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` is on `347240c7`. GitHub release run 44480264314 records successful promotion on November 19. Current alias metadata establishes a different target today. The reason for the change is unverified. Confirm intended release and rollback history before changing production routing.
+
+Continue on [PR #180](https://github.com/Blitzer0007/ai-infra-watch/pull/180). This branch includes current main and the Decision Center snapshot correction from [PR #184](https://github.com/Blitzer0007/ai-infra-watch/pull/184). Review one combined diff. The older Milestone 2 worktree has separate uncommitted work and has been preserved.
+
+[Brief diagnosis and acceptance](TELEGRAM-DAILY-BRIEF-QUALITY.md). Check the PR's current commit and GitHub workflow conclusions. Use mocked digest GET for preview. No live send or database operation is necessary for verification.
+
+---
+
 # CURRENT AI Infra Watch continuation — Milestone 7 app-wide UI release repair
 
 Updated: 19 November 2026

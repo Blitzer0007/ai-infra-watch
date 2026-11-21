@@ -82,3 +82,25 @@ test('health diagnostics cannot turn retrieval time, date-only data or a future 
   const future=summarizeMarketQuote({price:100,marketTime:'2027-01-01T00:00:00Z'},now);assert.equal(future.ageSeconds,null);assert.equal(future.futureTimestampDetected,true);
   assert.equal(summarizeMarketQuote({price:Infinity},now).available,false);
 });
+
+test('pre-open observation is display-only and cannot enter valuation or rule review', async () => {
+  const { previousSessionReferences, buildTelegramDecisionBrief } = await import('../utils/dailyDecisionBrief.js');
+  const { evaluateDeclaredQuote } = await import('../../shared/quoteAdmission.js');
+  const now = Date.parse('2026-11-20T12:35:00Z');
+  const quote = normalizeYahooQuote({meta:{
+    symbol:'FICT', currency:'USD', regularMarketPrice:42,
+    regularMarketTime: Date.parse('2026-11-19T20:59:00Z') / 1000,
+    currentTradingPeriod:{regular:{start:Date.parse('2026-11-20T14:30:00Z') / 1000,end:Date.parse('2026-11-20T21:00:00Z') / 1000}}
+  }}, now, 'FICT');
+  const row = {symbol:'FICT',quoteStatus:'unavailable',quote};
+  assert.equal(evaluateDeclaredQuote('FICT',quote,now).eligible,false);
+  const references = previousSessionReferences([row],now);
+  assert.equal(references.length,1);
+  const brief = buildTelegramDecisionBrief({ok:true,actionItems:[],portfolio:{}},'2026-11-20',null,{previousObservations:references});
+  assert.match(brief.text,/prior Yahoo observations[\s\S]*FICT · \$42.00 · 2026-11-19 20:59 UTC/);
+  assert.deepEqual(brief.reviewSymbols,[]);
+  for (const patch of [{stale:true},{simulated:true},{returnedSymbol:'OTHER'},{currency:'CAD'},
+    {nextRegularOpen:null},{marketTime:'2026-11-13T21:00:00Z'},{status:'conflicting'}]) {
+    assert.deepEqual(previousSessionReferences([{...row,quote:{...quote,...patch}}],now),[]);
+  }
+});
