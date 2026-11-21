@@ -1,6 +1,6 @@
 # Evidence channel health and recovery context
 
-21 November 2026 · `feature/data-health-evidence-states`
+21 November 2026 · `feature/data-health-evidence-states` · [Draft PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187)
 
 ## Problem and result
 
