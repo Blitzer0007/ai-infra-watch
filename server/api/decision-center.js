@@ -1,3 +1,4 @@
+import { quoteFailureReason, explainQuoteFailures } from '../utils/quoteFailureReasons.js';
 import { evaluateExistingRules, sortedHistoryPoints } from '../../shared/portfolioRuleEvaluation.js';
 import { reviewHoldingRules } from '../../shared/portfolioRuleReview.js';
 import { calculateReviewedServerPortfolio } from '../utils/reviewedDecisionAccounting.js';
@@ -375,14 +376,14 @@ export default async function handler(req, res) {
 
     const symbols = holdingRows.map(row => String(row.symbol).toUpperCase());
     const quoteEntries = await Promise.all(symbols.map(async symbol => {
-      try { return [symbol, await routedQuote(symbol)]; } catch { return [symbol, null]; }
+      try { return [symbol, await routedQuote(symbol)]; } catch (error) { return [symbol, null, quoteFailureReason(error)]; }
     }));
     const ruleAssessmentTime = new Date();
-    const actual = calculateReviewedServerPortfolio(
+    const actual = explainQuoteFailures(calculateReviewedServerPortfolio(
       holdingRows, Array.isArray(transactionRows) ? transactionRows : [],
       Object.fromEntries(quoteEntries), ruleAssessmentTime.getTime(),
       { holdings: 'ready', transactions: Array.isArray(transactionRows) ? 'ready' : 'unavailable' },
-    );
+    ), quoteEntries);
     const quotes = actual.admittedQuotes;
     const profitReviewSymbols = holdingRows.filter(holding => {
       const symbol = String(holding.symbol).toUpperCase();

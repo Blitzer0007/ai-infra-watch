@@ -25,6 +25,10 @@ def test_decision_accounting_from_original_rows_to_visible_review(page,mode,expe
         assert body['portfolio']['concentrationTop3Pct'] is None
         assert body['portfolio']['scenarioShockTotal'] is None
         assert body['portfolio']['riskScenarios']==[]
+        if mode == 'partial':
+            issue = next(row for row in body['portfolio']['accountingIssues'] if row['code'] == 'QUOTE_WITHHELD')
+            assert 'Yahoo service error' in issue['message']
+            assert 'Finnhub not configured' in issue['message']
     if mode=='unknown-fee':
         assert body['portfolio']['openCostBasis'] is None
         assert body['portfolio']['unrealizedPnl'] is None

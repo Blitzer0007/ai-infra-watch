@@ -56,6 +56,13 @@ function historicalReferenceLines(loaded) {
   return lines.length ? ['PRE-OPEN REFERENCE · prior Yahoo observations, excluded from rules and valuation', ...lines] : [];
 }
 
+function quoteIssueLines(issues) {
+  const withheld = Array.isArray(issues)
+    ? issues.filter(issue => issue?.code === 'QUOTE_WITHHELD' && symbol(issue.symbol)) : [];
+  return withheld.length ? ['Check quote evidence: ' + withheld.slice(0, 3)
+    .map(issue => issue.symbol + ' — ' + clean(issue.message, 100)).join(' / ')] : [];
+}
+
 function quoteObservationLines(loaded) {
   const observations = (Array.isArray(loaded?.observations) ? loaded.observations : [])
     .filter(item => symbol(item?.symbol) && finite(item.price) && item.price > 0 && item.price <= 1e9 &&
@@ -100,7 +107,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
       } else {
         lines.push('Portfolio accounting: requires verification before using a P&L.');
       }
-      lines.push(...quoteObservationLines(loaded), ...historicalReferenceLines(loaded));
+      lines.push(...quoteObservationLines(loaded), ...historicalReferenceLines(loaded), ...quoteIssueLines(loaded.quoteIssues));
     } else {
       lines.push('Stored holdings and quote coverage were not provided to this brief.');
     }
@@ -134,11 +141,7 @@ export function buildTelegramDecisionBrief(decision, date, weekly = null, loaded
   }
   const observedLines = [...quoteObservationLines(loaded), ...historicalReferenceLines(loaded)];
   if (observedLines.length) lines.push('Separate digest observations', ...observedLines);
-  const withheld = Array.isArray(portfolio.accountingIssues)
-    ? portfolio.accountingIssues.filter(issue => issue?.code === 'QUOTE_WITHHELD' && symbol(issue.symbol)) : [];
-  if (withheld.length) {
-    lines.push('Check quote evidence: ' + withheld.slice(0, 3).map(issue => issue.symbol + ' — ' + clean(issue.message, 100)).join(' / '));
-  }
+  lines.push(...quoteIssueLines(portfolio.accountingIssues));
 
   const returned = Array.isArray(decision.actionItems) ? decision.actionItems.filter(isPrompt) : [];
   const actions = [...returned].sort((a, b) => (a.severity === 'ACT' ? 0 : 1) - (b.severity === 'ACT' ? 0 : 1)).slice(0, 3);

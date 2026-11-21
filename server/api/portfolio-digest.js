@@ -1,3 +1,4 @@
+import { quoteFailureReason, explainQuoteFailures } from '../utils/quoteFailureReasons.js';
 import {quote as routedQuote} from '../../api/_market-data.js';
 import {storedHoldingInputs} from '../services/ledgerInputs.js';
 import {calculateReviewedServerPortfolio} from '../utils/reviewedDecisionAccounting.js';
@@ -424,13 +425,13 @@ export async function buildDigest(decisionJournal) {
   if (!Array.isArray(holdings) || holdings.length > 150 || (Array.isArray(transactions) && transactions.length > 1000)) throw new Error('Loaded records exceed the supported accounting review scope.');
   const entries = await Promise.all(holdings.map(async row => {
     try { return [String(row.symbol).trim().toUpperCase(), await routedQuote(row.symbol)]; }
-    catch { return [String(row.symbol).trim().toUpperCase(), null]; }
+    catch (error) { return [String(row.symbol).trim().toUpperCase(), null, quoteFailureReason(error)]; }
   }));
   const rawQuotes = Object.fromEntries(entries);
-  const actual = calculateReviewedServerPortfolio(
+  const actual = explainQuoteFailures(calculateReviewedServerPortfolio(
     holdings, Array.isArray(transactions) ? transactions : [], rawQuotes, Date.now(),
     { holdings: 'ready', transactions: Array.isArray(transactions) ? 'ready' : 'unavailable' },
-  );
+  ), entries);
   const rows = holdings.map(holding => {
     const original = storedHoldingInputs(holding), symbol = original.symbol;
     const q = actual.admittedQuotes[symbol], mark = actual.positionMarks.find(item => item.symbol === symbol);
@@ -465,6 +466,7 @@ export async function buildDigest(decisionJournal) {
     quoteStatus: actual.quoteCoverage.status,
     currentValueUsd: actual.currentValue,
     accountingStatus: actual.accountingStatus,
+    quoteIssues: actual.accountingIssues,
     previousObservations: previousSessionReferences(rows, Date.now()),
     observations: rows.filter(row => row.price !== null && actual.admittedQuotes[row.symbol])
       .sort((left, right) => Math.abs(right.changePct ?? 0) - Math.abs(left.changePct ?? 0))

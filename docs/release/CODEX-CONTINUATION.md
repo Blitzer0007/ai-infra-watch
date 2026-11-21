@@ -2,6 +2,8 @@
 
 Read [the reconciled product backlog](PLAN-RECONCILIATION-2026-11-21.md) before continuing. The current increment isolates transaction-service outages in Decision Center and the digest. Preserve usable marks with explicit unavailable transaction evidence, and keep financial returns withheld. Run current-commit CI after pushing.
 
+Current continuation adds bounded provider failure reasons to the existing QUOTE_WITHHELD issues in Decision Center and the digest. It identifies rate limiting, timeout, missing configuration, no price, request rejection and service errors with fixed provider labels. Raw error bodies/messages are discarded. The brief includes these reasons even when its independent Decision Center read fails. Shared quote admission and valuation rules remain authoritative. Local verification includes all Node tests and 11 focused Chromium accounting/outage cases. Check the resulting GitHub head and its fresh workflow conclusions before release.
+
 The user approved a UI-first production release on November 21. The public hostname now resolves to READY deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`, commit `347240c7657af8a6f830b254e84bedc10f88d785`. The same tested production build was promoted through Vercel MCP. Homepage and JavaScript returned HTTP 200, and public JavaScript matched the staged response exactly. All relevant commit checks had passed. The 30-minute error/fatal runtime-log count was empty. Private portfolio API verification was not completed in this release inspection.
 
 Rollback remains the READY prior Milestone 5 deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU` at `6827cce`. The reason the alias had previously returned to it is unverified.

@@ -156,3 +156,14 @@ testFn('partial decision snapshot shows admitted observations and actual rule co
   assert.match(brief.text,/MISS — Market session provenance/);
   assert.doesNotMatch(brief.text,/999|showing 0\/0|10 rules/);
 });
+
+
+testFn('failed Decision Center fallback still identifies bounded quote provider failures', () => {
+  const result = buildTelegramDecisionBrief(null,'2026-11-21',null,{
+    holdingsCount:1,quotesAccepted:0,quotesTotal:1,quoteStatus:'partial',
+    quoteIssues:[{code:'QUOTE_WITHHELD',symbol:'FICT',message:'Quote retrieval failed: Yahoo rate limited.'},
+      {code:'OTHER',symbol:'FICT',message:'Should not appear'}],
+  });
+  assert.match(result.text,/FICT — Quote retrieval failed: Yahoo rate limited/);
+  assert.doesNotMatch(result.text,/Should not appear/);
+});
