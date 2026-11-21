@@ -309,9 +309,9 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
     <div className="space-y-6" id="overview-view">
       {/* Page Header */}
       <div className="aiw-page-header flex flex-col space-y-1 md:space-y-2 border-b border-white/10 pb-4">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Section 01 / Markets</span>
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">Your daily workspace</span>
         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
-          AI Infrastructure Ecosystem Overview
+          Your portfolio, in focus
         </h1>
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <p className="text-xs text-white/60 max-w-3xl leading-relaxed">
@@ -353,6 +353,8 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
         {!Object.keys(livePrices).length && !Object.values(quotes).some((item: any) => item?.ok) && <div className="mt-3 text-[11px] text-white/50">Waiting for the first live quote refresh.</div>}
       </section>
 
+      <details className="aiw-learning-disclosure">
+        <summary>Understand the AI infrastructure ecosystem</summary>
       {/* Layman Connections & Benefits Master Guide */}
       <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-white/10 rounded-2xl p-5 md:p-6 space-y-4">
         <div className="flex items-center space-x-2.5">
@@ -409,6 +411,8 @@ export default function Overview({ config, onNavigate, livePrices = {}, news = [
           </div>
         </div>
       </div>
+
+      </details>
 
       {/* API Key Notice */}
       {!config.finnhubKey && (

@@ -390,7 +390,7 @@ export default function App() {
 
 
   return (
-    <div className="aiw-application min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white">
+    <div className="aiw-application aiw-light-workspace min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white">
       <a href="#main-content" className="aiw-skip-link">Skip to main content</a>
 {/* 1. FINITE, ACCESSIBLE MARKET OBSERVATION STRIP */}
       <div role="region" aria-label="Observed market quotes"
@@ -422,14 +422,13 @@ export default function App() {
           <div className="aiw-brand-block mb-5 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
             <span aria-hidden="true" className="aiw-brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black">A</span>
             <div className="min-w-0">
-              <p className="text-sm font-extrabold tracking-tight text-white">AI INFRA WATCH</p>
+              <p className="text-sm font-extrabold tracking-tight text-white">AI Infra Watch</p>
               <p className="mt-1 text-[11px] text-slate-400">Portfolio research platform</p>
             </div>
           </div>
           <WorkspaceNavigation activeView={activeView} onNavigate={handleNavigate} variant="desktop"/>
           <div className="aiw-sidebar-footer mt-5 border-t border-white/10 px-3 py-4 text-xs leading-relaxed text-slate-400">
-            <p>Evidence-first research · No automatic trades</p>
-            <p className="mt-1">Verify source freshness on Data Health.</p>
+            <p>Research for considered decisions</p>
           </div>
         </aside>
 
@@ -438,7 +437,7 @@ export default function App() {
           <div className="flex min-w-0 items-center gap-2.5">
             <span aria-hidden="true" className="aiw-brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black">A</span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold tracking-tight text-white">AI INFRA WATCH</p>
+              <p className="truncate text-sm font-extrabold tracking-tight text-white">AI Infra Watch</p>
               <p className="text-[11px] text-slate-400">Research workspaces</p>
             </div>
           </div>

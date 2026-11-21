@@ -33,7 +33,7 @@ export default function AccessGate({ children }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4">
+    <div className="aiw-light-workspace min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15181E] p-6 shadow-2xl">
         <div className="flex items-center gap-3 mb-5">
           <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-2.5">

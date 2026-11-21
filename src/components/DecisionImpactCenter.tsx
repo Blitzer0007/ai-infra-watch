@@ -320,6 +320,8 @@ function PreTradeGate({ data }: { data: DecisionData }) {
         </div>
         <span className="rounded border border-current/20 px-2 py-1 text-[8px] font-mono font-bold uppercase">{state}</span>
       </div>
+      <details className="mt-3 text-xs">
+        <summary className="cursor-pointer font-semibold">Review data readiness</summary>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-3">
         {checks.map(check => (
           <div key={check.label} className="rounded-lg border border-white/5 bg-black/10 p-2.5">
@@ -337,6 +339,7 @@ function PreTradeGate({ data }: { data: DecisionData }) {
           Forecast validation is still intentionally building its independent sample. Until the evidence gate is ready, forecast output should remain contextual rather than decision-driving.
         </div>
       )}
+      </details>
     </div>
   );
 }
