@@ -40,6 +40,9 @@ def test_mobile_workspaces_and_dismissible_navigation_keep_routes(width, page):
     page.set_viewport_size({"width": width, "height": 900})
     page.goto("/alerts")
     expect(page.get_by_test_id("workspace-title")).to_have_text("Alert Inbox")
+    header = page.locator(".aiw-mobile-header").bounding_box()
+    actions = page.locator(".aiw-top-actions").bounding_box()
+    assert actions["y"] >= header["y"] + header["height"], "Header must not cover search or its context"
     menu = page.get_by_role("button", name="Open navigation menu")
     expect(menu).to_be_visible()
     menu.click()
@@ -75,3 +78,75 @@ def test_every_screen_uses_same_context_and_uncertainty_aware_feed(width, page):
     expect(page.get_by_test_id("application-workspace")).to_be_visible()
     expect(page.get_by_role("button", name="Go to Progress Tracker")).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_light_workspace_remains_readable_on_every_route(width, page):
+    """Catch dark legacy styles and narrow-screen regressions across the whole app."""
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 1000})
+    errors, writes = [], []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("request", lambda request: writes.append(request.url)
+            if "/api/" in request.url and request.method not in ("GET", "HEAD", "OPTIONS") else None)
+    for route in ROUTES:
+        page.goto("/" + route)
+        title = page.get_by_test_id("workspace-title")
+        expect(title).to_be_visible()
+        # Test luminance and contrast, rather than pinning a particular theme hex.
+        appearance = title.evaluate("""title => {
+            const rgb = color => color.match(/[\\d.]+/g).slice(0, 3).map(Number);
+            const luminance = color => rgb(color).map(c => c / 255)
+                .map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4)
+                .reduce((sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
+            const canvas = luminance(getComputedStyle(title.closest('.aiw-application')).backgroundColor);
+            const ink = luminance(getComputedStyle(title).color);
+            return {canvas, contrast: (canvas + .05) / (ink + .05)};
+        }""")
+        assert appearance["canvas"] > .9, route
+        assert appearance["contrast"] >= 7, route
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), route
+    assert errors == []
+    assert writes == [], "Browsing research workspaces must not write API records"
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_progressive_details_keep_warnings_and_keyboard_access(width, page):
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.goto("/overview")
+    feed = page.get_by_test_id("app-feed-status")
+    expect(feed.get_by_role("button", name="REFRESH FEED")).to_be_visible()
+    source = feed.locator("details")
+    expect(source).not_to_have_attribute("open", "")
+    source.locator("summary").focus()
+    page.keyboard.press("Enter")
+    expect(source.get_by_text("Data feeds and quote observations", exact=False)).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    page.keyboard.press("Enter")
+
+    gate = page.get_by_test_id("pre-trade-gate")
+    expect(gate.get_by_text("Portfolio review is incomplete", exact=True)).to_be_visible()
+    expect(gate.get_by_text("Accounting reconciliation", exact=True)).not_to_be_visible()
+    gate.get_by_text("Review data readiness", exact=True).click()
+    expect(gate.get_by_text("Accounting reconciliation", exact=True)).to_be_visible()
+    # Low-opacity legacy text previously became white on white after the theme switch.
+    detail_color = gate.get_by_text("Matched loaded records", exact=False).evaluate(
+        "element => getComputedStyle(element).color")
+    assert detail_color != "rgb(255, 255, 255)"
+
+    guide = page.locator("details").filter(has=page.get_by_text("Understand the AI infrastructure ecosystem", exact=True))
+    expect(guide.get_by_text("How Every Stock Connects (In Plain English)", exact=True)).not_to_be_visible()
+    guide.locator("summary").click()
+    expect(guide.get_by_text("How Every Stock Connects (In Plain English)", exact=True)).to_be_visible()
+
+    page.goto("/portfolio")
+    expect(page.get_by_role("button", name="Simple", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Detailed", exact=True)).to_be_visible()
+    price_indicator = page.locator(".aiw-portfolio-indicators").get_by_text("LIVE PRICES", exact=False)
+    expect(price_indicator).not_to_be_visible()
+    indicators = page.get_by_text("Portfolio indicators", exact=True)
+    indicators.focus()
+    page.keyboard.press("Enter")
+    expect(price_indicator).to_be_visible()
+    expect(page.get_by_test_id("portfolio-accounting-status")).to_be_visible()

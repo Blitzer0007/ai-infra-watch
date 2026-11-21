@@ -1,3 +1,30 @@
+# Current continuation: clean light workspace draft — 21 November 2026
+
+**This section supersedes all historical instructions below.** The owner disliked the dark app and selected **clean light workspace with fewer cards and clearer navigation**.
+
+- Active branch: `feature/light-workspace-redesign`, isolated Cloud worktree `/workspace/ai-infra-watch-light-ui`, based on main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. Active draft: [PR #186](https://github.com/Blitzer0007/ai-infra-watch/pull/186). Its checks are the authoritative exact-head CI evidence.
+- Production: PR #180 has already merged and deployed successfully. Public `https://ai-infra-watch-theta.vercel.app` was verified at READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. Prior rollback is `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` (`347240c7657af8a6f830b254e84bedc10f88d785`). Recheck identities before any future release; do not execute historical PR #180 handoff instructions again.
+- Preserved draft PR #185: `feature/quote-admission-diagnostics`, head `c9db228aa878f14ad9c7f00af0006d838fdb1d3d`, separate quote-health worktree. It is excluded from this UI draft. PR #180's head is frozen for release attestations. All other worktrees and pending changes remain preserved.
+- UI changes: shared light CSS; shell/navigation/feed/search; Overview educational and readiness disclosures; flatter Portfolio navigation/summary, expandable indicators and directly available density controls; light auth/holding-dialog/PWA chrome. Financial/API/shared calculation files and release guards are unchanged. UI CI adds the previously omitted application-workspace test file.
+- Read [design scope, rendered fictional previews and acceptance](../design/LIGHT-WORKSPACE-REDESIGN.md).
+- Local verification: 1,085 Node tests, TypeScript, 57 focused mocked browser checks, 32 offline CI safety checks; the final mobile refinement reran and passed all 57 focused browser checks, including the all-workspace tests. Security audit and production build passed. CI evidence must match the latest exact branch head; inspect Frontend CI, Security audit and UI API DB Validation rather than assuming an earlier commit applies.
+- Full CI on the initial draft caught two legacy smoke assertions affected by sentence case and collapsed readiness details. The repair uses the visible Quality Lab heading and explicitly opens readiness before checking the same forecast /50 evidence, while adding an assertion that the incomplete-review warning stays visible. Financial assertions remain. Require fresh CI on this repair head; the earlier failed UI run is not validation.
+- No production integration or live portfolio correctness is claimed by fixture tests. Specialized research workflows retain existing behavior; this is an app-wide visual foundation with focused Overview/Portfolio simplification.
+
+## Next steps
+
+1. Verify PR #186's branch head, diff and all three applicable exact-head CI families. Repair any genuine regression without weakening financial, modal, history, source or no-write assertions.
+2. Review the desktop/mobile previews with the owner. Keep this branch draft and production unchanged until this new design has explicit release approval.
+3. If approved later, reconcile the independent PR #185 separately and use the current guarded release process. The completed one-release exception for PR #180 does not apply here. Do not change production Supabase, enable new live polling, retrieve secrets or send Telegram under this UI task.
+
+Pasteable resume prompt:
+
+> Continue AI Infra Watch on `feature/light-workspace-redesign`. Read the current top section of `docs/release/CODEX-CONTINUATION.md` and `docs/design/LIGHT-WORKSPACE-REDESIGN.md`. Inspect the branch's draft PR and exact-head CI. Preserve PR #185 and all worktrees. Continue the chosen clean light app-wide UI, using offline fictional fixtures; no merge, deployment, production database changes, new polling or Telegram send without separate approval.
+
+---
+
+**Historical checkpoints below are retained for provenance, not current operating instructions.**
+
 # Approved PR 180 release in progress · 21 November 2026
 
 The owner explicitly approved merging and deploying PR #180 using an exception limited to this release. The exception pins its branch and first parent `347240c7657af8a6f830b254e84bedc10f88d785`. The existing handoff will dispatch the guarded production workflow only after all required CI pass on its exact regular two-parent main merge. It retains staging, access gates, repeated commit checks and idempotent dispatch. Rollback is the currently live UI deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. Live checks remain false.

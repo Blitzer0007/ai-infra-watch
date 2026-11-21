@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Clock3, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Activity, AlertTriangle, RefreshCw } from 'lucide-react';
 
 type Props = {
   loading: boolean;
@@ -29,51 +29,30 @@ export default function FeedStatusBar({
       lastFeed ? 'Last feed response recorded' : 'Feed response not confirmed';
   return <aside aria-label="Market feed and evidence status"
     className="aiw-feed-toolbar" data-testid="app-feed-status">
-    <div className="flex min-w-0 flex-1 items-start gap-3">
-      <div className={'aiw-feed-indicator mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ' +
-        (error ? 'text-amber-300' : 'text-cyan-200')}>
-        {error ? <AlertTriangle aria-hidden="true" size={18}/> :
-          loading ? <RefreshCw aria-hidden="true" size={18} className="animate-spin"/> :
-            <Activity aria-hidden="true" size={18}/>}
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-white">Live Market Intelligence</span>
-          <span className={'aiw-feed-status-label rounded-full border px-2 py-0.5 text-[11px] font-medium ' +
-            (error ? 'border-amber-300/30 text-amber-200' :
-              lastFeed ? 'border-cyan-300/25 text-cyan-200' : 'border-white/15 text-slate-300')}>
-            {status}
-          </span>
-        </div>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          {error ? 'Latest data refresh did not complete. Previously shown observations may be stale.' :
-            'Data feeds and quote observations are monitored independently; values require source-level checks.'}
-        </p>
-        {error && <p role="alert" className="mt-1 text-xs text-amber-200">Source detail: {error}</p>}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-          <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" size={13}/>
-            {lastFeed ? 'Feed response ' + lastFeed : 'No feed response time'}
-          </span>
-          <span>
-            Quotes: {quoteCount ? quotesNotFlaggedStale + '/' + quoteCount +
-              ' not marked stale' : 'no admitted observations'}
-          </span>
-          {lastQuotes && <span>Last quote check {lastQuotes}</span>}
-          {buildCommit && <span>Build {buildCommit.slice(0, 7)}</span>}
-          {environment && <span>{environment}</span>}
-        </div>
-      </div>
+    <div className="aiw-feed-summary">
+      {error ? <AlertTriangle aria-hidden="true" size={16}/> : <Activity aria-hidden="true" size={16}/>}
+      <span className="font-semibold">Live Market Intelligence</span>
+      <span className="aiw-feed-status-label">{status}</span>
     </div>
-    <div className="flex shrink-0 items-center gap-2 self-start">
-      <span className="hidden items-center gap-1 text-[11px] text-slate-400 lg:inline-flex">
-        <ShieldCheck aria-hidden="true" size={14}/> Eligibility checked per source
-      </span>
+    <div className="aiw-feed-controls">
+      <details className="aiw-feed-details">
+        <summary>Source details</summary>
+        <div className="aiw-feed-detail-body">
+          <p>Data feeds and quote observations are monitored independently; values require source-level checks.</p>
+          <p>{lastFeed ? 'Feed response ' + lastFeed : 'No feed response time'}</p>
+          <p>Quotes: {quoteCount ? quotesNotFlaggedStale + '/' + quoteCount + ' not marked stale' : 'no admitted observations'}</p>
+          {lastQuotes && <p>Last quote check {lastQuotes}</p>}
+          {buildCommit && <p>Build {buildCommit.slice(0, 7)}</p>}
+          {environment && <p>{environment}</p>}
+        </div>
+      </details>
       <button type="button" onClick={onRefresh} disabled={loading}
         aria-label={loading ? 'SYNCHRONIZING...' : 'REFRESH FEED'}
-        className="aiw-feed-refresh inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-wait disabled:opacity-50">
-        <RefreshCw aria-hidden="true" size={15} className={loading ? 'animate-spin' : ''}/>
-        <span>{loading ? 'Refreshing…' : 'Refresh feed'}</span>
+        className="aiw-feed-refresh">
+        <RefreshCw aria-hidden="true" size={14} className={loading ? 'animate-spin' : ''}/>
+        <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
       </button>
     </div>
+    {error && <p role="alert" className="aiw-feed-error">Latest refresh failed. Previously shown observations may be stale. Source detail: {error}</p>}
   </aside>;
 }

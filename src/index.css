@@ -247,12 +247,12 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
 
 /* Accessibility baseline: preserve the compact visual language without making
    essential metadata depend on tiny type or low-contrast grey. */
-.text-\[8px\] { font-size: 10px !important; }
-.text-\[9px\] { font-size: 11px !important; }
-.text-white\/20 { color: rgba(255,255,255,.42) !important; }
-.text-white\/25 { color: rgba(255,255,255,.48) !important; }
-.text-white\/30 { color: rgba(255,255,255,.56) !important; }
-.text-white\/35 { color: rgba(255,255,255,.62) !important; }
+.aiw-application:not(.aiw-light-workspace) .text-\[8px\] { font-size: 10px !important; }
+.aiw-application:not(.aiw-light-workspace) .text-\[9px\] { font-size: 11px !important; }
+.aiw-application:not(.aiw-light-workspace) .text-white\/20 { color: rgba(255,255,255,.42) !important; }
+.aiw-application:not(.aiw-light-workspace) .text-white\/25 { color: rgba(255,255,255,.48) !important; }
+.aiw-application:not(.aiw-light-workspace) .text-white\/30 { color: rgba(255,255,255,.56) !important; }
+.aiw-application:not(.aiw-light-workspace) .text-white\/35 { color: rgba(255,255,255,.62) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -583,3 +583,160 @@ html, body, #root { width: 100%; max-width: 100%; min-width: 0; }
     align-content: flex-start;
   }
 }
+
+/* Light workspace. Legacy financial views keep their data and controls while
+   semantic surfaces and contrast are shared across every route. */
+:root {
+  color-scheme: light;
+  --aiw-ink: #18243b;
+  --aiw-subtle: #58677d;
+  --aiw-outline: #dce3ed;
+  --aiw-focus: #2456ce;
+  --aiw-card: #fff;
+}
+body { background: #f5f7fb; }
+.aiw-light-workspace {
+  color: #18243b;
+  background: #f5f7fb;
+  --font-mono: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+.aiw-light-workspace :is([class*="text-white"], [class*="text-[#F3F4F6]"], [class*="text-slate-200"], [class*="text-slate-300"]) { color: #25334b; }
+.aiw-light-workspace :is([class*="text-white/2"], [class*="text-white/3"], [class*="text-white/4"], [class*="text-slate-400"], [class*="text-slate-500"]) { color: #5c6b81; }
+.aiw-light-workspace [class*="border-white/"] { border-color: #dce3ed; }
+.aiw-light-workspace :is([class*="bg-[#0"], [class*="bg-[#1"], [class*="bg-[#2"]) { background-color: #fff; }
+.aiw-light-workspace :is([class*="bg-black/"], [class*="bg-white/"]) { background-color: #f4f7fb; }
+.aiw-light-workspace [class*="bg-gradient-"] { background-image: none; }
+.aiw-light-workspace :is([class*="text-emerald-"], [class*="text-green-"]) { color: #087451; }
+.aiw-light-workspace :is([class*="text-rose-"], [class*="text-red-"]) { color: #b52c48; }
+.aiw-light-workspace :is([class*="text-cyan-"], [class*="text-sky-"], [class*="text-blue-"]) { color: #285ac4; }
+.aiw-light-workspace :is([class*="text-amber-"], [class*="text-yellow-"], [class*="text-orange-"]) { color: #8a5310; }
+.aiw-light-workspace :is([class*="text-purple-"], [class*="text-violet-"], [class*="text-fuchsia-"]) { color: #7144a5; }
+.aiw-light-workspace :is([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"]) { font-size: 11px; line-height: 1.5; }
+.aiw-light-workspace :is([class*="text-[10px]"], [class*="text-[11px]"]) { font-size: 12px; line-height: 1.5; }
+.aiw-light-workspace .text-xs { font-size: 13px; line-height: 1.55; }
+.aiw-light-workspace .font-black { font-weight: 650; }
+.aiw-light-workspace .uppercase { text-transform: none; letter-spacing: .01em; }
+.aiw-light-workspace .rounded-2xl { border-radius: 12px; }
+.aiw-light-workspace .rounded-xl { border-radius: 9px; }
+.aiw-light-workspace :is(input:not([type="checkbox"]), textarea, select) {
+  background-color: #fff; color: #24334b; border-color: #c9d3e2; accent-color: #285ac4;
+}
+.aiw-light-workspace ::placeholder { color: #68778d; opacity: 1; }
+.aiw-light-workspace .aiw-market-strip { background: #fff; box-shadow: none; border-color: #e4e9f1; }
+.aiw-light-workspace .aiw-desktop-sidebar,
+.aiw-light-workspace .aiw-mobile-drawer { background: #fff; border-color: #e0e6ef; scrollbar-color: #c4cede transparent; }
+.aiw-light-workspace .aiw-brand-block { background: transparent; border: 0; padding: 2px 0 16px; margin-bottom: 8px; }
+.aiw-light-workspace .aiw-brand-mark { background: #285ac4; color: #fff; border: 0; box-shadow: none; }
+.aiw-light-workspace .aiw-nav-list { gap: 22px; }
+.aiw-light-workspace .aiw-nav-group-label { color: #79849a; font-size: 10px; font-weight: 650; letter-spacing: .08em; }
+.aiw-light-workspace .aiw-nav-entry { min-height: 39px; border-radius: 7px; padding: 8px 10px; color: #59677d; font-weight: 500; }
+.aiw-light-workspace .aiw-nav-entry:hover { background: #f3f6fb; color: #24364f; border-color: transparent; }
+.aiw-light-workspace .aiw-nav-entry--active,
+.aiw-light-workspace .aiw-nav-entry--active:hover { color: #2456ce; background: #edf2ff; box-shadow: none; border-color: transparent; font-weight: 650; }
+.aiw-light-workspace .aiw-sidebar-footer { font-size: 11px; }
+.aiw-light-workspace .aiw-mobile-header { top: 0; background: #fff; backdrop-filter: none; }
+.aiw-light-workspace .aiw-mobile-menu-button { background: #f4f7fb; color: #283a55; border-color: #dde4ee; }
+.aiw-light-workspace .aiw-mobile-backdrop { background: #24334b66; }
+.aiw-light-workspace .aiw-top-actions { border-bottom: 1px solid #e2e7ef; padding-bottom: 16px; margin-bottom: 25px; }
+.aiw-light-workspace .aiw-workspace-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  border: 0; border-radius: 0; padding: 0; margin-bottom: 20px; background: transparent; box-shadow: none; overflow: visible;
+}
+.aiw-light-workspace .aiw-workspace-header::before { display: none; }
+.aiw-light-workspace .aiw-workspace-title { margin: 0; color: #1c2940; font-size: clamp(25px, 2.3vw, 33px); line-height: 1.2; font-weight: 650; letter-spacing: -.035em; }
+.aiw-light-workspace .aiw-workspace-description { margin-top: 7px; color: #64728a; font-size: 14px; line-height: 1.6; max-width: 65ch; }
+.aiw-light-workspace .aiw-related-workspaces { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 16px; padding-top: 6px; max-width: 42%; }
+.aiw-light-workspace .aiw-workspace-shortcut { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0; color: #49658b; border: 0; background: transparent; border-radius: 3px; font-size: 12px; font-weight: 500; }
+.aiw-light-workspace .aiw-workspace-shortcut:hover { color: #2456ce; background: transparent; text-decoration: underline; }
+.aiw-light-workspace .aiw-feed-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border: 1px solid #e0e6f0; background: #fff; border-radius: 8px; box-shadow: none; font-size: 12px; }
+.aiw-light-workspace .aiw-feed-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #4f6078; }
+.aiw-light-workspace .aiw-feed-status-label { color: #68788e; font-size: 11px; }
+.aiw-light-workspace .aiw-feed-controls { display: flex; align-items: center; gap: 14px; }
+.aiw-light-workspace .aiw-feed-details { position: relative; color: #546780; font-size: 12px; }
+.aiw-light-workspace .aiw-feed-details summary { cursor: pointer; padding: 8px 0; }
+.aiw-light-workspace .aiw-feed-detail-body { position: absolute; right: 0; top: 100%; z-index: 45; width: min(340px, 80vw); padding: 16px; background: white; border: 1px solid #dce4f0; border-radius: 9px; box-shadow: 0 12px 30px #25334b1a; font-size: 12px; line-height: 1.6; }
+.aiw-light-workspace .aiw-feed-detail-body p + p { margin-top: 6px; }
+.aiw-light-workspace .aiw-feed-refresh { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 10px; background: #f6f8fc; border: 1px solid #dce4f0; border-radius: 6px; color: #355784; font-size: 12px; font-weight: 600; }
+.aiw-light-workspace .aiw-feed-refresh:hover:not(:disabled) { background: #edf2fc; border-color: #b8c8e2; }
+.aiw-light-workspace .aiw-feed-error { flex-basis: 100%; color: #8b5310; font-size: 12px; }
+.aiw-light-workspace .aiw-page-header,
+.aiw-light-workspace .aiw-view-stage .aiw-page-header { position: static; background: transparent; backdrop-filter: none; padding: 0 0 16px; border-color: #e1e7ef; }
+.aiw-light-workspace .aiw-page-header h1 { font-size: clamp(20px, 2vw, 25px) !important; line-height: 1.3 !important; font-weight: 600 !important; font-style: normal !important; text-transform: none !important; letter-spacing: -.025em !important; color: #24324a !important; }
+.aiw-light-workspace .aiw-page-header p { color: #5c6e86; font-size: 13px; }
+.aiw-light-workspace .aiw-page-header::after { display: none; }
+.aiw-light-workspace .aiw-table-shell { border-color: #dce4ef; border-radius: 9px; background: #fff; box-shadow: none; }
+.aiw-light-workspace .aiw-scroll-region thead th { background: #f5f8fc; color: #536680; box-shadow: inset 0 -1px #dde5ef; font-size: 11px; }
+.aiw-light-workspace .aiw-scroll-region tbody tr { border-color: #e4eaf2; }
+.aiw-light-workspace .aiw-view-stage section { box-shadow: none; }
+.aiw-light-workspace .aiw-learning-disclosure { background: #fff; border: 1px solid #dce4ef; border-radius: 10px; padding: 14px 18px; }
+.aiw-light-workspace .aiw-learning-disclosure > summary { cursor: pointer; color: #456184; font-size: 13px; font-weight: 600; }
+.aiw-light-workspace .aiw-learning-disclosure[open] > summary { margin-bottom: 16px; }
+.aiw-light-workspace .aiw-portfolio-navigation .aiw-portfolio-jump { background: transparent; border: 0; padding: 0; }
+.aiw-light-workspace .aiw-portfolio-navigation .aiw-portfolio-jump > .mb-3 { display: none; }
+.aiw-light-workspace .aiw-portfolio-navigation select { margin-bottom: 12px; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > .grid { gap: 0; border-bottom: 1px solid #d9e2ee; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > .grid > button { border: 0; border-radius: 0; background: transparent; padding: 12px 16px; color: #60718a; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > .grid > button[aria-current="page"] { color: #2456ce; box-shadow: inset 0 -2px #2456ce; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > details { border: 0; background: transparent; padding: 8px 0; }
+.aiw-light-workspace .recharts-text { fill: #536780; }
+.aiw-light-workspace .recharts-cartesian-grid line { stroke: #dce4ed; stroke-opacity: 1; }
+.aiw-light-workspace .recharts-default-tooltip { background: white !important; color: #27374e !important; border-color: #dce4ef !important; }
+.aiw-light-workspace .aiw-search-trigger { background: white; border-color: #dce4ef; color: #536b8d; box-shadow: 0 1px 2px #24334b08; }
+.aiw-light-workspace .aiw-search-dialog { background: white; color: #24334b; }
+.aiw-light-workspace .aiw-search-dialog :where(button):hover { background: #f0f4fc; }
+.aiw-light-workspace .aiw-skip-link { background: #2456ce; color: white; border-color: #2456ce; }
+.aiw-light-workspace .aiw-app-footer { color: #64758b; border-color: #dce4ef; }
+
+/* Native holding dialogs are portalled to body. Keep their theme explicit. */
+.aiw-holding-dialog { background: #fff; color: #24334b; border-color: #dce4ef; }
+.aiw-holding-dialog > header { background: #fff; border-color: #dce4ef; }
+.aiw-holding-dialog [class*="text-white"] { color: #344760; }
+.aiw-holding-dialog :is([class*="bg-[#0"], [class*="bg-[#1"], [class*="bg-black/"]) { background-color: #f5f8fc; }
+.aiw-holding-dialog [class*="border-white/"] { border-color: #dce4ef; }
+@media (min-width: 1280px) {
+  .aiw-light-workspace .aiw-portfolio-navigation select { width: 235px; }
+}
+@media (max-width: 767px) {
+  .aiw-light-workspace .aiw-workspace-header { flex-direction: column; gap: 8px; }
+  .aiw-light-workspace .aiw-related-workspaces { max-width: 100%; justify-content: flex-start; gap: 4px 14px; }
+  .aiw-light-workspace .aiw-feed-summary { min-height: 38px; }
+  .aiw-light-workspace .aiw-feed-controls { width: 100%; justify-content: space-between; }
+  .aiw-light-workspace .aiw-feed-detail-body { left: 0; right: auto; }
+  .aiw-light-workspace .aiw-workspace-description { font-size: 13px; }
+}
+
+.aiw-light-workspace .aiw-command-center { background: #fff; box-shadow: none; border-color: #dce4ef; border-radius: 12px; }
+.aiw-light-workspace .aiw-stat-tile::before { display: none; }
+.aiw-light-workspace [data-testid="portfolio-summary-grid"] { gap: 0; border-block: 1px solid #dce4ef; }
+.aiw-light-workspace .aiw-stat-tile { background: transparent; border: 0; border-radius: 0; }
+.aiw-light-workspace .aiw-stat-tile:hover { background: transparent; transform: none; box-shadow: none; }
+.aiw-light-workspace .aiw-stat-tile > .mb-5 { margin-bottom: 12px; }
+.aiw-light-workspace .aiw-page-header { box-shadow: none; }
+.aiw-light-workspace .aiw-page-header > span:first-child { color: #5f7290; background: transparent; border: 0; padding-left: 0; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > details > .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.aiw-light-workspace .aiw-portfolio-navigation nav > details > .grid > button { padding: 7px 12px; border: 0; background: #f0f4fa; }
+.aiw-light-workspace [data-testid="decision-impact-center"] > .grid > div { border: 0; border-radius: 0; background: transparent; }
+.aiw-light-workspace [data-testid="decision-impact-center"] > .grid { border-top: 1px solid #dce4ef; border-bottom: 1px solid #dce4ef; padding: 8px 0; }
+.aiw-light-workspace [data-testid="pre-trade-gate"] details > .grid { grid-template-columns: 1fr; }
+.aiw-light-workspace [data-testid="pre-trade-gate"] details > .grid > div { display: grid; grid-template-columns: 65px minmax(130px, 1fr) 2fr; gap: 8px; align-items: baseline; border: 0; border-bottom: 1px solid #dce4ef; border-radius: 0; background: transparent; }
+.aiw-light-workspace .aiw-portfolio-statusbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.aiw-light-workspace .aiw-portfolio-indicators { color: #526780; }
+.aiw-light-workspace .aiw-search-key { color: #60718a; font-size: 11px; padding: 3px 5px; border: 1px solid #dce4ef; border-radius: 4px; }
+.aiw-light-workspace .font-mono { font-variant-numeric: tabular-nums; }
+@media (max-width: 767px) {
+  .aiw-light-workspace .aiw-top-actions > div:first-child { display: none; }
+  .aiw-light-workspace [data-testid="pre-trade-gate"] details > .grid > div { grid-template-columns: 55px 1fr; }
+  .aiw-light-workspace [data-testid="pre-trade-gate"] details > .grid > div > div:last-child { grid-column: 2; }
+  .aiw-light-workspace .aiw-portfolio-statusbar { flex-wrap: wrap; align-items: baseline; }
+  .aiw-light-workspace .aiw-portfolio-indicators[open] { flex-basis: 100%; }
+}
+
+.aiw-light-workspace [data-testid="decision-impact-center"] { background: #fff; border-color: #dce4ef; }
+.aiw-light-workspace [data-testid="pre-trade-gate"] { background: #fffaf0; }
+.aiw-light-workspace :is([class*="text-slate-50"],[class*="text-slate-100"],[class*="text-gray-100"],[class*="text-gray-200"],[class*="text-gray-300"],[class*="text-gray-400"]) { color: #5c6b81; }
+.aiw-light-workspace .recharts-wrapper text { fill: #536780; }
+.aiw-light-workspace button:is(.bg-black,.bg-blue-500,.bg-blue-600) { background: #2456ce; color: #fff; }
+.aiw-light-workspace button:is(.bg-black,.bg-blue-500,.bg-blue-600) [class*="text-white"] { color: #fff; }
+
+#root .aiw-light-workspace :is(button,a,input,select,textarea,summary):focus-visible,
+.aiw-holding-dialog.aiw-light-workspace :is(button,a,input,select,textarea,summary):focus-visible { outline: 2px solid #2456ce; outline-offset: 3px; }

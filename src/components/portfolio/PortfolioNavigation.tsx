@@ -28,7 +28,7 @@ export default function PortfolioNavigation({tab, onChange}:{
   const tabClass = (active:boolean) => `group flex min-w-0 flex-col items-start gap-1.5 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${active
     ? 'border-cyan-300/40 bg-cyan-300/[0.11] text-white'
     : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/25 hover:bg-white/[0.07]'}`;
-  return <div data-testid="portfolio-navigation" className="space-y-3">
+  return <div data-testid="portfolio-navigation" className="aiw-portfolio-navigation space-y-3">
     <div className="aiw-portfolio-jump rounded-2xl border border-white/10 bg-[#151e2a] p-3 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-300">
@@ -55,7 +55,7 @@ export default function PortfolioNavigation({tab, onChange}:{
       </select>
       <nav aria-label="Portfolio workspaces" className="hidden space-y-3 md:block">
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {primary.map((item,index)=><button
+          {primary.map(item=><button
             type="button"
             key={item.id}
             onClick={()=>onChange(item.id)}
@@ -64,9 +64,7 @@ export default function PortfolioNavigation({tab, onChange}:{
             aria-pressed={tab===item.id}
             className={tabClass(tab===item.id)}
           >
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300/70">{String(index+1).padStart(2,'0')}</span>
             <span className="text-sm font-semibold">{item.label}</span>
-            <span className="text-xs leading-relaxed text-slate-400">{item.description}</span>
           </button>)}
         </div>
         <details open className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
@@ -87,7 +85,6 @@ export default function PortfolioNavigation({tab, onChange}:{
               className={tabClass(tab===item.id)}
             >
               <span className="text-sm font-semibold">{item.label}</span>
-              <span className="text-xs leading-relaxed text-slate-400">{item.description}</span>
             </button>)}
           </div>
         </details>
