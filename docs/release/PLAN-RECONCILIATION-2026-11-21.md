@@ -16,7 +16,7 @@ Older percentage estimates are historical. There is no defensible single complet
 | Original track | Current implementation | Open deliverable and acceptance |
 | --- | --- | --- |
 | Release 1 glossary and decision cards | Contextual glossary, Command Center and gated decision adapters are implemented. | Eligible position classifications still require authentic source and accounting evidence. Glossary/UI deployment cannot establish those inputs. |
-| Portfolio core and navigation | Main includes Command Center, holding dialog, Opportunities, Calendar, Inbox and company research. Mocked 17-route smoke passed. | Public alias was observed on older M5 build. Verify intended deployed commit and routing after release. |
+| Portfolio core and navigation | Main includes Command Center, holding dialog, Opportunities, Calendar, Inbox and company research. Mocked 17-route smoke passed. | UI restored to tested main build 347240c7 on November 21. Alias, homepage and identical staged/public JavaScript verified. Private authenticated journeys remain unverified. |
 | Source truth and consumer contracts | Shared quote normalization, admission, issue reasons and provenance checks exist. | Real issuer/security mappings, vendor source/time evidence and authentic historical coverage need explicit validation. Missing metadata cannot be manufactured. |
 | Resource coordination | Python provider attempt/token budgets exist and have offline coverage. | Multi-worker/account-level coordination and real provider quotas remain unverified. |
 | Accounting and Python handoff | Strict original-row matching and conditional cost/P&L calculations exist. | Complete broker history, fees, corporate actions, currency and cash flows require authentic records. Empty or failed transaction retrieval cannot establish a zero balance. |
@@ -27,7 +27,7 @@ Older percentage estimates are historical. There is no defensible single complet
 | AI roles and free providers | Offline Bull/Bear/Judge, Source Quality and manual research flows exist. | Secure model configuration, endpoint/model availability and frozen-evidence usefulness comparison remain unverified. #181 remains a separate integration proposal. |
 | Event Risk Radar and public X | Earlier stacked branch includes offline fixtures/specification. | Current main lacks the full requested source-acquisition integration. Public-account access, provenance and bounded manual monitoring must be implemented and tested before live polling. |
 | REA mirroring | Prior source analyses informed UI behavior and reference comparisons. | REA is a feature-research tool. It cannot supply authentic financial rows or certify source correctness. Runtime parity with reference applications remains unverified. |
-| Release acceptance | Main includes guarded production tooling and mocked/disposable CI. | Current alias differs from the successful November 19 promoted build. Cause is unverified. Review deployment history and intended version before routing changes. |
+| Release acceptance | Main includes guarded production tooling and mocked/disposable CI. | User-approved UI restoration completed November 21. Cause of the earlier alias reversal remains unverified. Verify subsequent releases against the intended live commit. |
 
 ## Repairs in the active candidate
 
@@ -55,3 +55,8 @@ No live sender, polling, production database mutation or production deployment w
 - Require all applicable GitHub workflows on the resulting commit before calling this continuation CI verified.
 
 Resume on the current head of PR #180. Read this reconciliation and CODEX-CONTINUATION.md, inspect GitHub checks, repair any failure, then work through the remaining implementation order using authentic source evidence where required. Preserve all other worktrees and draft PRs.
+
+
+## UI-first release completed
+
+On November 21 the owner requested UI deployment before remaining implementation. Vercel promoted the existing tested production build `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` at `347240c7` for team `team_TfbzU4SMDZD8lIgCHKsJNa6v`, project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`. The public alias resolves to that deployment, both static responses returned 200, and public/staged JavaScript matched exactly. The recent 30-minute error/fatal log count had no entries. These static checks do not certify private financial rows or provider availability. Service repairs remain on PR #180, with implementation commit `42717f7` already passing all applicable CI before this release-note update.

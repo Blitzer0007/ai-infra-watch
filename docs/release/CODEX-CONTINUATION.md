@@ -2,7 +2,11 @@
 
 Read [the reconciled product backlog](PLAN-RECONCILIATION-2026-11-21.md) before continuing. The current increment isolates transaction-service outages in Decision Center and the digest. Preserve usable marks with explicit unavailable transaction evidence, and keep financial returns withheld. Run current-commit CI after pushing.
 
-The public hostname `ai-infra-watch-theta.vercel.app` resolved in Vercel to READY deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU`, commit `6827cce` (Milestone 5). The newer READY redesign `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` is on `347240c7`. GitHub release run 44480264314 records successful promotion on November 19. Current alias metadata establishes a different target today. The reason for the change is unverified. Confirm intended release and rollback history before changing production routing.
+The user approved a UI-first production release on November 21. The public hostname now resolves to READY deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`, commit `347240c7657af8a6f830b254e84bedc10f88d785`. The same tested production build was promoted through Vercel MCP. Homepage and JavaScript returned HTTP 200, and public JavaScript matched the staged response exactly. All relevant commit checks had passed. The 30-minute error/fatal runtime-log count was empty. Private portfolio API verification was not completed in this release inspection.
+
+Rollback remains the READY prior Milestone 5 deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU` at `6827cce`. The reason the alias had previously returned to it is unverified.
+
+The restored UI includes grouped navigation for 17 workspaces, consistent workspace headings and next actions, responsive mobile navigation, the Portfolio Command Center, improved search, and explicit market-source status. The remaining service/data repairs on #180 are still outside this live commit. Resume their review and release preparation after verifying current GitHub checks.
 
 Continue on [PR #180](https://github.com/Blitzer0007/ai-infra-watch/pull/180). This branch includes current main and the Decision Center snapshot correction from [PR #184](https://github.com/Blitzer0007/ai-infra-watch/pull/184). Review one combined diff. The older Milestone 2 worktree has separate uncommitted work and has been preserved.
 
