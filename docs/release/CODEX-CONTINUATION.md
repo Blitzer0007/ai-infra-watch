@@ -1,3 +1,9 @@
+# Approved PR 180 release in progress · 21 November 2026
+
+The owner explicitly approved merging and deploying PR #180 using an exception limited to this release. The exception pins its branch and first parent `347240c7657af8a6f830b254e84bedc10f88d785`. The existing handoff will dispatch the guarded production workflow only after all required CI pass on its exact regular two-parent main merge. It retains staging, access gates, repeated commit checks and idempotent dispatch. Rollback is the currently live UI deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. Live checks remain false.
+
+Continue autonomously through final PR CI, mark ready, regular merge with expected head, exact-main CI, one-time handoff and production workflow. Inspect failures and repair them without weakening tests. Verify the public alias and served static bytes on the resulting deployment. Do not claim success until promotion and verification complete.
+
 # Product plan and production data review · 21 November 2026
 
 Read [the reconciled product backlog](PLAN-RECONCILIATION-2026-11-21.md) before continuing. The current increment isolates transaction-service outages in Decision Center and the digest. Preserve usable marks with explicit unavailable transaction evidence, and keep financial returns withheld. Run current-commit CI after pushing.

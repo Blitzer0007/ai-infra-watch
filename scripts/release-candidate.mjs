@@ -32,10 +32,17 @@ const M7_APP_UI_HEAD_BRANCH = 'feature/milestone7-application-wide-ui-20261119';
 const M7_SCROLL_REPAIR_PR = 183;
 const M7_SCROLL_REPAIR_PARENT = '69921f7a9022af5187ac2206aa5b688b11c855a1';
 const M7_SCROLL_REPAIR_BRANCH = 'fix/milestone7-mobile-holding-scroll-20261119';
+// Owner-approved November 21 data/brief release, limited to PR #180's
+// direct regular merge onto the verified UI production commit.
+const DATA_REPAIR_PR = 180;
+const DATA_REPAIR_PARENT = '347240c7657af8a6f830b254e84bedc10f88d785';
+const DATA_REPAIR_BRANCH = 'fix/telegram-daily-brief-evidence-20261119';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
-  const expected = pr?.number === M5_PR
+  const expected = pr?.number === DATA_REPAIR_PR
+    ? { parent: DATA_REPAIR_PARENT, branch: DATA_REPAIR_BRANCH }
+    : pr?.number === M5_PR
     ? { parent: M5_BASE_SHA, branch: M5_HEAD_BRANCH }
     : pr?.number === M5_REPAIR_PR
       ? { parent: M5_MERGE_SHA, branch: M5_REPAIR_BRANCH }
@@ -134,12 +141,14 @@ export async function checkCandidate(env, fetcher = fetch) {
   }
   // The waiver is opt-in and independently attested by the exact merged PR
   // and commit ancestry. Only the bounded reviewed PRs #176–#179, #182
-  // and immediate UI-restore PR #183 can meet this exception. Every candidate
+  // immediate UI-restore PR #183, and explicitly selected data/brief PR #180
+  // can meet this exception. Every candidate
   // must match its pinned direct main parent; never a generic bypass.
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
-    const prNumber = env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
+    const prNumber = env.AIW_RELEASE_PR === '180' ? DATA_REPAIR_PR
+      : env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
       : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR
       : env.EXPECTED_MAIN_SHA === M6_UI_FIRST_PARENT ? M5_ONE_SHOT_PR
       : env.EXPECTED_MAIN_SHA === M7_APP_UI_FIRST_PARENT ? M6_UI_PR
