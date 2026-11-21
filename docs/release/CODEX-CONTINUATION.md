@@ -1,3 +1,29 @@
+# Approved PR 180 release in progress · 21 November 2026
+
+The owner explicitly approved merging and deploying PR #180 using an exception limited to this release. The exception pins its branch and first parent `347240c7657af8a6f830b254e84bedc10f88d785`. The existing handoff will dispatch the guarded production workflow only after all required CI pass on its exact regular two-parent main merge. It retains staging, access gates, repeated commit checks and idempotent dispatch. Rollback is the currently live UI deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. Live checks remain false.
+
+Continue autonomously through final PR CI, mark ready, regular merge with expected head, exact-main CI, one-time handoff and production workflow. Inspect failures and repair them without weakening tests. Verify the public alias and served static bytes on the resulting deployment. Do not claim success until promotion and verification complete.
+
+# Product plan and production data review · 21 November 2026
+
+Read [the reconciled product backlog](PLAN-RECONCILIATION-2026-11-21.md) before continuing. The current increment isolates transaction-service outages in Decision Center and the digest. Preserve usable marks with explicit unavailable transaction evidence, and keep financial returns withheld. Run current-commit CI after pushing.
+
+Current UI continuation corrects false reassuring Overview states. Missing/incomplete rule evaluation or quote coverage shows Unknown for an empty urgent count, failed earnings shows Unknown instead of zero, absent independent forecast counts stay unknown, and malformed successful responses produce a recoverable error. Check data sources opens the existing Data Health workspace. The patch uses existing response data without new API paths or timer activation. Verification adds malformed-packet and missing-coverage Chromium regressions. The current service candidate remains unreleased. CI on dca33e2 found two older rule-count assertions expecting zero for missing/inconsistent counts. Updated those cases to expect Unknown while retaining the explicit-zero case, incomplete gate and zero-write assertions. Added checks that these cases also show Unknown urgent count and the incomplete-coverage heading. Require fresh full CI on the corrective commit.
+
+Current continuation adds bounded provider failure reasons to the existing QUOTE_WITHHELD issues in Decision Center and the digest. It identifies rate limiting, timeout, missing configuration, no price, request rejection and service errors with fixed provider labels. Raw error bodies/messages are discarded. The brief includes these reasons even when its independent Decision Center read fails. Shared quote admission and valuation rules remain authoritative. Local verification includes all Node tests and 11 focused Chromium accounting/outage cases. Check the resulting GitHub head and its fresh workflow conclusions before release.
+
+The user approved a UI-first production release on November 21. The public hostname now resolves to READY deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`, commit `347240c7657af8a6f830b254e84bedc10f88d785`. The same tested production build was promoted through Vercel MCP. Homepage and JavaScript returned HTTP 200, and public JavaScript matched the staged response exactly. All relevant commit checks had passed. The 30-minute error/fatal runtime-log count was empty. Private portfolio API verification was not completed in this release inspection.
+
+Rollback remains the READY prior Milestone 5 deployment `dpl_4Y7ZmLQaiKQXdH3sMi9VB7CtsWKU` at `6827cce`. The reason the alias had previously returned to it is unverified.
+
+The restored UI includes grouped navigation for 17 workspaces, consistent workspace headings and next actions, responsive mobile navigation, the Portfolio Command Center, improved search, and explicit market-source status. The remaining service/data repairs on #180 are still outside this live commit. Resume their review and release preparation after verifying current GitHub checks.
+
+Continue on [PR #180](https://github.com/Blitzer0007/ai-infra-watch/pull/180). This branch includes current main and the Decision Center snapshot correction from [PR #184](https://github.com/Blitzer0007/ai-infra-watch/pull/184). Review one combined diff. The older Milestone 2 worktree has separate uncommitted work and has been preserved.
+
+[Brief diagnosis and acceptance](TELEGRAM-DAILY-BRIEF-QUALITY.md). Check the PR's current commit and GitHub workflow conclusions. Use mocked digest GET for preview. No live send or database operation is necessary for verification.
+
+---
+
 # CURRENT AI Infra Watch continuation — Milestone 7 app-wide UI release repair
 
 Updated: 19 November 2026

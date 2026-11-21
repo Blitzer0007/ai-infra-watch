@@ -1,3 +1,4 @@
+import { quoteFailureReason, explainQuoteFailures } from '../utils/quoteFailureReasons.js';
 import {quote as routedQuote} from '../../api/_market-data.js';
 import {storedHoldingInputs} from '../services/ledgerInputs.js';
 import {calculateReviewedServerPortfolio} from '../utils/reviewedDecisionAccounting.js';
@@ -7,7 +8,7 @@ import { requireAccess } from '../../api/_access-auth.js';
 import { evaluatePortfolioReturnAlerts } from './portfolio-return-alerts.js';
 import { evaluatePortfolioHoldingReturnAlerts } from './portfolio-holding-return-alerts.js';
 import { isTelegramMessageAccepted, telegramDeliveryFailure } from '../utils/telegramDelivery.js';
-import { buildTelegramDecisionBrief, buildTelegramDigestPayload } from '../utils/dailyDecisionBrief.js';
+import { buildTelegramDecisionBrief, buildTelegramDigestPayload, previousSessionReferences } from '../utils/dailyDecisionBrief.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -419,15 +420,18 @@ export function buildDecisionFirstText(decision, fallbackDate, weekly, decisionE
 }
 
 export async function buildDigest(decisionJournal) {
-  const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&order=symbol.asc');
-  const transactions = await supabase('portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc');
-  if (!Array.isArray(holdings) || holdings.length > 150 || !Array.isArray(transactions) || transactions.length > 1000) throw new Error('Loaded records exceed the supported accounting review scope.');
+  const holdings = await supabase('portfolio_holdings?select=symbol,quantity,average_cost&quantity=gt.0&order=symbol.asc');
+  const transactions = await supabase('portfolio_transactions?select=id,symbol,transaction_type,trade_date,order_executed_at,quantity,price,amount,brokerage,currency,quantity_derived,price_derived&order=trade_date.asc,source_row.asc').catch(() => null);
+  if (!Array.isArray(holdings) || holdings.length > 150 || (Array.isArray(transactions) && transactions.length > 1000)) throw new Error('Loaded records exceed the supported accounting review scope.');
   const entries = await Promise.all(holdings.map(async row => {
     try { return [String(row.symbol).trim().toUpperCase(), await routedQuote(row.symbol)]; }
-    catch { return [String(row.symbol).trim().toUpperCase(), null]; }
+    catch (error) { return [String(row.symbol).trim().toUpperCase(), null, quoteFailureReason(error)]; }
   }));
   const rawQuotes = Object.fromEntries(entries);
-  const actual = calculateReviewedServerPortfolio(holdings,transactions,rawQuotes,Date.now());
+  const actual = explainQuoteFailures(calculateReviewedServerPortfolio(
+    holdings, Array.isArray(transactions) ? transactions : [], rawQuotes, Date.now(),
+    { holdings: 'ready', transactions: Array.isArray(transactions) ? 'ready' : 'unavailable' },
+  ), entries);
   const rows = holdings.map(holding => {
     const original = storedHoldingInputs(holding), symbol = original.symbol;
     const q = actual.admittedQuotes[symbol], mark = actual.positionMarks.find(item => item.symbol === symbol);
@@ -447,13 +451,31 @@ export async function buildDigest(decisionJournal) {
   const sorted = [...valid].sort((a,b)=>b.value-a.value);
   const date = new Intl.DateTimeFormat('en-CA',{timeZone:process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const result = await fetchDecisionCenter();
-  const decision = result.decision ? {...result.decision, portfolio:{...result.decision.portfolio,
-    ...actual,admittedQuotes:undefined,positionMarks:undefined,positionOpenCostBasis:undefined,positionUnrealizedPnl:undefined,
-    accountingStatus:actual.accountingStatus,cashFlowPnl:null,accountingReconciled:false},benchmark:{},
-    actionItems:(Array.isArray(result.decision.actionItems)?result.decision.actionItems:[]).filter(item=>actual.admittedQuotes[item.symbol])} : null;
+  // Rule results, their input coverage and risk estimates belong to one assessment.
+  // Digest quote observations are a separate snapshot and cannot veto those results.
+  const decision = result.decision || null;
   const sunday = new Intl.DateTimeFormat('en-US',{timeZone:process.env.PORTFOLIO_DIGEST_TIMEZONE || 'Asia/Kolkata',weekday:'short'}).format(new Date()) === 'Sun';
   const weekly = sunday && decisionJournal?.getWeeklyDecisionReview ? await decisionJournal.getWeeklyDecisionReview().catch(()=>null) : null;
-  const telegramBrief = buildTelegramDecisionBrief(decision,date,weekly);
+  // The digest has already loaded these records in this request. Preserve an
+  // honest, useful read-only coverage summary even when the independent
+  // Decision Center service cannot be reached with its server-side credential.
+  const telegramBrief = buildTelegramDecisionBrief(decision,date,weekly,{
+    holdingsCount: holdings.length,
+    quotesAccepted: rows.filter(row => row.quoteStatus === 'fresh').length,
+    quotesTotal: rows.length,
+    quoteStatus: actual.quoteCoverage.status,
+    currentValueUsd: actual.currentValue,
+    accountingStatus: actual.accountingStatus,
+    quoteIssues: actual.accountingIssues,
+    previousObservations: previousSessionReferences(rows, Date.now()),
+    observations: rows.filter(row => row.price !== null && actual.admittedQuotes[row.symbol])
+      .sort((left, right) => Math.abs(right.changePct ?? 0) - Math.abs(left.changePct ?? 0))
+      .slice(0, 3).map(row => ({
+        symbol: row.symbol, price: row.price, changePct: row.changePct,
+        marketTime: actual.admittedQuotes[row.symbol].marketTime,
+        lastClose: row.quoteStatus === 'last-close',
+      })),
+  });
   return {date,text:telegramBrief.text,telegramBrief,rows,totalValue:fullValue,totalPnl:actual.totalTradingPnl,
     totalPnlPct:actual.returnVsGrossPurchaseCostPct,accountingStatus:actual.accountingStatus,accountingReconciled:false,
     historyCoverage:'unverified',accountingIssues:actual.accountingIssues,

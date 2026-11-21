@@ -39,11 +39,12 @@ type DecisionData = {
     concentrationTop3Pct: number | null;
     semiconductorShock15Pct: number | null;
     scenarioShockTotal?: number | null;
-    quoteCoverage?: { status: string; coveragePct: number; liveQuotes: number; staleFallbacks: number; missingQuotes: number };
+    quoteCoverage?: { status: string; coveragePct: number | null; liveQuotes: number; staleFallbacks: number; missingQuotes: number };
     riskScenarios?: Array<{ group: string; shock: number; effectiveShockPct: number | null; holdings: number }>;
   };
   benchmark?: Record<string, { value: number | null; netDeposits: number; pnl: number | null; shares: number; coverage?: { status: string; coveragePct: number; tradesUsed: number; totalTrades: number } }>;
   benchmarkCoverage?: Record<string, { status?: string; coveragePct?: number } | null>;
+  earningsStatus?: string;
   earnings?: Array<{ symbol: string; date: string; daysUntil: number; hour?: string | null }>;
   forecast?: {
     verified: number;
@@ -83,10 +84,22 @@ function signedMoney(value: number | null | undefined) {
 }
 
 function evaluatedRuleCount(rules: DecisionData['rules']) {
-  if (!rules || !Number.isSafeInteger(rules.total) || rules.total < 0 || !Number.isSafeInteger(rules.evaluated) || rules.evaluated! < 0) return 0;
+  if (!rules || !Number.isSafeInteger(rules.total) || rules.total < 0 || !Number.isSafeInteger(rules.evaluated) || rules.evaluated! < 0) return null;
   const unresolved = [rules.noRule, rules.noData, rules.invalidConfig ?? 0, rules.incomplete ?? 0];
-  if (unresolved.some(value => !Number.isSafeInteger(value) || value < 0) || rules.evaluated! + unresolved.reduce((a,b) => a+b,0) !== rules.total) return 0;
+  if (unresolved.some(value => !Number.isSafeInteger(value) || value < 0) || rules.evaluated! + unresolved.reduce((a,b) => a+b,0) !== rules.total) return null;
   return rules.evaluated!;
+}
+
+function readDecisionResponse(body: DecisionData): DecisionData {
+  if (!body || body.ok !== true || !body.rules || !body.portfolio ||
+      !Number.isSafeInteger(body.rules.total) || body.rules.total < 0 ||
+      !Number.isSafeInteger(body.portfolio.holdings) || body.portfolio.holdings < 0 ||
+      !Array.isArray(body.actionItems) || body.actionItems.some(item =>
+        !item || !['ACT', 'WATCH', 'SETUP'].includes(item.severity) ||
+        typeof item.symbol !== 'string' || typeof item.title !== 'string' || typeof item.detail !== 'string')) {
+    throw new Error('Decision response is incomplete. Try refreshing the page.');
+  }
+  return body;
 }
 
 export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view: string) => void }) {
@@ -99,7 +112,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body?.error || 'Decision center unavailable');
-        return body;
+        return readDecisionResponse(body);
       })
       .then(body => { if (!cancelled) setData(body); })
       .catch(error => { if (!cancelled) setData({ error: error instanceof Error ? error.message : 'Decision center unavailable' }); })
@@ -107,7 +120,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
     const timer = setInterval(() => {
       authFetch('/api/decision-center', { cache: 'no-store' })
         .then(response => response.ok ? response.json() : null)
-        .then(body => { if (!cancelled && body?.ok) setData(body); })
+        .then(body => { if (!cancelled && body?.ok) setData(readDecisionResponse(body)); })
         .catch(() => {});
     }, 5 * 60 * 1000);
     return () => { cancelled = true; clearInterval(timer); };
@@ -132,6 +145,11 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
   const watch = actions.filter(item => item.severity === 'WATCH');
   const rules = data.rules!;
   const portfolio = data.portfolio!;
+  const rulesEvaluated = evaluatedRuleCount(rules);
+  const reviewCoverageComplete = rules.total > 0 && rulesEvaluated === rules.total &&
+    portfolio.quoteCoverage?.status === 'complete';
+  const earningsCount = data.earningsStatus === 'ok' && Array.isArray(data.earnings)
+    ? data.earnings.length : null;
   const spy = data.benchmark?.SPY;
   const soxx = data.benchmark?.SOXX;
   const comparisonReady = portfolio.accountingReconciled === true && portfolio.quoteCoverage?.status === 'complete';
@@ -152,17 +170,18 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
             This is a review layer, not an automatic trade instruction.
           </p>
         </div>
+        {!reviewCoverageComplete && <button type="button" onClick={() => onNavigate('health')} className="rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-semibold text-amber-100">Check data sources</button>}
         <button type="button" onClick={() => onNavigate('portfolio')} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 text-[9px] font-mono uppercase text-white/55 hover:text-white">
           Open portfolio <ArrowRight className="w-3 h-3" />
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-        <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={String(act.length)} tone={act.length ? 'danger' : 'good'} />
-        <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={String(data.earnings?.length || 0)} tone={data.earnings?.length ? 'warn' : 'neutral'} />
+        <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={act.length ? String(act.length) : reviewCoverageComplete ? '0' : 'Unknown'} tone={act.length ? 'danger' : reviewCoverageComplete ? 'good' : 'warn'} />
+        <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={earningsCount === null ? 'Unknown' : String(earningsCount)} tone={earningsCount === null || earningsCount > 0 ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Trading P&L" value={signedMoney(portfolio.accountingStatus === 'conditional-loaded-records' ? portfolio.totalTradingPnl : null)} tone={portfolio.accountingStatus !== 'conditional-loaded-records' || portfolio.totalTradingPnl == null ? 'neutral' : portfolio.totalTradingPnl >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={(data.forecast?.independentVerified ?? data.forecast?.verified ?? 0) + '/50'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
-        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={evaluatedRuleCount(rules) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={Number.isSafeInteger(data.forecast?.independentVerified) && data.forecast!.independentVerified! >= 0 ? data.forecast!.independentVerified + '/50' : 'Unknown'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
+        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={(rulesEvaluated === null ? 'Unknown' : rulesEvaluated) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
       </div>
 
       <PreTradeGate data={data} />
@@ -187,7 +206,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
           <div className="flex items-center justify-between gap-2">
             <div>
               <div className="text-[9px] font-mono uppercase tracking-widest text-white/25">Top review items</div>
-              <div className="text-sm font-black mt-1">{actions.length ? 'Focus here first' : 'Nothing urgent detected'}</div>
+              <div className="text-sm font-black mt-1">{actions.length ? 'Focus here first' : reviewCoverageComplete ? 'No rule prompts in this snapshot' : 'Review coverage needs attention'}</div>
             </div>
             {rules.near > 0 && <span className="text-[8px] font-mono uppercase text-amber-300">{rules.near} close to a rule</span>}
           </div>
@@ -229,13 +248,13 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-        <RiskCard title="Signal gate" value={(data.signalGate?.eligible ?? 0) + ' eligible'} detail={(data.signalGate?.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
+        <RiskCard title="Signal gate" value={data.signalGate ? data.signalGate.eligible + ' eligible' : 'Unknown'} detail={!data.signalGate ? 'Signal history could not be verified.' : (data.signalGate.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
-        <RiskCard title="Forecast evidence" value={(data.forecast?.verified ?? 0) + ' verified'} detail={(data.forecast?.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
+        <RiskCard title="Forecast evidence" value={data.forecast ? data.forecast.verified + ' verified' : 'Unknown'} detail={!data.forecast ? 'Forecast history could not be verified.' : (data.forecast.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
       </div>
 
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. Some figures may use stale fallbacks.</div>}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. See accounting coverage and inputs for withheld quotes.</div>}
       {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
       {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
@@ -257,7 +276,7 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     {
       label: 'Fresh portfolio pricing',
       ok: portfolio?.quoteCoverage?.status === 'complete',
-      detail: portfolio?.quoteCoverage ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
+      detail: typeof portfolio?.quoteCoverage?.coveragePct === 'number' ? portfolio.quoteCoverage.coveragePct.toFixed(0) + '% quote coverage' : 'Coverage unavailable',
     },
     {
       label: 'Accounting reconciliation',
@@ -267,7 +286,7 @@ function PreTradeGate({ data }: { data: DecisionData }) {
     {
       label: 'Position rules',
       ok: Boolean(rules && rules.total > 0 && evaluatedRuleCount(rules) === rules.total),
-      detail: rules ? evaluatedRuleCount(rules) + '/' + rules.total + ' holdings have mathematically evaluated rules; data eligibility is separate' : 'Rule state unavailable',
+      detail: rules ? (evaluatedRuleCount(rules) ?? 'Unknown') + '/' + rules.total + ' holdings have mathematically evaluated rules; data eligibility is separate' : 'Rule state unavailable',
     },
     {
       label: 'Decision-driving signals',

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyCandidate, verifyMilestone5Exception, M5_PROTECTION_EXCEPTION, verifyVercelTarget, deploymentUrl, checkCandidate, jsonGet } from '../../scripts/release-candidate.mjs';
+import { RELEASE_REPOSITORY, verifyCandidate, verifyMilestone5Exception, M5_PROTECTION_EXCEPTION, verifyVercelTarget, deploymentUrl, checkCandidate, jsonGet } from '../../scripts/release-candidate.mjs';
 
 const SHA = 'a'.repeat(40), OTHER = 'b'.repeat(40);
 const run = (file:string, id:number, overrides:any = {}) => ({ id, path:'.github/workflows/' + file,
@@ -378,4 +378,19 @@ test('failed-main UI repair fetches exactly PR #183 and its attested merge',asyn
   assert.deepEqual(await checkCandidate(env,fetcher),[1,2,8]);
   assert(urls[2].endsWith('/pulls/183'));
   assert(urls[3].endsWith('/commits/'+SHA));
+});
+
+test('approved PR 180 exception requires its exact direct merge and source branch', () => {
+  const pr={number:180,merged:true,state:'closed',merge_commit_sha:SHA,base:{ref:'main'},
+    head:{ref:'fix/telegram-daily-brief-evidence-20261119',sha:M5_HEAD,repo:{full_name:RELEASE_REPOSITORY}}};
+  const commit={sha:SHA,parents:[{sha:'347240c7657af8a6f830b254e84bedc10f88d785'},{sha:M5_HEAD}]};
+  const input={expectedSha:SHA,waiver:M5_PROTECTION_EXCEPTION,pr,commit};
+  assert.equal(verifyMilestone5Exception(input),true);
+  for (const patch of [
+    {pr:{...pr,number:184}}, {pr:{...pr,merged:false}},
+    {pr:{...pr,head:{...pr.head,ref:'different-branch'}}},
+    {commit:{...commit,parents:[{sha:M5_HEAD},{sha:M5_HEAD}]}},
+    {commit:{...commit,parents:[commit.parents[0]]}},
+    {pr:{...pr,head:{...pr.head,sha:'e'.repeat(40)}}},
+  ]) assert.throws(()=>verifyMilestone5Exception({...input,...patch}));
 });

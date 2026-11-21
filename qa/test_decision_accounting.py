@@ -25,6 +25,10 @@ def test_decision_accounting_from_original_rows_to_visible_review(page,mode,expe
         assert body['portfolio']['concentrationTop3Pct'] is None
         assert body['portfolio']['scenarioShockTotal'] is None
         assert body['portfolio']['riskScenarios']==[]
+        if mode == 'partial':
+            issue = next(row for row in body['portfolio']['accountingIssues'] if row['code'] == 'QUOTE_WITHHELD')
+            assert 'Yahoo service error' in issue['message']
+            assert 'Finnhub not configured' in issue['message']
     if mode=='unknown-fee':
         assert body['portfolio']['openCostBasis'] is None
         assert body['portfolio']['unrealizedPnl'] is None
@@ -48,3 +52,71 @@ def test_decision_accounting_from_original_rows_to_visible_review(page,mode,expe
     page.set_viewport_size({'width':360,'height':800})
     assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
     assert errors==[] and writes==[]
+
+
+def test_missing_coverage_percentage_keeps_decision_center_available(page):
+    body = replay('partial')
+    body['portfolio']['quoteCoverage']['coveragePct'] = None
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    expect(page.get_by_test_id('pre-trade-gate')).to_contain_text('Coverage unavailable')
+
+
+def test_forecast_service_failure_preserves_portfolio_and_rule_review(page):
+    body = replay('evidence-outage')
+    assert body['ok'] and body['portfolio']['holdings'] == 1 and body['forecast'] is None
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    center = page.get_by_test_id('decision-impact-center')
+    expect(center).to_contain_text('Forecast history could not be verified')
+    expect(center.get_by_text('Trading P&L',exact=True).locator('..')).to_contain_text('+$50.00')
+
+
+@pytest.mark.parametrize('mode', ['ledger-outage', 'earnings-malformed'])
+def test_partial_service_failures_keep_holdings_readable(page, mode):
+    body = replay(mode)
+    assert body['ok'] and body['portfolio']['holdings'] == 1
+    assert body['portfolio']['currentValue'] == 150
+    if mode == 'ledger-outage':
+        assert body['portfolio']['totalTradingPnl'] is None
+        assert any(issue['code'] == 'RECORDS_UNAVAILABLE' for issue in body['portfolio']['accountingIssues'])
+    else:
+        assert body['earningsStatus'] == 'unavailable'
+    mock_local_apis(page)
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    expect(page.get_by_test_id('decision-impact-center')).to_be_visible()
+    expect(page.get_by_test_id('pre-trade-gate')).to_be_visible()
+    assert errors == []
+
+
+@pytest.mark.parametrize('mode', ['partial', 'earnings-malformed'])
+def test_missing_coverage_does_not_look_like_a_clean_day(page, mode):
+    body = replay(mode)
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    goto_app(page)
+    center = page.get_by_test_id('decision-impact-center')
+    if mode == 'partial':
+        expect(center.get_by_text('Action now',exact=True).locator('..')).to_contain_text('Unknown')
+        expect(center).to_contain_text('Review coverage needs attention')
+    else:
+        expect(center.get_by_text('Next 7 days',exact=True).locator('..')).to_contain_text('Unknown')
+    expect(center).not_to_contain_text('Nothing urgent detected')
+    center.get_by_role('button',name='Check data sources',exact=True).click()
+    expect(page.get_by_test_id('workspace-title')).to_have_text('Data Health')
+
+
+@pytest.mark.parametrize('body', [{'ok': True}, {'ok': True,'rules':{'total':1},'portfolio':{'holdings':1},'actionItems':None}, {'ok':True,'rules':{'total':1},'portfolio':{'holdings':1},'actionItems':[None]}])
+def test_incomplete_success_response_is_an_error_state_without_crashing(page,body):
+    mock_local_apis(page)
+    errors=[]
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.route('**/api/decision-center**',lambda route:route.fulfill(status=200,json=body))
+    goto_app(page)
+    expect(page.get_by_test_id('decision-impact-center')).to_contain_text('Decision response is incomplete')
+    assert errors==[]

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import testFn from 'node:test';
 import { buildDecisionFirstText } from '../../server/api/portfolio-digest.js';
+import { buildTelegramDecisionBrief, buildTelegramDigestPayload } from '../../server/utils/dailyDecisionBrief.js';
 
 testFn('digest says earnings calendar unavailable when status is not ok', () => {
   const text = buildDecisionFirstText({
@@ -36,4 +37,133 @@ testFn('digest reports target reached separately from breaches', () => {
   }, '2026-10-04', null);
   assert.match(text, /Target reached/);
   assert.match(text, /1 targets reached/);
+});
+
+testFn('Telegram fallback preserves real coverage but refuses fabricated alerts and P&L', () => {
+  const result = buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:3,quotesAccepted:1,quotesTotal:3,quoteStatus:'partial',
+    accountingStatus:'conditional-loaded-records',
+  });
+  assert.match(result.text,/DECISION LAYER UNAVAILABLE/);
+  assert.match(result.text,/Recorded holdings: 3/);
+  assert.match(result.text,/Admitted intraday quotes: 1\/3 holdings · partial/);
+  assert.match(result.text,/loaded records only/);
+  assert.match(result.text,/NEXT STEP/);
+  assert.doesNotMatch(result.text,/0 urgent|0 watch|Trading P&L:|No monitored earnings/);
+  assert.equal(result.reviewSymbols.length,0);
+  assert.ok(result.text.length<3600);
+  const payload=buildTelegramDigestPayload({telegramBrief:result,date:'2026-11-19'},'fictional-chat');
+  assert.equal(payload.text,result.text);
+  assert.equal(payload.reply_markup.inline_keyboard.length,1);
+});
+
+testFn('Telegram review with conditional accounting groups missing comparisons without showing unverified money', () => {
+  const decision={
+    ok:true,checkedAt:'2026-11-19T09:00:00Z',
+    portfolio:{holdings:2,accountingStatus:'conditional-loaded-records',
+      totalTradingPnl:123456.78,realizedPnl:234.56,unrealizedPnl:987.65,
+      quoteCoverage:{status:'last-close'},concentrationTop3Pct:70,
+      cashFlowPnl:null,scenarioShockTotal:null,riskScenarios:[]},
+    actionItems:[], actionSummary:{version:1,total:0,act:0,watch:0,shown:0,omitted:0},
+    rules:{total:2,noRule:1},earningsStatus:'unavailable',earnings:[],
+    benchmark:{}, forecast:{},
+  };
+  const result=buildTelegramDecisionBrief(decision,'2026-11-19');
+  assert.match(result.text,/TODAY’S REVIEW/);
+  assert.match(result.text,/includes last-close quotes/);
+  assert.match(result.text,/P&L withheld/);
+  assert.match(result.text,/SPY\/SOXX comparisons withheld/);
+  assert.match(result.text,/Earnings dates not verified/);
+  assert.doesNotMatch(result.text,/123456|987\.65|234\.56|Top 3 concentration: 70/);
+  assert.doesNotMatch(result.text,/comparison unavailable|Forecasts: unavailable/);
+  assert.ok(result.text.length<=3600);
+});
+
+testFn('Telegram brief retains actual evidence and time when decision inputs are complete', () => {
+  const result=buildTelegramDecisionBrief({
+    ok:true,checkedAt:'2026-11-19T09:00:00Z',
+    actionItems:[{symbol:'NVDA',severity:'ACT',title:'Rule reached',detail:'Fictional price crossed verified test rule.'}],
+    actionSummary:{version:1,total:1,act:1,watch:0,shown:1,omitted:0},
+    rules:{total:1,noRule:0},
+    portfolio:{holdings:1,accountingStatus:'complete',
+      quoteCoverage:{status:'complete'},concentrationTop3Pct:100,
+      totalTradingPnl:10,realizedPnl:4,unrealizedPnl:6,cashFlowPnl:null,
+      scenarioShockTotal:-2,riskScenarios:[{shock:-2}]},
+    earningsStatus:'ok',earnings:[],forecast:{independentVerified:0,pending:1},
+    benchmark:{},
+  },'2026-11-19');
+  assert.match(result.text,/NVDA · URGENT REVIEW/);
+  assert.match(result.text,/Why: Fictional price crossed verified test rule/);
+  assert.match(result.text,/Trading P&L: \+\$10\.00/);
+  assert.match(result.text,/Top 3 concentration: 100\.0%/);
+  assert.match(result.text,/Forecasts: 0 independent verified · 1 pending/);
+  assert.deepEqual(result.reviewSymbols,['NVDA']);
+});
+
+testFn('Telegram brief displays a complete admitted marked value but never a value from partial quotes', () => {
+  const complete=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:2,quotesTotal:2,
+    quoteStatus:'complete',currentValueUsd:1250.5,
+    accountingStatus:'conditional-loaded-records',
+  });
+  assert.match(complete.text,/Marked holdings value: \$1250\.50/);
+  assert.match(complete.text,/not a verified trading return/);
+  assert.doesNotMatch(complete.text,/Trading P&L:/);
+  const partial=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:1,quotesTotal:2,
+    quoteStatus:'partial',currentValueUsd:1250.5,
+    accountingStatus:'quotes-incomplete',
+  });
+  assert.doesNotMatch(partial.text,/1250\.50|Marked holdings value/);
+  const malformed=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:2,quotesAccepted:2,quotesTotal:2,
+    quoteStatus:'complete',currentValueUsd:'1250.5',
+    accountingStatus:'conditional-loaded-records',
+  });
+  assert.doesNotMatch(malformed.text,/Marked holdings value/);
+});
+
+testFn('Telegram fallback shows only bounded, validated quote movements rather than fake rule alerts', () => {
+  const brief=buildTelegramDecisionBrief(null,'2026-11-19',null,{
+    holdingsCount:4,quotesAccepted:2,quotesTotal:4,quoteStatus:'partial',
+    accountingStatus:'quotes-incomplete',
+    observations:[
+      {symbol:'NVDA',price:145.35,changePct:-2.45},
+      {symbol:'BAD\nNAME',price:2,changePct:1},
+      {symbol:'DGXX',price:2.15,changePct:3.1},
+      {symbol:'MU',price:'3',changePct:1.5},
+      {symbol:'AMD',price:100,changePct:2001},
+    ],
+  });
+  assert.match(brief.text,/SOURCE-REPORTED QUOTE MOVES · NOT RULE ALERTS/);
+  assert.match(brief.text,/NVDA · \$145\.35 · -2\.45%/);
+  assert.match(brief.text,/DGXX · \$2\.15 · \+3\.10%/);
+  assert.doesNotMatch(brief.text,/BAD NAME|MU ·|AMD ·|URGENT REVIEW|Target reached/);
+  assert.ok(brief.text.length<=3600);
+});
+
+testFn('partial decision snapshot shows admitted observations and actual rule coverage', () => {
+  const brief = buildTelegramDecisionBrief({
+    ok:true, rules:{total:10,evaluated:2,noData:8,noRule:0},
+    actionItems:[], actionSummary:{version:1,act:0,watch:0,total:0,shown:0,omitted:0},
+    portfolio:{holdings:10,quoteCoverage:{status:'partial',totalHoldings:10,liveQuotes:1,lastCloseQuotes:1,missingQuotes:8},
+      accountingIssues:[{symbol:'MISS',code:'QUOTE_WITHHELD',message:'Market session provenance is unavailable.'}],
+      scenarioShockTotal:999,riskScenarios:[{shock:999}]},
+  },'2026-11-20',null,{observations:[{symbol:'TEST',marketTime:'2026-11-19T21:00:00Z',price:42,lastClose:true,changePct:null}]});
+  assert.match(brief.text,/1 intraday · 1 last close · 8 missing/);
+  assert.match(brief.text,/TEST · \$42.00 · 2026-11-19 21:00 UTC \(last close\)/);
+  assert.match(brief.text,/evaluated for 2\/10 holdings/);
+  assert.match(brief.text,/MISS — Market session provenance/);
+  assert.doesNotMatch(brief.text,/999|showing 0\/0|10 rules/);
+});
+
+
+testFn('failed Decision Center fallback still identifies bounded quote provider failures', () => {
+  const result = buildTelegramDecisionBrief(null,'2026-11-21',null,{
+    holdingsCount:1,quotesAccepted:0,quotesTotal:1,quoteStatus:'partial',
+    quoteIssues:[{code:'QUOTE_WITHHELD',symbol:'FICT',message:'Quote retrieval failed: Yahoo rate limited.'},
+      {code:'OTHER',symbol:'FICT',message:'Should not appear'}],
+  });
+  assert.match(result.text,/FICT — Quote retrieval failed: Yahoo rate limited/);
+  assert.doesNotMatch(result.text,/Should not appear/);
 });

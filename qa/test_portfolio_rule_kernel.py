@@ -69,12 +69,12 @@ def test_strict_browser_review_withholds_bad_configuration_and_partial_history(p
     assert result['complete']['stageStateDirty'] is False
 
 
-@pytest.mark.parametrize('rule_counts',[
-    {'total':3,'evaluated':0,'invalidConfig':1,'incomplete':1,'noData':1,'noRule':0},
-    {'total':3,'evaluated':3,'invalidConfig':1,'incomplete':0,'noData':0,'noRule':0},
-    {'total':3,'noData':0,'noRule':0},
+@pytest.mark.parametrize('rule_counts,expected_count',[
+    ({'total':3,'evaluated':0,'invalidConfig':1,'incomplete':1,'noData':1,'noRule':0}, '0'),
+    ({'total':3,'evaluated':3,'invalidConfig':1,'incomplete':0,'noData':0,'noRule':0}, 'Unknown'),
+    ({'total':3,'noData':0,'noRule':0}, 'Unknown'),
 ])
-def test_position_gate_withholds_readiness_for_missing_or_inconsistent_rule_reviews(page,rule_counts):
+def test_position_gate_withholds_readiness_for_missing_or_inconsistent_rule_reviews(page,rule_counts,expected_count):
     mock_local_apis(page)
     writes=[]
     page.on('request',lambda request:writes.append(request.url) if request.method in ('POST','PATCH','PUT','DELETE') else None)
@@ -88,8 +88,10 @@ def test_position_gate_withholds_readiness_for_missing_or_inconsistent_rule_revi
     goto_app(page)
     center=page.get_by_test_id('decision-impact-center')
     expect(center.get_by_test_id('pre-trade-gate')).to_contain_text('Portfolio review is incomplete')
-    expect(center.get_by_test_id('pre-trade-gate')).to_contain_text('0/3 holdings have mathematically evaluated rules')
+    expect(center.get_by_test_id('pre-trade-gate')).to_contain_text(expected_count + '/3 holdings have mathematically evaluated rules')
     expect(center).to_contain_text('Rules evaluated')
+    expect(center.get_by_text('Action now',exact=True).locator('..')).to_contain_text('Unknown')
+    expect(center).to_contain_text('Review coverage needs attention')
     center.get_by_text('Rule configuration and coverage issues',exact=True).click()
     expect(center.get_by_test_id('decision-rule-issues')).to_contain_text('FICT: Complete history coverage is required.')
     assert writes==[]

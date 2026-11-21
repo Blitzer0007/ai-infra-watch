@@ -4,15 +4,17 @@ import { execFileSync } from 'node:child_process';
 
 // A fresh process receives fictional credentials only. Every fetch is intercepted;
 // unknown URLs/methods throw, so no database, provider or Telegram service is used.
-function exercise(method, decisionAvailable = true) {
+function exercise(method, decisionAvailable = true, digestQuoteAvailable = true, ledgerAvailable = true) {
   const script = `
     import assert from 'node:assert/strict';
     const calls=[]; let telegramPayload=null;
     globalThis.fetch=async (input, options={})=>{
       const url=String(input); const method=options.method||'GET'; calls.push({url,method});
       if(url.startsWith('https://digest-fixture.invalid/rest/v1/portfolio_holdings') && method==='GET') return new Response(JSON.stringify([{symbol:'NVDA',quantity:1,average_cost:999}]));
+      if(url.startsWith('https://digest-fixture.invalid/rest/v1/portfolio_transactions') && !${ledgerAvailable}) return new Response('{}',{status:503});
       if(url.startsWith('https://digest-fixture.invalid/rest/v1/') && method==='GET') return new Response('[]');
       if(url.startsWith('https://query1.finance.yahoo.com/v8/finance/chart/NVDA?') && method==='GET') {
+        if (!${digestQuoteAvailable}) return new Response('{}',{status:503});
         const now=Date.now()/1000;
         return new Response(JSON.stringify({chart:{result:[{meta:{symbol:'NVDA',regularMarketPrice:100,regularMarketTime:Math.floor(now),currency:'USD',currentTradingPeriod:{regular:{start:now-1000,end:now+1000}}}}]}}));
       }
@@ -59,7 +61,28 @@ test('mocked existing Telegram transport uses compact text, accepted-ID semantic
   const result = exercise('POST'); assert.match(result.text, /URGENT REVIEW/);
 });
 
-test('failed decision layer creates a warning preview rather than an all-clear fallback', () => {
-  const result = exercise('GET', false); assert.match(result.text, /DECISION LAYER UNAVAILABLE/);
-  assert.doesNotMatch(result.text, /0 urgent|0 watch|all holdings/);
+test('failed decision layer retains real, bounded holdings and quote coverage instead of empty filler', () => {
+  const result = exercise('GET', false);
+  assert.match(result.text, /DECISION LAYER UNAVAILABLE/);
+  assert.match(result.text, /WHAT WE CAN CONFIRM/);
+  assert.match(result.text, /Recorded holdings: 1/);
+  assert.match(result.text, /Admitted intraday quotes: [01]\/1/);
+  assert.match(result.text, /NEXT STEP/);
+  assert.doesNotMatch(result.text, /0 urgent|0 watch|all holdings|Trading P&L: \+\$0/);
+});
+
+
+test('an independent digest quote failure cannot erase an assessed Decision Center prompt', () => {
+  const result = exercise('GET', true, false);
+  assert.match(result.text, /NVDA · URGENT REVIEW/);
+  assert.match(result.text, /Fictional rule evidence/);
+  assert.doesNotMatch(result.text, /NVDA · \$100/);
+});
+
+
+test('digest preview retains quotes through an unavailable transaction service', () => {
+  const result = exercise('GET', false, true, false);
+  assert.match(result.text, /Recorded holdings: 1/);
+  assert.match(result.text, /Marked holdings value: \$100.00/);
+  assert.doesNotMatch(result.text, /Trading P&L:/);
 });
