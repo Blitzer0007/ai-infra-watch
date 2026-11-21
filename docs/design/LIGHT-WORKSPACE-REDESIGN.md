@@ -1,6 +1,6 @@
 # Clean light workspace redesign
 
-Date: 21 November 2026. Branch: `feature/light-workspace-redesign`.
+Date: 21 November 2026. Branch: `feature/light-workspace-redesign`. [Draft PR #186](https://github.com/Blitzer0007/ai-infra-watch/pull/186).
 
 The owner chose a clean light workspace with fewer cards and clearer navigation. This independent draft starts from shipped main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. It does not incorporate or overwrite draft PR #185's separate quote-diagnostic work.
 
