@@ -1,3 +1,29 @@
+# Current continuation: evidence health recovery draft — 21 November 2026
+
+**This section supersedes historical instructions below.** The owner accepted the clean light direction and asked to move on. The next increment fixes misleading Data Health classifications and integrates the existing quote diagnostics without production changes.
+
+- Active: `feature/data-health-evidence-states`, Cloud worktree `/workspace/ai-infra-watch-data-health`. Its draft PR is stacked against `feature/light-workspace-redesign` (PR #186, base `fe8bde2916ebb4b746c717516155824a339b6d42`). Active draft: [PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187); its current exact-head checks are authoritative.
+- Preserved: PR #186 remains an independent UI draft at `fe8bde2`; PR #185 remains an independent quote-diagnostic draft at `c9db228aa878f14ad9c7f00af0006d838fdb1d3d`. Eight implementation/test/doc files from #185 are ported into this stacked candidate. Neither original branch or worktree is modified. The merged PR #180 branch and its release attestations remain frozen.
+- Production: main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v` as last verified after the completed PR #180 release. Previous rollback: `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` (`347240c7657af8a6f830b254e84bedc10f88d785`). Recheck live identities before any future release. No production action is authorized here.
+- Read [evidence health scope and acceptance](EVIDENCE-CHANNEL-HEALTH.md), [quote-diagnostic scope](QUOTE-ADMISSION-DIAGNOSTICS.md) and [the reconciled backlog](PLAN-RECONCILIATION-2026-11-21.md).
+- Changes: deterministic `evidenceChannelHealth.ts` and unit tests, DataHealth compact summary/recovery disclosure, quote admission projection and sample display from #185, fictional browser/quote fixtures and offline UI CI inclusion. Collection states never grant financial eligibility. No new API read, timer, vendor acquisition, schema or sender path.
+- Local verification: 1,096 Node tests; 36 focused browser checks, plus 14 final focus/refresh checks; 32 CI safety tests; TypeScript and QA build. Production build and staged security scan passed. Exact-head CI results belong in the draft PR. Do not treat earlier commits' checks as current-head proof.
+- Limitations: fixtures do not establish authentic source availability or complete accounting. The bounded quote sample remains SPY plus up to three holdings. Healthy means declared collection freshness, not correctness or complete financial history.
+
+## Next steps
+
+1. Verify this draft's exact head, diff and the two applicable CI families: Frontend CI (including its security scan) and UI API DB Validation. The standalone Security audit workflow targets main only and must run if this PR is later retargeted to main. Repair regressions without weakening the financial, quote-privacy, history/focus, source or no-write assertions.
+2. Review the rendered Data Health summary/recovery previews and the dependency on #186. Keep both drafts and production unchanged unless the owner explicitly requests a release. Do not reuse #180's one-release exception.
+3. The next data-recovery prerequisite is authenticated, read-only provider diagnostics by symbol, then a bounded fix supported by the provider's actual contract. Missing currency/security/session/time metadata cannot be invented. Authoritative returns still require complete broker/corporate-action/currency records.
+
+Resume prompt:
+
+> Continue AI Infra Watch on `feature/data-health-evidence-states`. Read the current top of `docs/release/CODEX-CONTINUATION.md` and `docs/release/EVIDENCE-CHANNEL-HEALTH.md`. Find its stacked draft PR and verify exact-head CI. Preserve PRs #185/#186 and every worktree. Use offline fictional fixtures. No merge, deployment, production Supabase changes, new live polling, secrets retrieval or Telegram send without separate authorization.
+
+---
+
+**Historical UI and release checkpoints follow; they are not current operating instructions.**
+
 # Current continuation: clean light workspace draft — 21 November 2026
 
 **This section supersedes all historical instructions below.** The owner disliked the dark app and selected **clean light workspace with fewer cards and clearer navigation**.

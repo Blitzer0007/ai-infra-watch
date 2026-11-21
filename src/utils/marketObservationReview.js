@@ -5,7 +5,7 @@
  */
 export function summarizeMarketObservation(rows, { loading = false, error = '' } = {}) {
   const counts = {
-    sampleRows: 0, quoteUnavailable: 0, quoteTimeUnknown: 0, quoteAged: 0,
+    sampleRows: 0, quoteWithheld: 0, quoteAdmissionUnknown: 0, quoteUnavailable: 0, quoteTimeUnknown: 0, quoteAged: 0,
     historyUnavailable: 0, historyDateUnknown: 0, historyAged: 0,
     adjustedIncomplete: 0, fallbackRows: 0, rateLimitedAttempts: 0,
   };
@@ -19,6 +19,8 @@ export function summarizeMarketObservation(rows, { loading = false, error = '' }
     const quote = item.quote && typeof item.quote === 'object' && !Array.isArray(item.quote) ? item.quote : {};
     const history = item.history && typeof item.history === 'object' && !Array.isArray(item.history) ? item.history : {};
     counts.sampleRows++;
+    if (quote.valuationAdmission?.eligible === false) counts.quoteWithheld++;
+    else if (quote.valuationAdmission?.eligible !== true) counts.quoteAdmissionUnknown++;
     if (quote.available !== true) counts.quoteUnavailable++;
     else if (finiteAge(quote.ageSeconds) === null || quote.futureTimestampDetected === true) counts.quoteTimeUnknown++;
     else if (quote.ageSeconds > 900 || quote.stale === true) counts.quoteAged++;
@@ -38,9 +40,9 @@ export function summarizeMarketObservation(rows, { loading = false, error = '' }
     if (history.errorCode === 'rate_limited' && !Array.isArray(history.providerAttempts)) counts.rateLimitedAttempts++;
   }
   if (!counts.sampleRows) return { state: 'unknown', observed: false, quotaRemaining: null, ...counts };
-  const attention = counts.quoteUnavailable || counts.quoteAged || counts.historyUnavailable ||
+  const attention = counts.quoteWithheld || counts.quoteUnavailable || counts.quoteAged || counts.historyUnavailable ||
     counts.historyAged || counts.rateLimitedAttempts;
-  const incomplete = counts.quoteTimeUnknown || counts.historyDateUnknown || counts.adjustedIncomplete || counts.fallbackRows;
+  const incomplete = counts.quoteAdmissionUnknown || counts.quoteTimeUnknown || counts.historyDateUnknown || counts.adjustedIncomplete || counts.fallbackRows;
   return {
     state: attention ? 'attention' : incomplete ? 'partial' : 'observed-only',
     observed: true,
