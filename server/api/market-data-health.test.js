@@ -112,3 +112,33 @@ test('malformed and future history dates are visible quality warnings', () => {
   assert.equal(result.ageDays, null);
   assert.equal(result.adjustedCloseAvailable, false);
 });
+
+test('Data Health applies the same quote gate as portfolio valuation without returning price rows', () => {
+  const now = Date.parse('2026-11-20T18:00:00Z');
+  const quote = {
+    price:123.45,returnedSymbol:'FICT',currency:'USD',adjustedBasis:'raw',
+    provider:'declared-source',sourceMode:'live',marketTimePrecision:'instant',
+    marketTime:'2026-11-20T17:59:00Z',retrievedAt:'2026-11-20T18:00:00Z',
+    isMarketSessionOpen:true,privateRecord:'must-not-leak',
+  };
+  const good = summarizeMarketDataHealth('FICT',quote,null,now).quote;
+  assert.equal(good.valuationAdmission.eligible,true);
+  assert.equal(good.available,true);
+  assert.doesNotMatch(JSON.stringify(good),/123\.45|must-not-leak|privateRecord/);
+  for (const patch of [
+    {returnedSymbol:'OTHER'},{currency:null},{currency:'CAD'},
+    {isMarketSessionOpen:null},{simulated:true},{stale:true},{adjustedBasis:'total_return'},
+    {marketTime:'2026-11-18T18:00:00Z'},{marketTime:'2026-11-21T18:00:00Z'},
+  ]) {
+    const result=summarizeMarketDataHealth('FICT',{...quote,...patch},null,now).quote;
+    assert.equal(result.available,true);
+    assert.equal(result.valuationAdmission.eligible,false);
+    assert.ok(result.valuationAdmission.reasons.length>0);
+  }
+  assert.equal(summarizeMarketQuote(quote,now).valuationAdmission.eligible,null);
+  const lastClose=summarizeMarketDataHealth('FICT',{
+    ...quote,marketTime:'2026-11-19T21:00:00Z',isMarketSessionOpen:false,status:'last_close',
+  },null,now).quote;
+  assert.equal(lastClose.valuationAdmission.eligible,true);
+  assert.equal(lastClose.valuationAdmission.status,'last_close');
+});

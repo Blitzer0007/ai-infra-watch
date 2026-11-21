@@ -213,7 +213,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Market data integrity</div>
             <div className="text-sm font-black mt-1">Quote and historical-price providers</div>
-            <div className="text-[9px] text-white/30 mt-1">Samples SPY and the three largest holdings by cost basis. Raw-close history is distinguished from complete split/dividend-adjusted history.</div>
+            <div className="text-[9px] text-white/30 mt-1">Samples SPY and the three largest holdings by cost basis. Raw-close history is distinguished from complete split/dividend-adjusted history. Quote checks assess declared identity, currency, timing and session metadata. Accounting is assessed separately.</div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[8px] font-mono uppercase text-white/25">{marketDataHealth?.rows?.length ? marketDataHealth.rows.length + ' symbols sampled' : 'unavailable'}</span>
@@ -226,6 +226,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3 text-[9px] text-white/60" data-testid="market-observation-review" role="status">
           <div className="text-[10px] font-semibold text-white/80">Source lag & quota observations · {marketObservation.state.replaceAll('-', ' ')}</div>
           <div className="mt-1">Sampled: {marketObservation.sampleRows} · Quote missing: {marketObservation.quoteUnavailable} · Time unknown: {marketObservation.quoteTimeUnknown} · Quote aged &gt;15m: {marketObservation.quoteAged}</div>
+          <div className="mt-1">Quote checks withheld: {marketObservation.quoteWithheld} · Quote checks unknown: {marketObservation.quoteAdmissionUnknown}</div>
           <div className="mt-1">History missing: {marketObservation.historyUnavailable} · Date unknown: {marketObservation.historyDateUnknown} · Calendar age &gt;5d: {marketObservation.historyAged} · Adjusted incomplete: {marketObservation.adjustedIncomplete}</div>
           <div className="mt-1">Fallback rows: {marketObservation.fallbackRows} · Rate-limited attempts: {marketObservation.rateLimitedAttempts} · Remaining provider quota: unknown</div>
           <div className="mt-1 text-white/35">Ages are observational thresholds, not US trading-session freshness certification. Rate-limit attempts do not reveal plan limits or remaining quota. No new provider request is made for this summary.</div>
@@ -237,9 +238,14 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
             const stale = quote.stale || history.stale;
             const fallback = quote.fallbackUsed || history.fallbackUsed;
             const adjustedHistoryComplete = history.adjustedCloseAvailable === true && !history.futureDateDetected && Number(history.invalidDateCount || 0) === 0;
-            const label = stale ? 'STALE' : fallback ? 'FALLBACK' : quote.available && history.available && adjustedHistoryComplete ? 'PRIMARY' : 'PARTIAL';
-            const tone = stale ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
-            return <div key={row.symbol} className="rounded-xl border border-white/5 bg-black/10 p-3">
+            const admission = quote.valuationAdmission;
+            const withheld = admission?.eligible === false;
+            const lastClose = admission?.eligible === true && admission.status === 'last_close';
+            const primaryComplete = admission?.eligible === true && quote.available && history.available && adjustedHistoryComplete;
+            const label = withheld ? 'WITHHELD' : lastClose ? 'LAST CLOSE'
+              : stale ? 'STALE' : fallback ? 'FALLBACK' : primaryComplete ? 'PRIMARY' : 'PARTIAL';
+            const tone = (label === 'WITHHELD' || label === 'LAST CLOSE' || stale) ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
+            return <div key={row.symbol} data-testid="market-sample-row" className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[10px] font-bold">{row.symbol}</span>
                 <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + tone}>{label}</span>
@@ -252,6 +258,10 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Adjusted-close coverage: <b className={history.adjustedCloseAvailable ? 'text-emerald-300' : 'text-amber-200'}>{history.adjustedCoveragePct ?? 0}%</b> ({history.adjustedPointCount ?? 0}/{history.pointCount ?? 0})</span>
                 <span>Latest daily bar age: <b className="text-white/70">{history.ageDays == null ? '—' : history.ageDays + 'd'}</b></span>
               </div>
+              <div className="mt-2 text-xs text-white/70" data-testid="sample-quote-admission">
+                Quote checks: {quote.valuationAdmission?.eligible === true ? 'Passed for conditional valuation' : quote.valuationAdmission?.eligible === false ? 'Withheld' : 'Unknown'}
+                {Array.isArray(quote.valuationAdmission?.reasons) && <ul className="mt-1 space-y-1">{quote.valuationAdmission.reasons.map((reason: string, index: number) => <li key={index}>{reason}</li>)}</ul>}
+              </div>
               {(quote.providerAttempts?.length > 1 || history.providerAttempts?.length > 1) ? (
                 <div className="mt-2 text-[7px] font-mono text-white/25">
                   Attempts: {[...(quote.providerAttempts || []), ...(history.providerAttempts || [])].map((item: any) => item.provider + ':' + item.status + (item.errorCode ? '(' + item.errorCode + ')' : '')).join(' · ')}
@@ -259,7 +269,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
               ) : null}
             </div>;
           })}
-          {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">Loading market provider health…</div> : null}
+          {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">{marketDataHealthLoaded ? 'No sampled provider rows were returned. Coverage is unknown.' : 'Loading market provider health…'}</div> : null}
         </div>
         {marketDataHealth?.retrievedAt && <div className="mt-2 text-[7px] font-mono text-white/20">Sample retrieved: {new Date(marketDataHealth.retrievedAt).toLocaleString()} · {marketDataHealth.cached ? 'cached summary' : 'live provider check'}</div>}
       </section>
