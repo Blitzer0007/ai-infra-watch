@@ -48,3 +48,8 @@ Verification used the locked production build, fictional GET previews with inter
 ## Provider failure explanation continuation
 
 A missing quote previously collapsed all exhausted provider attempts into a generic admission failure. Decision Center and digest now preserve a bounded explanation through a fixed provider/reason vocabulary. This exposes configuration, timeout, rate-limit and service failures without echoing raw messages or response bodies. The same explanation reaches the fallback brief when Decision Center itself is unavailable. Fictional tests verify redaction, unchanged valuation eligibility, issue identity and real-handler provider failure propagation. Genuine per-holding production provider availability still needs the protected diagnostic review.
+
+
+## Overview review-state follow-up
+
+The web review displayed a green zero urgent count and “Nothing urgent detected” even when rules were unevaluated. It also displayed zero upcoming events on an earnings failure and could render undefined forecast progress. The candidate now distinguishes unknown coverage from observed empty results and provides a Data Health shortcut. It validates the core successful-response shape and returned action records before rendering, preventing incomplete bodies from crashing the overview. Fictional Chromium cases cover partial quotes, failed earnings, malformed core objects and null actions. Existing financial assertions remain.
