@@ -16,8 +16,9 @@ export default function WorkspaceHeader({view, onNavigate}: {
     </div>
     <nav aria-label="Suggested next workspaces" className="aiw-related-workspaces">
       {next.map(item => <button key={item.id} type="button"
+        aria-label={'Go to ' + item.label}
         onClick={() => onNavigate(item.id)} className="aiw-workspace-shortcut">
-        <span>Go to {item.label}</span><ArrowUpRight aria-hidden="true" size={14}/>
+        <span>{item.label}</span><ArrowUpRight aria-hidden="true" size={14}/>
       </button>)}
     </nav>
   </header>;

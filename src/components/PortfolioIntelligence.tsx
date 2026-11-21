@@ -849,16 +849,19 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
       <p data-testid="portfolio-accounting-status" className="text-xs text-amber-200">Loaded-record calculations only · full history unverified. Unsupported P&amp;L and historical portfolio comparisons are withheld.</p>
       <div className="aiw-portfolio-statusbar">
         <h1 className="sr-only">Portfolio Overview &amp; Decisions</h1>
-        <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
-          <span className="px-2 py-1 rounded-full border border-white/10">LIVE PRICES {stressFreshCount}/{analyses.length}</span>
-          {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
-          <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">ADD OPPORTUNITIES {addReviews}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">RISK CHECKS {riskReviews}</span>
-          <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
-            <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
-            <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
+        <details className="aiw-portfolio-indicators text-xs">
+          <summary className="cursor-pointer font-medium">Portfolio indicators</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-mono text-white/40">
+            <span className="px-2 py-1 rounded-full border border-white/10">LIVE PRICES {stressFreshCount}/{analyses.length}</span>
+            {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
+            <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
+            <span className="px-2 py-1 rounded-full border border-white/10">ADD OPPORTUNITIES {addReviews}</span>
+            <span className="px-2 py-1 rounded-full border border-white/10">RISK CHECKS {riskReviews}</span>
           </div>
+        </details>
+        <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
+          <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
+          <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
         </div>
       </div>
 

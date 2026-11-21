@@ -8,9 +8,9 @@ The owner chose a clean light workspace with fewer cards and clearer navigation.
 
 - All 17 existing destinations share a light canvas, white surfaces, navy text, blue active states, readable legacy labels, consistent tables, inputs and charts, and quieter grouped navigation.
 - Workspace titles and related destinations replace large gradient headers, repeated badges and navigation counts. Search, mobile navigation, active-route semantics, browser history and existing deep links remain available.
-- Portfolio uses flat primary section tabs, compact research links and a separated summary row. Duplicate visible Portfolio heading copy is removed; the accessible page heading remains.
+- Portfolio uses flat primary section tabs, compact research links, expandable portfolio indicators and a separated summary row. Simple/Detailed controls remain directly available. Duplicate visible Portfolio heading copy is removed; the accessible page heading remains.
 - Feed source metadata, the ecosystem learning guide and detailed readiness checks expand on demand. The current feed status, refresh control, failures and incomplete portfolio-readiness warning remain visible.
-- Search, sign-in and the portalled native holding dialog use light surfaces. Focus rings, financial status colors and tabular numbers remain distinct. The mobile header no longer overlaps the search context.
+- Search, sign-in and the portalled native holding dialog use light surfaces. Focus rings, financial status colors and tabular numbers remain distinct. The mobile header no longer overlaps the search context; shorter related links and reduced mobile chrome bring the review content into view sooner.
 - PWA browser chrome and install background use the light canvas.
 
 ## Rendered previews
