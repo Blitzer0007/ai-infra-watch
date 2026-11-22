@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.jev.assess import ASSESSMENTS, assess
+from app.jev.opportunities import validate_opportunity_state
 
 
 app = FastAPI(title="AI Infra Watch Jev Assessment", version="1.0.0")
@@ -73,9 +74,15 @@ def evaluate(req: JevAssessRequest, request: Request, authorization: str | None 
             detail={"error": "unknown assessment kind", "allowed": sorted(ASSESSMENTS)},
         )
 
-    evaluation = assess(kind, req.state)
+    state = req.state
+    if kind == "opportunities":
+        try:
+            state = validate_opportunity_state(state)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid opportunity coverage summary") from None
+    evaluation = assess(kind, state)
     if not evaluation.usable:
-        status = 503 if settings.JEV_ENABLED and settings.JEV_API_KEY else 200
+        error_code = "disabled" if not settings.JEV_ENABLED else "not_configured" if not settings.JEV_API_KEY else "provider_unavailable"
         return {
             "ok": False,
             "kind": kind,
@@ -84,7 +91,8 @@ def evaluate(req: JevAssessRequest, request: Request, authorization: str | None 
             "latency_ms": evaluation.latency_ms,
             "input_tokens": evaluation.input_tokens,
             "answers": {},
-            "error": evaluation.error or "Jev assessment unavailable",
+            "error": "Jev assessment unavailable",
+            "error_code": error_code,
             "fallback": True,
         }
 

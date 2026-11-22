@@ -11,6 +11,17 @@ export const ledgerIssueLabels = {
     INVALID_SEQUENCE: 'A sale exceeds the inventory established by earlier records.', QUANTITY_MISMATCH: 'Recorded trades do not match the loaded holding quantity.',
     NUMERIC_LIMIT: 'The numeric scale cannot be reconciled safely.', CALCULATION_MISMATCH: 'The existing calculator did not satisfy the ledger conservation checks.',
 };
+export const ledgerDetailLabels = {
+    ID_INVALID: 'The transaction record ID is missing or malformed.',
+    ID_DUPLICATE: 'The same transaction record ID appears more than once.',
+    SYMBOL_INVALID: 'The transaction ticker is missing or does not match its stored inputs.',
+    TYPE_INVALID: 'The transaction type must explicitly be BUY or SELL.',
+    QUANTITY_INVALID: 'Quantity must be positive and within the supported eight-decimal precision and numeric range.',
+    AMOUNT_INVALID: 'The transaction amount must be a positive finite value within the supported range.',
+    DATE_INVALID: 'The trade date is missing or is not a valid calendar date.',
+    DATE_FUTURE: 'The trade date is later than the assessment date.',
+    EXECUTION_INVALID: 'Execution time needs a valid ISO instant with an explicit timezone, no later than assessment and consistent with the trade date.',
+};
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const symbol = (v) => typeof v === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(v);
 const finite = (v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e12;
@@ -29,8 +40,8 @@ function units(v) {
 const fields = ['contractVersion', 'symbol', 'transactionType', 'quantity', 'amount', 'brokerage', 'currency', 'tradeDate', 'executedAt', 'quantityDerived', 'priceDerived'];
 export function reviewLoadedLedger(input) {
     const result = { contractVersion: 'loaded-ledger-review-v1', status: 'needs-data', assessedAt: input.assessedAt, holdingCount: Array.isArray(input.holdings) ? input.holdings.length : 0, transactionCount: Array.isArray(input.transactions) ? input.transactions.length : 0, reviewedTransactionCount: 0, issues: [], positions: [], totals: null, historyCoverage: 'unverified', corporateActionCoverage: 'unverified', accountingReconciled: false, grantsDecisionEligibility: false, verifiesSourceRecords: false };
-    const issue = (code, s = null, id = null) => { if (result.issues.length < 100 && !result.issues.some(i => i.code === code && i.symbol === s && i.recordId === id))
-        result.issues.push({ code, symbol: s, recordId: id }); };
+    const issue = (code, s = null, id = null, detailCode = null) => { if (result.issues.length < 100 && !result.issues.some(i => i.code === code && i.symbol === s && i.recordId === id && (i.detailCode ?? null) === detailCode))
+        result.issues.push({ code, symbol: s, recordId: id, ...(detailCode ? {detailCode} : {}) }); };
     const assessed = time(input.assessedAt);
     if (assessed === null) {
         issue('TRADE_DATE_INVALID');
@@ -75,8 +86,12 @@ export function reviewLoadedLedger(input) {
     const trades = [];
     for (const raw of input.transactions) {
         result.reviewedTransactionCount++;
-        if (!object(raw) || typeof raw.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,80}$/.test(raw.id) || ids.has(raw.id)) {
-            issue('INVALID_TRANSACTION');
+        if (!object(raw) || typeof raw.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,80}$/.test(raw.id)) {
+            issue('INVALID_TRANSACTION', null, null, 'ID_INVALID');
+            continue;
+        }
+        if (ids.has(raw.id)) {
+            issue('INVALID_TRANSACTION', null, raw.id, 'ID_DUPLICATE');
             continue;
         }
         ids.add(raw.id);
@@ -87,8 +102,14 @@ export function reviewLoadedLedger(input) {
             continue;
         }
         const s = symbol(data.symbol) ? data.symbol : null;
-        if (!s || raw.symbol !== s || !['BUY', 'SELL'].includes(String(data.transactionType)) || units(data.quantity) === null || data.quantity === 0 || !finite(data.amount) || data.amount <= 0) {
-            issue('INVALID_TRANSACTION', s, id);
+        const invalidFields = [
+            [!s || raw.symbol !== s, 'SYMBOL_INVALID'],
+            [!['BUY', 'SELL'].includes(String(data.transactionType)), 'TYPE_INVALID'],
+            [units(data.quantity) === null || data.quantity === 0, 'QUANTITY_INVALID'],
+            [!finite(data.amount) || data.amount <= 0, 'AMOUNT_INVALID'],
+        ].filter(([invalid]) => invalid);
+        if (invalidFields.length) {
+            for (const [,detailCode] of invalidFields) issue('INVALID_TRANSACTION', s, id, detailCode);
             continue;
         }
         if (data.currency !== 'USD')
@@ -97,11 +118,11 @@ export function reviewLoadedLedger(input) {
             issue('FEE_UNKNOWN', s, id);
         if (data.quantityDerived !== false || data.priceDerived !== false || raw.dataQuality !== 'ok')
             issue('DERIVED_OR_REVIEW_RECORD', s, id);
-        if (!day(data.tradeDate) || data.tradeDate > input.assessedAt.slice(0, 10))
-            issue('TRADE_DATE_INVALID', s, id);
+        if (!day(data.tradeDate)) issue('TRADE_DATE_INVALID', s, id, 'DATE_INVALID');
+        else if (data.tradeDate > input.assessedAt.slice(0, 10)) issue('TRADE_DATE_INVALID', s, id, 'DATE_FUTURE');
         const execution = time(data.executedAt);
         if (data.executedAt !== null && (execution === null || execution > assessed || typeof data.tradeDate !== 'string' || data.executedAt.slice(0, 10) !== data.tradeDate))
-            issue('TRADE_DATE_INVALID', s, id);
+            issue('TRADE_DATE_INVALID', s, id, 'EXECUTION_INVALID');
         trades.push({ id, data: data, execution, quantity: units(data.quantity) });
     }
     if (result.issues.length)

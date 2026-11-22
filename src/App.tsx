@@ -46,6 +46,7 @@ import AutonomousResearch from './components/AutonomousResearch';
 import JevAutonomousPortfolioLab from './components/JevAutonomousPortfolioLab';
 import DataHealth from './components/DataHealth';
 import AIQualityLab from './components/AIQualityLab';
+import { ThemeSwitch, useThemeClass } from './components/ThemeProvider';
 
 type LivePrice = {
   returnedSymbol?:string|null;sourceMode?:string;currency?:string|null;adjustedBasis?:string;marketTimePrecision?:string;isMarketSessionOpen?:boolean|null;simulated?:boolean;status?:string;fallbackUsed?:boolean;independentObservations?:unknown;
@@ -60,6 +61,7 @@ type LivePrice = {
 };
 
 export default function App() {
+  const themeClass = useThemeClass();
   const [activeView, setActiveView] = useState<string>(() => viewFromPath(window.location.pathname));
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [tickerPrices, setTickerPrices] = useState<Record<string, LivePrice>>({});
@@ -390,7 +392,7 @@ export default function App() {
 
 
   return (
-    <div className="aiw-application aiw-light-workspace min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white">
+    <div className={'aiw-application ' + themeClass + ' min-h-screen bg-[#0c121a] text-[#F3F4F6] flex flex-col font-sans selection:bg-cyan-300/25 selection:text-white'}>
       <a href="#main-content" className="aiw-skip-link">Skip to main content</a>
 {/* 1. FINITE, ACCESSIBLE MARKET OBSERVATION STRIP */}
       <div role="region" aria-label="Observed market quotes"
@@ -428,6 +430,7 @@ export default function App() {
           </div>
           <WorkspaceNavigation activeView={activeView} onNavigate={handleNavigate} variant="desktop"/>
           <div className="aiw-sidebar-footer mt-5 border-t border-white/10 px-3 py-4 text-xs leading-relaxed text-slate-400">
+            <ThemeSwitch />
             <p>Research for considered decisions</p>
           </div>
         </aside>
@@ -441,12 +444,14 @@ export default function App() {
               <p className="text-[11px] text-slate-400">Research workspaces</p>
             </div>
           </div>
+          <div className="flex shrink-0 items-center gap-2"><ThemeSwitch compact />
           <button type="button" aria-expanded={isMobileMenuOpen} aria-controls="aiw-mobile-workspace-menu"
             aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="aiw-mobile-menu-button inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-white/15">
             {isMobileMenuOpen ? <X aria-hidden="true" size={21}/> : <Menu aria-hidden="true" size={21}/>}
           </button>
+          </div>
         </div>
 
 {/* MOBILE NAVIGATION DRAWER */}

@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ResearchCandidate } from './opportunityResearch';
-import { opportunityJevState, normalizeOpportunityJevReview } from './opportunityJevReview';
+import { opportunityJevState, normalizeOpportunityJevReview, opportunityJevFailure } from './opportunityJevReview';
 const candidate:ResearchCandidate={symbol:'FICT',companyName:'Private display name',status:'needs-data',horizonMonths:{min:2,max:12},snapshotId:'private-snapshot',asOf:null,ruleVersion:'reported-growth-cash-flow-v1-experimental',supportingReasons:[],conflictingReasons:[],evidence:[{id:'private-ref',label:'Private text',source:'Bearer fixture-secret',url:'https://example.com/?token=fixture-secret'}],missingInputs:['Private thesis and secret notes'],dataEligibility:'insufficient',signalEligibility:'experimental',portfolioContext:'holding',accounting:'unverified',nextReviewCondition:'Private note'};
 const response=()=>({ok:true,enabled:true,fallback:false,kind:'opportunities',answers:{next_check:{type:'choice',choice:'monitor'},context:{type:'choice',choice:'bounded_review'}},input_tokens:123,latency_ms:42,model:'fixture-model',token:'fixture-secret',balance:9000});
+test('JEV errors distinguish schema/access/configuration failures without echoing private bodies',()=>{
+  assert.match(opportunityJevFailure(400,{error:'private-secret'}),/same release/);
+  assert.match(opportunityJevFailure(401,{}),/Unlock/);
+  assert.match(opportunityJevFailure(429,{}),/limit/);
+  assert.match(opportunityJevFailure(200,{error_code:'not_configured',enabled:true}),/did not call TypeSafe/);
+  assert.match(opportunityJevFailure(503,{}),/Credits may have been used/);
+  assert.doesNotMatch(opportunityJevFailure(500,{error:'private-secret'}),/private-secret/);
+});
 
 test('JEV summary selects bounded coverage metadata and omits private/raw input text',()=>{
   const state=opportunityJevState(candidate);

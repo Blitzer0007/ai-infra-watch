@@ -10,6 +10,8 @@ import { summarizeMarketObservation } from '../utils/marketObservationReview';
 import { summarizeHistoricalProvenance } from '../utils/historicalProvenanceReview';
 import { summarizeEvidenceChannels } from '../utils/evidenceChannelHealth';
 import type { EvidenceChannelState } from '../utils/evidenceChannelHealth';
+import DiagnosticSnapshot from './DiagnosticSnapshot';
+import { buildSourceDiagnosticSnapshot } from '../utils/healthDiagnosticSnapshot';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -295,6 +297,11 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">{marketDataHealthLoaded ? 'No sampled provider rows were returned. Coverage is unknown.' : 'Loading market provider health…'}</div> : null}
         </div>
         {marketDataHealth?.retrievedAt && <div className="mt-2 text-[7px] font-mono text-white/20">Sample retrieved: {new Date(marketDataHealth.retrievedAt).toLocaleString()} · {marketDataHealth.cached ? 'cached summary' : 'live provider check'}</div>}
+        <p className="mt-2 text-xs text-white/45">This is the internal provider-router sample. It does not test the public Yahoo endpoint used by browser quotes.</p>
+        <DiagnosticSnapshot label="Source diagnostics" buildReport={() => buildSourceDiagnosticSnapshot({
+          channels: evidenceAvailability, channelsLoading: isLoading, channelsFailed: Boolean(error),
+          market: marketDataHealth, loading: !marketDataHealthLoaded, failed: Boolean(marketDataHealthError),
+        })} />
       </section>
 
       <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[.025] p-4" data-testid="forecast-operations-review" aria-label="Forecast operations review">

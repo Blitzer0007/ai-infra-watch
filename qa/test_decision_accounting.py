@@ -9,6 +9,33 @@ from test_ui import goto_app, mock_local_apis
 
 ROOT=Path(__file__).resolve().parents[1]
 
+
+@pytest.mark.parametrize('mode,expected_issue', [('unknown-fee', 'FEE_UNKNOWN'), ('ledger-outage', 'RECORDS_UNAVAILABLE')])
+def test_accounting_diagnostic_report_uses_loaded_issue_codes_without_financial_rows(page, mode, expected_issue):
+    body = replay(mode)
+    body['portfolio']['accountingIssues'].append({'code': 'untrusted-private-token', 'symbol': 'PRIVATEHOLDING', 'message': 'private-record-id'})
+    mock_local_apis(page)
+    page.route('**/api/decision-center**', lambda route: route.fulfill(status=200, json=body))
+    requests, writes = [], []
+    page.on('request', lambda request: requests.append(request.url))
+    page.on('request', lambda request: writes.append(request.url) if request.method not in ('GET','HEAD','OPTIONS') else None)
+    goto_app(page)
+    center = page.get_by_test_id('decision-impact-center')
+    center.get_by_text('Accounting coverage and inputs', exact=True).click()
+    page.wait_for_load_state('networkidle')
+    before = len(requests)
+    panel = center.get_by_label('Accounting diagnostics', exact=True)
+    panel.locator('summary').click()
+    panel.get_by_role('button', name='Prepare accounting diagnostics', exact=True).click()
+    text = panel.get_by_role('textbox', name='Accounting diagnostics preview', exact=True).input_value()
+    report = json.loads(text)
+    assert report['issues'][expected_issue] >= 1 and report['issues']['unknown'] == 1
+    assert report['reportedAccountingReconciled'] is False and report['grantsDecisionEligibility'] is False
+    assert report['historyCoverage'] == 'unverified'
+    for private in ['untrusted-private-token', 'PRIVATEHOLDING', 'private-record-id', 'currentValue', 'totalTradingPnl', 'recordId']:
+        assert private not in text
+    assert len(requests) == before and writes == []
+
 def replay(mode):
     return json.loads(subprocess.check_output(['node','qa/fixtures/decision-accounting.fictional.mjs',mode],
         cwd=ROOT,env={'PATH':os.environ['PATH']},text=True))

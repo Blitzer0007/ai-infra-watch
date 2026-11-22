@@ -93,5 +93,8 @@ def test_position_gate_withholds_readiness_for_missing_or_inconsistent_rule_revi
     expect(center.get_by_text('Action now',exact=True).locator('..')).to_contain_text('Unknown')
     expect(center).to_contain_text('Review coverage needs attention')
     center.get_by_text('Rule configuration and coverage issues',exact=True).click()
-    expect(center.get_by_test_id('decision-rule-issues')).to_contain_text('FICT: Complete history coverage is required.')
+    issues = center.get_by_test_id('decision-rule-issues')
+    expect(issues.get_by_role('listitem')).to_have_count(1)
+    expect(issues.get_by_role('listitem')).to_contain_text('Complete history coverage is required.')
+    expect(issues.get_by_role('listitem')).to_contain_text('Affected: FICT')
     assert writes==[]

@@ -1,9 +1,88 @@
 from pathlib import Path
 import json
 import os
+import pytest
 from test_ui import goto_app, mock_local_apis
 
 ARTIFACTS = Path(os.getenv('QA_ARTIFACT_DIR','/tmp/aiw-release2'))
+
+
+def test_actual_opportunity_summary_is_accepted_by_python_assessment_endpoint_without_live_provider(monkeypatch):
+    import importlib.util
+    import sys
+    import subprocess
+    from fastapi.testclient import TestClient
+    root = Path(__file__).resolve().parents[1]
+    program = """import {opportunityJevState} from './src/utils/opportunityJevReview.ts';
+      console.log(JSON.stringify(opportunityJevState({symbol:'FICT',status:'needs-data',ruleVersion:'reported-growth-cash-flow-v1-experimental',dataEligibility:'insufficient',asOf:null,missingInputs:['Private note'],evidence:[],supportingReasons:[],conflictingReasons:[]})));"""
+    state = json.loads(subprocess.check_output(['node','--import','tsx','--input-type=module','-e',program],cwd=root,env={'PATH':os.environ['PATH']},text=True))
+    spec = importlib.util.spec_from_file_location('fictional_opportunity_endpoint', root/'api/jev-assess.py')
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)
+    spec.loader.exec_module(module)
+    from app.jev.assess import assess
+    from app.jev.client import JevEvaluation, JevAnswer
+    captured = []
+    class FakeClient:
+        def evaluate(self, **kwargs):
+            captured.append(kwargs)
+            return JevEvaluation(answers={'next_check':JevAnswer(type='choice',choice='gather_evidence'), 'context':JevAnswer(type='choice',choice='insufficient')},model='fictional-model')
+    monkeypatch.setenv('AIW_ACCESS_TOKEN','fictional-opportunity-session')
+    monkeypatch.setattr(module, 'assess', lambda kind, state: assess(kind,state,client=FakeClient()))
+    client=TestClient(module.app)
+    headers={'Authorization':'Bearer fictional-opportunity-session'}
+    response=client.post('/api/jev-assess',headers=headers,json={'kind':'opportunities','state':state})
+    assert response.status_code == 200 and response.json()['ok'] is True
+    assert response.json()['answers']['context']['choice'] == 'insufficient'
+    assert len(captured)==1 and set(captured[0]['questions'])=={'next_check','context'}
+    assert json.loads(captured[0]['state'])==state and 'Private note' not in captured[0]['state']
+    for invalid in [{**state,'holdings':[{'quantity':999}]}, {**state,'missingInputCount':True}, {**state,'asOf':'2026-02-30T00:00:00Z'}, {**state,'status':'excluded'}]:
+        assert client.post('/api/jev-assess',headers=headers,json={'kind':'opportunities','state':invalid}).status_code==422
+    assert client.post('/api/jev-assess',json={'kind':'opportunities','state':state}).status_code==401
+    assert len(captured)==1
+
+
+@pytest.mark.parametrize('status,body,expected', [
+    (400,{'detail':{'error':'unknown assessment kind'}},'same release'),
+    (200,{'ok':False,'enabled':False,'error_code':'disabled'},'did not call TypeSafe'),
+    (503,{'error':'fictional-private-response'},'Credits may have been used'),
+])
+def test_opportunity_jev_failure_is_actionable_and_does_not_retry(page,status,body,expected):
+    from playwright.sync_api import expect
+    fictional_portfolio(page)
+    calls=[]
+    def reply(route):
+        calls.append(route.request.post_data_json)
+        route.fulfill(status=status,json=body)
+    page.route('**/api/jev-assess',reply)
+    page.goto('/opportunities')
+    page.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
+    panel=page.get_by_test_id('opportunity-jev-review')
+    panel.locator('summary').click()
+    panel.get_by_role('button',name='Run JEV coverage review · uses credits',exact=True).click()
+    expect(panel.get_by_role('alert')).to_contain_text(expected)
+    assert len(calls)==1 and calls[0]['kind']=='opportunities'
+    assert 'fictional-private-response' not in panel.inner_text()
+    assert not any(field in calls[0]['state'] for field in ['quantity','holdings','notes','costs'])
+
+
+def test_jev_endpoint_never_returns_raw_provider_failure_text(monkeypatch):
+    import importlib.util
+    import sys
+    from fastapi.testclient import TestClient
+    root=Path(__file__).resolve().parents[1]
+    spec=importlib.util.spec_from_file_location('fictional_jev_error_endpoint',root/'api/jev-assess.py')
+    module=importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules,spec.name,module)
+    spec.loader.exec_module(module)
+    from app.jev.client import JevEvaluation
+    monkeypatch.setenv('AIW_ACCESS_TOKEN','fictional-opportunity-session')
+    monkeypatch.setattr(module.settings,'JEV_ENABLED',True)
+    monkeypatch.setattr(module.settings,'JEV_API_KEY','fictional-provider-key')
+    monkeypatch.setattr(module,'assess',lambda *_:JevEvaluation(error='fictional-private-upstream-error'))
+    response=TestClient(module.app).post('/api/jev-assess',headers={'Authorization':'Bearer fictional-opportunity-session'},json={'kind':'platform','state':{}})
+    assert response.json()['error_code']=='provider_unavailable'
+    assert 'fictional-private-upstream-error' not in response.text and 'fictional-provider-key' not in response.text
 
 
 def fictional_portfolio(page, watchlist=('DEMO',)):
