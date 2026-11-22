@@ -1,3 +1,23 @@
+# Current continuation: November 22 release preparation
+
+**This section supersedes prior no-release instructions for preparation scope only.** The owner said “lets do it” after the proposal to release the tested UI/quote repairs, and asked about Bull/Bear/Judge agents. Release preparation is authorized; no new unprotected-main exception is yet authorized or implemented.
+
+- Active: `feature/data-health-evidence-states`, Cloud worktree `/workspace/ai-infra-watch-data-health`, [PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187). It now targets `main` as one combined UI + Data Health + public-quote candidate; #186's source is already in its ancestry. Preserve #185/#186 heads/worktrees. Do not merge the duplicate UI PR separately while reviewing this combined path.
+- Read [the concrete release candidate, blockers, rollback and agent status](NOV22-RELEASE-CANDIDATE.md). Source before this documentation: `064b1827139c11a42f20e4f77b9869701f723642`; fresh main-target PR CI is required on the new head. Current source passed 1,115 Node tests, 28 latest browser checks, TypeScript, production build and security scan. The main-target PR must also run standalone Security audit.
+- Current main: `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, `protected=false`. Connected tools have no protection-write operation; CLI protection read was forbidden. Existing release guard and handoff only permit the already-approved historical exact releases, most recently #180; do not reuse that exception for #187 or silently add a new waiver.
+- Complete authorized candidate review and exact-head CI before asking the owner to resolve the concrete release-control blocker. Either configure the required protection/environment controls, or obtain a fresh, clearly scoped #187-only owner exception before changing the pinned exception/handoff. Do not merge into an unusable release path.
+- Current live READY production and proposed new-release rollback: `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, commit `529e9562`, public alias `ai-infra-watch-theta.vercel.app`, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`, project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`. Reverify before action. The older #180 rollback is not automatically the rollback for this release.
+- Telegram's labeled Settings test is already confirmed received by the owner screenshot; do not send a duplicate or replay a digest slot. No production keys, database changes or live polling are authorized by this preparation.
+- Bull/Bear/Judge exists as manual evidence research, with development-only NVIDIA opt-in, bounded calls and optional separate TypeSafe click. No agent activation is part of this release. Explain provisional preference/abstention rather than claiming three agents determine future correctness.
+
+Resume prompt:
+
+> Continue PR #187 on `feature/data-health-evidence-states`, now targeting main as the combined light UI and quote/data-health release candidate. Read this current top section and `docs/release/NOV22-RELEASE-CANDIDATE.md`. Verify all three exact-head PR CI workflows, then resolve the documented release-control blocker without silently reusing #180's exception. Preserve #185/#186. Telegram connection test is already confirmed; no duplicate sends, production database changes, keys retrieval or new polling.
+
+---
+
+**Historical checkpoints follow.**
+
 # Current continuation: public quote contract repair — 22 November 2026
 
 **This section supersedes historical instructions below.** The owner asked to fix provider issues and explicitly authorized a labeled production Telegram test. The test is now confirmed received by the owner's screenshot; do not send another.
