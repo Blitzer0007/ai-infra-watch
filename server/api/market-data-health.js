@@ -1,3 +1,5 @@
+import { evaluateDeclaredQuote } from '../../shared/quoteAdmission.js';
+import { quoteFailureReason } from '../utils/quoteFailureReasons.js';
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote, classifyProviderError } from '../../api/_market-data.js';
 
@@ -62,12 +64,17 @@ function dateOnlyAgeDays(dateValue, nowMs = Date.now()) {
   return Math.floor((todayMs - lastMs) / 86400000);
 }
 
-export function summarizeMarketQuote(data, nowMs = Date.now()) {
-  if (!data || typeof data.price!=='number' || !Number.isFinite(data.price) || data.price<=0) return { available: false, errorCode: 'no_data' };
+export function summarizeMarketQuote(data, nowMs = Date.now(), symbol = null) {
+  const admission = symbol === null
+    ? { eligible: null, status: 'unknown', reasons: ['Requested symbol was not supplied for quote checks.'] }
+    : evaluateDeclaredQuote(symbol, data, nowMs);
+  const valuationAdmission = { eligible: admission.eligible, status: admission.status, reasons: admission.reasons };
+  if (!data || typeof data.price!=='number' || !Number.isFinite(data.price) || data.price<=0) return { available: false, errorCode: 'no_data', valuationAdmission };
   const observation = data.marketTime || (data.marketTimePrecision !== 'date-only' ? data.asOf : null) || null;
   const exactObservation = typeof observation==='string'&&/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(observation) ? observation : null;
   return {
     available: true,
+    valuationAdmission,
     provider: data.provider || 'unknown',
     providerStatus: data.providerStatus || (data.cached ? 'CACHED' : 'PRIMARY'),
     fallbackUsed: Boolean(data.fallbackUsed),
@@ -136,7 +143,7 @@ export function summarizeMarketHistory(data, nowMs = Date.now()) {
 export function summarizeMarketDataHealth(symbol, quoteData, historyData, nowMs = Date.now()) {
   return {
     symbol,
-    quote: summarizeMarketQuote(quoteData, nowMs),
+    quote: summarizeMarketQuote(quoteData, nowMs, symbol),
     history: summarizeMarketHistory(historyData, nowMs),
   };
 }
@@ -161,8 +168,10 @@ export default async function handler(req, res) {
       return {
         symbol,
         quote: quoteData
-          ? summarizeMarketQuote(quoteData)
-          : summarizeProviderFailure(quoteResult.reason),
+          ? summarizeMarketQuote(quoteData, Date.now(), symbol)
+          : { ...summarizeProviderFailure(quoteResult.reason), valuationAdmission: {
+            eligible: false, status: 'missing', reasons: [quoteFailureReason(quoteResult.reason)],
+          } },
         history: historyData
           ? summarizeMarketHistory(historyData)
           : summarizeProviderFailure(historyResult.reason),

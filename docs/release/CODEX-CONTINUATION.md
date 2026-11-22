@@ -1,3 +1,123 @@
+# Current continuation: approved PR #187 release — 22 November 2026
+
+**This section supersedes previous release-blocker text.** After being asked for the new PR #187-only unprotected-main exception, the owner replied “as of now ignore this.” Proceed with that scoped exception and all retained exact-commit, staging, access and rollback checks. No further confirmation of this same action is needed.
+
+- Active release: `feature/data-health-evidence-states`, `/workspace/ai-infra-watch-data-health`, [ready PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187) targeting `main`. Its tree includes the complete #186 light UI and quote/Data Health repairs. Preserve #185/#186 branch heads and worktrees. Do not merge duplicate #186 separately.
+- Base/current main and direct first-parent pin: `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. New exception is explicitly PR 187 / branch `feature/data-health-evidence-states` / intended repository only. The updated one-time handoff waits for exact-main QA, independently checks all required main CI and PR ancestry, and dispatches the guarded manual workflow at most once. Its rollback is `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`. Historical #180 attestation is retained unchanged; this is a new scope.
+- Read [the authorized release plan](NOV22-RELEASE-CANDIDATE.md). Latest local guard verification: 1,118 Node tests, 33 offline safety/deployment checks and TypeScript passed. Application source previously passed 28 latest mocked browser checks and production build; the new final head must pass fresh Frontend CI, Security audit and UI API DB Validation.
+- Continue autonomously through final PR CI, expected-head regular two-parent merge, exact-main CI, the one-time handoff, staging/auth/HTML/JS/CSS checks, promotion, public alias/commit verification and bounded runtime-error inspection. Fix genuine failures without weakening checks. Do not declare deployed until promotion and verification actually succeed.
+- Freeze the feature branch head after merging: handoff attestation compares the second main parent with that PR head. Record later production evidence in `/workspace/ai-infra-watch-release-evidence/PR187-PRODUCTION.md` and the PR description, not another feature-branch commit.
+- Current known-good READY production/rollback is `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, main `529e9562`, public alias `ai-infra-watch-theta.vercel.app`, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`, project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`. Verify before release. No other project, deployment parent or rollback is authorized by these pins.
+- Keep `run_live_checks=false`: it includes SEC/provider refresh, which remains outside scope while production database changes are not authorized. No production keys displayed/retrieved by the agent, no new polling and no AI model activation. The production Telegram test is already confirmed received by the owner's screenshot; do not duplicate or replay a slot.
+- Bull/Bear/Judge is manual-start, bounded research. The UI is development/QA-only; its NVIDIA adapter requires explicit development flags and refuses production. It is not continuous autonomous production monitoring. The owner asked what it is; that question does not authorize enabling it.
+
+Resume prompt:
+
+> Continue the approved PR #187 release on `feature/data-health-evidence-states`. Read this current top section and `docs/release/NOV22-RELEASE-CANDIDATE.md`. The fresh PR #187-only exception is owner-approved; keep exact ancestry/CI, staging, auth, asset bytes and rollback checks. Complete PR CI, regular expected-head merge, main CI, one-time handoff and verified production promotion. Freeze the PR branch after merge. No duplicate Telegram sends, production database changes, secret display, new polling or AI activation.
+
+---
+
+**Historical checkpoints below retain provenance; earlier pending-approval statements are superseded above.**
+
+# Current continuation: November 22 release preparation
+
+**This section supersedes prior no-release instructions for preparation scope only.** The owner said “lets do it” after the proposal to release the tested UI/quote repairs, and asked about Bull/Bear/Judge agents. Release preparation is authorized; no new unprotected-main exception is yet authorized or implemented.
+
+- Active: `feature/data-health-evidence-states`, Cloud worktree `/workspace/ai-infra-watch-data-health`, [PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187). It now targets `main` as one combined UI + Data Health + public-quote candidate; #186's source is already in its ancestry. Preserve #185/#186 heads/worktrees. Do not merge the duplicate UI PR separately while reviewing this combined path.
+- Read [the concrete release candidate, blockers, rollback and agent status](NOV22-RELEASE-CANDIDATE.md). Source before this documentation: `064b1827139c11a42f20e4f77b9869701f723642`; fresh main-target PR CI is required on the new head. Current source passed 1,115 Node tests, 28 latest browser checks, TypeScript, production build and security scan. The main-target PR must also run standalone Security audit.
+- Current main: `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, `protected=false`. Connected tools have no protection-write operation; CLI protection read was forbidden. Existing release guard and handoff only permit the already-approved historical exact releases, most recently #180; do not reuse that exception for #187 or silently add a new waiver.
+- Complete authorized candidate review and exact-head CI before asking the owner to resolve the concrete release-control blocker. Either configure the required protection/environment controls, or obtain a fresh, clearly scoped #187-only owner exception before changing the pinned exception/handoff. Do not merge into an unusable release path.
+- Current live READY production and proposed new-release rollback: `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, commit `529e9562`, public alias `ai-infra-watch-theta.vercel.app`, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`, project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`. Reverify before action. The older #180 rollback is not automatically the rollback for this release.
+- Telegram's labeled Settings test is already confirmed received by the owner screenshot; do not send a duplicate or replay a digest slot. No production keys, database changes or live polling are authorized by this preparation.
+- Bull/Bear/Judge exists as manual evidence research, with development-only NVIDIA opt-in, bounded calls and optional separate TypeSafe click. No agent activation is part of this release. Explain provisional preference/abstention rather than claiming three agents determine future correctness.
+
+Resume prompt:
+
+> Continue PR #187 on `feature/data-health-evidence-states`, now targeting main as the combined light UI and quote/data-health release candidate. Read this current top section and `docs/release/NOV22-RELEASE-CANDIDATE.md`. Verify all three exact-head PR CI workflows, then resolve the documented release-control blocker without silently reusing #180's exception. Preserve #185/#186. Telegram connection test is already confirmed; no duplicate sends, production database changes, keys retrieval or new polling.
+
+---
+
+**Historical checkpoints follow.**
+
+# Current continuation: public quote contract repair — 22 November 2026
+
+**This section supersedes historical instructions below.** The owner asked to fix provider issues and explicitly authorized a labeled production Telegram test. The test is now confirmed received by the owner's screenshot; do not send another.
+
+- Continue on `feature/data-health-evidence-states`, worktree `/workspace/ai-infra-watch-data-health`, [draft PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187), stacked against #186 (`fe8bde2916ebb4b746c717516155824a339b6d42`). Preserve original #185 (`c9db228`) and #186 heads and every other worktree. The merged #180 branch stays frozen for release attestations.
+- This continuation fixes the actual public quote controller, which was discarding metadata retained by the internal provider adapter. It reuses the shared Yahoo parser and mapping, keeps the public route Yahoo-only, preserves original cache timestamps and fails with bounded errors. No financial gate, credential-bearing fallback, polling, database, sender implementation or deployment control changed.
+- Read [the repair and Telegram evidence](PUBLIC-QUOTE-CONTRACT-REPAIR.md), [Data Health acceptance](EVIDENCE-CHANNEL-HEALTH.md), and [the reconciled backlog](PLAN-RECONCILIATION-2026-11-21.md).
+- Local checks: 1,115 Node tests, 28 focused mocked browser cases, TypeScript and QA build passed. Production build and security scan passed. Fresh exact-head CI must be recorded in the PR. Earlier green `1567b58` checks cover the prior candidate, not this new patch.
+- Production remains last-verified main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`; rollback `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. No merge or deployment is authorized by this continuation.
+- Telegram: PR #180's brief improvements are already deployed. The owner screenshot shows the labeled Settings connection test received at 08:55 Asia/Kolkata on November 22. The agent did not send it or retrieve production keys. Do not replay a digest slot or send a duplicate. Existing Settings tests omit a dedupe key and avoid outbox/database bookkeeping; intercepted regression tests verify that path.
+- Live limits: no matching recent quote/Telegram log entries, no successful direct Cloud connection to Yahoo, and no authenticated private provider packet. These are observability/access limits, not proof of a production vendor outage. The code-contract defect is independently reproduced and repaired offline. Source accuracy and complete accounting remain unverified.
+
+## Next concrete steps
+
+1. Verify the latest PR #187 head and both applicable workflows: Frontend CI (including security scan) and UI API DB Validation. Require the standalone main-only Security audit as well if later retargeting to main. Repair real regressions without weakening financial, identity, privacy, freshness or no-write guards.
+2. Review this combined candidate against #186. Keep both drafts unreleased until explicitly approved; the one-release exception for #180 is not reusable.
+3. After an approved release, verify the actual public quote metadata and protected redacted per-symbol diagnostics in an authenticated session before any further provider configuration change. Never manufacture metadata or accounting records to clear a gate.
+
+Resume prompt:
+
+> Continue AI Infra Watch on `feature/data-health-evidence-states` / draft PR #187. Read this current top section and `docs/release/PUBLIC-QUOTE-CONTRACT-REPAIR.md`. Verify exact-head CI and preserve #185/#186 and all other worktrees. The production Telegram connection test is already confirmed received by the owner's screenshot; do not resend it. No merge/deploy, secret retrieval, production database change or new polling without separate authorization.
+
+---
+
+**Historical checkpoints follow; they are not current operating instructions.**
+
+# Current continuation: evidence health recovery draft — 21 November 2026
+
+**This section supersedes historical instructions below.** The owner accepted the clean light direction and asked to move on. The next increment fixes misleading Data Health classifications and integrates the existing quote diagnostics without production changes.
+
+- Active: `feature/data-health-evidence-states`, Cloud worktree `/workspace/ai-infra-watch-data-health`. Its draft PR is stacked against `feature/light-workspace-redesign` (PR #186, base `fe8bde2916ebb4b746c717516155824a339b6d42`). Active draft: [PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187); its current exact-head checks are authoritative.
+- Preserved: PR #186 remains an independent UI draft at `fe8bde2`; PR #185 remains an independent quote-diagnostic draft at `c9db228aa878f14ad9c7f00af0006d838fdb1d3d`. Eight implementation/test/doc files from #185 are ported into this stacked candidate. Neither original branch or worktree is modified. The merged PR #180 branch and its release attestations remain frozen.
+- Production: main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v` as last verified after the completed PR #180 release. Previous rollback: `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` (`347240c7657af8a6f830b254e84bedc10f88d785`). Recheck live identities before any future release. No production action is authorized here.
+- Read [evidence health scope and acceptance](EVIDENCE-CHANNEL-HEALTH.md), [quote-diagnostic scope](QUOTE-ADMISSION-DIAGNOSTICS.md) and [the reconciled backlog](PLAN-RECONCILIATION-2026-11-21.md).
+- Changes: deterministic `evidenceChannelHealth.ts` and unit tests, DataHealth compact summary/recovery disclosure, quote admission projection and sample display from #185, fictional browser/quote fixtures and offline UI CI inclusion. Collection states never grant financial eligibility. No new API read, timer, vendor acquisition, schema or sender path.
+- Local verification: 1,096 Node tests; 36 focused browser checks, plus 14 final focus/refresh checks; 32 CI safety tests; TypeScript and QA build. Production build and staged security scan passed. Exact-head CI results belong in the draft PR. Do not treat earlier commits' checks as current-head proof.
+- Limitations: fixtures do not establish authentic source availability or complete accounting. The bounded quote sample remains SPY plus up to three holdings. Healthy means declared collection freshness, not correctness or complete financial history.
+
+## Next steps
+
+1. Verify this draft's exact head, diff and the two applicable CI families: Frontend CI (including its security scan) and UI API DB Validation. The standalone Security audit workflow targets main only and must run if this PR is later retargeted to main. Repair regressions without weakening the financial, quote-privacy, history/focus, source or no-write assertions.
+2. Review the rendered Data Health summary/recovery previews and the dependency on #186. Keep both drafts and production unchanged unless the owner explicitly requests a release. Do not reuse #180's one-release exception.
+3. The next data-recovery prerequisite is authenticated, read-only provider diagnostics by symbol, then a bounded fix supported by the provider's actual contract. Missing currency/security/session/time metadata cannot be invented. Authoritative returns still require complete broker/corporate-action/currency records.
+
+Resume prompt:
+
+> Continue AI Infra Watch on `feature/data-health-evidence-states`. Read the current top of `docs/release/CODEX-CONTINUATION.md` and `docs/release/EVIDENCE-CHANNEL-HEALTH.md`. Find its stacked draft PR and verify exact-head CI. Preserve PRs #185/#186 and every worktree. Use offline fictional fixtures. No merge, deployment, production Supabase changes, new live polling, secrets retrieval or Telegram send without separate authorization.
+
+---
+
+**Historical UI and release checkpoints follow; they are not current operating instructions.**
+
+# Current continuation: clean light workspace draft — 21 November 2026
+
+**This section supersedes all historical instructions below.** The owner disliked the dark app and selected **clean light workspace with fewer cards and clearer navigation**.
+
+- Active branch: `feature/light-workspace-redesign`, isolated Cloud worktree `/workspace/ai-infra-watch-light-ui`, based on main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. Active draft: [PR #186](https://github.com/Blitzer0007/ai-infra-watch/pull/186). Its checks are the authoritative exact-head CI evidence.
+- Production: PR #180 has already merged and deployed successfully. Public `https://ai-infra-watch-theta.vercel.app` was verified at READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. Prior rollback is `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2` (`347240c7657af8a6f830b254e84bedc10f88d785`). Recheck identities before any future release; do not execute historical PR #180 handoff instructions again.
+- Preserved draft PR #185: `feature/quote-admission-diagnostics`, head `c9db228aa878f14ad9c7f00af0006d838fdb1d3d`, separate quote-health worktree. It is excluded from this UI draft. PR #180's head is frozen for release attestations. All other worktrees and pending changes remain preserved.
+- UI changes: shared light CSS; shell/navigation/feed/search; Overview educational and readiness disclosures; flatter Portfolio navigation/summary, expandable indicators and directly available density controls; light auth/holding-dialog/PWA chrome. Financial/API/shared calculation files and release guards are unchanged. UI CI adds the previously omitted application-workspace test file.
+- Read [design scope, rendered fictional previews and acceptance](../design/LIGHT-WORKSPACE-REDESIGN.md).
+- Local verification: 1,085 Node tests, TypeScript, 57 focused mocked browser checks, 32 offline CI safety checks; the final mobile refinement reran and passed all 57 focused browser checks, including the all-workspace tests. Security audit and production build passed. CI evidence must match the latest exact branch head; inspect Frontend CI, Security audit and UI API DB Validation rather than assuming an earlier commit applies.
+- Full CI on the initial draft caught two legacy smoke assertions affected by sentence case and collapsed readiness details. The repair uses the visible Quality Lab heading and explicitly opens readiness before checking the same forecast /50 evidence, while adding an assertion that the incomplete-review warning stays visible. Financial assertions remain. Require fresh CI on this repair head; the earlier failed UI run is not validation.
+- No production integration or live portfolio correctness is claimed by fixture tests. Specialized research workflows retain existing behavior; this is an app-wide visual foundation with focused Overview/Portfolio simplification.
+
+## Next steps
+
+1. Verify PR #186's branch head, diff and all three applicable exact-head CI families. Repair any genuine regression without weakening financial, modal, history, source or no-write assertions.
+2. Review the desktop/mobile previews with the owner. Keep this branch draft and production unchanged until this new design has explicit release approval.
+3. If approved later, reconcile the independent PR #185 separately and use the current guarded release process. The completed one-release exception for PR #180 does not apply here. Do not change production Supabase, enable new live polling, retrieve secrets or send Telegram under this UI task.
+
+Pasteable resume prompt:
+
+> Continue AI Infra Watch on `feature/light-workspace-redesign`. Read the current top section of `docs/release/CODEX-CONTINUATION.md` and `docs/design/LIGHT-WORKSPACE-REDESIGN.md`. Inspect the branch's draft PR and exact-head CI. Preserve PR #185 and all worktrees. Continue the chosen clean light app-wide UI, using offline fictional fixtures; no merge, deployment, production database changes, new polling or Telegram send without separate approval.
+
+---
+
+**Historical checkpoints below are retained for provenance, not current operating instructions.**
+
 # Approved PR 180 release in progress · 21 November 2026
 
 The owner explicitly approved merging and deploying PR #180 using an exception limited to this release. The exception pins its branch and first parent `347240c7657af8a6f830b254e84bedc10f88d785`. The existing handoff will dispatch the guarded production workflow only after all required CI pass on its exact regular two-parent main merge. It retains staging, access gates, repeated commit checks and idempotent dispatch. Rollback is the currently live UI deployment `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. Live checks remain false.

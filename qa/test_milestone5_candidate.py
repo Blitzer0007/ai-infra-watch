@@ -100,3 +100,50 @@ def test_provenance_ready_label_never_certifies_accuracy_or_exposes_paths(page):
     expect(review).to_contain_text('Publisher receipts: not verified')
     expect(review).to_contain_text('Prospective holdout: not verified')
     assert 'sensitive-object-path' not in review.inner_text()
+
+
+@pytest.mark.parametrize('width',[360,768,1440])
+def test_sampled_prices_show_actual_quote_checks_and_last_close_scope(page,width):
+    import subprocess
+    import os
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    payload=json.loads(subprocess.check_output(['node','qa/fixtures/quote-health.fictional.mjs'],
+        cwd=root,env={'PATH':os.environ['PATH']},text=True))
+    mock_local_apis(page)
+    reads=[];writes=[];errors=[]
+    def reply(route):
+        reads.append(route.request.url)
+        route.fulfill(status=200,json=payload)
+    page.route('**/api/market?route=market-data-health*',reply)
+    page.on('request',lambda request:writes.append(request.url) if request.method not in ('GET','HEAD') else None)
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.set_viewport_size({'width':width,'height':1000})
+    page.goto('/health')
+    samples=page.get_by_test_id('market-provider-health')
+    bad=samples.get_by_test_id('market-sample-row').filter(has_text='BADT')
+    expect(bad.get_by_text('WITHHELD',exact=True)).to_be_visible()
+    expect(bad.get_by_test_id('sample-quote-admission')).to_contain_text('Only USD quotes are supported')
+    good=samples.get_by_test_id('market-sample-row').filter(has_text='FICT')
+    expect(good.get_by_test_id('sample-quote-admission')).to_contain_text('Passed for conditional valuation')
+    close=samples.get_by_test_id('market-sample-row').filter(has_text='OLDCL')
+    expect(close.get_by_text('LAST CLOSE',exact=True)).to_be_visible()
+    legacy=samples.get_by_test_id('market-sample-row').filter(has_text='LEGACY')
+    expect(legacy.get_by_test_id('sample-quote-admission')).to_contain_text('Unknown')
+    expect(legacy.get_by_text('PRIMARY',exact=True)).to_have_count(0)
+    expect(samples.get_by_test_id('market-observation-review')).to_contain_text('Quote checks withheld: 1')
+    expect(samples.get_by_test_id('market-observation-review')).to_contain_text('Quote checks unknown: 1')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    # React StrictMode replays mount effects in the development QA bundle.
+    # Both supported builds remain bounded to the initial effect reads.
+    page.wait_for_load_state('networkidle')
+    assert len(reads) in (1,2) and writes==[] and errors==[]
+
+
+def test_empty_market_sample_finishes_loading_with_unknown_coverage(page):
+    mock_local_apis(page)
+    page.route('**/api/market?route=market-data-health*',lambda route:route.fulfill(status=200,json={'ok':True,'rows':[]}))
+    page.goto('/health')
+    samples=page.get_by_test_id('market-provider-health')
+    expect(samples).to_contain_text('No sampled provider rows were returned. Coverage is unknown.')
+    expect(samples).not_to_contain_text('Loading market provider health')

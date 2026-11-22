@@ -109,8 +109,9 @@ def test_protected_staged_vercel_smoke_preserves_app_auth_checks():
     commands = staged['run']
     # Authenticate only at the Vercel protection layer, never disable SSO or
     # substitute a successful platform response for app-owned HTTP 401 gates.
-    assert commands.count('$(vercel curl "$BASE_URL/') == 3
-    assert commands.count(' -- --silent --show-error --max-time=20 ') == 3
+    # Three original homepage/auth/portfolio checks plus the fixed asset loop.
+    assert commands.count('$(vercel curl "$BASE_URL/') == 4
+    assert commands.count(' -- --silent --show-error --max-time=20 ') == 4
     assert 'vercel curl --silent --show-error --max-time 20' not in commands
     assert 'vercel curl "$BASE_URL/" --' in commands
     assert 'vercel curl "$BASE_URL/api/auth" --' in commands
@@ -150,3 +151,19 @@ def test_one_time_milestone5_handoff_waits_for_main_ci_and_preserves_manual_rele
     assert list(release[True]) == ["workflow_dispatch"]
     assert release["jobs"]["deploy"]["environment"] == "production"
     assert release[True]["workflow_dispatch"]["inputs"]["run_live_checks"]["default"] is False
+
+
+def test_nov22_release_keeps_pr_identity_and_checks_both_ui_assets_before_and_after_promotion():
+    workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
+    job = workflow['jobs']['deploy']
+    assert job['env']['AIW_RELEASE_PR'] == '187'
+    assert 'PR #187' in workflow[True]['workflow_dispatch']['inputs']['confirm_milestone5_unprotected_main_exception']['description']
+    steps = job['steps']
+    staged = next(step for step in steps if step['name'] == 'Check staged homepage and access gates')
+    public = next(step for step in steps if step['name'] == 'Verify production homepage')
+    for step, prefix in [(staged, 'staged'), (public, 'production')]:
+        assert 'for asset in assets/main.js assets/styles.css' in step['run']
+        assert 'test "$asset_status" = "200"' in step['run']
+        assert f'cmp --silent ".vercel/output/static/$asset" "/tmp/{prefix}-${{asset##*/}}"' in step['run']
+    assert 'vercel curl "$BASE_URL/$asset" --' in staged['run']
+    assert steps.index(staged) < next(i for i, step in enumerate(steps) if step['name'] == 'Promote the tested production build')

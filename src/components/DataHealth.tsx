@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Activity, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2, Database, Fingerprint } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { authFetch } from '../utils/apiAuth';
-import FreshnessBadge from './FreshnessBadge';
 import ForecastEvaluationLifecycle from './ForecastEvaluationLifecycle';
 import { summarizeForecastOperations } from '../utils/forecastOperationsReview';
 import { summarizeForecastEvidenceAdmissibility } from '../utils/forecastEvidenceAdmissibility';
 import { summarizeSchedulerFleet } from '../utils/schedulerFleetHealth';
 import { summarizeMarketObservation } from '../utils/marketObservationReview';
 import { summarizeHistoricalProvenance } from '../utils/historicalProvenanceReview';
+import { summarizeEvidenceChannels } from '../utils/evidenceChannelHealth';
+import type { EvidenceChannelState } from '../utils/evidenceChannelHealth';
 
 type Props = {
   evidenceAvailability: Record<string, any>;
@@ -25,6 +26,19 @@ const LABELS: Record<string, string> = {
   political: 'Political / policy',
   congress: 'Congress trades',
   macro: 'Macro risks'
+};
+
+const CHANNEL_TONES: Record<EvidenceChannelState, string> = {
+  healthy: 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5',
+  aging: 'text-amber-300 border-amber-400/20 bg-amber-400/5',
+  stale: 'text-amber-300 border-amber-400/20 bg-amber-400/5',
+  missing: 'text-rose-300 border-rose-400/20 bg-rose-400/5',
+  conflict: 'text-rose-300 border-rose-400/20 bg-rose-400/5',
+  failed: 'text-rose-300 border-rose-400/20 bg-rose-400/5',
+  fallback: 'text-amber-300 border-amber-400/20 bg-amber-400/5',
+  pending: 'text-sky-300 border-sky-400/20 bg-sky-400/5',
+  'not-applicable': 'text-white/45 border-white/10 bg-white/[.02]',
+  unknown: 'text-white/45 border-white/10 bg-white/[.02]',
 };
 
 function statusClass(status: string, stale?: boolean) {
@@ -47,45 +61,9 @@ function formatDuration(ms: unknown) {
 }
 
 export default function DataHealth({ evidenceAvailability, timestamp, isLoading, error, onRefresh }: Props) {
-  const entries = Object.entries(evidenceAvailability || {});
-
-  const sourceHealth = (item: any) => {
-    const status = String(item?.conflictStatus === 'CONFLICT' ? 'CONFLICT' : item?.status || 'NOT_FOUND');
-    if (status === 'NOT_FOUND') return { label: 'MISSING', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
-    if (status === 'PENDING') return { label: 'PENDING', tone: 'text-sky-300 border-sky-400/20 bg-sky-400/5' };
-    if (item?.freshness?.status === 'VERY_STALE' || item?.stale || status === 'STALE') return { label: 'Needs refresh', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
-    if (item?.freshness?.status === 'AGING') return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
-    if (status === 'CONFLICT') return { label: 'CONFLICT', tone: 'text-rose-300 border-rose-400/20 bg-rose-400/5' };
-    if (!item?.retrievedAt) return { label: status === 'AVAILABLE' ? 'HEALTHY' : status, tone: status === 'AVAILABLE' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]' };
-
-    const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
-    if (!Number.isFinite(ageMs)) return { label: 'UNKNOWN', tone: 'text-white/45 border-white/10 bg-white/[.02]' };
-
-    const ageSeconds = ageMs / 1000;
-    const cadence = Number(item?.refreshIntervalSeconds) > 0 ? Number(item.refreshIntervalSeconds) : null;
-    if (cadence && ageSeconds > cadence * 5) {
-      return { label: 'Needs refresh', tone: 'text-amber-300 border-amber-400/20 bg-amber-400/5' };
-    }
-    if (cadence && ageSeconds > cadence * 2) {
-      return { label: 'AGING', tone: 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' };
-    }
-    return { label: 'HEALTHY', tone: 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' };
-  };
-
-  const freshness = (item: any) => {
-    if (!item?.retrievedAt) return null;
-    const ageMs = Math.max(0, Date.now() - new Date(item.retrievedAt).getTime());
-    if (!Number.isFinite(ageMs)) return null;
-    const ageMinutes = Math.round(ageMs / 60000);
-    return ageMinutes < 1 ? 'just now' : ageMinutes + 'm ago';
-  };
-
-  const healthy = entries.filter(([, item]) => sourceHealth(item).label === 'HEALTHY').length;
-  const aging = entries.filter(([, item]) => sourceHealth(item).label === 'AGING').length;
-  const stale = entries.filter(([, item]) => sourceHealth(item).label === 'STALE').length;
-  const missing = entries.filter(([, item]) => sourceHealth(item).label === 'MISSING').length;
-  const conflicts = entries.filter(([, item]) => String(item?.status || '') === 'CONFLICT' || String(item?.conflictStatus || '') === 'CONFLICT').length;
-  const fallback = entries.filter(([, item]) => Boolean(item?.fallback)).length;
+  const channelReview = summarizeEvidenceChannels(evidenceAvailability, {loading: Boolean(isLoading), error: Boolean(error)});
+  const entries = channelReview.channels.map(channel => [channel.key, evidenceAvailability?.[channel.key], channel] as const);
+  const channelCount = (state: EvidenceChannelState) => channelReview.channels.filter(channel => channel.state === state).length;
   const [marketDataHealth, setMarketDataHealth] = useState<any>(null);
   const [marketDataHealthError, setMarketDataHealthError] = useState('');
   const [marketDataHealthReload, setMarketDataHealthReload] = useState(0);
@@ -195,17 +173,62 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         </button>
       </div>
 
-      {error && <div className="rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-200">{error}</div>}
+      <section aria-label="Data health summary" data-testid="evidence-channel-summary" className="space-y-3">
+        <h2 className="text-sm font-semibold">Evidence channels · {channelReview.state}</h2>
+        <p className="text-xs text-white/45">Collection freshness only. Healthy channels do not establish quote eligibility, complete accounting or source accuracy.</p>
+        {isLoading && <p role="status" className="text-xs text-white/50">Refreshing evidence; any displayed channel observations are from the previous response.</p>}
+        {error && <p role="alert" className="text-xs text-amber-300">Latest feed request failed. Previous channel records are unconfirmed.</p>}
+        {!channelReview.observed && !isLoading && !error && <p className="text-xs text-amber-300">No channel observations returned; coverage is unknown.</p>}
+        <dl className="grid grid-cols-2 gap-4 border-y border-white/10 py-4 sm:grid-cols-3 xl:grid-cols-6">
+          {[
+            ['healthy', 'Healthy', channelReview.healthy],
+            ['attention', 'Needs attention', channelReview.attention],
+            ['missing', 'Missing', channelReview.missing],
+            ['unknown', 'Unknown / pending', channelReview.unknown],
+            ['not-applicable', 'Not applicable', channelReview.notApplicable],
+            ['total', 'Reported channels', channelReview.total],
+          ].map(([key, label, value]) => <div key={key}>
+            <dt className="text-xs text-white/45">{label}</dt>
+            <dd data-testid={'channel-count-' + key} className="mt-1 text-xl font-semibold">{channelReview.observed || key === 'total' ? value : '—'}</dd>
+          </div>)}
+        </dl>
+        {channelReview.observed && <p data-testid="channel-attention-breakdown" className="text-xs text-white/45">
+          Needs refresh: {channelCount('stale')} · Aging: {channelCount('aging')} · Conflicts: {channelCount('conflict')} · Provider issues: {channelCount('failed')} · Fallbacks: {channelCount('fallback')} · Pending: {channelCount('pending')}
+        </p>}
+      </section>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3" aria-label="Data health summary">
-        <Metric label="Healthy" value={healthy} icon={<ShieldCheck className="w-4 h-4"/>}/>
-        <Metric label="Aging" value={aging} icon={<Activity className="w-4 h-4"/>}/>
-        <Metric label="Needs refresh" value={stale} icon={<Activity className="w-4 h-4"/>}/>
-        <Metric label="Missing" value={missing} icon={<ShieldAlert className="w-4 h-4"/>}/>
-        <Metric label="Conflicts" value={conflicts} icon={<ShieldAlert className="w-4 h-4"/>}/>
-        <Metric label="Fallbacks" value={fallback} icon={<RefreshCw className="w-4 h-4"/>}/>
-        <Metric label="Total channels" value={entries.length} icon={<ShieldAlert className="w-4 h-4"/>}/>
-      </div>
+      <details className="rounded-xl border border-white/10 bg-[#15181E]" aria-label="Evidence channel health">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Review channels and recovery steps</summary>
+        <div className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 border-b border-white/10 text-[9px] font-mono uppercase tracking-widest text-white/35">
+          <span>Evidence channel</span><span className="text-right">Status</span>
+        </div>
+        {!entries.length && <p className="p-4 text-xs text-white/45">No channel records to inspect.</p>}
+        {entries.map(([key, item, health]) => {
+          return (
+            <div key={key} data-testid={'evidence-channel-' + key} data-state={health.state} className="grid grid-cols-[1fr_auto] gap-3 items-center px-4 py-3 border-b border-white/5 last:border-0">
+              <div className="min-w-0">
+                <div className="text-xs font-bold">{LABELS[key] || key}</div>
+                <div className="text-[9px] text-white/30 mt-1 break-words">
+                  {Number.isSafeInteger(item?.count) && item.count >= 0 ? item.count + ' evidence items' : ''}
+                  {item?.source ? ' · ' + item.source : ''}
+                  {item?.provider ? ' · provider: ' + item.provider : ''}
+                  {health.retrievedAgeSeconds !== null ? ' · retrieved ' + Math.round(health.retrievedAgeSeconds / 60) + 'm ago' : ''}
+                  {typeof item?.refreshIntervalSeconds === 'number' && Number.isFinite(item.refreshIntervalSeconds) && item.refreshIntervalSeconds > 0 ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
+                  {item?.fallback ? ' · fallback' : ''}
+                  {item?.upstreamError ? ' · upstream issue' : ''}
+                </div>
+                <p className="mt-2 text-xs text-white/60">{health.reason}</p>
+                <p className="mt-1 text-xs text-white/45">Next: {health.nextStep}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + CHANNEL_TONES[health.state]}>
+                  {health.label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </details>
 
 
       <section className="rounded-2xl border border-white/10 bg-[#15181E] p-4" data-testid="market-provider-health">
@@ -213,7 +236,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
           <div>
             <div className="text-[9px] font-mono uppercase tracking-widest text-cyan-300">Market data integrity</div>
             <div className="text-sm font-black mt-1">Quote and historical-price providers</div>
-            <div className="text-[9px] text-white/30 mt-1">Samples SPY and the three largest holdings by cost basis. Raw-close history is distinguished from complete split/dividend-adjusted history.</div>
+            <div className="text-[9px] text-white/30 mt-1">Samples SPY and the three largest holdings by cost basis. Raw-close history is distinguished from complete split/dividend-adjusted history. Quote checks assess declared identity, currency, timing and session metadata. Accounting is assessed separately.</div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[8px] font-mono uppercase text-white/25">{marketDataHealth?.rows?.length ? marketDataHealth.rows.length + ' symbols sampled' : 'unavailable'}</span>
@@ -226,6 +249,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3 text-[9px] text-white/60" data-testid="market-observation-review" role="status">
           <div className="text-[10px] font-semibold text-white/80">Source lag & quota observations · {marketObservation.state.replaceAll('-', ' ')}</div>
           <div className="mt-1">Sampled: {marketObservation.sampleRows} · Quote missing: {marketObservation.quoteUnavailable} · Time unknown: {marketObservation.quoteTimeUnknown} · Quote aged &gt;15m: {marketObservation.quoteAged}</div>
+          <div className="mt-1">Quote checks withheld: {marketObservation.quoteWithheld} · Quote checks unknown: {marketObservation.quoteAdmissionUnknown}</div>
           <div className="mt-1">History missing: {marketObservation.historyUnavailable} · Date unknown: {marketObservation.historyDateUnknown} · Calendar age &gt;5d: {marketObservation.historyAged} · Adjusted incomplete: {marketObservation.adjustedIncomplete}</div>
           <div className="mt-1">Fallback rows: {marketObservation.fallbackRows} · Rate-limited attempts: {marketObservation.rateLimitedAttempts} · Remaining provider quota: unknown</div>
           <div className="mt-1 text-white/35">Ages are observational thresholds, not US trading-session freshness certification. Rate-limit attempts do not reveal plan limits or remaining quota. No new provider request is made for this summary.</div>
@@ -237,9 +261,14 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
             const stale = quote.stale || history.stale;
             const fallback = quote.fallbackUsed || history.fallbackUsed;
             const adjustedHistoryComplete = history.adjustedCloseAvailable === true && !history.futureDateDetected && Number(history.invalidDateCount || 0) === 0;
-            const label = stale ? 'STALE' : fallback ? 'FALLBACK' : quote.available && history.available && adjustedHistoryComplete ? 'PRIMARY' : 'PARTIAL';
-            const tone = stale ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
-            return <div key={row.symbol} className="rounded-xl border border-white/5 bg-black/10 p-3">
+            const admission = quote.valuationAdmission;
+            const withheld = admission?.eligible === false;
+            const lastClose = admission?.eligible === true && admission.status === 'last_close';
+            const primaryComplete = admission?.eligible === true && quote.available && history.available && adjustedHistoryComplete;
+            const label = withheld ? 'WITHHELD' : lastClose ? 'LAST CLOSE'
+              : stale ? 'STALE' : fallback ? 'FALLBACK' : primaryComplete ? 'PRIMARY' : 'PARTIAL';
+            const tone = (label === 'WITHHELD' || label === 'LAST CLOSE' || stale) ? 'text-amber-300 border-amber-400/20 bg-amber-400/5' : fallback ? 'text-yellow-200 border-yellow-400/20 bg-yellow-400/5' : label === 'PRIMARY' ? 'text-emerald-300 border-emerald-400/20 bg-emerald-400/5' : 'text-white/45 border-white/10 bg-white/[.02]';
+            return <div key={row.symbol} data-testid="market-sample-row" className="rounded-xl border border-white/5 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[10px] font-bold">{row.symbol}</span>
                 <span className={'px-2 py-1 rounded-full border text-[8px] font-mono uppercase ' + tone}>{label}</span>
@@ -252,6 +281,10 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 <span>Adjusted-close coverage: <b className={history.adjustedCloseAvailable ? 'text-emerald-300' : 'text-amber-200'}>{history.adjustedCoveragePct ?? 0}%</b> ({history.adjustedPointCount ?? 0}/{history.pointCount ?? 0})</span>
                 <span>Latest daily bar age: <b className="text-white/70">{history.ageDays == null ? '—' : history.ageDays + 'd'}</b></span>
               </div>
+              <div className="mt-2 text-xs text-white/70" data-testid="sample-quote-admission">
+                Quote checks: {quote.valuationAdmission?.eligible === true ? 'Passed for conditional valuation' : quote.valuationAdmission?.eligible === false ? 'Withheld' : 'Unknown'}
+                {Array.isArray(quote.valuationAdmission?.reasons) && <ul className="mt-1 space-y-1">{quote.valuationAdmission.reasons.map((reason: string, index: number) => <li key={index}>{reason}</li>)}</ul>}
+              </div>
               {(quote.providerAttempts?.length > 1 || history.providerAttempts?.length > 1) ? (
                 <div className="mt-2 text-[7px] font-mono text-white/25">
                   Attempts: {[...(quote.providerAttempts || []), ...(history.providerAttempts || [])].map((item: any) => item.provider + ':' + item.status + (item.errorCode ? '(' + item.errorCode + ')' : '')).join(' · ')}
@@ -259,7 +292,7 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
               ) : null}
             </div>;
           })}
-          {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">Loading market provider health…</div> : null}
+          {!marketDataHealth?.rows?.length && !marketDataHealthError ? <div className="text-[9px] font-mono text-white/30">{marketDataHealthLoaded ? 'No sampled provider rows were returned. Coverage is unknown.' : 'Loading market provider health…'}</div> : null}
         </div>
         {marketDataHealth?.retrievedAt && <div className="mt-2 text-[7px] font-mono text-white/20">Sample retrieved: {new Date(marketDataHealth.retrievedAt).toLocaleString()} · {marketDataHealth.cached ? 'cached summary' : 'live provider check'}</div>}
       </section>
@@ -525,40 +558,6 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
         {!forecastValidationError && <ForecastEvaluationLifecycle report={forecastValidation?.evaluationProtocol ?? null} status={forecastValidation?.evaluationProtocolStatus === 'ready' ? 'ready' : 'unavailable'} />}
       </section>
 
-      <div className="rounded-2xl border border-white/10 bg-[#15181E] overflow-hidden" aria-label="Evidence channel health">
-        <div className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 border-b border-white/10 text-[9px] font-mono uppercase tracking-widest text-white/35">
-          <span>Evidence channel</span><span className="text-right">Status</span>
-        </div>
-        {entries.map(([key, item]) => {
-          const status = String(item?.status || 'NOT_FOUND');
-          const health = sourceHealth(item);
-          return (
-            <div key={key} className="grid grid-cols-[1fr_auto] gap-3 items-center px-4 py-3 border-b border-white/5 last:border-0">
-              <div className="min-w-0">
-                <div className="text-xs font-bold">{LABELS[key] || key}</div>
-                <div className="text-[9px] text-white/30 mt-1 break-words">
-                  {item?.count != null ? item.count + ' evidence items' : ''}
-                  {item?.source ? ' · ' + item.source : ''}
-                  {item?.provider ? ' · provider: ' + item.provider : ''}
-                  {freshness(item) ? ' · last retrieved ' + freshness(item) : ''}
-                  {item?.refreshIntervalSeconds ? ' · cadence ' + Math.round(item.refreshIntervalSeconds / 60) + 'm' : ''}
-                  {item?.fallback ? ' · fallback' : ''}
-                  {item?.upstreamError ? ' · upstream issue' : ''}
-                  {item?.lastRefreshStatus ? ' · refresh ' + item.lastRefreshStatus : ''}
-                  {item?.lastRefreshError ? ' · refresh error: ' + item.lastRefreshError : ''}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className={'px-2 py-1 rounded-full border text-[9px] font-mono uppercase ' + health.tone}>
-                  {health.label}
-                </span>
-                {key === 'market' && <FreshnessBadge marketTime={item?.marketTime} retrievedAt={item?.retrievedAt} asOf={item?.asOf} stale={item?.stale} showAge={false} />}
-                <span className="text-[8px] font-mono uppercase text-white/20">{status}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[0.03] p-4 text-[10px] text-white/45 leading-5">
         <div className="font-mono uppercase tracking-widest text-cyan-300/70 mb-2">JEV interpretation rule</div>

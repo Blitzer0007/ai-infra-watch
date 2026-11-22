@@ -42,7 +42,6 @@ export default function WorkspaceNavigation({activeView, onNavigate, variant}: P
       return <section key={group.id} aria-label={group.label + ' workspaces'} className="aiw-nav-group min-w-0">
         <div className="aiw-nav-group-label flex items-center justify-between gap-2 px-3 pb-2">
           <span>{group.label}</span>
-          <span aria-label={pages.length + ' destinations'}>{String(pages.length).padStart(2, '0')}</span>
         </div>
         <div className="space-y-1">
           {pages.map(page => {
@@ -56,7 +55,6 @@ export default function WorkspaceNavigation({activeView, onNavigate, variant}: P
                 (selected ? 'aiw-nav-entry--active' : '')}>
               <Icon aria-hidden="true" size={18} className="shrink-0 opacity-80"/>
               <span className="min-w-0 flex-1">{page.label}</span>
-              {selected && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300"/>}
             </button>;
           })}
         </div>

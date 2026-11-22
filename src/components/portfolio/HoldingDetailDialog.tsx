@@ -51,7 +51,7 @@ export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,
       });
     };
   },[]);
-  return createPortal(<dialog ref={dialog} aria-labelledby={heading} aria-describedby={description} data-testid="holding-detail-dialog" className="aiw-holding-dialog" onCancel={event=>{event.preventDefault();onClose();}} onKeyDown={(event:KeyboardEvent<HTMLDialogElement>)=>{
+  return createPortal(<dialog ref={dialog} aria-labelledby={heading} aria-describedby={description} data-testid="holding-detail-dialog" className="aiw-holding-dialog aiw-light-workspace" onCancel={event=>{event.preventDefault();onClose();}} onKeyDown={(event:KeyboardEvent<HTMLDialogElement>)=>{
     if(event.key!=='Tab')return;
     const root:HTMLDialogElement|null=dialog.current;if(!root)return;
     const controls=Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]')).filter(node=>{

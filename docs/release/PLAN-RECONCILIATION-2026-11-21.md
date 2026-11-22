@@ -1,3 +1,17 @@
+# November 22 continuation
+
+The active draft #187 now repairs the public quote HTTP controller's metadata/normalization mismatch with the internal Yahoo adapter. The owner supplied direct screenshot evidence that the labeled production Telegram connection test arrived at 08:55 IST; the agent did not resend it. The #180 brief changes were already deployed. Authentic per-symbol provider availability, complete accounting and sufficient twenty-day forecast outcomes remain open. See [current repair evidence](PUBLIC-QUOTE-CONTRACT-REPAIR.md). Production is unchanged by this draft.
+
+---
+
+# Current progress after the PR #180 release — 21 November 2026
+
+This update supersedes historical release-state references below. PR #180 has shipped at main `529e9562`; PR #186 is the tested clean light UI draft, and PR #185 is the separate tested quote-admission diagnostic draft. The current stacked `feature/data-health-evidence-states` candidate integrates those diagnostics with the light UI and fixes collection-health states, misleading stale totals, unknown metadata, failed-refresh handling and recovery guidance. It remains unreleased. See [current acceptance](EVIDENCE-CHANNEL-HEALTH.md) and [continuation](CODEX-CONTINUATION.md).
+
+The next data prerequisites remain authentic read-only provider failure observations, bounded provider-contract repairs, and complete broker/currency/corporate-action evidence. Issuer/Event Risk Radar acquisition, frozen-evidence model usefulness comparisons and authentic forecast outcomes remain pending. Offline implementation and green CI do not close those live-evidence gaps. No overall completion percentage or new release is claimed.
+
+---
+
 # Product plan reconciliation — 21 November 2026
 
 The five milestone releases describe increments of deployed code. The original Release 2 backlog also requires source acquisition, complete accounting evidence, operational acceptance and measured model usefulness. Those requirements remain open even where offline implementations pass.

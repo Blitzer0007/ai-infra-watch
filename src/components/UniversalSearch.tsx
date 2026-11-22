@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ArrowRight, Command, Plus, X } from 'lucide-react';
+import { Search, ArrowRight, Plus, X } from 'lucide-react';
 import { STOCK_METADATA } from '../data';
 import { STOCK_UNIVERSE_SYMBOLS } from '../utils/stockUniverse';
 import { rankSearchResults } from '../utils/search';
@@ -126,9 +126,7 @@ export default function UniversalSearch({ onNavigate }: UniversalSearchProps) {
           <Search className="w-4 h-4 shrink-0" />
           <span className="truncate">Search pages, companies or tickers…</span>
         </span>
-        <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-mono text-white/25 border border-white/10 rounded px-1.5 py-1">
-          <Command className="w-3 h-3" />K
-        </span>
+        <kbd className="aiw-search-key hidden sm:inline-flex">⌘ K</kbd>
       </button>
 
       {open && (

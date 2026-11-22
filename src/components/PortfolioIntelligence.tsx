@@ -847,22 +847,21 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   return (
     <div className="space-y-6" data-testid="portfolio-intelligence">
       <p data-testid="portfolio-accounting-status" className="text-xs text-amber-200">Loaded-record calculations only · full history unverified. Unsupported P&amp;L and historical portfolio comparisons are withheld.</p>
-      <div className="aiw-page-header sticky top-0 z-30 -mx-2 px-2 py-3 flex flex-wrap items-end justify-between gap-3 bg-[#0F1115]/95 backdrop-blur-md border-b border-white/10">
-        <div>
-          <div className="text-[10px] font-mono tracking-[.2em] uppercase text-emerald-400">AI INFRA WATCH / PORTFOLIO INTELLIGENCE</div>
-          <div className="text-2xl font-black mt-2">Portfolio Overview &amp; Decisions</div>
-          <div className="text-xs text-white/45 mt-1">Your holdings · live prices · performance · risks · evidence · market comparisons</div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-mono text-white/40">
-          <span className="px-2 py-1 rounded-full border border-white/10">LIVE PRICES {stressFreshCount}/{analyses.length}</span>
-          {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
-          <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">ADD OPPORTUNITIES {addReviews}</span>
-          <span className="px-2 py-1 rounded-full border border-white/10">RISK CHECKS {riskReviews}</span>
-          <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
-            <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
-            <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
+      <div className="aiw-portfolio-statusbar">
+        <h1 className="sr-only">Portfolio Overview &amp; Decisions</h1>
+        <details className="aiw-portfolio-indicators text-xs">
+          <summary className="cursor-pointer font-medium">Portfolio indicators</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-mono text-white/40">
+            <span className="px-2 py-1 rounded-full border border-white/10">LIVE PRICES {stressFreshCount}/{analyses.length}</span>
+            {selectedAnalysis && <FreshnessBadge {...(livePrices[selectedAnalysis.symbol] || {})} labelOverride={selectedAnalysis.liveStale ? 'Last close' : undefined} showAge />}
+            <span className="px-2 py-1 rounded-full border border-white/10">UP TODAY {breadthPositive}/{breadthCoverage}</span>
+            <span className="px-2 py-1 rounded-full border border-white/10">ADD OPPORTUNITIES {addReviews}</span>
+            <span className="px-2 py-1 rounded-full border border-white/10">RISK CHECKS {riskReviews}</span>
           </div>
+        </details>
+        <div className="flex items-center rounded-lg border border-white/10 bg-white/[.02] p-0.5" aria-label="Portfolio view density">
+          <button type="button" onClick={() => changeViewMode('simple')} aria-pressed={viewMode === 'simple'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'simple' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Simple</button>
+          <button type="button" onClick={() => changeViewMode('detailed')} aria-pressed={viewMode === 'detailed'} className={'px-2 py-1 rounded text-[9px] uppercase ' + (viewMode === 'detailed' ? 'bg-white text-black' : 'text-white/45 hover:text-white')}>Detailed</button>
         </div>
       </div>
 
