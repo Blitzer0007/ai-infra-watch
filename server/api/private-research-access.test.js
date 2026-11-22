@@ -7,6 +7,8 @@ process.env.AIW_ACCESS_TOKEN = 'fictional-private-session';
 process.env.CRON_SECRET = 'fictional-private-cron';
 process.env.SUPABASE_URL = 'https://fictional-private-storage.invalid';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fictional-storage-key';
+const sessionHeader = () => 'Bearer ' + process.env.AIW_ACCESS_TOKEN;
+const schedulerHeader = () => 'Bearer ' + process.env.CRON_SECRET;
 const {default: forecast} = await import('./forecast-verification.js?private-access-regression');
 const {default: quality} = await import('./ai-quality.js?private-access-regression');
 test.after(() => { for (const name of names) { if (original[name] === undefined) delete process.env[name]; else process.env[name] = original[name]; } });
@@ -37,13 +39,13 @@ test('authenticated model/quality reads and existing scheduler authentication st
   };
   try {
     const model = response();
-    await forecast({method: 'GET', query: {ticker: 'FICT', horizon: '5'}, headers: {authorization: 'Bearer fictional-private-session'}}, model);
+    await forecast({method: 'GET', query: {ticker: 'FICT', horizon: '5'}, headers: {authorization: sessionHeader()}}, model);
     assert.equal(model.output.status, 200); assert.equal(model.output.body.model, 'analogue-v1');
     const history = response();
-    await quality({method: 'GET', query: {}, headers: {authorization: 'Bearer fictional-private-session'}}, history);
+    await quality({method: 'GET', query: {}, headers: {authorization: sessionHeader()}}, history);
     assert.equal(history.output.status, 200);
     const scheduler = response();
-    await forecast({method: 'GET', query: {}, headers: {authorization: 'Bearer fictional-private-cron'}}, scheduler);
+    await forecast({method: 'GET', query: {}, headers: {authorization: schedulerHeader()}}, scheduler);
     assert.equal(scheduler.output.status, 200);
     assert(calls.length >= 3); assert(calls.every(method => method === 'GET'));
   } finally {globalThis.fetch = before;}
