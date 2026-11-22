@@ -1,3 +1,29 @@
+# Current continuation: public quote contract repair — 22 November 2026
+
+**This section supersedes historical instructions below.** The owner asked to fix provider issues and explicitly authorized a labeled production Telegram test. The test is now confirmed received by the owner's screenshot; do not send another.
+
+- Continue on `feature/data-health-evidence-states`, worktree `/workspace/ai-infra-watch-data-health`, [draft PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187), stacked against #186 (`fe8bde2916ebb4b746c717516155824a339b6d42`). Preserve original #185 (`c9db228`) and #186 heads and every other worktree. The merged #180 branch stays frozen for release attestations.
+- This continuation fixes the actual public quote controller, which was discarding metadata retained by the internal provider adapter. It reuses the shared Yahoo parser and mapping, keeps the public route Yahoo-only, preserves original cache timestamps and fails with bounded errors. No financial gate, credential-bearing fallback, polling, database, sender implementation or deployment control changed.
+- Read [the repair and Telegram evidence](PUBLIC-QUOTE-CONTRACT-REPAIR.md), [Data Health acceptance](EVIDENCE-CHANNEL-HEALTH.md), and [the reconciled backlog](PLAN-RECONCILIATION-2026-11-21.md).
+- Local checks: 1,115 Node tests, 28 focused mocked browser cases, TypeScript and QA build passed. Production build and security scan passed. Fresh exact-head CI must be recorded in the PR. Earlier green `1567b58` checks cover the prior candidate, not this new patch.
+- Production remains last-verified main `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`, READY `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`; rollback `dpl_7tAgXVLtXbF3Zhh9u2Ac7J3kLDE2`. No merge or deployment is authorized by this continuation.
+- Telegram: PR #180's brief improvements are already deployed. The owner screenshot shows the labeled Settings connection test received at 08:55 Asia/Kolkata on November 22. The agent did not send it or retrieve production keys. Do not replay a digest slot or send a duplicate. Existing Settings tests omit a dedupe key and avoid outbox/database bookkeeping; intercepted regression tests verify that path.
+- Live limits: no matching recent quote/Telegram log entries, no successful direct Cloud connection to Yahoo, and no authenticated private provider packet. These are observability/access limits, not proof of a production vendor outage. The code-contract defect is independently reproduced and repaired offline. Source accuracy and complete accounting remain unverified.
+
+## Next concrete steps
+
+1. Verify the latest PR #187 head and both applicable workflows: Frontend CI (including security scan) and UI API DB Validation. Require the standalone main-only Security audit as well if later retargeting to main. Repair real regressions without weakening financial, identity, privacy, freshness or no-write guards.
+2. Review this combined candidate against #186. Keep both drafts unreleased until explicitly approved; the one-release exception for #180 is not reusable.
+3. After an approved release, verify the actual public quote metadata and protected redacted per-symbol diagnostics in an authenticated session before any further provider configuration change. Never manufacture metadata or accounting records to clear a gate.
+
+Resume prompt:
+
+> Continue AI Infra Watch on `feature/data-health-evidence-states` / draft PR #187. Read this current top section and `docs/release/PUBLIC-QUOTE-CONTRACT-REPAIR.md`. Verify exact-head CI and preserve #185/#186 and all other worktrees. The production Telegram connection test is already confirmed received by the owner's screenshot; do not resend it. No merge/deploy, secret retrieval, production database change or new polling without separate authorization.
+
+---
+
+**Historical checkpoints follow; they are not current operating instructions.**
+
 # Current continuation: evidence health recovery draft — 21 November 2026
 
 **This section supersedes historical instructions below.** The owner accepted the clean light direction and asked to move on. The next increment fixes misleading Data Health classifications and integrates the existing quote diagnostics without production changes.

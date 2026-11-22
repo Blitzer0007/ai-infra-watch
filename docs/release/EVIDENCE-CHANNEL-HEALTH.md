@@ -1,5 +1,7 @@
 # Evidence channel health and recovery context
 
+Current follow-on: [public quote HTTP contract repair and confirmed Telegram test](PUBLIC-QUOTE-CONTRACT-REPAIR.md), 22 November. This extends the same draft #187; the earlier validation figures below describe its initial increment.
+
 21 November 2026 · `feature/data-health-evidence-states` · [Draft PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187)
 
 ## Problem and result
