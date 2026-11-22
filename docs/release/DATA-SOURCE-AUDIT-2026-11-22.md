@@ -1,5 +1,7 @@
 # Data sources, missing charts and Agent Reach review
 
+**Code follow-up:** the later #188 increment adds the explicit authenticated SEC dossier connection described in [SEC-DOSSIER-CONNECTION.md](SEC-DOSSIER-CONNECTION.md). The null-request finding below describes the audited earlier head; it is now repaired in the draft with offline tests. No live certification, deployment or Opportunities eligibility change follows from that connection. Other findings retain their original audit scope.
+
 22 November 2026 · draft PR #188 · production remains PR #187, main `978ccefac76e36fa24e4b35cab2f1a08cbaca899`.
 
 ## Findings

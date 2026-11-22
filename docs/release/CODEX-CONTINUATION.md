@@ -1,4 +1,22 @@
-# Current continuation: workspace, private-access and source recovery — 22 November 2026
+# Current continuation: manual SEC dossier connection — 22 November 2026
+
+This section supersedes the previous #188 verification-next-step text below. PR #187 remains production; #188 remains a draft development candidate.
+
+- Active branch/worktree: `feature/read-only-health-snapshot`, `/workspace/ai-infra-watch-health-snapshot`, draft https://github.com/Blitzer0007/ai-infra-watch/pull/188 against main. Previous head `bb9b96bdaeeafaeb101d5ba0c27ae8ef236b84e3` passed all seven applicable workflows. The new SEC increment requires its own exact-head checks; do not reuse those older results.
+- Read [SEC-DOSSIER-CONNECTION.md](SEC-DOSSIER-CONNECTION.md). The company dossier now has an explicit authenticated read action using fixed SEC directory/submissions/companyfacts URLs, declared issuer consistency, retained-source financial admission and bounded period selection. Source authenticity/security class, valuation/trading eligibility and accounting authority remain unverified. Opportunities classification/financial eligibility is not changed.
+- Source requests occur only after the manual button. Private access and valid configured EDGAR contact are required. No production config was inspected/changed and no live SEC request was made. Process-local concurrency/budget/cache limits are documented; they are not distributed quotas. No background polling, model call, DB write or message is added.
+- Changed files: new shared SEC connector, server source-loader/private action and regression tests; existing company-scale dispatcher, HoldingCompanyDossier/CompanyDossier and company research browser suite; fictional fixtures. Existing dark theme and all previous #188 repairs are preserved.
+- Local checks passed: 1,144 Node tests, TypeScript, security scan, 31 dossier/navigation/Milestone 3/4 browser cases, eight manual-connection cases including an added attempt-limit test, and 34 production-build/offline safety checks. The first connector test exposed missing earlier cash coverage when selecting only the newest instant; bounded period selection was corrected. Browser test ordering and explicit memo/reference typing were corrected without weakening gates. Final current-head CI/results belong in the PR description and Cloud evidence after push.
+- Production remains main `978ccefac76e36fa24e4b35cab2f1a08cbaca899`, last verified deployment `dpl_BxDnHxX17q5mXVjLntaUtU4fazV6`. PR #187's exception is consumed. No #188 merge/deploy is authorized. Preserve every previous worktree/frozen branch. Telegram test was already confirmed; do not resend it.
+- Next: finish exact-head CI, then continue authentic listing/security-class and financial integration for Opportunities, shared provider budgets/compatible adjusted history, and original broker precision/timezone/full-history evidence. Do not manufacture classifications, timestamps, shares, source authority or account returns. Agent Reach remains reviewed but uninstalled; no AI activation or new polling.
+
+Resume prompt:
+
+> Continue AI Infra Watch on feature/read-only-health-snapshot / draft PR #188. Read this top section and SEC-DOSSIER-CONNECTION.md. Recheck the latest head and all applicable CI; bb9b96b's seven green workflows cover the earlier candidate only. Preserve dark/theme/source/private-access repairs and all old worktrees. The new manual SEC dossier connection is offline-tested, not live-certified or deployed. Production remains #187. No merge, deployment, production DB modification, secret retrieval/display, live polling, model activation or duplicate Telegram message.
+
+---
+
+# Historical continuation: workspace, private-access and source recovery — 22 November 2026
 
 **This section supersedes the historical pre-release instructions below. PR #187 is already deployed; do not deploy or merge it again.**
 

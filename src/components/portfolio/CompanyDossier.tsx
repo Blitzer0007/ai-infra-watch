@@ -1,4 +1,4 @@
-import {useId,useState} from 'react';
+import {useId,useMemo,useState} from 'react';
 import type {CompanyFinancialObservation,FinancialObservationRequest} from '../../utils/companyFinancialObservations';
 import {DOSSIER_SECTIONS,dossierObservations,dossierStatusLabels,dossierIssueLabels,formatDossierValue,type DossierSection} from '../../utils/companyDossier';
 import {statementRows} from '../../utils/dossierStatements';
@@ -15,20 +15,22 @@ export default function CompanyDossier({symbol,configuredName,request,statements
   const [section,setSection]=useState<DossierSection>('Overview');
   const [annualChoice,setAnnualChoice]=useState<{scope:string;period:string}|null>(null);
   const id=useId(),panel=id+'-panel',heading=id+'-heading';
-  const reviewed=reviewDossierOperating(symbol,request,statements,operations);
+  const reviewed=useMemo<ReturnType<typeof reviewDossierOperating>>(()=>reviewDossierOperating(symbol,request,statements,operations),[symbol,request,statements,operations]);
   const {snapshot,status}=reviewed.financials;
   const annual=reviewed.operating;
+  const loadedCount=(snapshot?.observations.length??0)+reviewed.valuation.statementAdmission.snapshots.reduce((n,s)=>n+s.observations.length,0)+annual.sourceRows.length;
+  const displayStatus=loadedCount?'partial':status;
   const annualPeriod=annualChoice?.scope===annual.scope&&annual.periods.some(p=>p.key===annualChoice.period)?annualChoice.period:'';
   const rows=dossierObservations(snapshot,section);
   const valuationReview=reviewed.valuation;
   const {statementAdmission}=valuationReview;
   const balanceInputs=statementRows(statementAdmission,'Financial health'),valuationInputs=statementRows(statementAdmission,'Valuation');
-  const references=[...new Map((snapshot?.observations??[]).flatMap(o=>o.references.map(ref=>[ref.accession,ref] as const))).values()];
+  const references=[...new Map<string,CompanyFinancialObservation['references'][number]>((snapshot?.observations??[]).flatMap(o=>o.references.map(ref=>[ref.accession,ref] as const))).values()];
   return <section aria-label={symbol+' company dossier'} data-testid="company-dossier" className="min-w-0 space-y-4 rounded-xl border border-cyan-200/25 p-4 text-sm text-white/80">
     <header className="space-y-2">
       <p className="font-semibold text-cyan-100">{fictional?'Fictional preview · ':''}{symbol} company dossier</p>
       {configuredName&&<p className="break-words">{configuredName} · {fictional?'invented company':'name from app configuration'}</p>}
-      <p role="status" data-testid="dossier-source-status">{dossierStatusLabels[status]}. Source coverage and issuer verification remain unverified.</p>
+      <p role="status" data-testid="dossier-source-status">{dossierStatusLabels[displayStatus]}. Source coverage and issuer verification remain unverified.</p>
       {fictional&&<p className="rounded-lg border border-amber-200/30 p-3 font-semibold text-amber-100">Fictional data only. These are invented financial statements, not a real issuer or your holdings. Every populated figure below is a demonstration.</p>}
       <p>Read-only research · no accounting reconciliation or decision eligibility is granted.</p>
       {statementAdmission.status!=='not-connected'&&<p role={statementAdmission.status==='invalid'?'alert':'status'} data-testid="dossier-statement-status">{statementAdmission.status==='conditional'?'Additional statement inputs: partial, bound declarations.':statementAdmission.status==='invalid'?'Additional statement inputs withheld.':'Additional statement inputs need data.'} {statementAdmission.reason}</p>}
@@ -41,14 +43,14 @@ export default function CompanyDossier({symbol,configuredName,request,statements
       <h3 id={heading} className="text-lg font-semibold">{section}</h3>
       {section==='Overview'&&<>
         <p>Business description unavailable. No verified business model, customer mix or issuer profile is connected to this dossier.</p>
-        <dl className="grid gap-2 sm:grid-cols-2"><dt>Supported loaded observations</dt><dd>{snapshot?.observations.length??0} · {snapshot?.observations.length?'partial coverage':'coverage not established'}</dd><dt>Financial source</dt><dd>{dossierStatusLabels[status]}</dd><dt>Issuer / source verification</dt><dd>Unverified</dd><dt>Trading or allocation decision</dt><dd>Withheld</dd></dl>
+        <dl className="grid gap-2 sm:grid-cols-2"><dt>Supported loaded observations</dt><dd>{loadedCount} · {loadedCount?'partial coverage; declarations may overlap':'coverage not established'}</dd><dt>Financial source</dt><dd>{dossierStatusLabels[displayStatus]}</dd><dt>Issuer / source verification</dt><dd>Unverified</dd><dt>Trading or allocation decision</dt><dd>Withheld</dd></dl>
         <p>Choose a section to inspect supported observations and missing inputs. Holding returns, analyst targets and model opinions are not substitutes for company financial statements.</p>
         {statementAdmission.status==='conditional'&&<p>Additional statement observations: {statementAdmission.snapshots.reduce((n,s)=>n+s.observations.length,0)}. Values retain their own dates, units and share bases; no totals or multiples are calculated.</p>}
       </>}
       {(section==='Growth'||section==='Financial health')&&<>
         <p>{section==='Growth'?'Annual-duration declarations and their supported comparisons; no growth forecast is supplied.':'Declared cash flows and point-in-time balances; no overall financial-health rating is inferred.'}</p>
-        {section==='Growth'&&<p className="[&_button]:min-h-11"><FinancialTerm termId="eps-growth"/> needs compatible earnings periods and share bases. No EPS-growth calculation is connected here.</p>}
-        {!rows.length&&<p>No supported observations loaded for this section. This does not mean zero revenue, zero cash flow or a healthy balance sheet.</p>}
+        {section==='Growth'&&<p className="[&_button]:min-h-11"><FinancialTerm termId="eps"/> growth needs compatible earnings periods and share bases. No EPS-growth calculation is connected here.</p>}
+        {!rows.length&&<p>No core comparison observations loaded for this section. Separate statement declarations may appear below; missing figures do not mean zero revenue, zero cash flow or a healthy balance sheet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">{rows.map(row=><Observation key={row.id} row={row} fictional={fictional}/>)}</div>
         {section==='Financial health'&&<><DossierStatementCards rows={balanceInputs} fictional={fictional}/><p>{balanceInputs.length?'Cash and individual borrowing declarations are shown where supported. Total interest-bearing debt, lease scope and component overlap remain unverified; components are not summed.':'Cash and interest-bearing debt are unavailable.'} Total liabilities / equity is a different measure from debt / equity.</p></>}
         <DossierOperatingPanel view={annual} section={section} period={annualPeriod} onPeriod={period=>setAnnualChoice({scope:annual.scope,period})} fictional={fictional}/>
@@ -62,7 +64,7 @@ export default function CompanyDossier({symbol,configuredName,request,statements
       {section==='Catalysts'&&<><p>No company event feed is connected to this dossier. Upcoming-event coverage is unknown; this is not a claim that no events exist.</p><p>Confirmed, estimated, cancelled and date-only events require their own source evidence before they can appear here.</p></>}
       {section==='Risks'&&<><p>No evidence-backed company risk assessment is connected. Financial gaps and unverified sources cannot establish a low-risk result.</p><ul className="list-disc space-y-2 pl-5"><li>Source authenticity and ticker-to-issuer mapping remain unverified.</li><li>Full statement coverage, fiscal labels and adjustment basis are incomplete.</li><li>Amendments and restatements need original filing evidence.</li><li>These declarations do not authorize trades or reconcile account history.</li></ul></>}
       {section==='Sources'&&<>
-        <p>Source status: {dossierStatusLabels[status]}. Loaded metadata is not publisher authentication.</p>
+        <p>Source status: {dossierStatusLabels[displayStatus]}. Loaded metadata is not publisher authentication.</p>
         {snapshot&&<dl className="grid min-w-0 gap-2 break-words sm:grid-cols-2"><dt>Declared source</dt><dd>SEC EDGAR companyfacts</dd><dt>Declared issuer CIK</dt><dd>{snapshot.cik} · mapping unverified</dd><dt>Declared retrieval</dt><dd>{[...new Set(snapshot.observations.map(o=>o.retrievedAt))].join(' · ')||'Unavailable'}</dd><dt>Assessed at</dt><dd>{snapshot.assessedAt}</dd><dt>Projection activity</dt><dd>0 provider / model / database calls · acquisition usage unknown</dd></dl>}
         {!!snapshot?.issues.length&&<ul className="list-disc space-y-2 pl-5">{snapshot.issues.map(code=><li key={code}>{dossierIssueLabels[code]??'A financial input requires review.'}</li>)}</ul>}
         {!references.length&&<p>No supported filing references loaded. The absence of references is not an empty filing history.</p>}

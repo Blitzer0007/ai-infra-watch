@@ -1,5 +1,8 @@
 """Configured watchlist research stays distinct from holdings; all APIs intercepted."""
 import json
+import os
+import subprocess
+from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 from test_release2 import fictional_portfolio
@@ -13,6 +16,80 @@ def readonly(page):
  assert errors==[] and writes==[]
 
 def workspace(page):return page.get_by_test_id('company-research-workspace')
+
+def sec_packet(symbol='DEMO'):
+ root=Path(__file__).resolve().parents[1]
+ return json.loads(subprocess.check_output(['node','qa/fixtures/sec-dossier.fictional.mjs',symbol],cwd=root,env={'PATH':os.environ['PATH']},text=True))
+
+@pytest.mark.parametrize('width,theme',[(390,'dark'),(1440,'light')])
+def test_manual_sec_connection_populates_original_declarations_without_background_calls(page,width,theme):
+ fictional_portfolio(page);page.set_viewport_size({'width':width,'height':1000})
+ page.add_init_script(f'localStorage.setItem("aiw-ui-theme-v1",{json.dumps(theme)});sessionStorage.setItem("aiw_access_token_v1","fictional-sec-browser-session");')
+ calls=[]
+ def respond(route):
+  calls.append(route.request)
+  route.fulfill(status=200,json=sec_packet())
+ page.route('**/api/company-scale?action=dossier&symbol=*',respond)
+ page.goto('/portfolio?portfolio_tab=research&research_symbol=DEMO')
+ research=workspace(page);research.get_by_text('Company dossier',exact=True).click()
+ expect(research.get_by_test_id('company-dossier')).to_be_visible();assert calls==[]
+ research.get_by_role('button',name='Load SEC financial declarations',exact=True).click()
+ expect(research.get_by_test_id('sec-dossier-connection')).to_contain_text('CIK 0000000001')
+ expect(research.get_by_test_id('dossier-source-status')).to_contain_text('Partial loaded declarations')
+ assert len(calls)==1 and calls[0].method=='GET'
+ assert calls[0].headers.get('authorization')=='Bearer fictional-sec-browser-session'
+ dossier=research.get_by_test_id('company-dossier')
+ dossier.get_by_role('button',name='Growth',exact=True).click()
+ expect(dossier).not_to_contain_text('Definition unavailable')
+ dossier.get_by_test_id('dossier-operating-panel').locator('summary').first.click()
+ dossier.get_by_role('combobox').select_option(index=1)
+ expect(dossier).to_contain_text('Net income (loss)')
+ expect(dossier).to_contain_text('-8 USD')
+ dossier.get_by_role('button',name='Financial health',exact=True).click();expect(dossier).to_contain_text('Cash and cash equivalents')
+ dossier.get_by_role('button',name='Valuation',exact=True).click();expect(dossier).to_contain_text('Valuation multiples unavailable')
+ research.get_by_text('Company dossier',exact=True).click();research.get_by_text('Company dossier',exact=True).click()
+ page.wait_for_load_state('networkidle');assert len(calls)==1
+ assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+ research.get_by_role('combobox',name='Research company',exact=True).select_option('FICT')
+ expect(research.get_by_test_id('sec-dossier-connection')).to_have_count(0)
+
+@pytest.mark.parametrize('status,code,expected',[(401,'PRIVATE','Sign in again'),(503,'CONTACT_NOT_CONFIGURED','SEC contact configuration'),(429,'RATE_LIMITED','rate limited'),(502,'UNRECOGNIZED','acquisition is unavailable')])
+def test_manual_sec_failures_are_bounded_and_do_not_retry(page,status,code,expected):
+ fictional_portfolio(page);calls=[]
+ def respond(route):
+  calls.append(route.request.url);route.fulfill(status=status,json={'ok':False,'code':code,'error':'private-upstream-detail'})
+ page.route('**/api/company-scale?action=dossier&symbol=*',respond)
+ page.goto('/portfolio?portfolio_tab=research&research_symbol=DEMO')
+ research=workspace(page);research.get_by_text('Company dossier',exact=True).click()
+ research.get_by_role('button',name='Load SEC financial declarations',exact=True).click()
+ expect(research.get_by_role('alert')).to_contain_text(expected)
+ expect(research).not_to_contain_text('private-upstream-detail');expect(research.get_by_test_id('sec-dossier-connection')).to_have_count(0)
+ page.wait_for_load_state('networkidle');assert len(calls)==1
+
+def test_manual_sec_packet_for_another_issuer_cannot_populate_dossier(page):
+ fictional_portfolio(page)
+ page.route('**/api/company-scale?action=dossier&symbol=*',lambda route:route.fulfill(status=200,json=sec_packet('FICT')))
+ page.goto('/portfolio?portfolio_tab=research&research_symbol=DEMO')
+ research=workspace(page);research.get_by_text('Company dossier',exact=True).click()
+ research.get_by_role('button',name='Load SEC financial declarations',exact=True).click()
+ expect(research.get_by_role('alert')).to_contain_text('failed issuer or input checks')
+ expect(research.get_by_test_id('dossier-source-status')).to_contain_text('Financial source not connected')
+
+def test_manual_sec_attempt_limit_and_symbol_change_do_not_reuse_old_issuer(page):
+ fictional_portfolio(page);calls=[]
+ def respond(route):
+  calls.append(route.request.url);route.fulfill(status=502,json={'ok':False,'code':'NO_DATA'})
+ page.route('**/api/company-scale?action=dossier&symbol=*',respond)
+ page.goto('/portfolio?portfolio_tab=research&research_symbol=DEMO')
+ research=workspace(page);research.get_by_text('Company dossier',exact=True).click()
+ button=research.get_by_role('button',name='Load SEC financial declarations',exact=True)
+ for i in range(3):
+  button.click();expect(research.get_by_role('alert')).to_contain_text('was not available')
+ expect(button).to_be_disabled();assert len(calls)==3
+ research.get_by_role('combobox',name='Research company',exact=True).select_option('FICT')
+ research.get_by_text('Company dossier',exact=True).click()
+ expect(research.get_by_role('button',name='Load SEC financial declarations',exact=True)).to_be_enabled()
+ expect(research).to_contain_text('0/3 attempts')
 
 def test_opportunity_to_unheld_dossier_and_explicit_rescan_retains_filters(page):
  fictional_portfolio(page)
