@@ -1,3 +1,23 @@
+# Current continuation: NVIDIA-first role routing and PR #188 release preparation — 22 November 2026
+
+This section supersedes the earlier no-release-preparation text below. The owner requested different free-model choices and a production release, then selected **NVIDIA first**. Development/release preparation is authorized; a new PR #188-specific exception to deferred protection controls is still pending. Do not merge under PR #187's consumed approval.
+
+- Active Cloud worktree `/workspace/ai-infra-watch-health-snapshot`, branch `feature/read-only-health-snapshot`, draft https://github.com/Blitzer0007/ai-infra-watch/pull/188 against main. Preserve every older worktree and frozen release branch. Prior `2b0adc85d31a32a19e0fd3f48ac467f6ac836848` passed all seven applicable workflows; current edits require fresh exact-head CI.
+- Read [MULTI-MODEL-COUNCIL.md](MULTI-MODEL-COUNCIL.md) and [PR188-RELEASE-CANDIDATE.md](PR188-RELEASE-CANDIDATE.md). Adds explicit Bull/Bear/Judge model routing, NVIDIA-first candidate profile and optional zero-price OpenRouter adapter. No random router, paid fallback, redirect or automatic retry. Existing budgets/controlled output/evidence/abstention/false-authority gates remain intact. Production/Vercel rejects configuration and calls; council UI stays absent from production. JEV is still a separate manual counts-only action.
+- Owner-selected NVIDIA-first profile: openai/gpt-oss-20b, qwen/qwen3-next-80b-a3b-instruct, meta/llama-3.3-70b-instruct. Official NVIDIA model references were checked; availability, quota, latency, billing and usefulness are not established. Dedicated COUNCIL_NVIDIA_API_KEY was absent by name-only check. Do not inspect/copy production or shared legacy credentials. Configure a dedicated Cloud development secret before live probing; never ask for keys in chat. Agent Reach remains uninstalled.
+- New probe script defaults to offline fictional evidence and a deterministic protocol fixture; explicit --live still requires all development opt-ins and dedicated credentials. Receipts contain only role/model/latency/usage/cost metadata. Unknown costs stay unknown. No live inference was run.
+- Local checks passed: 1,151 Node tests, 105 Python role/council/admission cases, 33 offline CI/release-safety checks, TypeScript/security/whitespace and production build. Council/navigation mocked suite passed 33 cases with its production-only case skipped then separately passed on the production bundle. Legacy/multi-model browser relay plus JEV counts passed two targeted cases. Production all-workspace no-passive-write smoke passed.
+- Prepared #188 guard/handoff pins direct first parent/current main `978ccefac76e36fa24e4b35cab2f1a08cbaca899`, source branch and actual merged head; rollback/current READY `dpl_BxDnHxX17q5mXVjLntaUtU4fazV6`. Public alias was independently confirmed there. Team/project remain the intended AI Infra Watch identities. Manual release/waiver defaults stay NO, live checks false, exact-main CI/staging/access/asset/rollback checks retained. No PR #188 owner exception has been granted yet. Automatic domain-assignment state was not exposed by the project metadata tool; reverify before any approved merge.
+- Next: complete current-head CI and record exact links in the PR and Cloud Markdown, then ask for the concrete #188-only protection exception as the final release decision. Do not mark ready/merge/stage/promote until resolved. After approval, complete regular merge, exact-main CI, pinned handoff/staging checks, promotion and final evidence. Live agents, DB changes, polling and Telegram sends remain out of scope.
+
+Resume:
+
+> Continue AI Infra Watch draft #188 on feature/read-only-health-snapshot. Read MULTI-MODEL-COUNCIL.md and PR188-RELEASE-CANDIDATE.md. The owner chose NVIDIA first; dedicated development key is not configured and no live inference ran. Verify the latest exact-head CI. Production remains #187 at 978ccefac / dpl_BxDnHxX17q5mXVjLntaUtU4fazV6. Complete release preparation, then obtain the new explicit #188-only exception before merging to unprotected main. Preserve all work; do not reuse #187 approval, inspect secrets, activate models/polling, modify production DB or send Telegram messages.
+
+---
+
+Historical checkpoints follow.
+
 # Current continuation: Opportunities financial review — 22 November 2026
 
 This section supersedes the earlier #188 next-step text below. Production remains PR #187; no new release is authorized.

@@ -156,8 +156,8 @@ def test_one_time_milestone5_handoff_waits_for_main_ci_and_preserves_manual_rele
 def test_nov22_release_keeps_pr_identity_and_checks_both_ui_assets_before_and_after_promotion():
     workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
     job = workflow['jobs']['deploy']
-    assert job['env']['AIW_RELEASE_PR'] == '187'
-    assert 'PR #187' in workflow[True]['workflow_dispatch']['inputs']['confirm_milestone5_unprotected_main_exception']['description']
+    assert job['env']['AIW_RELEASE_PR'] == '188'
+    assert 'PR #188' in workflow[True]['workflow_dispatch']['inputs']['confirm_milestone5_unprotected_main_exception']['description']
     steps = job['steps']
     staged = next(step for step in steps if step['name'] == 'Check staged homepage and access gates')
     public = next(step for step in steps if step['name'] == 'Verify production homepage')

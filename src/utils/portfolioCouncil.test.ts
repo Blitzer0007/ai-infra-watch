@@ -7,6 +7,15 @@ import {adaptSecCouncilFacts} from '../../server/utils/councilSecAdapter.js';
 import {councilDevelopmentEnabled,councilJevEnvelope} from '../../shared/portfolioCouncilContract.js';
 const fixture=JSON.parse(readFileSync('aitracker-upload/data/research/council-ui-case.json','utf8'));
 const secFacts=()=>JSON.parse(readFileSync('qa/fixtures/council-sec.fictional.json','utf8'));
+test('multi-model mode crosses the strict wire contract without granting evidence or action authority',()=>{
+  const value={...structuredClone(fixture.result),mode:'multi-model'};
+  const payload={mode:'loaded',packet:{contract_version:'portfolio-council-v1',run_id:value.run_id,symbol:value.symbol,horizon_months:value.horizon_months,assessed_at:value.assessed_at,evidence:value.evidence}};
+  assert.equal(councilEnvelope(value,payload),true);
+  assert.equal(councilEnvelope({...value,grants_decision_eligibility:true},payload),false);
+  const state=councilCoverageState(value);
+  assert.equal(state.mode,'multi-model');assert(councilPayload({mode:'jev',run_id:value.run_id,state}));
+  assert.equal(councilPayload({mode:'jev',run_id:value.run_id,state:{...state,provider_key:'private'}}),null);
+});
 test('actual Python fixture validates; fixture cannot gain decision authority or evidence eligibility',()=>{
   assert.equal(councilEnvelope(fixture.result,fixture.request),true);
   for(const patch of [{sends_messages:true},{disposition:'balanced'},{symbol:'NVDA'},{unexpected:'private'},{run_id:'different'}])assert.equal(councilEnvelope({...fixture.result,...patch},fixture.request),false);

@@ -183,7 +183,7 @@ class PortfolioCouncil:
         snapshot_id = hashlib.sha256(packet.model_dump_json().encode()).hexdigest()
         result = {"contract_version": VERSION, "presentation_version": PRESENTATION_VERSION, "run_id": packet.run_id, "snapshot_id": snapshot_id,
                   "symbol": packet.symbol, "horizon_months": packet.horizon_months, "assessed_at": packet.assessed_at,
-                  "mode": "fixture" if getattr(self.model, "mode", None) == "fixture" else "nvidia" if getattr(self.model, "mode", None) == "nvidia" else "unconfigured",
+                  "mode": getattr(self.model, "mode", None) if getattr(self.model, "mode", None) in ("fixture", "nvidia", "multi-model") else "unconfigured",
                   "status": "unavailable", "termination_reason": "model-not-configured", "disposition": "insufficient-evidence",
                   "quality": quality, "roles": {}, "trace": [], "evidence": [row.model_dump(mode="json") for row in packet.evidence],
                   "usage": {"model_calls": 0, "tool_calls": 0, "prompt_chars": 0, "output_token_limit_per_call": MAX_OUTPUT_TOKENS, "provider_requests": 0, "jev_calls": 0},
@@ -276,7 +276,7 @@ class PortfolioCouncil:
                     raise CouncilStopped("step-budget")
             result["status"], result["termination_reason"] = "complete", "completed"
             judge = result["roles"]["judge"]
-            if result["mode"] == "nvidia" and not quality["missing_families"] and not quality["conflicting_ids"] and all(result["roles"][side]["claims"] for side in ("bull", "bear")) and all(claim["evidence_id"] in quality["usable_ids"] for side in ("bull", "bear") for claim in result["roles"][side]["claims"]):
+            if result["mode"] in ("nvidia", "multi-model") and not quality["missing_families"] and not quality["conflicting_ids"] and all(result["roles"][side]["claims"] for side in ("bull", "bear")) and all(claim["evidence_id"] in quality["usable_ids"] for side in ("bull", "bear") for claim in result["roles"][side]["claims"]):
                 result["disposition"] = {"bull": "provisional-bull", "bear": "provisional-bear", "balanced": "balanced", "insufficient": "insufficient-evidence"}[judge["preference"]]
         except CouncilStopped as error:
             result["status"], result["termination_reason"] = "partial", str(error)

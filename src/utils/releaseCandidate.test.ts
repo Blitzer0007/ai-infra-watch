@@ -413,6 +413,18 @@ test('approved PR 187 exception is limited to its direct reviewed light/quote me
   ]) assert.throws(()=>verifyMilestone5Exception({...input,...patch}));
 });
 
+test('prepared PR 188 path requires explicit waiver and its exact direct merge; PR 187 authorization cannot match',()=>{
+  const pr={number:188,merged:true,state:'closed',merge_commit_sha:SHA,base:{ref:'main'},
+    head:{ref:'feature/read-only-health-snapshot',sha:M5_HEAD,repo:{full_name:RELEASE_REPOSITORY}}};
+  const commit={sha:SHA,parents:[{sha:'978ccefac76e36fa24e4b35cab2f1a08cbaca899'},{sha:M5_HEAD}]};
+  const input={expectedSha:SHA,waiver:M5_PROTECTION_EXCEPTION,pr,commit};
+  assert.equal(verifyMilestone5Exception(input),true);
+  for(const patch of [{waiver:null},{pr:{...pr,number:187}},{pr:{...pr,merged:false}},
+    {pr:{...pr,head:{...pr.head,ref:'feature/data-health-evidence-states'}}},
+    {commit:{...commit,parents:[{sha:'529e956254bc73c12ed8d7f4ffa6510f9b3d4442'},{sha:M5_HEAD}]}},
+    {commit:{...commit,parents:[commit.parents[0]]}}])assert.throws(()=>verifyMilestone5Exception({...input,...patch}));
+});
+
 test('explicit PR 187 selection independently checks PR identity and ancestry', async () => {
   const urls:string[]=[];
   const fetcher:typeof fetch=async input=>{

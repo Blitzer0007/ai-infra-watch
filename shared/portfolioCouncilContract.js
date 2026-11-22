@@ -41,7 +41,7 @@ export function councilPayload(v) {
 }
 export function councilCoverageSummary(s) {
   return exact(s,['contract_version','mode','observed_count','usable_count','missing_families','conflict_count','bull_claim_count','bear_claim_count','role_count','judge_abstained'])&&
-    s.contract_version==='council-coverage-v1'&&s.mode==='nvidia'&&integer(s.observed_count,8)&&integer(s.usable_count,s.observed_count)&&integer(s.conflict_count,8)&&integer(s.bull_claim_count,4)&&integer(s.bear_claim_count,4)&&s.role_count===3&&typeof s.judge_abstained==='boolean'&&array(s.missing_families,4,f=>families.includes(f))&&new Set(s.missing_families).size===s.missing_families.length;
+    s.contract_version==='council-coverage-v1'&&['nvidia','multi-model'].includes(s.mode)&&integer(s.observed_count,8)&&integer(s.usable_count,s.observed_count)&&integer(s.conflict_count,8)&&integer(s.bull_claim_count,4)&&integer(s.bear_claim_count,4)&&s.role_count===3&&typeof s.judge_abstained==='boolean'&&array(s.missing_families,4,f=>families.includes(f))&&new Set(s.missing_families).size===s.missing_families.length;
 }
 export function councilJevEnvelope(v,payload) {
   return exact(v,['contract_version','run_id','available','coverage','next_check','input_tokens','error_code','grants_decision_eligibility'])&&
@@ -52,7 +52,7 @@ export function councilJevEnvelope(v,payload) {
 const resultKeys=['contract_version','presentation_version','run_id','snapshot_id','symbol','horizon_months','assessed_at','mode','status','termination_reason','disposition','quality','roles','trace','evidence','usage','policy','source_authenticity_verified','forecast_validity_established','grants_decision_eligibility','changes_allocation','sends_messages'];
 export function councilEnvelope(v, payload) {
   if(!exact(v,resultKeys)||v.contract_version!=='portfolio-council-v1'||v.presentation_version!==COUNCIL_PRESENTATION_VERSION||v.run_id!==(payload.mode==='demo'?payload.run_id:payload.packet.run_id)||
-    !/^[a-f0-9]{64}$/.test(v.snapshot_id)||!['fixture','nvidia','unconfigured'].includes(v.mode)||
+    !/^[a-f0-9]{64}$/.test(v.snapshot_id)||!['fixture','nvidia','multi-model','unconfigured'].includes(v.mode)||
     !['complete','partial','failed','unavailable'].includes(v.status)||!['completed','budget','tool-budget','step-budget','model-or-contract-error','model-not-configured'].includes(v.termination_reason)||
     !['insufficient-evidence','provisional-bull','provisional-bear','balanced'].includes(v.disposition)||
     ['source_authenticity_verified','forecast_validity_established','grants_decision_eligibility','changes_allocation','sends_messages'].some(k=>v[k]!==false))return false;

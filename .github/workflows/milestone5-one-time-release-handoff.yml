@@ -1,8 +1,9 @@
-name: PR 187 Light UI and Quote Release Handoff
-run-name: One-time PR 187 release handoff • ${{ github.event.workflow_run.head_sha }}
+name: PR 188 Repair Release Handoff
+run-name: One-time PR 188 release handoff • ${{ github.event.workflow_run.head_sha }}
 
 # The GitHub connector cannot start workflow_dispatch. For this explicitly
-# authorized PR #187 light UI/quote release only, a successful exact-main QA run can
+# prepared PR #188 release only, after its separate owner approval and merge,
+# a successful exact-main QA run can
 # dispatch the existing manual guarded production workflow. This workflow
 # itself has no Vercel credentials and no production environment access.
 on:
