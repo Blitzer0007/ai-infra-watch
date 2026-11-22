@@ -1,4 +1,5 @@
 import DataTable from './DataTable';
+import { authFetch } from '../utils/apiAuth';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -246,7 +247,7 @@ export default function AIQualityLab() {
         'Return one compact line per case using exactly: CATEGORY | ADVERSARIAL PROMPT | EXPECTED DEFENSE.',
         'Do not include answers, secrets, or harmful operational instructions.',
       ].join('\n');
-      const res = await fetch('/api/agent-ask', {
+      const res = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: prompt }),
@@ -289,7 +290,7 @@ export default function AIQualityLab() {
     setBusy(true);
     setMessage('');
     try {
-      const res = await fetch('/api/agent-ask', {
+      const res = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: selected.prompt }),

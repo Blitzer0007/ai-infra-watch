@@ -166,6 +166,7 @@ export default function Settings() {
     <div className="space-y-6" id="settings-view">
       <div className="aiw-page-header border-b border-white/10 pb-5">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">System preferences</span>
+        <p className="mt-2 text-xs text-white/55">Browser preferences stay on this device. To update server alerts, review and save them explicitly in <a href="/watchlist" className="underline">Watchlist</a>.</p>
         <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white mt-1">Settings</h1>
         <p className="text-xs text-white/50 max-w-3xl mt-2 leading-relaxed">
           Control what appears on your dashboard, how notifications behave, and which market-data connection the app uses.

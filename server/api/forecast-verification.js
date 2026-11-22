@@ -1,4 +1,5 @@
 import { createPublicKey, createVerify } from 'node:crypto';
+import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, requireAdjustedHistory } from '../../api/_market-data.js';
 import { hasFreshMarketHistory } from '../utils/forecastHistoryGuard.js';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
@@ -798,6 +799,7 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true, verification, learning, learningRun, modelEvaluation, modelSelectionGate });
     }
 
+    if (!requireAccess(req, res)) return;
     if (req.method === 'GET') {
       const ticker = String(req.query?.ticker || '').trim().toUpperCase();
       const horizon = Number(req.query?.horizon);

@@ -1,0 +1,76 @@
+# Data sources, missing charts and Agent Reach review
+
+22 November 2026 · draft PR #188 · production remains PR #187, main `978ccefac76e36fa24e4b35cab2f1a08cbaca899`.
+
+## Findings
+
+Market-data dependence is concentrated on Yahoo, especially public browser quotes and adjusted history. The app is not using Yahoo for every information category. Several unavailable features are disconnected integrations or deliberately withheld calculations, so replacing Yahoo would not restore them.
+
+This is a code-path audit of the 17 workspaces, offline integration tests, and the read-only production metadata/aggregate observations recorded in NOV22-SCREENSHOT-RECOVERY.md. It is not a live per-provider health certification. No API keys, private row values or browser sessions were retrieved. A provider listed in code is not proof that its credentials, plan entitlements or current endpoint work in production.
+
+## Market paths and concentration
+
+| Path | Implemented source / fallback | What is still missing |
+| --- | --- | --- |
+| Browser quote strip, holding marks and browser alert inputs | `src/utils.ts` → public `server/api/quote.js`: Yahoo-only when no browser-supplied Finnhub key is used. The controller metadata repair shipped in #187. | Public quote fallback is not the same as the protected internal router. Do not add credential-bearing providers to an unauthenticated route. Prefer an authenticated, bounded server route after reviewing quotas and equivalent metadata. The legacy direct browser Finnhub-key path is not the recommended future integration. |
+| Internal Decision Center, digest, Data Health and company history | `api/_market-data.js`: Yahoo → Finnhub → Alpha Vantage, with attempt/error metadata and memory cache. | Credential availability and entitlements were not inspected. Fallback transport success does not establish compatible units, returned identity, timing, adjustment basis or source rights. |
+| Split/dividend-adjusted history | Yahoo includes declared adjusted-close observations; `requireAdjustedHistory` rejects incomplete/stale/raw-only packets. | Current Finnhub and Alpha adapters explicitly produce `adjusted:false`, `adjustedPrice:null`, and unknown currency/exchange. They cannot replace Yahoo for consumers requiring adjusted data. A compatible historical provider/adapter needs independent validation. |
+| Server alerts / re-entry quote history / signal-scorecard history | Separate Yahoo call sites in `server/utils/serverAlertQuote.js`, `server/api/reentry-alerts.js` and `server/api/signal-scorecard.js`. | These paths do not automatically inherit the generic router's fallback chain. Consolidation needs consumer-specific session, adjustment and no-duplicate-delivery tests; do not activate new monitoring while refactoring. |
+| Portfolio account-return charts | Market histories plus original broker transactions, full account/corporate-action coverage and accounting reconciliation. | `calculateLoadedTradingPerformance` deliberately returns `accountingReconciled:false`; PortfolioIntelligence supplies no transactions to account-history reconstruction until that authority exists. There is currently no production path here that certifies full history. These charts remain withheld even if individual market histories load. |
+| Individual holding price chart and high-water displays | Existing `company-scale?action=history` route, separate from account-return reconstruction. | Must distinguish returned raw price history, source freshness/metadata, and sufficient points. It is not an account P&L chart. The browser cache currently reduces histories to date/price; carrying complete provenance into chart consumers remains a follow-up. |
+
+## Workspace-by-workspace audit
+
+| Workspace | Main dependency | Explanation / required work |
+| --- | --- | --- |
+| Overview | Decision Center, stored holdings/transactions, routed quotes, forecast/signal summaries, earnings | Quote coverage, accounting, configured rule evaluation and allocation prompts are independent. #188 groups issue causes, distinguishes horizon counts and last-close marks, and removes unsupported blank benchmark tiles. Original ledger and rule-history inputs remain prerequisites. |
+| Opportunities | Frozen loaded quotes and configured company names; optional manual JEV assessment | Scanner currently constructs every company with `assetClass:'unknown'` and passes no connected financial observations/listing provenance. Quote success cannot make this scan eligible. Build authentic issuer/listing and financial adapters; do not mark config names verified. #188 repairs the missing `opportunities` JEV kind, not the financial acquisition gap. |
+| Catalyst Calendar | Already-loaded catalyst snapshot built from existing earnings/news/contract observations | Empty returned events do not establish comprehensive event coverage. Verify publisher, time, issuer and revisions; public X acquisition is not connected through Agent Reach. |
+| Alert Inbox | Local detections and explicitly loaded protected delivery ledger | A transport receipt does not verify an event or prove the user read it. No resend/replay performed. Source and delivery coverage must be inspected separately. |
+| Portfolio Intelligence | Broker store, public quote marks, company history, conditional ledger review | Unsupported original quantity precision, execution timestamp formats, derived records and full-history authority block accounting. The candidate explains why market histories can load while account-return charts stay withheld. |
+| Watchlist | Loaded market/feed data, existing rules and persisted signal reviews | Rule state rows do not prove successful mathematical evaluations. Price-trigger sources and independent signal validation remain separate. |
+| JEV Portfolio Lab | Protected lab endpoints, recorded data and explicit research operations | Model configuration/usefulness remains unverified. Bull/Bear/Judge UI and NVIDIA adapter remain development-only; no autonomous production activation. |
+| Forward Outlook | Company history, analyst/earnings sources, forecasts and optional agent review | Some agent calls omitted session auth. #188 aligns them with the protected route. Forecast storage now requires private access; opening the page no longer uploads legacy browser forecasts automatically. Device-only rows remain local and are not displayed as server-confirmed. |
+| Contracts | SEC filings/company primary sources plus search discovery leads | News/search leads are not confirmed contracts. Check original filings/issuer releases and economic terms. Yahoo is not the contract source. |
+| Progress Tracker | `company-scale` history, milestone discovery and company search | Incomplete acquisition or conflicting source dates can withhold progress assessments. A timeline UI does not prove construction progress. |
+| Congress Trades | Public Bargo feed, DataDawn fallback and cache in `api/congress-trades.js` | This is not Yahoo. Disclosure dates, transaction dates, amendment/issuer mapping and feed coverage need distinct checks. Cache/fallback labels cannot establish complete disclosure coverage. |
+| Macro & Politics | GDELT/news search, official policy pages/Federal Register and loaded macro observations | RSS/search/official-source retrieval and issuer exposure evidence can fail independently. Missing feed items are not a low-risk result. |
+| AI Research | Protected agent proxy and configured research backend/tools | A deployed UI does not prove backend/tool/model readiness. Use bounded read-only probes and allowlisted evidence; no live research/model request was executed in this audit. |
+| AI Quality Lab | Protected agent calls and persisted quality runs | Several manual agent calls omitted auth. #188 sends the existing private session and protects quality history/storage routes. Synthetic/golden success does not verify financial data or model investment usefulness. |
+| Data Health | Collection declarations, bounded internal provider sample, job/forecast/archive observations | Sampled transport health is not full portfolio eligibility or public Yahoo endpoint verification. The candidate adds explicit path scope and redacted local reports. |
+| Help & Guide | Static glossary/help plus optional protected agent call | The manual guide request omitted session auth; repaired in #188. The glossary is not a market-data source. |
+| Settings | Local preferences and explicit existing connectivity controls | Theme preference is local-only. No new Telegram test was sent; the owner's earlier test is already confirmed. Do not retrieve credentials to diagnose configuration. |
+
+## Repairs in this candidate
+
+1. Keep dark/light mode, grouped diagnostics and JEV endpoint fixes from the first #188 increment.
+2. Performance/Evidence/detailed Overview now request holdings plus SPY/QQQ/SOXX histories; the full `MONEY_ROTATION_SYMBOLS` universe is requested only for the Rotation tab. Each view batch permits at most three in-flight history loads and stops starting queued work after leaving the view. This removes unrelated provider fan-out from account performance. Existing caching/in-flight deduplication stays in place; this is not an account-wide quota and no polling is added.
+3. Replace unconditional “HISTORY READY” with observed returned-history counts or missing/partial states. Add a source-vs-accounting explanation and direct navigation to the existing holding charts. Empty account charts state the accounting prerequisite rather than implying a provider outage.
+4. Use the existing private session for Help/AI Quality/Forward Outlook agent requests and private quality/forecast requests. Guard quality and non-scheduler forecast routes with the same private-access helper. Scheduler authorization is preserved. Offline tests reject anonymous reads/writes before any storage/model access.
+5. Remove the page-open legacy forecast POST migration. Browser rows are preserved locally; explicit saves retain earlier local records within the existing bounded cache. No local row is silently presented as persisted.
+6. Remove the production-only alert-config POST on application mount/config events and the second passive Watchlist sync. These could write device defaults to server settings merely by opening the app and were skipped by the QA-mode guard. Watchlist now has an explicit save control with a scoped payload, a replacement explanation and response status. Editing device preferences and navigating do not save server monitoring settings; no new monitor or sender is activated.
+
+## Agent Reach assessment
+
+Reviewed [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach) at commit `c70ae6da5d39bc90e09ad2ae0575ccc89f31e284`, package version 1.6.1, MIT, Python >=3.10. Inspection covered package metadata and the web, Twitter and Xueqiu channel source. README capability claims are not proof of live operation. No installation, upstream execution, cookie/session copying or remote channel request was performed.
+
+- [Web channel](https://github.com/Panniantong/Agent-Reach/blob/c70ae6da5d39bc90e09ad2ae0575ccc89f31e284/agent_reach/channels/web.py): Jina Reader / Exa fallback discovery and reading. Potentially useful for finding issuer IR pages, event leads and primary documents when existing tools cannot access them. Retain original URL, publisher/time, issuer binding and retrieval evidence; search text alone cannot become a financial observation.
+- [Twitter/X channel](https://github.com/Panniantong/Agent-Reach/blob/c70ae6da5d39bc90e09ad2ae0575ccc89f31e284/agent_reach/channels/twitter.py): explicitly **experimental**, OpenCLI plus Node/Chrome and an authenticated dedicated browser. Could support a later bounded manual public-account research trial, including the requested Aravind monitoring, but does not provide reliable unattended acquisition by itself. A fresh isolated Cloud session would be required; do not import the user's Windows browser/cookies.
+- [Xueqiu channel](https://github.com/Panniantong/Agent-Reach/blob/c70ae6da5d39bc90e09ad2ae0575ccc89f31e284/agent_reach/channels/xueqiu.py): optional quotes/community data. The quote action prefers Tencent with Xueqiu API fallback. The inspected channel is not a compatible adjusted historical-series/broker ledger provider. Adding it would not clear accounting or backtest requirements.
+- Runtime fit: a separately isolated Codex Cloud research environment is the appropriate evaluation location. Persistent dedicated-browser state and optional CLI dependencies do not belong inside the current stateless production API path. REA remains useful for feature mirroring; Agent Reach addresses acquisition reach. Neither establishes source truth or accounting authority.
+
+## Prioritized remaining implementation
+
+1. Review and release the current UI/auth/contract repairs through a separately authorized exact-commit process. PR #187's exception is consumed; no merge/deploy is authorized here.
+2. Establish the original broker precision and execution-timezone contract, reconcile derived inputs and complete history, and prepare an exact reviewable repair candidate. Do not round transactions or assume a timezone from the viewer's location.
+3. Connect authentic issuer/listing and SEC financial observations to Opportunities and the dossier, with original source references, periods/units and explicit partial/error states. Existing SEC helpers are not automatically wired into those views.
+4. Add an authenticated quote route/provider strategy with equivalent identity/session/currency/time metadata, bounded per-request/account budgets and rate-limit behavior. Verify actual supported plan coverage without reading secrets. Preserve the public keyless route's boundary.
+5. Introduce a compatible historical provider and retained source/corporate-action/session coverage before enabling account return reconstruction or adjusted validation. Carry provenance through browser caches instead of reducing all packets to date/price.
+6. Trial Agent Reach manually in isolated Cloud for source discovery if explicitly authorized to install/use it. Verify original public posts and primary releases before Event Radar ingestion; no live polling enabled by this audit.
+7. Validate authentic forecast cohorts and compare configured AI roles with deterministic baselines before production AI activation.
+
+The app is not yet fully live-data complete. The fixes above address confirmed code paths and confusing presentation while preserving unavailable facts and the user's production restrictions.
+
+## Verification checkpoint
+
+The source-audit increment passed 1,133 Node tests, 41 source/browser regressions, the targeted scoped-history/auth/legacy/manual-save browser cases, TypeScript, 33 offline safety checks, production build and security scan. A production-mode local smoke uses fictional intercepted APIs and a fictional session; it verifies the real private sign-in gate first, then browses all 17 workspaces with zero passive writes/alert dispatches/page errors and preserved device-only forecasts. That same production-mode test is now in the local mocked CI job after its regular QA tests. It does not use a deployed URL, credentials or production services. Fresh exact-head CI results are recorded in PR #188.

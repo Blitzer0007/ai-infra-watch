@@ -4,6 +4,68 @@ from test_ui import goto_app, mock_local_apis
 from playwright.sync_api import expect
 
 
+def test_private_research_actions_carry_session_without_automatic_agent_requests(page):
+    mock_local_apis(page)
+    page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-dashboard-session")')
+    calls=[];quality_reads=[]
+    page.on('request',lambda r:quality_reads.append(r.headers.get('authorization')) if '/api/ai-quality' in r.url else None)
+    def agent(route):
+        calls.append(route.request.headers.get('authorization'))
+        route.fulfill(status=200,json={'ok':True,'summary':'Evidence | Fictional prompt | Verify original sources','calls':[]})
+    page.route('**/api/agent-ask',agent)
+    page.goto('/guide')
+    page.wait_for_load_state('networkidle')
+    assert calls==[]
+    page.get_by_role('button',name='Ask JEV',exact=True).click()
+    page.wait_for_load_state('networkidle')
+    assert calls==['Bearer fictional-dashboard-session']
+    page.goto('/quality')
+    page.wait_for_load_state('networkidle')
+    assert len(calls)==1
+    page.get_by_role('button',name='AI generate',exact=True).click()
+    page.wait_for_load_state('networkidle')
+    assert calls==['Bearer fictional-dashboard-session']*2
+    assert quality_reads and all(token=='Bearer fictional-dashboard-session' for token in quality_reads)
+
+
+def test_opening_outlook_keeps_legacy_forecasts_local_and_authenticates_read_requests(page):
+    import json
+    mock_local_apis(page)
+    legacy=[{'id':'fictional-legacy-only','ticker':'FICT','horizon':5,'entryPrice':100,'median':1}]
+    page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-dashboard-session");localStorage.setItem("aiw-forward-outlook-forecasts-v1",'+json.dumps(json.dumps(legacy))+')')
+    calls=[]
+    def forecast(route):
+        calls.append((route.request.method,route.request.headers.get('authorization')))
+        route.fulfill(status=200,json={'forecasts':[],'model':'analogue-v1','config':None,'analytics':None})
+    page.route('**/api/forecast-verification*',forecast)
+    page.goto('/outlook')
+    expect(page.get_by_text('Older browser-only forecasts were found.',exact=False)).to_be_visible()
+    page.wait_for_load_state('networkidle')
+    assert calls and all(method=='GET' and token=='Bearer fictional-dashboard-session' for method,token in calls)
+    assert json.loads(page.evaluate('localStorage.getItem("aiw-forward-outlook-forecasts-v1")'))==legacy
+
+
+def test_watchlist_saves_server_configuration_only_after_explicit_click(page):
+    mock_local_apis(page)
+    page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-dashboard-session")')
+    calls=[]
+    def config(route):
+        if route.request.method=='POST':
+            calls.append((route.request.headers.get('authorization'),route.request.post_data_json))
+            route.fulfill(status=200,json={'ok':True,'updated_at':'2026-11-22T00:00:00Z'})
+        else:route.fulfill(status=200,json={'config':{'updated_at':'2026-11-21T00:00:00Z'}})
+    page.route('**/api/alert-config*',config)
+    page.goto('/watchlist')
+    panel=page.get_by_role('region',name='Server alert settings',exact=True)
+    expect(panel).to_be_visible()
+    page.wait_for_load_state('networkidle')
+    assert calls==[]
+    panel.get_by_role('button',name='Save device alert settings to server',exact=True).click()
+    expect(panel.get_by_role('status')).to_contain_text('Saved the settings captured')
+    assert len(calls)==1 and calls[0][0]=='Bearer fictional-dashboard-session'
+    assert set(calls[0][1])=={'watchlist','alerts','largeMoveEnabled','largeMovePct','catalystAlerts'}
+
+
 def _table_with_header(page, label: str):
     table = page.locator("table").filter(has=page.locator("th", has_text=label)).first
     table.wait_for(state="visible", timeout=30000)

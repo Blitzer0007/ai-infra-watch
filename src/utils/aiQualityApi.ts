@@ -1,3 +1,4 @@
+import { authFetch } from './apiAuth';
 export type AIQualityRegression = {
   passed: boolean;
   regressionCount: number;
@@ -33,7 +34,7 @@ export type AIQualityRun = {
 };
 
 export async function fetchAIQualityRuns(limit = 20): Promise<AIQualityRun[]> {
-  const response = await fetch('/api/ai-quality?limit=' + encodeURIComponent(String(limit)), {
+  const response = await authFetch('/api/ai-quality?limit=' + encodeURIComponent(String(limit)), {
     cache: 'no-store',
   });
   const body = await response.json().catch(() => ({}));
@@ -42,7 +43,7 @@ export async function fetchAIQualityRuns(limit = 20): Promise<AIQualityRun[]> {
 }
 
 export async function saveAIQualityRun(run: Omit<AIQualityRun, 'id' | 'createdAt'>): Promise<AIQualityRun> {
-  const response = await fetch('/api/ai-quality', {
+  const response = await authFetch('/api/ai-quality', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(run),
@@ -53,7 +54,7 @@ export async function saveAIQualityRun(run: Omit<AIQualityRun, 'id' | 'createdAt
 }
 
 export async function fetchAIQualityAnalytics(limit = 20): Promise<AIQualityAnalytics> {
-  const response = await fetch('/api/ai-quality?limit=' + encodeURIComponent(String(limit)), {
+  const response = await authFetch('/api/ai-quality?limit=' + encodeURIComponent(String(limit)), {
     cache: 'no-store',
   });
   const body = await response.json().catch(() => ({}));
