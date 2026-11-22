@@ -394,3 +394,40 @@ test('approved PR 180 exception requires its exact direct merge and source branc
     {pr:{...pr,head:{...pr.head,sha:'e'.repeat(40)}}},
   ]) assert.throws(()=>verifyMilestone5Exception({...input,...patch}));
 });
+
+test('approved PR 187 exception is limited to its direct reviewed light/quote merge', () => {
+  const pr={number:187,merged:true,state:'closed',merge_commit_sha:SHA,base:{ref:'main'},
+    head:{ref:'feature/data-health-evidence-states',sha:M5_HEAD,repo:{full_name:RELEASE_REPOSITORY}}};
+  const commit={sha:SHA,parents:[{sha:'529e956254bc73c12ed8d7f4ffa6510f9b3d4442'},{sha:M5_HEAD}]};
+  const input={expectedSha:SHA,waiver:M5_PROTECTION_EXCEPTION,pr,commit};
+  assert.equal(verifyMilestone5Exception(input),true);
+  for(const patch of [
+    {waiver:null}, {pr:{...pr,number:188}}, {pr:{...pr,number:180}}, {pr:{...pr,merged:false}},
+    {pr:{...pr,base:{ref:'feature/light-workspace-redesign'}}},
+    {pr:{...pr,head:{...pr.head,ref:'another-branch'}}},
+    {pr:{...pr,head:{...pr.head,repo:{full_name:'other/repository'}}}},
+    {commit:{...commit,parents:[{sha:'347240c7657af8a6f830b254e84bedc10f88d785'},{sha:M5_HEAD}]}},
+    {commit:{...commit,parents:[{sha:M5_HEAD},{sha:M5_HEAD}]}},
+    {commit:{...commit,parents:[commit.parents[0]]}},
+    {pr:{...pr,head:{...pr.head,sha:'e'.repeat(40)}}},
+  ]) assert.throws(()=>verifyMilestone5Exception({...input,...patch}));
+});
+
+test('explicit PR 187 selection independently checks PR identity and ancestry', async () => {
+  const urls:string[]=[];
+  const fetcher:typeof fetch=async input=>{
+    const url=String(input);urls.push(url);
+    let data:any;
+    if(url.endsWith('/branches/main'))data={commit:{sha:SHA},protected:false};
+    else if(url.includes('/actions/runs?head_sha='))data={total_count:3,workflow_runs:[run('frontend-ci.yml',1),run('qa-validation.yml',2),run('security-audit.yml',8)]};
+    else if(url.endsWith('/pulls/187'))data={number:187,merged:true,state:'closed',merge_commit_sha:SHA,base:{ref:'main'},
+      head:{ref:'feature/data-health-evidence-states',sha:M5_HEAD,repo:{full_name:RELEASE_REPOSITORY}}};
+    else if(url.endsWith('/commits/'+SHA))data={sha:SHA,parents:[{sha:'529e956254bc73c12ed8d7f4ffa6510f9b3d4442'},{sha:M5_HEAD}]};
+    else throw Error('Unexpected release evidence endpoint');
+    return new Response(JSON.stringify(data),{status:200,headers:{'content-type':'application/json'}});
+  };
+  assert.deepEqual(await checkCandidate({GITHUB_REPOSITORY:RELEASE_REPOSITORY,GITHUB_REF:'refs/heads/main',
+    GITHUB_SHA:SHA,EXPECTED_MAIN_SHA:SHA,GH_TOKEN:'fictional-ci-token',AIW_MAIN_PROTECTION_WAIVER:'YES',AIW_RELEASE_PR:'187'},fetcher),[1,2,8]);
+  assert(urls.some(url=>url.endsWith('/pulls/187')));
+  assert(!urls.some(url=>url.endsWith('/pulls/180')));
+});

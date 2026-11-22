@@ -1,3 +1,24 @@
+# Current continuation: approved PR #187 release — 22 November 2026
+
+**This section supersedes previous release-blocker text.** After being asked for the new PR #187-only unprotected-main exception, the owner replied “as of now ignore this.” Proceed with that scoped exception and all retained exact-commit, staging, access and rollback checks. No further confirmation of this same action is needed.
+
+- Active release: `feature/data-health-evidence-states`, `/workspace/ai-infra-watch-data-health`, [ready PR #187](https://github.com/Blitzer0007/ai-infra-watch/pull/187) targeting `main`. Its tree includes the complete #186 light UI and quote/Data Health repairs. Preserve #185/#186 branch heads and worktrees. Do not merge duplicate #186 separately.
+- Base/current main and direct first-parent pin: `529e956254bc73c12ed8d7f4ffa6510f9b3d4442`. New exception is explicitly PR 187 / branch `feature/data-health-evidence-states` / intended repository only. The updated one-time handoff waits for exact-main QA, independently checks all required main CI and PR ancestry, and dispatches the guarded manual workflow at most once. Its rollback is `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`. Historical #180 attestation is retained unchanged; this is a new scope.
+- Read [the authorized release plan](NOV22-RELEASE-CANDIDATE.md). Latest local guard verification: 1,118 Node tests, 33 offline safety/deployment checks and TypeScript passed. Application source previously passed 28 latest mocked browser checks and production build; the new final head must pass fresh Frontend CI, Security audit and UI API DB Validation.
+- Continue autonomously through final PR CI, expected-head regular two-parent merge, exact-main CI, the one-time handoff, staging/auth/HTML/JS/CSS checks, promotion, public alias/commit verification and bounded runtime-error inspection. Fix genuine failures without weakening checks. Do not declare deployed until promotion and verification actually succeed.
+- Freeze the feature branch head after merging: handoff attestation compares the second main parent with that PR head. Record later production evidence in `/workspace/ai-infra-watch-release-evidence/PR187-PRODUCTION.md` and the PR description, not another feature-branch commit.
+- Current known-good READY production/rollback is `dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v`, main `529e9562`, public alias `ai-infra-watch-theta.vercel.app`, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`, project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD`. Verify before release. No other project, deployment parent or rollback is authorized by these pins.
+- Keep `run_live_checks=false`: it includes SEC/provider refresh, which remains outside scope while production database changes are not authorized. No production keys displayed/retrieved by the agent, no new polling and no AI model activation. The production Telegram test is already confirmed received by the owner's screenshot; do not duplicate or replay a slot.
+- Bull/Bear/Judge is manual-start, bounded research. The UI is development/QA-only; its NVIDIA adapter requires explicit development flags and refuses production. It is not continuous autonomous production monitoring. The owner asked what it is; that question does not authorize enabling it.
+
+Resume prompt:
+
+> Continue the approved PR #187 release on `feature/data-health-evidence-states`. Read this current top section and `docs/release/NOV22-RELEASE-CANDIDATE.md`. The fresh PR #187-only exception is owner-approved; keep exact ancestry/CI, staging, auth, asset bytes and rollback checks. Complete PR CI, regular expected-head merge, main CI, one-time handoff and verified production promotion. Freeze the PR branch after merge. No duplicate Telegram sends, production database changes, secret display, new polling or AI activation.
+
+---
+
+**Historical checkpoints below retain provenance; earlier pending-approval statements are superseded above.**
+
 # Current continuation: November 22 release preparation
 
 **This section supersedes prior no-release instructions for preparation scope only.** The owner said “lets do it” after the proposal to release the tested UI/quote repairs, and asked about Bull/Bear/Judge agents. Release preparation is authorized; no new unprotected-main exception is yet authorized or implemented.

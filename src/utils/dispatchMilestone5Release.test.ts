@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dispatchOneTimeRelease, verifyCompletion, M5_HANDOFF_PARENT, M5_ROLLBACK,
+  dispatchOneTimeRelease, verifyCompletion, M5_HANDOFF_PR, M5_HANDOFF_PARENT, M5_ROLLBACK,
 } from '../../scripts/dispatch-milestone5-release.mjs';
 
 const REPO = 'Blitzer0007/ai-infra-watch';
@@ -21,11 +21,17 @@ const ciRun=(file:string,id:number,overrides:any={})=>({
   event:'push', status:'completed', conclusion:'success', ...overrides,
 });
 const pr=()=>({
-  number:180, merged:true, state:'closed', merge_commit_sha:SHA,
-  base:{ref:'main'}, head:{ref:'fix/telegram-daily-brief-evidence-20261119',
+  number:187, merged:true, state:'closed', merge_commit_sha:SHA,
+  base:{ref:'main'}, head:{ref:'feature/data-health-evidence-states',
     sha:HEAD,repo:{full_name:REPO}},
 });
 const commit=()=>({sha:SHA,parents:[{sha:M5_HANDOFF_PARENT},{sha:HEAD}]});
+
+test('November 22 handoff pins only PR 187, its live main parent and the current rollback',()=>{
+  assert.equal(M5_HANDOFF_PR,187);
+  assert.equal(M5_HANDOFF_PARENT,'529e956254bc73c12ed8d7f4ffa6510f9b3d4442');
+  assert.equal(M5_ROLLBACK,'dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v');
+});
 
 function mockGithub(opts:any={}) {
   const requests:{url:string,method:string,body?:any}[]=[];
@@ -40,7 +46,7 @@ function mockGithub(opts:any={}) {
     }
     let value:any;
     if(url.endsWith('/actions/runs/12345'))value=run(opts.triggerOverride);
-    else if(url.endsWith('/pulls/180'))value={...pr(),...opts.prOverride};
+    else if(url.endsWith('/pulls/187'))value={...pr(),...opts.prOverride};
     else if(url.endsWith('/commits/'+SHA))value={...commit(),...opts.commitOverride};
     else if(url.endsWith('/branches/main'))value={commit:{sha:opts.mainSha||SHA},protected:opts.protected??false};
     else if(url.includes('/actions/runs?head_sha='))value={
@@ -96,7 +102,7 @@ test('one-shot dispatch delegates to existing gated production workflow after CI
       expected_main_sha:SHA,rollback_deployment:M5_ROLLBACK,run_live_checks:'false',
     },
   });
-  assert(requests.some(r=>r.url.endsWith('/pulls/180')));
+  assert(requests.some(r=>r.url.endsWith('/pulls/187')));
   assert(requests.some(r=>r.url.endsWith('/commits/'+SHA)));
   assert(requests.some(r=>r.url.includes('/actions/runs?head_sha='+SHA)));
 });
@@ -113,6 +119,7 @@ test('any failed required gate or forged PR ancestry prevents release dispatch',
     {triggerOverride:{conclusion:'failure'}},
     {triggerOverride:{event:'pull_request'}},
     {prOverride:{number:184}},
+    {prOverride:{number:180}},
     {prOverride:{merged:false}},
     {prOverride:{head:{ref:'some-other-branch',sha:HEAD,repo:{full_name:REPO}}}},
     {prOverride:{merge_commit_sha:HEAD}},

@@ -13,7 +13,7 @@ on:
         required: true
         default: "NO"
       confirm_milestone5_unprotected_main_exception:
-        description: "Owner-approved PR #180 data/brief release; pinned merge parents and main CI required"
+        description: "Owner-approved PR #187 light UI/quote release only; pinned merge parents and main CI required"
         type: choice
         options:
           - "NO"
@@ -52,7 +52,7 @@ jobs:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
-      AIW_RELEASE_PR: "180"
+      AIW_RELEASE_PR: "187"
       AIW_MAIN_PROTECTION_WAIVER: ${{ inputs.confirm_milestone5_unprotected_main_exception }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
       # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.
@@ -165,6 +165,12 @@ jobs:
           fi
           cmp --silent .vercel/output/static/index.html /tmp/staged-home.html
 
+          for asset in assets/main.js assets/styles.css; do
+            asset_status="$(vercel curl "$BASE_URL/$asset" -- --silent --show-error --max-time=20 -w '%{http_code}' -o "/tmp/staged-${asset##*/}")"
+            test "$asset_status" = "200"
+            cmp --silent ".vercel/output/static/$asset" "/tmp/staged-${asset##*/}"
+          done
+
           auth_status="$(vercel curl "$BASE_URL/api/auth" -- --silent --show-error --max-time=20 -o /tmp/production-auth.json -w '%{http_code}' \
             -H "Content-Type: application/json" -X POST --data '{"token":""}')"
           if [ "$auth_status" != "401" ]; then
@@ -200,6 +206,12 @@ jobs:
           home_status="$(curl --silent --show-error --max-time 20 -w '%{http_code}' https://ai-infra-watch-theta.vercel.app/ -o /tmp/production-home.html)"
           test "$home_status" = "200"
           cmp --silent .vercel/output/static/index.html /tmp/production-home.html
+
+          for asset in assets/main.js assets/styles.css; do
+            asset_status="$(curl --silent --show-error --max-time 20 -w '%{http_code}' "https://ai-infra-watch-theta.vercel.app/$asset" -o "/tmp/production-${asset##*/}")"
+            test "$asset_status" = "200"
+            cmp --silent ".vercel/output/static/$asset" "/tmp/production-${asset##*/}"
+          done
 
       - name: Record code-release evidence
         env:

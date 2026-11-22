@@ -37,10 +37,17 @@ const M7_SCROLL_REPAIR_BRANCH = 'fix/milestone7-mobile-holding-scroll-20261119';
 const DATA_REPAIR_PR = 180;
 const DATA_REPAIR_PARENT = '347240c7657af8a6f830b254e84bedc10f88d785';
 const DATA_REPAIR_BRANCH = 'fix/telegram-daily-brief-evidence-20261119';
+// Owner-approved November 22 combined light UI/quote release. This is a new
+// PR-specific exception; the prior data/brief release's ancestry is unchanged.
+const LIGHT_QUOTES_PR = 187;
+const LIGHT_QUOTES_PARENT = '529e956254bc73c12ed8d7f4ffa6510f9b3d4442';
+const LIGHT_QUOTES_BRANCH = 'feature/data-health-evidence-states';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
-  const expected = pr?.number === DATA_REPAIR_PR
+  const expected = pr?.number === LIGHT_QUOTES_PR
+    ? { parent: LIGHT_QUOTES_PARENT, branch: LIGHT_QUOTES_BRANCH }
+    : pr?.number === DATA_REPAIR_PR
     ? { parent: DATA_REPAIR_PARENT, branch: DATA_REPAIR_BRANCH }
     : pr?.number === M5_PR
     ? { parent: M5_BASE_SHA, branch: M5_HEAD_BRANCH }
@@ -141,13 +148,15 @@ export async function checkCandidate(env, fetcher = fetch) {
   }
   // The waiver is opt-in and independently attested by the exact merged PR
   // and commit ancestry. Only the bounded reviewed PRs #176–#179, #182
-  // immediate UI-restore PR #183, and explicitly selected data/brief PR #180
+  // immediate UI-restore PR #183, explicitly selected data/brief PR #180,
+  // and the separately owner-approved combined light/quote PR #187
   // can meet this exception. Every candidate
   // must match its pinned direct main parent; never a generic bypass.
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
-    const prNumber = env.AIW_RELEASE_PR === '180' ? DATA_REPAIR_PR
+    const prNumber = env.AIW_RELEASE_PR === '187' ? LIGHT_QUOTES_PR
+      : env.AIW_RELEASE_PR === '180' ? DATA_REPAIR_PR
       : env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
       : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR
       : env.EXPECTED_MAIN_SHA === M6_UI_FIRST_PARENT ? M5_ONE_SHOT_PR
@@ -155,6 +164,7 @@ export async function checkCandidate(env, fetcher = fetch) {
       : env.EXPECTED_MAIN_SHA === M7_SCROLL_REPAIR_PARENT ? M7_APP_UI_PR
       : M7_SCROLL_REPAIR_PR;
     waiverPr = await jsonGet(base + '/pulls/' + prNumber, env.GH_TOKEN, fetcher);
+    if (waiverPr?.number !== prNumber) throw Error('Release PR identity does not match the requested candidate.');
     waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
   }
   return verifyCandidate({ repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF, dispatchSha: env.GITHUB_SHA,
