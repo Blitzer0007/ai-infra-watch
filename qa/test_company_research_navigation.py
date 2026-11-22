@@ -22,6 +22,62 @@ def sec_packet(symbol='DEMO'):
  return json.loads(subprocess.check_output(['node','qa/fixtures/sec-dossier.fictional.mjs',symbol],cwd=root,env={'PATH':os.environ['PATH']},text=True))
 
 @pytest.mark.parametrize('width,theme',[(390,'dark'),(1440,'light')])
+def test_opportunity_financial_review_is_explicit_and_does_not_promote_frozen_scan(page,width,theme):
+ fictional_portfolio(page);page.set_viewport_size({'width':width,'height':1000})
+ page.add_init_script(f'localStorage.setItem("aiw-ui-theme-v1",{json.dumps(theme)});sessionStorage.setItem("aiw_access_token_v1","fictional-opportunity-financial-session");Date.now=()=>1794744000000;')
+ calls=[]
+ def respond(route):
+  calls.append(route.request);route.fulfill(status=200,json=sec_packet())
+ page.route('**/api/company-scale?action=dossier&symbol=*',respond)
+ page.goto('/opportunities');scanner=page.get_by_test_id('opportunity-scanner')
+ scanner.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
+ panel=scanner.get_by_test_id('opportunity-financial-review')
+ panel.locator('summary').first.click();assert calls==[]
+ panel.get_by_role('combobox',name='Financial review company',exact=True).select_option('DEMO')
+ panel.get_by_role('button',name='Load SEC financial inputs',exact=True).click()
+ expect(panel).to_contain_text('declared CIK 0000000001')
+ panel.get_by_role('combobox',name='Annual financial period',exact=True).select_option(index=1)
+ table=panel.get_by_test_id('opportunity-financial-table');expect(table).to_contain_text('120 USD');expect(table).to_contain_text('-8 USD')
+ expect(scanner).to_contain_text('Research input coverage: 0/2 eligible')
+ assert len(calls)==1 and calls[0].method=='GET'
+ assert calls[0].headers.get('authorization')=='Bearer fictional-opportunity-financial-session'
+ panel.locator('summary').first.click();panel.locator('summary').first.click()
+ page.wait_for_load_state('networkidle');assert len(calls)==1
+ assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+ scanner.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
+ panel=scanner.get_by_test_id('opportunity-financial-review');panel.locator('summary').first.click()
+ expect(panel.get_by_test_id('opportunity-financial-table')).to_have_count(0)
+ expect(panel).to_contain_text('0/3 attempts');assert len(calls)==1
+
+def test_opportunity_financial_failures_and_issuer_switch_discard_previous_review(page):
+ fictional_portfolio(page);calls=[]
+ def respond(route):
+  calls.append(route.request.url)
+  if 'symbol=DEMO' in route.request.url:route.fulfill(status=200,json=sec_packet())
+  else:route.fulfill(status=429,json={'ok':False,'code':'RATE_LIMITED','error':'private-upstream-detail'})
+ page.route('**/api/company-scale?action=dossier&symbol=*',respond)
+ page.goto('/opportunities');scanner=page.get_by_test_id('opportunity-scanner');scanner.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
+ panel=scanner.get_by_test_id('opportunity-financial-review');panel.locator('summary').first.click()
+ picker=panel.get_by_role('combobox',name='Financial review company',exact=True);picker.select_option('DEMO')
+ panel.get_by_role('button',name='Load SEC financial inputs',exact=True).click();expect(panel).to_contain_text('declared CIK 0000000001')
+ picker.select_option('FICT');expect(panel).not_to_contain_text('declared CIK');expect(panel).to_contain_text('0/3 attempts')
+ panel.get_by_role('button',name='Load SEC financial inputs',exact=True).click();expect(panel.get_by_role('alert')).to_contain_text('rate limited')
+ expect(panel).not_to_contain_text('private-upstream-detail');page.wait_for_load_state('networkidle');assert len(calls)==2
+
+def test_opportunity_financial_inflight_switch_drops_late_packet(page):
+ fictional_portfolio(page);pending=[]
+ page.route('**/api/company-scale?action=dossier&symbol=*',lambda route:pending.append(route))
+ page.goto('/opportunities');scanner=page.get_by_test_id('opportunity-scanner');scanner.get_by_role('button',name='Scan loaded snapshot',exact=True).click()
+ panel=scanner.get_by_test_id('opportunity-financial-review');panel.locator('summary').first.click()
+ picker=panel.get_by_role('combobox',name='Financial review company',exact=True);picker.select_option('DEMO')
+ with page.expect_request('**/api/company-scale?action=dossier&symbol=DEMO'):
+  panel.get_by_role('button',name='Load SEC financial inputs',exact=True).click()
+ picker.select_option('FICT');expect(panel).to_contain_text('0/3 attempts')
+ pending[0].fulfill(status=200,json=sec_packet())
+ expect(panel).not_to_contain_text('DEMO · declared CIK');expect(panel.get_by_role('button',name='Load SEC financial inputs',exact=True)).to_be_enabled()
+ expect(panel.get_by_test_id('opportunity-financial-table')).to_have_count(0)
+
+@pytest.mark.parametrize('width,theme',[(390,'dark'),(1440,'light')])
 def test_manual_sec_connection_populates_original_declarations_without_background_calls(page,width,theme):
  fictional_portfolio(page);page.set_viewport_size({'width':width,'height':1000})
  page.add_init_script(f'localStorage.setItem("aiw-ui-theme-v1",{json.dumps(theme)});sessionStorage.setItem("aiw_access_token_v1","fictional-sec-browser-session");')

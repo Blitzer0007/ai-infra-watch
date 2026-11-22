@@ -1,4 +1,21 @@
-# Current continuation: manual SEC dossier connection — 22 November 2026
+# Current continuation: Opportunities financial review — 22 November 2026
+
+This section supersedes the earlier #188 next-step text below. Production remains PR #187; no new release is authorized.
+
+- Active Cloud worktree `/workspace/ai-infra-watch-health-snapshot`, branch `feature/read-only-health-snapshot`, draft PR https://github.com/Blitzer0007/ai-infra-watch/pull/188 against main. Preserve all earlier worktrees and frozen branches. Previous head `11b596cefaa0e482ef94a5172afa77d64b25029c` passed all seven applicable workflows; the new increment needs fresh exact-head CI.
+- Read [OPPORTUNITIES-FINANCIAL-REVIEW.md](OPPORTUNITIES-FINANCIAL-REVIEW.md). Opportunities now has an expandable manual per-company financial review using the existing private SEC action and admitted annual declarations. It shows source references and missing groups without changing the frozen scan, research eligibility, JEV summaries, account figures or trading status. No arithmetic is inferred from context-unverified statement inputs.
+- `useManualSecDossier` shares the existing auth, request admission, three-attempt cap, successful-load guard, fixed error vocabulary and cancellation between company dossiers and Opportunities. No source request happens on mount/open/scan/company change; only the explicit button acquires. Scope changes/rescans clear prior data; late replies are discarded. Scan generations stay unique even with a fixed clock.
+- Local verification: 1,149 Node tests, TypeScript/security/whitespace checks and 12 targeted browser cases passed. Broader Opportunities/navigation/source-quality suites passed 41 cases with one production-only case skipped in the QA build; that case then passed separately on the local production bundle. The production build and all-workspace no-passive-write smoke passed. Final current-head CI belongs in the PR and Cloud evidence after push; older-head green checks are historical.
+- Production/main remains `978ccefac76e36fa24e4b35cab2f1a08cbaca899`, last verified deployment `dpl_BxDnHxX17q5mXVjLntaUtU4fazV6`. PR #187's exception is consumed. #188 remains draft, unmerged and undeployed. No production configuration/DB change, secret inspection/display, live provider/model call, polling or Telegram send occurred. Do not duplicate the earlier confirmed Telegram test.
+- Remaining prerequisites: authentic security-class/listing evidence and compatible reported research observations before classification; source access/contact and original filing-context verification; shared provider budgets/adjusted history; broker precision/timezone/full-account evidence. Agent Reach remains reviewed but uninstalled, and AI activation is unchanged.
+
+Resume prompt:
+
+> Continue AI Infra Watch on feature/read-only-health-snapshot / draft #188. Read this top section and OPPORTUNITIES-FINANCIAL-REVIEW.md. Recheck the latest exact head and all applicable CI; 11b596c's green CI covers the earlier dossier stage only. Preserve all previous worktrees and existing dark-theme/source/private-access repairs. Production remains #187. Continue authentic financial/listing integration without inventing eligibility, accounting or source authority. No merge, deployment, production writes/config changes, secret retrieval/display, polling, AI activation or Telegram message.
+
+---
+
+# Historical continuation: manual SEC dossier connection — 22 November 2026
 
 This section supersedes the previous #188 verification-next-step text below. PR #187 remains production; #188 remains a draft development candidate.
 

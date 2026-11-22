@@ -1,5 +1,7 @@
 # Manual SEC dossier connection — 22 November 2026
 
+Follow-up: [the Opportunities financial-input review](OPPORTUNITIES-FINANCIAL-REVIEW.md) reuses this explicit SEC connection and shares its browser loader with the dossier. It adds a bounded evidence table, without changing research eligibility or the controls below.
+
 This increment connects the existing company dossier to an explicit, authenticated SEC read action. Previously the holding/research wrapper always passed `request={null}`. The connection is part of draft PR #188; it is not a deployment or a live-source health certification.
 
 ## User flow

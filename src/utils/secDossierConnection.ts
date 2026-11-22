@@ -22,3 +22,6 @@ export const secDossierFailureLabels:Record<string,string>={
   SOURCE_LIMIT:'The SEC source exceeded the supported size or row limits. Financial inputs were withheld.',SOURCE_LIMIT_OR_INVALID:'The SEC source exceeded supported limits or had an unsupported structure.',
   INVALID_SOURCE:'The SEC response had an unsupported format.',TIMEOUT:'The SEC request timed out. No automatic retry will run.',NO_DATA:'The requested SEC document was not available.',
 };
+export function secDossierFailureMessage(code:unknown):string{
+  return typeof code==='string'&&Object.hasOwn(secDossierFailureLabels,code)?secDossierFailureLabels[code]:'SEC financial acquisition is unavailable. No automatic retry will run.';
+}
