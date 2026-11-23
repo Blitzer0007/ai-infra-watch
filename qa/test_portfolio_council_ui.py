@@ -169,6 +169,7 @@ def test_production_build_omits_council(page):
     fictional_portfolio(page);page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-council-session")')
     page.goto(address+'/jev-lab');page.wait_for_load_state('networkidle')
     expect(page.get_by_test_id('portfolio-council')).to_have_count(0)
+    expect(page.get_by_test_id('research-role-review')).to_have_count(0)
 
 def test_source_receipt_retains_filing_days_and_formulas_and_freezes_model_snapshot_across_feed_refresh(page,council_gateway):
     source=json.loads((ROOT/'qa/fixtures/council-source-receipt.fictional.json').read_text())
@@ -242,18 +243,42 @@ def test_model_free_admission_and_v2_model_run_bind_the_same_frozen_inputs(page,
     expect(report).to_contain_text('Conditionally usable for research');expect(report).to_contain_text('neither endpoint is the actual publication time')
     assert len(calls)==1 and calls[0].post_data_json['mode']=='admission-v2'
     assert panel.get_by_test_id('council-result').count()==0
+    roles=panel.get_by_test_id('research-role-review')
+    expect(roles).to_contain_text('Deterministic baseline · no model calls')
+    expect(roles.get_by_role('tab',name='Company',exact=True)).to_have_attribute('aria-selected','true')
+    expect(roles).to_contain_text('Review the negative cash-flow observation')
+    roles.locator('summary').click();expect(roles).to_contain_text('-5 USD')
+    roles.get_by_role('tab',name='Company',exact=True).focus();page.keyboard.press('ArrowRight')
+    expect(roles.get_by_role('tab',name='Catalyst',exact=True)).to_be_focused()
+    expect(roles.get_by_role('tabpanel')).to_contain_text('Event timing and confirmation')
+    page.keyboard.press('End')
+    expect(roles.get_by_role('tab',name='Daily review',exact=True)).to_be_focused()
+    expect(roles.get_by_role('tabpanel')).to_contain_text('not a portfolio or whole-day assessment')
+    assert not roles.locator('details').evaluate('(element)=>element.open'), 'New role starts with citations collapsed'
+    page.locator(':focus').evaluate('(element)=>element.blur()')
+    assert len(calls)==1, 'Changing deterministic role tabs must make no API or model call'
     ARTIFACTS.mkdir(parents=True,exist_ok=True)
     for width in [360,768,1440]:
         page.set_viewport_size({'width':width,'height':1000});assert report.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         report.screenshot(path=str(ARTIFACTS/f'portfolio-council-admission-fictional-{width}.png'))
+        assert roles.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
+        roles.screenshot(path=str(ARTIFACTS/f'research-roles-fictional-{width}.png'))
+    light_background=roles.evaluate('(element)=>getComputedStyle(element).backgroundColor')
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('html')).to_have_attribute('data-aiw-theme','dark')
+    assert roles.evaluate('(element)=>getComputedStyle(element).backgroundColor')!=light_background
+    roles.screenshot(path=str(ARTIFACTS/'research-roles-fictional-dark-1440.png'))
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('html')).to_have_attribute('data-aiw-theme','light')
+    assert len(calls)==1, 'Theme changes must not repeat research validation'
     panel.get_by_role('button',name='Analyze loaded evidence',exact=True).click()
     expect(panel.get_by_test_id('council-result')).to_contain_text('No decision eligibility was granted')
     assert len(calls)==2 and calls[1].post_data_json['mode']=='loaded-v2'
     assert calls[0].post_data_json['packet']==calls[1].post_data_json['packet']
     assert calls[0].post_data_json['sources']==calls[1].post_data_json['sources']
     panel.get_by_role('combobox',name='Council research horizon',exact=True).select_option('6')
-    expect(report).to_have_count(0);assert len(calls)==2 and errors==[]
+    expect(report).to_have_count(0);expect(roles).to_have_count(0);assert len(calls)==2 and errors==[]
 
 def test_same_day_filing_cannot_gain_a_fabricated_precise_publication_time(page,council_gateway):
     page.clock.set_fixed_time(datetime(2026,11,9,12,0,tzinfo=timezone.utc))
@@ -265,5 +290,10 @@ def test_same_day_filing_cannot_gain_a_fabricated_precise_publication_time(page,
     panel.get_by_role('button',name='Validate research inputs',exact=True).click()
     report=panel.get_by_test_id('council-admission');expect(report).to_contain_text('PUBLICATION WINDOW UNCLOSED')
     expect(report).to_contain_text('needs data')
+    roles=panel.get_by_test_id('research-role-review')
+    expect(roles.get_by_role('tabpanel')).to_contain_text('Company · Needs data')
+    roles.locator('summary').click()
+    expect(roles).to_contain_text('No conditionally usable observations for this role')
+    expect(roles).not_to_contain_text('Review the negative cash-flow observation')
     assert len(calls)==1 and all(o['evidence']['published_at'] is None for o in calls[0].post_data_json['sources']['sec']['observations'])
     assert panel.get_by_test_id('council-result').count()==0 and errors==[]

@@ -5,6 +5,8 @@ import {councilAdmissionEnvelope,councilV2Envelope,councilRequestDigest} from '.
 import {councilJevEnvelope} from '../../shared/portfolioCouncilContract.js';
 import type {PeerFundamentalSnapshot} from '../utils/peerStrength';
 import type {CatalystSnapshot} from '../utils/catalystCalendar';
+import {researchRoleReview,type ResearchRoleReview} from '../utils/researchRoleReview';
+import ResearchRolesPanel from './ResearchRolesPanel';
 
 type JevCoverage = {available:boolean;coverage:string|null;next_check:string|null;input_tokens:number|null};
 const control='rounded-lg border border-white/20 bg-slate-950 px-3 py-2 text-sm disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300';
@@ -18,6 +20,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
   const [result,setResult]=useState<CouncilResult|null>(null);
   const [sources,setSources]=useState<ReturnType<typeof inspectCouncilSources>|null>(null);
   const [admission,setAdmission]=useState<CouncilAdmission|null>(null);
+  const [roleReview,setRoleReview]=useState<ResearchRoleReview|null>(null);
   const [jev,setJev]=useState<JevCoverage|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -27,7 +30,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
   const attemptCount=useRef(0);
   useEffect(()=>{
     version.current+=1;flight.current?.abort();flight.current=null;
-    setResult(null);setSources(null);setAdmission(null);setJev(null);setError('');setBusy(false);
+    setResult(null);setSources(null);setAdmission(null);setRoleReview(null);setJev(null);setError('');setBusy(false);
     return ()=>{version.current+=1;flight.current?.abort();flight.current=null;};
   },[symbol,horizon]);
 
@@ -35,15 +38,15 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
     if(flight.current)return;
     try {
       setSources(inspectCouncilSources(symbol,quotes[symbol],financials.find(f=>f.symbol===symbol),'council:'+crypto.randomUUID(),Date.now(),horizon,calendar));
-      setResult(null);setAdmission(null);setJev(null);setError('');
-    }catch {setSources(null);setError('Loaded source inspection is unavailable. No model request occurred.');}
+      setResult(null);setAdmission(null);setRoleReview(null);setJev(null);setError('');
+    }catch {setSources(null);setRoleReview(null);setError('Loaded source inspection is unavailable. No model request occurred.');}
   }
 
   async function run(mode:'demo'|'loaded-v2'|'admission-v2'|'jev') {
     if(flight.current||attemptCount.current>=5||(['loaded-v2','admission-v2'].includes(mode)&&!sources)||(mode==='jev'&&(!result||!['nvidia','multi-model'].includes(result.mode)||result.status!=='complete')))return;
     const controller=new AbortController();flight.current=controller;
     const current=version.current;
-    if(mode==='demo'){setSources(null);setAdmission(null);}
+    if(mode==='demo'){setSources(null);setAdmission(null);setRoleReview(null);}
     attemptCount.current+=1;setAttempts(attemptCount.current);setBusy(true);setError('');
     const timeout=setTimeout(()=>controller.abort(),47000);
     try {
@@ -55,9 +58,13 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
       const response=await authFetch('/api/agent-ask?task=council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
       const raw=await response.text();if(raw.length>65536)throw Error();
       const value=JSON.parse(raw);
-      const valid=mode==='admission-v2'?councilAdmissionEnvelope(value,payload,await councilRequestDigest(payload)):mode==='loaded-v2'?councilV2Envelope(value,payload,await councilRequestDigest(payload)):mode==='jev'?councilJevEnvelope(value,payload):councilEnvelope(value,payload);
+      const digest=['admission-v2','loaded-v2'].includes(mode)?await councilRequestDigest(payload):null;
+      const valid=mode==='admission-v2'?councilAdmissionEnvelope(value,payload,digest):mode==='loaded-v2'?councilV2Envelope(value,payload,digest):mode==='jev'?councilJevEnvelope(value,payload):councilEnvelope(value,payload);
       if(!response.ok||!valid)throw Error();
+      const review=['admission-v2','loaded-v2'].includes(mode)?researchRoleReview(payload,mode==='admission-v2'?value:value.admission,digest) as ResearchRoleReview|null:null;
+      if(['admission-v2','loaded-v2'].includes(mode)&&!review)throw Error();
       if(current!==version.current)return;
+      if(mode!=='jev')setRoleReview(review);
       if(mode==='jev')setJev(value);else if(mode==='admission-v2')setAdmission(value);else {setResult(value);setAdmission(value.admission||null);setJev(null);}
     } catch {
       if(current===version.current)setError('Council review unavailable. Check the private development configuration or loaded evidence. No automatic retry occurred.');
@@ -78,7 +85,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
         <button className={control} disabled={busy||!symbol} onClick={inspect}>Inspect loaded sources</button>
         <button className={control} disabled={disabled||!sources||!!admission} onClick={()=>void run('admission-v2')}>Validate research inputs</button>
         <button className={control+' text-cyan-200'} disabled={disabled||!!result||!sources?.packet.evidence.length} onClick={()=>void run('loaded-v2')}>Analyze loaded evidence</button>
-        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setSources(null);setAdmission(null);setJev(null);setError('');}}>Start a new review</button>}
+        {result&&<button className={control} disabled={busy} onClick={()=>{setResult(null);setSources(null);setAdmission(null);setRoleReview(null);setJev(null);setError('');}}>Start a new review</button>}
       </div>
       <p className="text-xs leading-5 text-slate-400">Manual only · Up to six model calls and three loaded-data tools per council · Five attempts per page session · No automatic retries. Loaded analysis requires a separately enabled NVIDIA development backend. TypeSafe is optional and runs only on a separate click.</p>
       {sources&&<details open data-testid="council-source-receipt" className="rounded-xl border border-white/15 p-3 text-sm">
@@ -110,6 +117,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           <p>The legacy council protocol remains separate. V2 analysis independently rechecks the same frozen source declarations before using its conditional coverage.</p>
         </div>
       </details>}
+      {roleReview&&sources&&<ResearchRolesPanel key={roleReview.request_sha256} review={roleReview} evidence={sources.packet.evidence}/>}
       {busy&&<p role="status" className="text-sm text-cyan-200">Reviewing the frozen evidence snapshot…</p>}
       {error&&<p role="alert" className="text-sm text-amber-200">{error}</p>}
       {attempts>=5&&<p className="text-sm text-amber-200">The session review limit is reached.</p>}

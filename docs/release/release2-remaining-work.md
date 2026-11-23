@@ -12,12 +12,14 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 
 [NVIDIA council comparison](NVIDIA-COUNCIL-EVALUATION.md) adds eight fictional calibration scenarios, labels outside model prompts, a numeric-selection baseline, protocol-control comparison, role selection/citation/abstention scoring and an explicit single-case live hook with redacted telemetry. Dedicated development credentials are absent; actual live evaluation remains unrun. Exact-head CI status is recorded in the draft PR/Cloud handoff.
 
+[Company/Catalyst/Daily Review baseline views](RESEARCH-ROLE-REVIEW.md) organize conditionally admitted loaded inputs into cited observations and fixed review questions in the development UI. They use no LLM or additional provider request and are not autonomous AI agents. Model-selected research, document inspection and independent usefulness evaluation remain pending.
+
 ## Pending acceptance and implementations
 
 | Area | Remaining work |
 | --- | --- |
 | NVIDIA/JEV model evaluation | Dedicated NVIDIA development secret; account availability/free-quota/cost/latency checks; independently reviewed grounding/usefulness cases and holdouts; actual comparison with deterministic baselines. TypeSafe remains a separate manual counts-only assessment. |
-| Research roles | Bounded Company/Catalyst Research and Daily Review roles, clear source/call budgets and meaningful evaluation before production activation. Bull/Bear/Judge remains manual development research. |
+| Research roles | Deterministic read-only Company/Catalyst/Daily views implemented in draft189. Model-selected bounded roles, independent source/document inspection, portfolio-wide daily summaries and meaningful evaluation still pending. Bull/Bear/Judge remains manual development research. |
 | Accounting and return charts | Broker precision/timezone, complete original account/cashflow history, corporate actions and reconciled source evidence. Do not round shares or assume a timezone to restore charts. |
 | Market/financial sources | Reduce Yahoo dependence; correctly adjusted historical alternatives, issuer/security-class verification, source contact/access and retained financial lineage. Code adapters do not prove coverage. |
 | Forecast validation | Authentic outcomes, point-in-time membership, holdouts and horizon-specific validation. Counts or model confidence do not establish forecast validity. |

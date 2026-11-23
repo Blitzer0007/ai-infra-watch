@@ -1,4 +1,22 @@
-# Current continuation: NVIDIA council evaluation — 23 November 2026
+# Current continuation: deterministic research-role views — 23 November 2026
+
+This supersedes the earlier implementation/CI phase below. Read [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md), [NVIDIA-COUNCIL-EVALUATION.md](NVIDIA-COUNCIL-EVALUATION.md) and [release2-remaining-work.md](release2-remaining-work.md).
+
+- Continue existing draft [PR #189](https://github.com/Blitzer0007/ai-infra-watch/pull/189) on `feature/nvidia-council-evaluation`, Cloud worktree `/workspace/ai-infra-watch-model-evals`. Previous sourceffb9e303 passed seven applicable workflows. The new role/UI increment needs fresh exact-head CI; final source SHA and results belong in the PR description and Cloud handoff. Preserve every older worktree/change.
+- Added Python/JavaScript deterministic Company/Catalyst/Daily Review baseline helpers, strict request/admission binding and eight matching fictional fixtures. The development UI presents cited observations and fixed review questions in accessible tabs after explicit input validation. No extra provider request, new API endpoint, model call, persistence or message capability. These views are not autonomous AI agents, a portfolio-wide daily decision summary or model usefulness evidence.
+- Company handles financial/risk evidence and zero/negative cash flow; Catalyst exposes event confirmation/timing gaps; Daily Review lists source/coverage questions for one symbol/frozen snapshot. Missing/uncertain evidence stays uncited. All source/forecast/decision/allocation/message authority flags remain false; limits are eight observations and seven codes per role.
+- Local checks passed:1,156 Node tests,152 Python council/roles/evaluation tests,33 offline CI/release-safety checks, TypeScript/security/whitespace and production build. Council browser suite11 passed/one production-only skip; final role/tab/theme cases passed2 targeted checks after contrast/accessibility changes. Separate production omission/no-passive-persistence checks passed2 cases. Fictional light/dark previews are under `/tmp/aiw-research-role-ui/`; no production data or credentials were used.
+- Main/production remains successful PR #188 at79fddf79a452c2a385b596fced604397781316eb / READY dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo / ai-infra-watch-theta.vercel.app. Merged188 source3175243 is frozen; its protection exception is consumed. No merge or deployment is authorized for189 by this checkpoint.
+- Dedicated NVIDIA development key remains absent by name-only check. No live inference/quota/cost/latency/usefulness trial. Configure only a dedicated Codex Cloud development secret, never chat/source/prod/shared credentials. The benchmark single-case live hook and independently reviewed labels/holdouts remain pending, followed by model-selected bounded roles and independent source/document inspection. Keep production agents/polling/DB/messages off.
+- Next: push the coherent increment, update PR title/body for benchmark plus deterministic role views, verify all applicable exact-head CI and update Cloud Markdown. Do not reuse the oldffb9e30 CI as new-head evidence. Code release and missing broker/source/history/forecast acceptance remain separate.
+
+Resume:
+
+> Continue draft PR189 on feature/nvidia-council-evaluation in /workspace/ai-infra-watch-model-evals. Read this checkpoint and RESEARCH-ROLE-REVIEW.md. The branch includes the offline model benchmark plus deterministic Company/Catalyst/Daily review views, not autonomous model agents. Verify the latest pushed head and all applicable CI;ffb9e30 is historical after this increment. Production stays188 at79fddf79 / dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo. Dedicated NVIDIA development key is absent; live trials and independently reviewed usefulness/holdouts remain pending. Preserve all work and production-disabled/source/decision controls; no merge, deploy, production secrets, DB modification, polling or Telegram send.
+
+---
+
+# Historical continuation: NVIDIA council evaluation — 23 November 2026
 
 This section supersedes all historical approval, release and production identities below. Read [release2-remaining-work.md](release2-remaining-work.md) and [NVIDIA-COUNCIL-EVALUATION.md](NVIDIA-COUNCIL-EVALUATION.md).
 
