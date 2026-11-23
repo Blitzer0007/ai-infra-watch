@@ -1,4 +1,22 @@
-# Current continuation: council CI isolation recovery — 23 November 2026
+# Current continuation: NVIDIA council evaluation — 23 November 2026
+
+This section supersedes all historical approval, release and production identities below. Read [release2-remaining-work.md](release2-remaining-work.md) and [NVIDIA-COUNCIL-EVALUATION.md](NVIDIA-COUNCIL-EVALUATION.md).
+
+- PR #188 is merged and successfully deployed. Production/main is `79fddf79a452c2a385b596fced604397781316eb`, READY `dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo`; public alias `ai-infra-watch-theta.vercel.app`. Seven exact-main workflows and guarded staging/access/assets/rollback/promotion/public asset checks passed. The PR188-only protection exception is consumed; do not reuse it. Its frozen source branch/worktree stays at3175243.
+- New Cloud worktree `/workspace/ai-infra-watch-model-evals`, branch `feature/nvidia-council-evaluation`, based on that verified main. Preserve every historical worktree and pending change. Commit/push this development increment and open a draft PR; do not merge or deploy it.
+- Added `app/eval/council_benchmark.py`, CLI `scripts/council_model_benchmark.py`, eight bundled FICT scenarios and independent explicit selection/admission/abstention labels, test coverage and CI offline Markdown artifact. The numeric baseline never reads expected labels. Protocol completion is separated from selection quality. No future-winner score or financial-usefulness claim.
+- Only an explicit single-case --live can call the dedicated development router, at most six attempts. Default controls make no HTTP calls or provider-configuration reads. JSON/Markdown export metadata/metrics only, with unknown usage/cost preserved. Production/Vercel guards and all source/action/evidence boundaries remain unchanged.
+- Dedicated NVIDIA development key is absent by name-only presence check; no live inference or quota/cost/latency measurement. Configure via dedicated Cloud development secret settings, never chat/production/shared keys. These authored fictional calibration labels are not independently reviewed financial truth or holdout evidence.
+- Local verification: 141 council/evaluation tests and33 CI-safety tests passed, including the final Markdown telemetry/unknown-cost checks; security and whitespace passed. Default offline Markdown comparison generated successfully. Require fresh exact-head CI after commit/push. A minimal QA-only venv lacked LangGraph during the first collection attempt; the existing full Cloud venv runs the agent/evaluation suite. No production or shared credentials were read. Do not label unrun CI as passed.
+- Next: finish local checks, update these results, commit/push and open the draft PR, record exact-head CI and keep Cloud Markdown current. Then dedicated NVIDIA live probing/independent evaluation and bounded research-role expansion remain pending. Broader broker/source/history/forecast acceptance gaps remain in the register. No production activation/polling/DB/messages or deployment is part of this increment.
+
+Resume:
+
+> Continue AI Infra Watch on feature/nvidia-council-evaluation in /workspace/ai-infra-watch-model-evals. Read this checkpoint, NVIDIA-COUNCIL-EVALUATION.md and release2-remaining-work.md. Production remains successful PR188 at79fddf79 / dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo; source3175243 is frozen. Finish/verify the fictional council comparison and draft PR; record exact-head CI. Dedicated NVIDIA development key is absent and no live trial ran. Preserve work and all production-disabled/evidence boundaries; no merge, deployment, production secrets, DB modification, polling or Telegram send.
+
+---
+
+# Historical continuation: council CI isolation recovery — 23 November 2026
 
 - Continue draft [PR #188](https://github.com/Blitzer0007/ai-infra-watch/pull/188), branch `feature/read-only-health-snapshot`, Cloud worktree `/workspace/ai-infra-watch-health-snapshot`. Preserve all previous changes/worktrees. The current pushed SHA and exact-head workflow links belong in the PR description and Cloud release evidence.
 - Previous head `0e9981c9556f9b017d14f4f55def08f3082ef0d8` passed six applicable workflows but failed [UI API DB Validation](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/45039131514). Two council browser cases exhausted the gateway's 12-requests/minute bucket shared across independent cases. Do not describe that head as fully verified.
