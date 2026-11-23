@@ -1,4 +1,25 @@
-# Current continuation: deterministic research-role views — 23 November 2026
+# Current continuation: bounded research-role runner — 23 November 2026
+
+This supersedes the earlier baseline-only stage below. Read [RESEARCH-ROLE-AGENTS.md](RESEARCH-ROLE-AGENTS.md), [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md) and [release2-remaining-work.md](release2-remaining-work.md).
+
+- Continue existing draft [PR #189](https://github.com/Blitzer0007/ai-infra-watch/pull/189), `feature/nvidia-council-evaluation`, Cloud worktree `/workspace/ai-infra-watch-model-evals`. Previousfa07e5c passed eight workflows for the baseline UI increment; fresh exact-head CI is required after this runner increment. Preserve all old worktrees and Codex work.
+- Added a bounded tool-calling Company/Catalyst/Daily Review runner: one loaded inspection/coverage step and two model calls per role; six model/provider attempts, three tools, 40 seconds, 600 output tokens per call and60,000 prompt characters total. It returns at most three baseline-permitted review codes/four inspected usable citations per role. Numeric/event codes require a matching citation. No free-form prose, extra tool loops, new source acquisition, persistence, messages or trade authority.
+- Company/Catalyst receive independent scoped catalogs; Daily receives only their validated selections. Results bind the original source-admission digest and distinguish protocol completion from input status; selections are non-exhaustive. Existing source/forecast/decision/action flags remain false.
+- Dedicated model adapter explicitly aliases Company→bull slot, Catalyst→bear slot, Daily→judge slot using the existing distinct-model development factory. Fresh/single-use adapter and runner prevent receipt/budget reuse. No shared/legacy credential fallback. Production/Vercel guards are rechecked before real calls.
+- Added `research_role_probe.py`: offline fictional protocol by default; explicit --live requires one bundled fictional case and dedicated existing development setup. JSON/Markdown expose controlled selections and redacted alias/model/latency/usage/cost metadata; unknown cost remains unknown. CI generates/uploads the default offline report with no provider configuration or live flag.
+- Browser role tabs remain deterministic, production-hidden and unchanged. Model-selected results are CLI/development-probe only; there is no new API mode, UI live-model action or production activation. This is not independent original-document/source inspection or a portfolio-wide daily summary.
+- Local verification passed:182 Python runner/council/role/admission/evaluation tests and33 offline CI/release-safety checks; offline probe generated; security/whitespace passed. Provider transports were mocked. JavaScript/UI unchanged from verifiedfa07e5c; do not relabel old-head UI/CI results as current-head evidence.
+- Production/main remains PR #188 at79fddf79a452c2a385b596fced604397781316eb / READY dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo. Old source3175243 frozen. The188 release exception is consumed. No merge/deploy, production secret retrieval, DB modification, polling/agent activation or Telegram send.
+- Dedicated NVIDIA development key remains absent by name-only check; no live inference, quota/cost/latency/usefulness or independent holdout evidence. Configure a dedicated Cloud development secret, never chat/source/prod/shared credentials. Next after setup: one explicit fictional live case, then independent selection/grounding evaluation and eventual authenticated UI integration after provider acceptance.
+- Next: commit/push tested checkpoint, update PR title/body for runner+baseline+benchmark, verify all applicable exact-head workflows/artifacts and save final links in PR/Cloud Markdown. Broader broker/source/history/forecast acceptance remains in the register.
+
+Resume:
+
+> Continue draft189 on feature/nvidia-council-evaluation in /workspace/ai-infra-watch-model-evals. Read this checkpoint and RESEARCH-ROLE-AGENTS.md. The branch now includes a bounded tool-calling runner plus the earlier deterministic UI and model benchmark. Verify latest exact-head CI;fa07e5c checks are historical. Dedicated NVIDIA development key is absent; no live trial ran. Browser tabs stay deterministic; runner is development/CLI only. Production remains188 at79fddf79 / dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo. Preserve all work and do not merge/deploy/inspect production secrets/activate polling/change DB/send Telegram or reuse188 release approval.
+
+---
+
+# Historical continuation: deterministic research-role views — 23 November 2026
 
 This supersedes the earlier implementation/CI phase below. Read [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md), [NVIDIA-COUNCIL-EVALUATION.md](NVIDIA-COUNCIL-EVALUATION.md) and [release2-remaining-work.md](release2-remaining-work.md).
 

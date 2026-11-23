@@ -80,7 +80,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py aitracker-upload/tests/agents/test_council_role_models.py aitracker-upload/tests/agents/test_research_role_review.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py aitracker-upload/tests/agents/test_council_role_models.py aitracker-upload/tests/agents/test_research_role_review.py aitracker-upload/tests/agents/test_research_role_agent.py
 
       - name: Run MCP contract tests
         env:
@@ -111,4 +111,15 @@ jobs:
         with:
           name: council-offline-comparison
           path: /tmp/council-offline-comparison.md
+
+      - name: Generate offline research role agent probe
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python aitracker-upload/scripts/research_role_probe.py --format markdown > /tmp/research-role-agent-probe.md
+
+      - name: Upload fictional research role agent probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-role-agent-probe
+          path: /tmp/research-role-agent-probe.md
 
