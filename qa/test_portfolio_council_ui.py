@@ -16,8 +16,10 @@ from safety import is_loopback_url
 ROOT=Path(__file__).resolve().parents[1]
 ARTIFACTS=Path(os.getenv('QA_ARTIFACT_DIR','/tmp/aiw-council'))
 
-@pytest.fixture(scope='module')
+@pytest.fixture
 def council_gateway(tmp_path_factory):
+    # Each independent case needs a fresh authenticated gateway/rate bucket.
+    # Reuse across cases makes success depend on finishing fewer than 12 calls/min.
     log=tmp_path_factory.mktemp('council-loopback')/'backend.log'
     sock=socket.socket();sock.bind(('127.0.0.1',0));sock.listen(128);port=sock.getsockname()[1]
     env={'PATH':os.environ.get('PATH',''),'PYTHONPATH':str(ROOT/'aitracker-upload'),'COUNCIL_DEV_ENABLED':'true','COUNCIL_JEV_DEV_ENABLED':'true','AI_INFRA_AGENT_TOKEN':'fictional-council-backend','EVAL_STUB':'true','LLM_PROVIDER':'stub'}

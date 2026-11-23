@@ -1,3 +1,19 @@
+# Current continuation: council CI isolation recovery — 23 November 2026
+
+- Continue draft [PR #188](https://github.com/Blitzer0007/ai-infra-watch/pull/188), branch `feature/read-only-health-snapshot`, Cloud worktree `/workspace/ai-infra-watch-health-snapshot`. Preserve all previous changes/worktrees. The current pushed SHA and exact-head workflow links belong in the PR description and Cloud release evidence.
+- Previous head `0e9981c9556f9b017d14f4f55def08f3082ef0d8` passed six applicable workflows but failed [UI API DB Validation](https://github.com/Blitzer0007/ai-infra-watch/actions/runs/45039131514). Two council browser cases exhausted the gateway's 12-requests/minute bucket shared across independent cases. Do not describe that head as fully verified.
+- Recovery changes: `qa/test_portfolio_council_ui.py` now starts a fresh gateway/backend per independent case. New `server/api/councilRateLimit.test.js` verifies requests 1–12 succeed, 13–14 return 429 without upstream calls, and the minute boundary restores admission. Application rate limits and evidence checks are unchanged.
+- Local recovery checks passed: all 1,152 Node tests, TypeScript, security scan and whitespace checks; council browser suite 11 passed / one production-only skip against the QA build. Used a separate `/tmp/aiw-ci-repro-venv` installed from existing QA/backend requirements; original Cloud venv preserved. Earlier production-build/boundary and Python checks remain historical; require all applicable fresh exact-head CI for this correction.
+- NVIDIA-first candidate routing, optional free-only OpenRouter adapter, controlled outputs, six-call budgets and production guards remain as described below and in [MULTI-MODEL-COUNCIL.md](MULTI-MODEL-COUNCIL.md). Dedicated development key remains unconfigured. No live inference, billing/latency observation or financial usefulness claim.
+- Production remains PR #187 at `978ccefac76e36fa24e4b35cab2f1a08cbaca899`; proposed rollback `dpl_BxDnHxX17q5mXVjLntaUtU4fazV6`. No PR #188 protection exception has been granted. [PR188-RELEASE-CANDIDATE.md](PR188-RELEASE-CANDIDATE.md) describes the prepared release, deferred controls and exact ancestry/CI/staging/asset/access/rollback gates.
+- Next: push this coherent recovery checkpoint, inspect all exact-head CI and update the PR/Cloud evidence. When green, obtain the explicit PR #188-only decision before ready/regular merge/staging/promotion. Do not reuse PR #187 approval, inspect production secrets, activate agents/polling, change production DB or send Telegram.
+
+Resume:
+
+> Continue draft PR #188 on feature/read-only-health-snapshot. Read this checkpoint, MULTI-MODEL-COUNCIL.md and PR188-RELEASE-CANDIDATE.md. Verify fresh CI for the council gateway test-isolation fix; 0e9981c had a genuine QA failure and is historical. Owner selected NVIDIA first but dedicated development key is absent and live tests have not run. Production remains #187; a new explicit #188-only protection exception is required before merge/deploy. Preserve all work and the production-disabled model/evidence controls.
+
+---
+
 # Current continuation: NVIDIA-first role routing and PR #188 release preparation — 22 November 2026
 
 This section supersedes the earlier no-release-preparation text below. The owner requested different free-model choices and a production release, then selected **NVIDIA first**. Development/release preparation is authorized; a new PR #188-specific exception to deferred protection controls is still pending. Do not merge under PR #187's consumed approval.

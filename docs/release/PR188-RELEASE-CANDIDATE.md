@@ -26,7 +26,7 @@ Before any approved merge, reverify all current source CI, main/base, target/rol
 
 ## Acceptance and limits
 
-Local verification includes 1,151 Node tests, 105 Python role/council/admission cases, 33 offline deployment safety checks, relevant mocked browser/production-boundary checks, TypeScript, production build and security scan. Fresh exact-head CI is required on the prepared candidate. Previous 2b0adc8 checks do not cover this increment.
+Local verification includes 1,152 Node tests, 105 Python role/council/admission cases, 33 offline deployment safety checks, relevant mocked browser/production-boundary checks, TypeScript, production build and security scan. The 23 November recovery isolated each council browser case's gateway so independent cases cannot exhaust one shared rate bucket; 11 browser cases passed with one production-only skip against the QA build. A direct regression preserves the actual 12-requests/minute limit. Previous 0e9981c passed six workflows but failed the shared-bucket browser cases; all applicable fresh exact-head CI is required on the correction. Previous 2b0adc8 checks do not cover this increment.
 
 After an explicitly approved regular merge, require successful exact-main CI, staged access/assets and rollback checks before promotion. Capture the actual released main SHA, immutable deployment, public alias and observed limitations in the PR and Markdown evidence.
 
