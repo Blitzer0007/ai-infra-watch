@@ -1,5 +1,5 @@
 // Pure bridge from original stored rows into the shared conditional ledger/quote checks.
-import { reviewLoadedLedger, ledgerIssueLabels } from '../../shared/loadedLedgerReview.js';
+import { reviewLoadedLedger, ledgerIssueLabels, ledgerDetailLabels } from '../../shared/loadedLedgerReview.js';
 import { evaluateDeclaredQuote } from '../../shared/quoteAdmission.js';
 import { storedHoldingInputs, storedLedgerInputs, transactionQuality } from '../services/ledgerInputs.js';
 
@@ -38,7 +38,8 @@ export function calculateReviewedServerPortfolio(holdings, transactions, quotes,
     assessedAt: new Date(nowMs).toISOString(), holdingsAvailability: availability.holdings,
     transactionsAvailability: availability.transactions });
   base.accountingIssues = review.issues.map(issue => ({ code: issue.code, symbol: issue.symbol,
-    message: ledgerIssueLabels[issue.code] }));
+    ...(issue.detailCode ? {detailCode: issue.detailCode} : {}),
+    message: ledgerDetailLabels[issue.detailCode] || ledgerIssueLabels[issue.code] }));
   base.quantityMismatchSymbols = review.issues.filter(issue => issue.code === 'QUANTITY_MISMATCH' && issue.symbol).map(issue => issue.symbol);
   base.derivedTransactionCount = projectedTrades.filter(row => row?.accountingInputs.quantityDerived === true || row?.accountingInputs.priceDerived === true).length;
 

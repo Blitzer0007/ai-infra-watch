@@ -1,4 +1,5 @@
 import FinancialGlossary from './education/FinancialGlossary';
+import { authFetch } from '../utils/apiAuth';
 import { useMemo, useState } from 'react';
 import {
   ArrowRight, BookOpen, CheckCircle2, CircleHelp, FileSearch, Gauge,
@@ -154,7 +155,7 @@ export default function HelpGuide({ onNavigate }: Props) {
     setJevAnswer(null);
     setJevMeta(null);
     try {
-      const response = await fetch('/api/agent-ask', {
+      const response = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

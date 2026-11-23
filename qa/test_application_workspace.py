@@ -11,6 +11,38 @@ ROUTES = [
 ]
 
 
+@pytest.mark.parametrize('width',[390,1440])
+def test_dark_theme_is_keyboard_accessible_persistent_and_shared_across_workspaces(page,width):
+    mock_local_apis(page)
+    page.set_viewport_size({'width':width,'height':1000})
+    writes=[]; errors=[]
+    page.on('request',lambda request:writes.append(request.url) if request.method not in ('GET','HEAD','OPTIONS') else None)
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.goto('/overview')
+    switch=page.get_by_role('switch',name='Dark theme',exact=True)
+    expect(switch).not_to_be_checked()
+    switch.focus();page.keyboard.press('Space')
+    expect(switch).to_be_checked()
+    for view in ROUTES:
+        page.goto('/'+view)
+        expect(page.get_by_role('switch',name='Dark theme',exact=True)).to_be_checked()
+        expect(page.locator('.aiw-application')).to_have_class(__import__('re').compile('aiw-dark-workspace'))
+        assert page.evaluate('document.documentElement.dataset.aiwTheme')=='dark'
+        assert page.locator('.aiw-application').evaluate("el => getComputedStyle(el).backgroundColor") == 'rgb(12, 18, 26)'
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    page.reload()
+    expect(page.get_by_role('switch',name='Dark theme',exact=True)).to_be_checked()
+    page.goto('/portfolio?portfolio_tab=holdings')
+    page.get_by_role('button',name='Open NVDA holding details from table',exact=True).click()
+    dialog = page.get_by_role('dialog',name='NVDA holding details',exact=True)
+    expect(dialog).to_have_class(__import__('re').compile('aiw-dark-workspace'))
+    dialog.get_by_role('button',name='Back to holdings',exact=True).click()
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('.aiw-application')).to_have_class(__import__('re').compile('aiw-light-workspace'))
+    assert page.evaluate('localStorage.getItem("aiw-ui-theme-v1")')=='light'
+    assert writes==[] and errors==[]
+
+
 def test_all_workspaces_are_discoverable_without_hidden_sidebar_links(page):
     mock_local_apis(page)
     page.goto("/overview")

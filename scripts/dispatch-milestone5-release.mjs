@@ -1,12 +1,13 @@
-// One-time PR #187 light UI/quote release: trusted main CI dispatches the
+// Prepared one-time PR #188 repair release: owner approval is required before
+// merge; trusted exact-main CI then dispatches the
 // existing environment-gated manual release. Does not deploy or read Vercel
 // credentials itself. Never log tokens or remote API bodies.
 import { pathToFileURL } from 'node:url';
 import { RELEASE_REPOSITORY, M5_PROTECTION_EXCEPTION, verifyMilestone5Exception, checkCandidate, jsonGet } from './release-candidate.mjs';
 
-export const M5_HANDOFF_PARENT = '529e956254bc73c12ed8d7f4ffa6510f9b3d4442';
-export const M5_HANDOFF_PR = 187;
-export const M5_ROLLBACK = 'dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v';
+export const M5_HANDOFF_PARENT = '978ccefac76e36fa24e4b35cab2f1a08cbaca899';
+export const M5_HANDOFF_PR = 188;
+export const M5_ROLLBACK = 'dpl_BxDnHxX17q5mXVjLntaUtU4fazV6';
 const SHA = /^[a-f0-9]{40}$/;
 const RUN_ID = /^[1-9][0-9]{0,14}$/;
 
@@ -37,7 +38,7 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
   const base = 'https://api.github.com/repos/' + RELEASE_REPOSITORY;
   const sourceRun = await jsonGet(base + '/actions/runs/' + env.CI_RUN_ID, token, fetcher);
   const sha = verifyCompletion(env, sourceRun);
-  // Authorize only PR #187's pinned two-parent merge if the branch later
+  // Authorize only PR #188's pinned two-parent merge if the branch later
   // becomes protected; never rely on main.protected to permit a broader
   // successful-CI commit to dispatch a release.
   const pr = await jsonGet(base + '/pulls/' + M5_HANDOFF_PR, token, fetcher);
@@ -46,12 +47,12 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
   verifyMilestone5Exception({ expectedSha: sha, waiver: M5_PROTECTION_EXCEPTION, pr, commit });
 
   // checkCandidate performs an independent branch + paged CI check and only
-  // permits the exact two-parent PR #187 merge (first parent 529e956,
+  // permits the exact two-parent PR #188 merge (first parent 978ccef,
   // second parent authenticated PR head) while main remains unprotected.
   await checkCandidate({
     GITHUB_REPOSITORY: RELEASE_REPOSITORY, GITHUB_REF: 'refs/heads/main',
     GITHUB_SHA: sha, EXPECTED_MAIN_SHA: sha,
-    AIW_MAIN_PROTECTION_WAIVER: 'YES', AIW_RELEASE_PR: '187', GH_TOKEN: token,
+    AIW_MAIN_PROTECTION_WAIVER: 'YES', AIW_RELEASE_PR: '188', GH_TOKEN: token,
   }, fetcher);
 
   // Fail closed if this commit already has a production release workflow run.
@@ -101,9 +102,9 @@ export async function dispatchOneTimeRelease(env, fetcher = fetch) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   dispatchOneTimeRelease(process.env).then(value => {
-    console.log('PR #187 light UI/quote one-time release: ' + value.status + ' for ' + value.sha);
+    console.log('PR #188 repair one-time release: ' + value.status + ' for ' + value.sha);
   }).catch(() => {
-    console.error('PR #187 light UI/quote one-time release was not dispatched; review exact-main CI and GitHub Actions permissions. No secrets or remote response bodies logged.');
+    console.error('PR #188 repair one-time release was not dispatched; review exact-main CI and GitHub Actions permissions. No secrets or remote response bodies logged.');
     process.exitCode = 1;
   });
 }

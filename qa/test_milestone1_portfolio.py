@@ -10,6 +10,31 @@ from playwright.sync_api import expect
 from test_ui import goto_app,mock_local_apis
 ROOT=Path(__file__).resolve().parents[1]
 
+
+def test_performance_history_requests_are_scoped_and_market_data_is_separate_from_account_reconciliation(page):
+ mock_local_apis(page)
+ requested=[];writes=[]
+ page.on('request',lambda r:writes.append(r.url) if r.method not in ('GET','HEAD','OPTIONS') else None)
+ def history(route):
+  query=parse_qs(urlparse(route.request.url).query)
+  if query.get('action')!=['history']:return route.fallback()
+  requested.append(query.get('symbol',[''])[0])
+  route.fulfill(status=200,json={'symbol':requested[-1],'provider':'yahoo','points':[
+   {'date':'2026-11-18','price':100},{'date':'2026-11-19','price':101}]})
+ page.route('**/api/company-scale?*',history)
+ page.goto('/portfolio?portfolio_tab=performance')
+ panel=page.get_by_test_id('portfolio-chart-readiness')
+ expect(panel).to_contain_text('4 symbol histories returned')
+ expect(panel).to_contain_text('full broker history and corporate actions are unverified')
+ expect(panel).to_contain_text('does not mean market-price history is unavailable')
+ assert set(requested)=={'NVDA','SPY','QQQ','SOXX'}
+ assert 'AMD' not in requested and 'NBIS' not in requested
+ page.wait_for_load_state('networkidle')
+ before=list(requested)
+ panel.get_by_role('button',name='Review individual holding charts',exact=True).click()
+ expect(page.get_by_role('button',name='Open NVDA holding details from table',exact=True)).to_be_visible()
+ assert requested==before and writes==[]
+
 @pytest.mark.parametrize('mode,expected',[
  ('valid','+$50'),('unknown-fee','—'),('partial','—'),('simulated','—'),
  ('tiny','+1.0000e-10 USD'),('zero','+$0'),('loss','−$20'),('unavailable','—')])

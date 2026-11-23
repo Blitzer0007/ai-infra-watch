@@ -1,5 +1,6 @@
 import { isProjectEventRelevant } from '../utils/projectEventRelevance.js';
 import { history as routedHistory, providerSymbol, quote as routedQuote } from '../../api/_market-data.js';
+import companyDossier from './company-dossier.js';
 
 const tickerCache = globalThis.__aiwTickerCache || (globalThis.__aiwTickerCache = {
   loadedAt: 0,
@@ -1263,6 +1264,7 @@ async function handleMilestones(req, res) {
 
 export default async function handler(req, res) {
   const action = String(req.query?.action || '').trim().toLowerCase();
+  if (action === 'dossier') return companyDossier(req, res);
   if (action === 'history') return handleHistory(req, res);
   if (action === 'peer-fundamentals') return handlePeerFundamentals(req, res);
   if (action === 'milestones') return handleMilestones(req, res);

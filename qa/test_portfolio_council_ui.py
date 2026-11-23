@@ -16,8 +16,10 @@ from safety import is_loopback_url
 ROOT=Path(__file__).resolve().parents[1]
 ARTIFACTS=Path(os.getenv('QA_ARTIFACT_DIR','/tmp/aiw-council'))
 
-@pytest.fixture(scope='module')
+@pytest.fixture
 def council_gateway(tmp_path_factory):
+    # Each independent case needs a fresh authenticated gateway/rate bucket.
+    # Reuse across cases makes success depend on finishing fewer than 12 calls/min.
     log=tmp_path_factory.mktemp('council-loopback')/'backend.log'
     sock=socket.socket();sock.bind(('127.0.0.1',0));sock.listen(128);port=sock.getsockname()[1]
     env={'PATH':os.environ.get('PATH',''),'PYTHONPATH':str(ROOT/'aitracker-upload'),'COUNCIL_DEV_ENABLED':'true','COUNCIL_JEV_DEV_ENABLED':'true','AI_INFRA_AGENT_TOKEN':'fictional-council-backend','EVAL_STUB':'true','LLM_PROVIDER':'stub'}
@@ -117,8 +119,17 @@ def test_tampered_controlled_presentation_is_rejected_before_display(page,counci
     assert 'Cash flow is positive.' not in panel.inner_text() and 'A future winner is guaranteed.' not in panel.inner_text()
     assert len(calls)==1 and errors==[]
 
-def test_loaded_metadata_unknowns_stay_unknown_and_typesafe_is_separate_explicit_call(page,council_gateway):
+@pytest.mark.parametrize('model_mode',['nvidia','multi-model'])
+def test_loaded_metadata_unknowns_stay_unknown_and_typesafe_is_separate_explicit_call(page,council_gateway,model_mode):
     panel,calls,errors=setup(page,council_gateway)
+    if model_mode=='multi-model':
+        def multi_model_response(route):
+            with httpx.Client(trust_env=False) as client:
+                response=client.post(council_gateway+'/api/agent-ask?task=council',content=route.request.post_data,headers={'Content-Type':'application/json','Authorization':'Bearer fictional-council-session'})
+            value=response.json()
+            if value.get('mode')=='nvidia':value['mode']='multi-model'
+            route.fulfill(status=response.status_code,json=value)
+        page.route('**/api/agent-ask?task=council',multi_model_response)
     expect(panel.get_by_role('button',name='Analyze loaded evidence',exact=True)).to_be_disabled()
     panel.get_by_role('button',name='Inspect loaded sources',exact=True).click()
     expect(panel.get_by_test_id('council-source-receipt')).to_contain_text('Inspection makes no request')

@@ -13,7 +13,7 @@ QUESTIONS = {
 
 def valid_summary(state):
     keys = {"contract_version", "mode", "observed_count", "usable_count", "missing_families", "conflict_count", "bull_claim_count", "bear_claim_count", "role_count", "judge_abstained"}
-    if not isinstance(state, dict) or set(state) != keys or state["contract_version"] != "council-coverage-v1" or state["mode"] != "nvidia":
+    if not isinstance(state, dict) or set(state) != keys or state["contract_version"] != "council-coverage-v1" or state["mode"] not in ("nvidia", "multi-model"):
         return False
     for key, limit in (("observed_count", 8), ("usable_count", 8), ("conflict_count", 8), ("bull_claim_count", 4), ("bear_claim_count", 4), ("role_count", 3)):
         if type(state[key]) is not int or not 0 <= state[key] <= limit:

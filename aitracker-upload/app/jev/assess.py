@@ -6,9 +6,11 @@ import json
 from typing import Any
 
 from .client import JevClient, JevEvaluation
+from .opportunities import OPPORTUNITY_QUESTIONS, validate_opportunity_state
 
 
 ASSESSMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    "opportunities": OPPORTUNITY_QUESTIONS,
     "research": {
         "sufficiency": {
             "type": "choice",
@@ -258,6 +260,11 @@ def assess(kind: str, state: Any, client: JevClient | None = None) -> JevEvaluat
     questions = ASSESSMENTS.get(key)
     if questions is None:
         return JevEvaluation(error=f"Unknown Jev assessment kind: {key!r}")
+    if key == "opportunities":
+        try:
+            state = validate_opportunity_state(state)
+        except ValueError:
+            return JevEvaluation(error="Invalid opportunity coverage summary")
     evaluation = (client or JevClient()).evaluate(
         state=_compact_state(state),
         questions=questions,

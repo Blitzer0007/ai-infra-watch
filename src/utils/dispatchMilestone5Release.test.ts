@@ -21,16 +21,16 @@ const ciRun=(file:string,id:number,overrides:any={})=>({
   event:'push', status:'completed', conclusion:'success', ...overrides,
 });
 const pr=()=>({
-  number:187, merged:true, state:'closed', merge_commit_sha:SHA,
-  base:{ref:'main'}, head:{ref:'feature/data-health-evidence-states',
+  number:188, merged:true, state:'closed', merge_commit_sha:SHA,
+  base:{ref:'main'}, head:{ref:'feature/read-only-health-snapshot',
     sha:HEAD,repo:{full_name:REPO}},
 });
 const commit=()=>({sha:SHA,parents:[{sha:M5_HANDOFF_PARENT},{sha:HEAD}]});
 
-test('November 22 handoff pins only PR 187, its live main parent and the current rollback',()=>{
-  assert.equal(M5_HANDOFF_PR,187);
-  assert.equal(M5_HANDOFF_PARENT,'529e956254bc73c12ed8d7f4ffa6510f9b3d4442');
-  assert.equal(M5_ROLLBACK,'dpl_8jCVHBD3ZrnZWsnc9AcdaAE91e1v');
+test('November 22 handoff pins only PR 188, its live main parent and the current rollback',()=>{
+  assert.equal(M5_HANDOFF_PR,188);
+  assert.equal(M5_HANDOFF_PARENT,'978ccefac76e36fa24e4b35cab2f1a08cbaca899');
+  assert.equal(M5_ROLLBACK,'dpl_BxDnHxX17q5mXVjLntaUtU4fazV6');
 });
 
 function mockGithub(opts:any={}) {
@@ -46,7 +46,7 @@ function mockGithub(opts:any={}) {
     }
     let value:any;
     if(url.endsWith('/actions/runs/12345'))value=run(opts.triggerOverride);
-    else if(url.endsWith('/pulls/187'))value={...pr(),...opts.prOverride};
+    else if(url.endsWith('/pulls/188'))value={...pr(),...opts.prOverride};
     else if(url.endsWith('/commits/'+SHA))value={...commit(),...opts.commitOverride};
     else if(url.endsWith('/branches/main'))value={commit:{sha:opts.mainSha||SHA},protected:opts.protected??false};
     else if(url.includes('/actions/runs?head_sha='))value={
@@ -102,7 +102,7 @@ test('one-shot dispatch delegates to existing gated production workflow after CI
       expected_main_sha:SHA,rollback_deployment:M5_ROLLBACK,run_live_checks:'false',
     },
   });
-  assert(requests.some(r=>r.url.endsWith('/pulls/187')));
+  assert(requests.some(r=>r.url.endsWith('/pulls/188')));
   assert(requests.some(r=>r.url.endsWith('/commits/'+SHA)));
   assert(requests.some(r=>r.url.includes('/actions/runs?head_sha='+SHA)));
 });
@@ -119,6 +119,7 @@ test('any failed required gate or forged PR ancestry prevents release dispatch',
     {triggerOverride:{conclusion:'failure'}},
     {triggerOverride:{event:'pull_request'}},
     {prOverride:{number:184}},
+    {prOverride:{number:187}},
     {prOverride:{number:180}},
     {prOverride:{merged:false}},
     {prOverride:{head:{ref:'some-other-branch',sha:HEAD,repo:{full_name:REPO}}}},

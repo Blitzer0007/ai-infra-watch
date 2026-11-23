@@ -2,10 +2,12 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { LockKeyhole, Loader2 } from 'lucide-react';
 import { authenticateAccessToken, clearAccessToken, getAccessToken } from '../utils/apiAuth';
+import { ThemeSwitch, useThemeClass } from './ThemeProvider';
 
 type Props = { children: ReactNode };
 
 export default function AccessGate({ children }: Props) {
+  const themeClass = useThemeClass();
   const qaMode = import.meta.env.VITE_QA_MODE === 'true';
   const [token, setToken] = useState(() => getAccessToken());
   const [draft, setDraft] = useState('');
@@ -33,8 +35,9 @@ export default function AccessGate({ children }: Props) {
   };
 
   return (
-    <div className="aiw-light-workspace min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4">
+    <div className={themeClass + ' min-h-screen bg-[#0F1115] text-white flex items-center justify-center px-4'}>
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15181E] p-6 shadow-2xl">
+        <div className="mb-4 flex justify-end"><ThemeSwitch /></div>
         <div className="flex items-center gap-3 mb-5">
           <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-2.5">
             <LockKeyhole className="w-5 h-5 text-emerald-300" />

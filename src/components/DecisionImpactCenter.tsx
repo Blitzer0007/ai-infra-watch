@@ -2,6 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, ShieldAlert, Target } from 'lucide-react';
 import { authFetch } from '../utils/apiAuth';
 import DecisionJournalPanel from './DecisionJournalPanel';
+import DiagnosticSnapshot from './DiagnosticSnapshot';
+import { buildAccountingDiagnosticSnapshot } from '../utils/healthDiagnosticSnapshot';
+import { groupAccountingIssues, groupRuleIssues } from '../utils/reviewIssueGroups';
 
 type ActionItem = {
   severity: 'ACT' | 'WATCH' | 'SETUP';
@@ -35,7 +38,7 @@ type DecisionData = {
     totalTradingPnl?: number | null;
     accountingStatus?: string;
     accountingReconciled?: boolean;
-    accountingIssues?: Array<{code:string;symbol:string|null;message:string}>;
+    accountingIssues?: Array<{code:string;detailCode?:string;symbol:string|null;message:string}>;
     concentrationTop3Pct: number | null;
     semiconductorShock15Pct: number | null;
     scenarioShockTotal?: number | null;
@@ -178,10 +181,10 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         <DecisionMetric icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Action now" value={act.length ? String(act.length) : reviewCoverageComplete ? '0' : 'Unknown'} tone={act.length ? 'danger' : reviewCoverageComplete ? 'good' : 'warn'} />
-        <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={earningsCount === null ? 'Unknown' : String(earningsCount)} tone={earningsCount === null || earningsCount > 0 ? 'warn' : 'neutral'} />
+        <DecisionMetric icon={<CalendarClock className="w-3.5 h-3.5" />} label="Next 7 days" value={earningsCount === null ? 'Unknown' : String(earningsCount)} detail={earningsCount === 0 ? 'No events returned by the monitored feed; coverage may be incomplete.' : undefined} tone={earningsCount === null || earningsCount > 0 ? 'warn' : 'neutral'} />
         <DecisionMetric icon={<CircleDollarSign className="w-3.5 h-3.5" />} label="Trading P&L" value={signedMoney(portfolio.accountingStatus === 'conditional-loaded-records' ? portfolio.totalTradingPnl : null)} tone={portfolio.accountingStatus !== 'conditional-loaded-records' || portfolio.totalTradingPnl == null ? 'neutral' : portfolio.totalTradingPnl >= 0 ? 'good' : 'danger'} />
-        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={Number.isSafeInteger(data.forecast?.independentVerified) && data.forecast!.independentVerified! >= 0 ? data.forecast!.independentVerified + '/50' : 'Unknown'} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
-        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={(rulesEvaluated === null ? 'Unknown' : rulesEvaluated) + '/' + rules.total} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
+        <DecisionMetric icon={<Target className="w-3.5 h-3.5" />} label="Validation progress" value={Number.isSafeInteger(data.forecast?.independentVerified) && data.forecast!.independentVerified! >= 0 ? data.forecast!.independentVerified + ' independent' : 'Unknown'} detail={data.forecast ? '5-day: ' + (data.forecast.independent5D ?? 'unknown') + '/25 · 20-day: ' + (data.forecast.independent20D ?? 'unknown') + '/25. Both horizons and 50 overall are required.' : undefined} tone={(data.forecast?.gate === 'ready') ? 'good' : 'warn'} />
+        <DecisionMetric icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Rules evaluated" value={(rulesEvaluated === null ? 'Unknown' : rulesEvaluated) + '/' + rules.total} detail={rulesEvaluated !== null && rulesEvaluated < rules.total ? 'Configured rule sets need inputs. Separate allocation checks may still return review prompts.' : undefined} tone={rules.total > 0 && evaluatedRuleCount(rules) === rules.total ? 'good' : 'warn'} />
       </div>
 
       <PreTradeGate data={data} />
@@ -189,16 +192,17 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
       <details className="rounded-xl border border-amber-400/20 bg-amber-400/[.035] p-3" data-testid="decision-accounting-issues">
         <summary className="cursor-pointer text-xs font-bold text-amber-200">Accounting coverage and inputs</summary>
         <p className="mt-2 text-xs text-white/60">Trading figures require matched original loaded records. Full account history and corporate actions remain unverified. Cash-flow P&amp;L and benchmark comparisons need separately supported evidence.</p>
-        <ul className="mt-2 space-y-2 text-xs text-white/60">
-          {(Array.isArray(portfolio.accountingIssues) ? portfolio.accountingIssues : []).map((entry,index) => <li key={entry.code + '-' + index}>{entry.symbol ? entry.symbol + ': ' : ''}{entry.message}</li>)}
-        </ul>
+        <IssueGroups groups={groupAccountingIssues(portfolio.accountingIssues)} />
+        <p className="mt-2 text-xs text-white/50">Check the original transaction amount, quantity, ID and date for each reported issue. No broker records are changed by this review.</p>
+        <DiagnosticSnapshot label="Accounting diagnostics" buildReport={() => buildAccountingDiagnosticSnapshot(data)} />
       </details>
 
       {Array.isArray(rules.configurationIssues) && rules.configurationIssues.length > 0 && <details className="rounded-xl border border-amber-400/20 bg-amber-400/[.035] p-3" data-testid="decision-rule-issues">
         <summary className="cursor-pointer text-xs font-bold text-amber-200">Rule configuration and coverage issues</summary>
-        <ul className="mt-2 space-y-2 text-xs text-white/60">
-          {rules.configurationIssues.map((entry,index) => <li key={entry.symbol + '-' + index}><strong className="text-white/80">{entry.symbol}</strong>: {entry.issues.join(' ')}</li>)}
-        </ul>
+        <p className="mt-2 text-xs text-white/50">Shared prerequisites are grouped below. Mathematical review remains incomplete until the affected inputs are supplied.</p>
+        <IssueGroups groups={groupRuleIssues(rules.configurationIssues)} />
+        <p className="mt-2 text-xs text-white/50">Review broker alert directions in Forward Outlook. Trailing and staged exits also require verified history covering purchase through assessment; last-close quote coverage alone does not supply it.</p>
+        <button type="button" onClick={() => onNavigate('outlook')} className="mt-3 rounded-lg border border-white/15 px-3 py-2 text-xs">Review broker alerts in Forward Outlook</button>
       </details>}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-3">
@@ -235,7 +239,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
           <div className="text-[9px] font-mono uppercase tracking-widest text-white/25">Your result vs simple benchmark</div>
           <div className="text-sm font-black mt-1">Same cash-flow benchmark</div>
           <div className="text-[9px] text-white/35 mt-1">{comparisonReady ? 'Compare supported dated account cash flows with the same amounts invested on the same dates.' : 'Cash-flow and history evidence is incomplete; comparisons are unavailable.'}</div>
-          <div className="grid grid-cols-3 gap-2 mt-3">
+          {comparisonReady ? <><div className="grid grid-cols-3 gap-2 mt-3">
             <MiniResult label="You" value={signedMoney(accountPnl)} />
             <MiniResult label="SPY" value={signedMoney(spyPnl)} />
             <MiniResult label="You − SPY" value={signedMoney(excessSpy)} />
@@ -243,7 +247,7 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
           <div className="grid grid-cols-2 gap-2 mt-2">
             <MiniResult label="SOXX" value={signedMoney(soxxPnl)} />
             <MiniResult label="You − SOXX" value={signedMoney(excessSoxx)} />
-          </div>
+          </div></> : <p className="mt-3 text-xs text-white/60">Next: resolve the accounting issues above, then verify dated cash flows and compatible benchmark history. Current marks and concentration can still be reviewed separately.</p>}
         </div>
       </div>
 
@@ -251,10 +255,10 @@ export default function DecisionImpactCenter({ onNavigate }: { onNavigate: (view
         <RiskCard title="Signal gate" value={data.signalGate ? data.signalGate.eligible + ' eligible' : 'Unknown'} detail={!data.signalGate ? 'Signal history could not be verified.' : (data.signalGate.experimental ?? 0) + ' experimental/under review · ' + (data.signalGate?.retired ?? 0) + ' retired. Only independently validated families can influence decision status.'} />
         <RiskCard title="Top 3 holdings" value={portfolio.concentrationTop3Pct == null ? '—' : portfolio.concentrationTop3Pct.toFixed(1) + '%'} detail="Share of current portfolio value held in the three biggest positions." />
         <RiskCard title="If semiconductors fall 15%" value={money(portfolio.semiconductorShock15Pct)} detail="Estimated dollar loss from current semiconductor exposure; SOXL is counted at 3x. Scenario only." danger />
-        <RiskCard title="Forecast evidence" value={data.forecast ? data.forecast.verified + ' verified' : 'Unknown'} detail={!data.forecast ? 'Forecast history could not be verified.' : (data.forecast.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
+        <RiskCard title="Forecast evidence" value={data.forecast ? (data.forecast.independentVerified ?? 'Unknown') + ' independent' : 'Unknown'} detail={!data.forecast ? 'Forecast history could not be verified.' : data.forecast.verified + ' verified rows before overlap exclusions · ' + (data.forecast.independent5D ?? 0) + ' independent 5D · ' + (data.forecast?.independent20D ?? 0) + ' independent 20D · ' + (data.forecast?.pending ?? 0) + ' pending'} />
       </div>
 
-      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. See accounting coverage and inputs for withheld quotes.</div>}
+      {portfolio.quoteCoverage?.status && portfolio.quoteCoverage.status !== 'complete' && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Portfolio quote coverage: {portfolio.quoteCoverage.status} · {portfolio.quoteCoverage.coveragePct?.toFixed?.(0) ?? '—'}% valued. {portfolio.quoteCoverage.status === 'last-close' ? 'Values use the last market close, not a live session quote. Accounting and rule-history checks remain separate.' : 'See accounting coverage and inputs for withheld quotes.'}</div>}
       {(data.benchmarkCoverage?.SPY?.status === 'partial' || data.benchmarkCoverage?.SOXX?.status === 'partial') && <div className="rounded-lg border border-amber-400/15 bg-amber-400/[.03] px-3 py-2 text-[9px] font-mono text-amber-200/70">Benchmark coverage is partial; benchmark edge is withheld where trade dates could not be matched.</div>}
       {rules.targetReached ? <div className="text-[9px] font-mono text-cyan-200/60">{rules.targetReached} target level{rules.targetReached === 1 ? '' : 's'} reached · review staged exits.</div> : null}
       <DecisionJournalPanel />
@@ -344,9 +348,15 @@ function PreTradeGate({ data }: { data: DecisionData }) {
   );
 }
 
-function DecisionMetric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: 'danger'|'good'|'warn'|'neutral' }) {
+function IssueGroups({groups}: {groups: ReturnType<typeof groupAccountingIssues>}) {
+  return <ul className="mt-3 space-y-3 text-xs text-white/60">{groups.map(group => <li key={group.message} className="border-l-2 border-amber-400/25 pl-3">
+    <p>{group.message}</p>
+    <p className="mt-1 text-white/45">{group.symbols.length ? 'Affected: ' + group.symbols.join(', ') + ' · ' : ''}{group.entries} reported issue entr{group.entries === 1 ? 'y' : 'ies'}</p>
+  </li>)}</ul>;
+}
+function DecisionMetric({ icon, label, value, tone, detail }: { icon: ReactNode; label: string; value: string; detail?: string; tone: 'danger'|'good'|'warn'|'neutral' }) {
   const toneClass = tone === 'danger' ? 'text-rose-300' : tone === 'good' ? 'text-emerald-300' : tone === 'warn' ? 'text-amber-300' : 'text-white/70';
-  return <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className={toneClass}>{icon}</div><div className="text-[8px] font-mono uppercase text-white/25 mt-2">{label}</div><div className={'text-sm font-black font-mono mt-1 ' + toneClass}>{value}</div></div>;
+  return <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className={toneClass}>{icon}</div><div className="text-[8px] font-mono uppercase text-white/25 mt-2">{label}</div><div className={'text-sm font-black font-mono mt-1 ' + toneClass}>{value}</div>{detail && <p className="mt-1 text-xs text-white/45">{detail}</p>}</div>;
 }
 function SeverityPill({ severity }: { severity: 'ACT'|'WATCH'|'SETUP' }) {
   const cls = severity === 'ACT' ? 'border-rose-400/20 bg-rose-400/10 text-rose-300' : severity === 'WATCH' ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-cyan-400/15 bg-cyan-400/5 text-cyan-200';

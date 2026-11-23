@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useId, type ReactNode } from 'rea
 import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, TrendingUp, WalletCards, Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
+import { loadPortfolioHistoryBatch } from '../utils/portfolioHistoryBatch';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
@@ -409,17 +410,12 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   useEffect(() => {
     let cancelled = false;
     if(!['performance','rotation','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed')) return;
-    const symbols = [...new Set([...MONEY_ROTATION_SYMBOLS, ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
+    const symbols = [...new Set([...(tab === 'rotation' ? MONEY_ROTATION_SYMBOLS : []), ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
     if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
     setPortfolioHistory({ loading: true, histories: {}, error: '' });
-    Promise.allSettled(symbols.map(async symbol => {
-      const points = await fetchHistoryCached(symbol, '1y');
-      return { symbol, points };
-    })).then(results => {
+    loadPortfolioHistoryBatch(symbols, symbol => fetchHistoryCached(symbol, '1y'), () => cancelled).then(({histories, failures}) => {
       if (cancelled) return;
-      const histories: Record<string, PortfolioHistoryPoint[]> = {}; const failures: string[] = [];
-      results.forEach(result => { if (result.status === 'fulfilled') histories[result.value.symbol] = result.value.points; else failures.push(String(result.reason?.message || result.reason || 'history unavailable')); });
-      setPortfolioHistory({ loading: false, histories, error: failures.length ? failures.slice(0, 3).join(' · ') : '' });
+      setPortfolioHistory({ loading: false, histories, error: failures.length ? 'History unavailable for ' + failures.slice(0, 3).join(', ') + '. Review provider diagnostics.' : '' });
     });
     return () => { cancelled = true; };
   }, [holdings.map(item => item.symbol).join(','), tab, viewMode]);
@@ -685,6 +681,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     ),
     [portfolioHistory.histories, portfolioTransactions, loadedReview],
   );
+  const loadedMarketHistories = Object.values(portfolioHistory.histories).filter(points => Array.isArray(points) && points.length > 1).length;
   const correlationSymbols = analyses.slice().sort((a, b) => (b.portfolioWeight ?? 0) - (a.portfolioWeight ?? 0)).slice(0, 8).map(item => item.symbol);
   const portfolioCorrelation = useMemo(() => calculatePortfolioCorrelation(portfolioHistory.histories, correlationSymbols), [portfolioHistory.histories, correlationSymbols.join(',')]);
   const stressTrend = useMemo(() => buildPortfolioDailySeriesFromTransactions(
@@ -937,8 +934,15 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
               <section className="rounded-2xl border border-white/10 bg-[#15181E]/50 p-4">
                 <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3">
                   <div><div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">Portfolio performance &amp; risk</div><h2 className="text-lg font-black mt-1">Risk, performance &amp; market comparison</h2><p className="text-[10px] text-white/35 mt-1">Weights use current value when fresh; cost basis is used only when current value is unavailable. Benchmarks use overlapping market dates.</p></div>
-                  <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : 'HISTORY READY'}</div>
+                  <div className="text-[9px] font-mono text-white/30">{portfolioHistory.loading ? 'LOADING 1Y HISTORY…' : portfolioHistory.error ? 'PARTIAL HISTORY' : loadedMarketHistories ? loadedMarketHistories + ' SYMBOL HISTORIES RETURNED' : 'NO HISTORIES RETURNED'}</div>
                 </div>
+                <section data-testid="portfolio-chart-readiness" className="mt-3 space-y-2 rounded-lg border border-white/10 p-3 text-xs text-white/65">
+                  <h3 className="font-semibold">Market prices and account returns use different inputs</h3>
+                  <p role="status">{portfolioHistory.loading ? 'Loading the existing market-history requests.' : loadedMarketHistories + ' symbol histories returned with at least two points. Loaded points do not verify complete, adjusted or authentic history.'}</p>
+                  {!loadedReview.accountingReconciled && <p>Account return charts are withheld because full broker history and corporate actions are unverified. This does not mean market-price history is unavailable. Individual holding price charts are reviewed separately.</p>}
+                  <p>The history route supports Yahoo, Finnhub and Alpha Vantage in sequence. Provider access and source coverage must be verified separately; adding a web-search agent cannot reconcile account records.</p>
+                  <button type="button" onClick={() => changeTab('holdings')} className="rounded-lg border border-white/15 px-3 py-2">Review individual holding charts</button>
+                </section>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
                   <Info label="Portfolio stress" value={weightedStress.score == null ? '—' : weightedStress.score + '/100'} />
                   <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
@@ -948,7 +952,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                 </div>
                 <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3 mt-3">
                   <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="flex items-center justify-between"><div><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">30-day portfolio pressure trend</div><div className="text-[9px] text-white/30 mt-1">Observed market-move component using the actual held quantities from the broker transaction history; current macro load is separate.</div></div><div className="text-right"><div className="text-sm font-black">{stressTrendLatest == null ? '—' : stressTrendLatest + '/100'}</div><div className="text-[8px] font-mono text-white/25">avg {stressTrendAverage == null ? '—' : stressTrendAverage.toFixed(1)}</div></div></div>
-                    <div className="h-36 mt-2">{stressTrend.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={stressTrend}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} /><XAxis dataKey="date" hide /><YAxis domain={[0, 100]} hide /><Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(0), 'Stress']} /><Line type="monotone" dataKey="stressScore" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Not enough overlapping market history yet.</div>}</div>
+                    <div className="h-36 mt-2">{stressTrend.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={stressTrend}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.08} /><XAxis dataKey="date" hide /><YAxis domain={[0, 100]} hide /><Tooltip contentStyle={{ background: '#15181E', border: '1px solid rgba(255,255,255,.1)', fontSize: 10 }} formatter={(value: number) => [value.toFixed(0), 'Stress']} /><Line type="monotone" dataKey="stressScore" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">{!loadedReview.accountingReconciled ? 'Account pressure trend withheld: broker history and corporate actions are unverified.' : 'Not enough overlapping market history yet.'}</div>}</div>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-black/10 p-3"><div className="text-[8px] font-mono uppercase tracking-widest text-white/25">Where your money is concentrated</div><div className="space-y-2 mt-3">{groupConcentration.length ? groupConcentration.map(item => <div key={item.group}><div className="flex justify-between text-[9px] font-mono"><span className="text-white/60">{item.group}</span><span className="text-white/40">{(item.weight * 100).toFixed(1)}%</span></div><div className="h-1.5 rounded-full bg-white/5 mt-1 overflow-hidden"><div className="h-full bg-cyan-300/60" style={{ width: Math.min(100, item.weight * 100) + '%' }} /></div></div>) : <div className="text-[9px] font-mono text-white/25">No holdings with a usable value yet.</div>}</div></div>
                 </div>
@@ -974,7 +978,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                             <Line type="monotone" dataKey="normalizedValue" strokeWidth={2} dot={false} />
                           </LineChart>
                         </ResponsiveContainer>
-                      ) : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">Not enough shared holding history yet.</div>}
+                      ) : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/25">{!loadedReview.accountingReconciled ? 'Account return history withheld: broker history and corporate actions are unverified.' : 'Not enough shared holding history yet.'}</div>}
                     </div>
                     <div className="text-[8px] font-mono text-white/20 mt-1">Indexed to 100 at the first date when the broker transaction history shows an active position; market performance is separated from new cash added by later purchases. This is historical reconstruction, not a forecast.</div>
                   </div>

@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useThemeClass } from '../ThemeProvider';
 
 export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,onOpened,onScrollReady,children}:{symbol:string;name?:string;onClose:()=>void;onRestoreFocus:()=>void;onOpened?:()=>void;onScrollReady?:(scrollY:number)=>void;children:ReactNode}) {
+  const themeClass = useThemeClass();
   const dialog=useRef<HTMLDialogElement>(null);const close=useRef<HTMLButtonElement>(null);const heading=useId();const description=useId();
   const restore=useRef(onRestoreFocus);restore.current=onRestoreFocus;
   const opened=useRef(onOpened);opened.current=onOpened;
@@ -51,7 +53,7 @@ export default function HoldingDetailDialog({symbol,name,onClose,onRestoreFocus,
       });
     };
   },[]);
-  return createPortal(<dialog ref={dialog} aria-labelledby={heading} aria-describedby={description} data-testid="holding-detail-dialog" className="aiw-holding-dialog aiw-light-workspace" onCancel={event=>{event.preventDefault();onClose();}} onKeyDown={(event:KeyboardEvent<HTMLDialogElement>)=>{
+  return createPortal(<dialog ref={dialog} aria-labelledby={heading} aria-describedby={description} data-testid="holding-detail-dialog" className={'aiw-holding-dialog ' + themeClass} onCancel={event=>{event.preventDefault();onClose();}} onKeyDown={(event:KeyboardEvent<HTMLDialogElement>)=>{
     if(event.key!=='Tab')return;
     const root:HTMLDialogElement|null=dialog.current;if(!root)return;
     const controls=Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]')).filter(node=>{

@@ -6,6 +6,49 @@ from playwright.sync_api import expect
 from test_ui import mock_local_apis
 
 
+@pytest.mark.parametrize("width,clipboard_ok", [(360, True), (1440, False)])
+def test_source_diagnostic_preview_is_redacted_local_and_has_manual_copy_fallback(page, width, clipboard_ok):
+    mock_local_apis(page)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.add_init_script("""Object.defineProperty(navigator, 'clipboard', {value: {
+      writeText: async text => { %s }
+    }});""" % ("window.copiedReport = text;" if clipboard_ok else "throw new Error('fictional denial');"))
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    page.route("**/api/market?route=market-data-health*", lambda route: route.fulfill(status=200, json={
+        "ok": True, "retrievedAt": now, "rows": [{"symbol": "PRIVATEHOLDING", "quantity": 987654,
+            "quote": {"provider": "yahoo", "available": False, "errorCode": "rate_limited", "price": 12345.67,
+                      "error": "fictional-sensitive-key", "valuationAdmission": {"eligible": False, "status": "missing"}},
+            "history": {"available": False}}]}))
+    requests, writes = [], []
+    page.on("request", lambda request: requests.append(request.url))
+    page.on("request", lambda request: writes.append(request.url) if request.method not in ("GET", "HEAD", "OPTIONS") else None)
+    page.goto("/health")
+    expect(page.get_by_test_id("market-sample-row")).to_be_visible()
+    page.wait_for_load_state("networkidle")
+    initial_requests = len(requests)
+    panel = page.get_by_label("Source diagnostics", exact=True)
+    panel.locator("summary").focus()
+    page.keyboard.press("Enter")
+    panel.get_by_role("button", name="Prepare source diagnostics", exact=True).click()
+    preview = panel.get_by_role("textbox", name="Source diagnostics preview", exact=True)
+    report_text = preview.input_value()
+    report = json.loads(report_text)
+    assert report["rows"][0]["quote"]["errorCode"] == "rate_limited"
+    assert report["rows"][0]["quote"]["reportedEligible"] is False
+    assert "does not test the public Yahoo" in report["sourcePath"]
+    for private in ["PRIVATEHOLDING", "fictional-sensitive-key", "987654", "12345.67"]:
+        assert private not in report_text
+    panel.get_by_role("button", name="Copy report", exact=True).click()
+    if clipboard_ok:
+        expect(panel.get_by_role("status")).to_contain_text("Copied")
+        assert page.evaluate("window.copiedReport") == report_text
+    else:
+        expect(panel.get_by_role("status")).to_contain_text("copy the preview manually")
+        expect(preview).to_have_value(report_text)
+    assert len(requests) == initial_requests and writes == []
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
 def fictional_channels():
     now = datetime.datetime.now(datetime.timezone.utc)
     def timestamp(seconds):

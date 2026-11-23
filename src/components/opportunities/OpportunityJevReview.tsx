@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { authFetch } from '../../utils/apiAuth';
-import { normalizeOpportunityJevReview, opportunityJevState, type OpportunityJevReview as Review } from '../../utils/opportunityJevReview';
+import { normalizeOpportunityJevReview, opportunityJevState, opportunityJevFailure, type OpportunityJevReview as Review } from '../../utils/opportunityJevReview';
 import type { ResearchCandidate } from '../../utils/opportunityResearch';
 import { FilterSelect } from '../FilterControls';
 
@@ -23,13 +23,15 @@ export default function OpportunityJevReview({candidates}:{candidates:readonly R
     const controller=new AbortController();request.current=controller;
     const timer=window.setTimeout(()=>controller.abort(),15000);
     setErrors(previous=>({...previous,[key]:''}));
+    let failure = opportunityJevFailure(0, null);
     try {
       const response=await authFetch('/api/jev-assess',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'opportunities',state}),signal:controller.signal,cache:'no-store'});
-      if(!response.ok)throw new Error();
-      const result=normalizeOpportunityJevReview(await response.json(),state);
+      const body = await response.json();
+      if(!response.ok || body?.ok !== true) { failure = opportunityJevFailure(response.status, body); throw new Error(); }
+      const result=normalizeOpportunityJevReview(body,state);
       if(mounted.current&&!controller.signal.aborted)setResults(previous=>({...previous,[key]:result}));
     } catch {
-      if(mounted.current&&request.current===controller)setErrors(previous=>({...previous,[key]:'JEV review is unavailable or was interrupted. Credits may have been used. No automatic retry occurred; research eligibility is unchanged.'}));
+      if(mounted.current&&request.current===controller)setErrors(previous=>({...previous,[key]:failure}));
     } finally {window.clearTimeout(timer);active.current=false;if(mounted.current)setBusy(false);}
   };
   const result=results[key];

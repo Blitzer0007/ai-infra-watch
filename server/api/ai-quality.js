@@ -1,3 +1,4 @@
+import { requireAccess } from '../../api/_access-auth.js';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
@@ -105,6 +106,7 @@ function aggregateRuns(runs) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
+  if (!requireAccess(req, res)) return;
 
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {

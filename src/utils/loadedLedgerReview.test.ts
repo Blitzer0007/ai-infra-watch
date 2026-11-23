@@ -11,6 +11,13 @@ const transaction=(id='fictional-buy',fields:Record<string,unknown>={})=>{
 const review=(holdings:readonly unknown[]=[holding()],transactions:readonly unknown[]=[transaction()],extra:Record<string,unknown>={})=>reviewLoadedLedger({holdings,transactions,holdingsAvailability:'ready',transactionsAvailability:'ready',assessedAt:NOW,...extra});
 const code=(result:ReturnType<typeof review>,value:string)=>result.issues.some(i=>i.code===value);
 describe('loaded ledger diagnostics over existing accounting',()=>{
+  it('distinguishes invalid fields, duplicate IDs and future dates without changing withheld calculations',()=>{
+    for (const [fields,detail] of [[{amount:-1},'AMOUNT_INVALID'],[{quantity:0},'QUANTITY_INVALID'],[{transaction_type:'OTHER'},'TYPE_INVALID'],[{trade_date:'2027-01-01'},'DATE_FUTURE'],[{trade_date:'2026-02-30'},'DATE_INVALID']] as const) {
+      const result=review([holding()],[transaction('b',fields)]);
+      assert(result.issues.some(issue=>issue.detailCode===detail));assert.equal(result.totals,null);assert.equal(result.accountingReconciled,false);
+    }
+    assert(review([holding()],[transaction(),transaction()]).issues.some(issue=>issue.detailCode==='ID_DUPLICATE'));
+  });
   it('matches only supplied records without borrowing holding cost or upgrading authority',()=>{
     const result=review();assert.equal(result.status,'matched-loaded-records');assert.deepEqual(result.totals,{openCostBasis:100,recordedTradeResult:0,grossPurchaseCost:100,netSaleProceeds:0});
     assert.equal(result.positions[0].openCostBasis,100);assert.equal(result.historyCoverage,'unverified');assert.equal(result.corporateActionCoverage,'unverified');

@@ -48,6 +48,8 @@ export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSna
   const [lastRefresh, setLastRefresh] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [serverSync, setServerSync] = useState<string | null>(null);
+  const [savingServerConfig, setSavingServerConfig] = useState(false);
+  const [serverSaveStatus, setServerSaveStatus] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'attention' | 'symbol' | 'today'>('attention');
   const [watchDraft, setWatchDraft] = useState('');
@@ -122,17 +124,7 @@ export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSna
     };
 
     void refreshQuotes();
-    if(!import.meta.env.DEV&&import.meta.env.VITE_QA_MODE!=='true') void authFetch('/api/alert-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      watchlist: config.watchlist,
-      alerts: config.alerts,
-      largeMoveEnabled: config.largeMoveEnabled,
-      largeMovePct: config.largeMovePct,
-      catalystAlerts: config.catalystAlerts,
-    }), cache: 'no-store' }).then(async response => {
-      if (!response.ok || cancelled) return;
-      const data = await response.json().catch(() => ({}));
-      setServerSync(data?.updated_at || new Date().toISOString());
-    }).catch(() => {});
+
 
     return () => {
       cancelled = true;
@@ -144,6 +136,23 @@ export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSna
     setConfig(updated);
     saveConfig(updated);
     setMessage('');
+    setServerSaveStatus('Device changes have not been saved to the server.');
+  };
+
+  const saveServerConfig = async () => {
+    if (!config || savingServerConfig) return;
+    setSavingServerConfig(true);
+    setServerSaveStatus('');
+    try {
+      const response = await authFetch('/api/alert-config', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({watchlist: config.watchlist, alerts: config.alerts, largeMoveEnabled: config.largeMoveEnabled,
+          largeMovePct: config.largeMovePct, catalystAlerts: config.catalystAlerts}), cache: 'no-store'});
+      if (!response.ok) throw new Error('Save rejected');
+      const data = await response.json();
+      setServerSync(typeof data?.updated_at === 'string' && Number.isFinite(Date.parse(data.updated_at)) ? data.updated_at : null);
+      setServerSaveStatus('Saved the settings captured when you clicked Save. Later device edits require another save.');
+    } catch { setServerSaveStatus('Server settings were not confirmed saved. Review access and retry explicitly.'); }
+    finally { setSavingServerConfig(false); }
   };
 
   const catalog = useMemo(() => {
@@ -287,10 +296,16 @@ export default function BuySellWatchlist({ onEarningsSnapshot }: { onEarningsSna
           <div className="flex flex-wrap gap-2 text-[9px] font-mono uppercase">
             <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/40">{freshCount}/{config.watchlist.length} fresh</span>
             <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/40">{activeAlerts.length} active alerts</span>
-            <span className={serverSync ? 'rounded border border-emerald-400/15 bg-emerald-400/5 px-2 py-1 text-emerald-300' : 'rounded border border-white/10 bg-white/5 px-2 py-1 text-white/35'}>{serverSync ? 'Server sync ' + new Date(serverSync).toLocaleTimeString() : 'Server sync pending'}</span>
+            <span className={serverSync ? 'rounded border border-emerald-400/15 bg-emerald-400/5 px-2 py-1 text-emerald-300' : 'rounded border border-white/10 bg-white/5 px-2 py-1 text-white/35'}>{serverSync ? 'Server record ' + new Date(serverSync).toLocaleTimeString() : 'Server record unconfirmed'}</span>
           </div>
         </div>
       </div>
+
+      <section className="rounded-xl border border-white/10 p-4 text-xs" aria-label="Server alert settings">
+        <p>Saving replaces the server watchlist and alert settings with this device’s values. Review the watchlist and alert rules below before saving. Opening or editing this page does not save them to the server.</p>
+        <button type="button" onClick={() => void saveServerConfig()} disabled={savingServerConfig} className="mt-3 rounded-lg border border-white/15 px-3 py-2 disabled:opacity-40">{savingServerConfig ? 'Saving settings…' : 'Save device alert settings to server'}</button>
+        <p role="status" className="mt-2 text-white/60">{serverSaveStatus}</p>
+      </section>
 
       <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.025] p-4 md:p-5">
         <div className="flex items-center justify-between gap-3">

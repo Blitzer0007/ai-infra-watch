@@ -4,7 +4,7 @@ import { STOCK_METADATA } from '../data';
 import { fetchPortfolioHoldings, updatePortfolioHolding } from '../utils/portfolioApi';
 import { mapStoredPortfolioHoldings, type PortfolioPosition } from '../utils/portfolioPositions';
 import { formatPrice } from '../utils';
-import { authHeaders } from '../utils/apiAuth';
+import { authHeaders, authFetch } from '../utils/apiAuth';
 import { summarizeCalibration, summarizeValidationMatrix, type CalibrationBucket } from '../utils/measurement';
 import { forecastValidationGate, FORECAST_VALIDATION_MINIMUM } from '../utils/forecastValidation';
 import { independentForecastRows } from '../utils/forecastIndependence.js';
@@ -107,7 +107,12 @@ function forecastDirection(actualReturn: number, predictedReturn: number): 'Dire
   return Math.sign(actualReturn) === Math.sign(predictedReturn) ? 'Direction right' : 'Direction wrong';
 }
 
-function saveForecasts(items: ForecastSnapshot[]) { localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify(items.slice(-100))); }
+function saveForecasts(items: ForecastSnapshot[]) {
+  // Keep older device-only records when explicitly saving a new server result.
+  // They are not inserted into the server-confirmed display or uploaded here.
+  const records = new Map([...loadForecasts(), ...items].map(item => [item.id, item]));
+  localStorage.setItem(FORECAST_STORAGE_KEY, JSON.stringify([...records.values()].slice(-100)));
+}
 
 function percentile(values: number[], p: number): number {
   if (!values.length) return 0;
@@ -559,7 +564,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     let cancelled = false;
     async function loadPersistentForecasts() {
       try {
-        const response = await fetch('/api/forecast-verification', { cache: 'no-store' });
+        const response = await authFetch('/api/forecast-verification', { cache: 'no-store' });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
           const detail = typeof body?.error === 'string' ? body.error : 'Persistent forecast storage is unavailable.';
@@ -576,31 +581,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           if (!remote.length) {
             const legacy = loadForecasts();
             if (legacy.length) {
-              // Migrate legacy browser-only forecasts only after a successful API read.
-              // Keep migration failures visible rather than silently treating local rows as persisted.
-              const migrationResults = await Promise.allSettled(legacy.map(item =>
-                fetch('/api/forecast-verification', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(item)
-                }).then(async result => {
-                  if (!result.ok) throw new Error('Forecast migration request failed (' + result.status + ')');
-                  return result;
-                })
-              ));
-              const failedMigrations = migrationResults.filter(result => result.status === 'rejected').length;
-              const refreshed = await fetch('/api/forecast-verification', { cache: 'no-store' });
-              const refreshedBody = await refreshed.json().catch(() => ({}));
-              if (!refreshed.ok || !Array.isArray(refreshedBody?.forecasts)) {
-                throw new Error('Could not confirm that older browser forecasts were saved to the server.');
-              }
-              if (!cancelled) {
-                setForecasts(refreshedBody.forecasts);
-                setForecastAnalytics(refreshedBody?.analytics || null);
-                if (failedMigrations > 0) {
-                  setForecastStorageError(failedMigrations + ' older browser forecast(s) could not be migrated. Displayed results are the server-confirmed records only.');
-                }
-              }
+              setForecastStorageError('Older browser-only forecasts were found. They remain on this device and were not uploaded automatically. Only server-confirmed records are displayed.');
             }
           }
         }
@@ -620,7 +601,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
     let cancelled = false;
     async function loadModel() {
       try {
-        const response = await fetch('/api/forecast-verification?ticker=' + encodeURIComponent(selectedStock) + '&horizon=' + horizon);
+        const response = await authFetch('/api/forecast-verification?ticker=' + encodeURIComponent(selectedStock) + '&horizon=' + horizon);
         if (!response.ok) throw new Error('Model configuration unavailable');
         const body = await response.json();
         if (!cancelled) {
@@ -873,7 +854,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Macro risks: ' + JSON.stringify(compact(macroRisks, ['title','description','impactRating']))
       ].join('\n');
 
-      const response = await fetch('/api/agent-ask', {
+      const response = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ question: prompt })
@@ -999,7 +980,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
       brokerAlertPrices: portfolioContext.holding?.brokerAlertPrices || []
     };
     try {
-      const response = await fetch('/api/forecast-verification', {
+      const response = await authFetch('/api/forecast-verification', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot)
       });
       if (!response.ok) throw new Error('Persistent forecast storage failed (HTTP ' + response.status + ')');
@@ -1037,7 +1018,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
           actualDate: point.date, actualPrice: point.price, actualReturn,
           medianError: actualReturn - forecast.median
         };
-        const savedResponse = await fetch('/api/forecast-verification', {
+        const savedResponse = await authFetch('/api/forecast-verification', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
         });
         if (!savedResponse.ok) throw new Error('Database verification failed for ' + forecast.ticker + ' (HTTP ' + savedResponse.status + ')');
@@ -1141,7 +1122,7 @@ export default function ForwardOutlook({ livePrices, macroRisks = [], contracts 
         'Validation rule: this backtest uses only information available before each historical as-of date; future outcomes are used only as the realized result for that test.'
       ].join('\n');
 
-      const response = await fetch('/api/agent-ask', {
+      const response = await authFetch('/api/agent-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: prompt })

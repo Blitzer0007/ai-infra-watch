@@ -40,7 +40,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
   }
 
   async function run(mode:'demo'|'loaded-v2'|'admission-v2'|'jev') {
-    if(flight.current||attemptCount.current>=5||(['loaded-v2','admission-v2'].includes(mode)&&!sources)||(mode==='jev'&&(!result||result.mode!=='nvidia'||result.status!=='complete')))return;
+    if(flight.current||attemptCount.current>=5||(['loaded-v2','admission-v2'].includes(mode)&&!sources)||(mode==='jev'&&(!result||!['nvidia','multi-model'].includes(result.mode)||result.status!=='complete')))return;
     const controller=new AbortController();flight.current=controller;
     const current=version.current;
     if(mode==='demo'){setSources(null);setAdmission(null);}
@@ -145,7 +145,7 @@ export default function JevCouncilPanel({symbols,quotes,financials,calendar}:{sy
           </div>
         </details>
         <div className="rounded-xl border border-white/10 p-3 text-sm">
-          <button className={control} disabled={disabled||!!jev||result.mode!=='nvidia'||result.status!=='complete'} onClick={()=>void run('jev')}>Check coverage with TypeSafe</button>
+          <button className={control} disabled={disabled||!!jev||!['nvidia','multi-model'].includes(result.mode)||result.status!=='complete'} onClick={()=>void run('jev')}>Check coverage with TypeSafe</button>
           <p className="mt-2 text-xs text-slate-400">Optional typed check of coverage counts only; may consume TypeSafe credits when enabled. Unavailable for the fictional demo. It cannot validate source truth, predict returns, or override evidence gates.</p>
           {jev&&<p className="mt-2" role="status">{jev.available?`TypeSafe coverage: ${human(jev.coverage!)} · Next check: ${human(jev.next_check!)} · Input tokens: ${jev.input_tokens??'unreported'}`:'TypeSafe coverage is unavailable. No automatic retry occurred.'}</p>}
         </div>

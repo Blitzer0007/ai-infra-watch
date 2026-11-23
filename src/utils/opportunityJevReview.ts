@@ -15,6 +15,15 @@ export function opportunityJevState(candidate: ResearchCandidate) {
 }
 export type OpportunityJevState = ReturnType<typeof opportunityJevState>;
 export type OpportunityJevReview = {nextCheck:'gather_evidence'|'resolve_conflicts'|'inspect_sources'|'monitor';context:'insufficient'|'conflicting'|'bounded_review';inputTokens:number|null;latencyMs:number|null;model:string|null};
+export function opportunityJevFailure(status: number, value: unknown): string {
+  const body = value as any;
+  if (status === 401 || status === 403) return 'Private access was rejected. Unlock the dashboard again before retrying. No automatic retry occurred.';
+  if (status === 400 || status === 422) return 'The server rejected this coverage summary. Check that the UI and assessment endpoint are on the same release. No automatic retry occurred.';
+  if (status === 429) return 'The review request limit was reached. Wait before retrying; no automatic retry occurred.';
+  if (body?.error_code === 'disabled' || body?.error_code === 'not_configured' || body?.enabled === false)
+    return 'JEV is disabled or its server configuration is incomplete. This endpoint did not call TypeSafe. Research eligibility is unchanged.';
+  return 'JEV review is unavailable or was interrupted. Credits may have been used. No automatic retry occurred; research eligibility is unchanged.';
+}
 export function normalizeOpportunityJevReview(value:unknown,state:OpportunityJevState):OpportunityJevReview {
   const body=value as any;
   if (!body||body.ok!==true||body.enabled!==true||body.fallback!==false||body.kind!=='opportunities') throw new Error('JEV unavailable');

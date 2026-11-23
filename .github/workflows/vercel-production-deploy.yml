@@ -13,7 +13,7 @@ on:
         required: true
         default: "NO"
       confirm_milestone5_unprotected_main_exception:
-        description: "Owner-approved PR #187 light UI/quote release only; pinned merge parents and main CI required"
+        description: "PR #188 repair release only, after separate owner approval; pinned merge parents and main CI required"
         type: choice
         options:
           - "NO"
@@ -52,7 +52,7 @@ jobs:
       VERCEL_ORG_ID: team_TfbzU4SMDZD8lIgCHKsJNa6v
       VERCEL_PROJECT_ID: prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
-      AIW_RELEASE_PR: "187"
+      AIW_RELEASE_PR: "188"
       AIW_MAIN_PROTECTION_WAIVER: ${{ inputs.confirm_milestone5_unprotected_main_exception }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
       # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.

@@ -42,10 +42,17 @@ const DATA_REPAIR_BRANCH = 'fix/telegram-daily-brief-evidence-20261119';
 const LIGHT_QUOTES_PR = 187;
 const LIGHT_QUOTES_PARENT = '529e956254bc73c12ed8d7f4ffa6510f9b3d4442';
 const LIGHT_QUOTES_BRANCH = 'feature/data-health-evidence-states';
+// Prepared PR #188 release: requires its own explicit owner decision before
+// merge. The historical #187 approval does not authorize this candidate.
+const RESEARCH_REPAIRS_PR = 188;
+const RESEARCH_REPAIRS_PARENT = '978ccefac76e36fa24e4b35cab2f1a08cbaca899';
+const RESEARCH_REPAIRS_BRANCH = 'feature/read-only-health-snapshot';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
-  const expected = pr?.number === LIGHT_QUOTES_PR
+  const expected = pr?.number === RESEARCH_REPAIRS_PR
+    ? { parent: RESEARCH_REPAIRS_PARENT, branch: RESEARCH_REPAIRS_BRANCH }
+    : pr?.number === LIGHT_QUOTES_PR
     ? { parent: LIGHT_QUOTES_PARENT, branch: LIGHT_QUOTES_BRANCH }
     : pr?.number === DATA_REPAIR_PR
     ? { parent: DATA_REPAIR_PARENT, branch: DATA_REPAIR_BRANCH }
@@ -155,7 +162,8 @@ export async function checkCandidate(env, fetcher = fetch) {
   let waiverPr = null, waiverCommit = null;
   const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
   if (main?.protected === false && waiver) {
-    const prNumber = env.AIW_RELEASE_PR === '187' ? LIGHT_QUOTES_PR
+    const prNumber = env.AIW_RELEASE_PR === '188' ? RESEARCH_REPAIRS_PR
+      : env.AIW_RELEASE_PR === '187' ? LIGHT_QUOTES_PR
       : env.AIW_RELEASE_PR === '180' ? DATA_REPAIR_PR
       : env.EXPECTED_MAIN_SHA === M5_MERGE_SHA ? M5_PR
       : env.EXPECTED_MAIN_SHA === M5_REPAIR_MERGE_SHA ? M5_REPAIR_PR

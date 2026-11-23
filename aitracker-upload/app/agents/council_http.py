@@ -13,8 +13,11 @@ _slot = BoundedSemaphore(1)
 
 
 def loaded_model():
-    if os.getenv("COUNCIL_LIVE_DEV_ENABLED") != "true":
+    if not development_enabled() or os.getenv("COUNCIL_LIVE_DEV_ENABLED") != "true":
         return None
+    if os.getenv("COUNCIL_MULTI_MODEL_DEV_ENABLED") == "true":
+        from app.agents.council_model import configured_role_model
+        return configured_role_model()
     from app.config import settings
     from app.agents.council_model import NvidiaCouncilModel
     # Reuse existing server-only provider configuration, never caller-selected hosts/models.
