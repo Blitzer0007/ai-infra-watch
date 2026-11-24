@@ -95,7 +95,7 @@ def validate_sec(receipt, packet):
 
 def parse_request(raw):
     value = decode(raw)
-    if not exact(value, ("mode", "packet", "sources")) or value["mode"] not in ("admission-v2", "loaded-v2") or not exact(value["sources"], ("sec", "catalyst")):
+    if not exact(value, ("mode", "packet", "sources")) or value["mode"] not in ("admission-v2", "loaded-v2", "research-v2") or not exact(value["sources"], ("sec", "catalyst")):
         raise ValueError("Invalid admission request")
     packet = parse_packet(json.dumps(value["packet"], allow_nan=False).encode())
     sec = validate_sec(value["sources"]["sec"], packet)

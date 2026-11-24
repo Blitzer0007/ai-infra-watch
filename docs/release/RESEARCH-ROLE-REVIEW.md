@@ -1,6 +1,6 @@
 # Company, Catalyst and Daily Review baseline — 23 November 2026
 
-This adds three **deterministic read-only role views** after an explicit conditional input-validation request in the development JEV council panel. These views are not autonomous AI agents and do not require NVIDIA credentials. A separate [bounded tool-calling role runner](RESEARCH-ROLE-AGENTS.md) is implemented for offline/development probes; live provider acceptance, UI integration and independent usefulness evaluation remain pending.
+This adds three **deterministic read-only role views** after an explicit conditional input-validation request in the development JEV council panel. These views are not autonomous AI agents and do not require NVIDIA credentials. A separate [bounded tool-calling role runner](RESEARCH-ROLE-AGENTS.md) has a separately opted-in, authenticated manual development UI action. Live provider acceptance and independent usefulness evaluation remain pending. These tabs themselves still make no model calls.
 
 ## Role interfaces
 

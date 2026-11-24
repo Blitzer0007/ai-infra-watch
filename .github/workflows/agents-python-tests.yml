@@ -14,6 +14,7 @@ on:
       - "aitracker-upload/app/eval/**"
       - "aitracker-upload/tests/eval/**"
       - "aitracker-upload/data/research/council-benchmark.fictional.json"
+      - "aitracker-upload/data/research/research-role-response.fictional.json"
       - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
@@ -36,6 +37,7 @@ on:
       - "aitracker-upload/app/eval/**"
       - "aitracker-upload/tests/eval/**"
       - "aitracker-upload/data/research/council-benchmark.fictional.json"
+      - "aitracker-upload/data/research/research-role-response.fictional.json"
       - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
@@ -80,7 +82,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py aitracker-upload/tests/agents/test_council_role_models.py aitracker-upload/tests/agents/test_research_role_review.py aitracker-upload/tests/agents/test_research_role_agent.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py aitracker-upload/tests/agents/test_council_role_models.py aitracker-upload/tests/agents/test_research_role_review.py aitracker-upload/tests/agents/test_research_role_agent.py aitracker-upload/tests/agents/test_research_role_http.py
 
       - name: Run MCP contract tests
         env:

@@ -155,7 +155,9 @@ class ResearchRoleAgent:
                         else:
                             raise ValueError()
                         result["usage"]["tool_calls"] += 1
-                        result["trace"].append({"role": role, "action": action, "status": "ok"})
+                        result["trace"].append({"role": role, "action": action, "status": "ok",
+                            "evidence_ids": step["evidence_ids"] if action == "inspect" else [],
+                            "families": step["families"] if action == "coverage" else []})
                         messages.extend([{"role": "assistant", "content": text},
                                          {"role": "user", "content": json.dumps({"tool_result": observation, "remaining_tools": 0})}])
                         continue
@@ -172,7 +174,7 @@ class ResearchRoleAgent:
                             raise ValueError()
                     result["roles"][role] = {"input_status": baseline["roles"][role]["status"],
                         "review_codes": step["review_codes"], "evidence_ids": step["evidence_ids"]}
-                    result["trace"].append({"role": role, "action": "review", "status": "ok"})
+                    result["trace"].append({"role": role, "action": "review", "status": "ok", "evidence_ids": [], "families": []})
             result["status"], result["termination_reason"] = "complete", "completed"
         except ResearchRoleStopped as error:
             result["status"], result["termination_reason"] = "partial", "tool-budget" if error.args == ("tool-budget",) else "budget"

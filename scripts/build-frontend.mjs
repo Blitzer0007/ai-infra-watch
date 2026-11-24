@@ -37,6 +37,7 @@ await esbuild({
     'import.meta.env.PROD': 'true',
     'import.meta.env.MODE': JSON.stringify('production'),
     'import.meta.env.VITE_QA_MODE': JSON.stringify(process.env.VITE_QA_MODE ?? ''),
+    'import.meta.env.VITE_RESEARCH_ROLE_DEV_ENABLED': JSON.stringify(process.env.VITE_RESEARCH_ROLE_DEV_ENABLED ?? ''),
   },
   minify: process.env.NODE_ENV === 'production',
   logLevel: 'info',

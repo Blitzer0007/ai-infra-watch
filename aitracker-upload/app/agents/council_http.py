@@ -29,6 +29,18 @@ def loaded_model():
         return None
 
 
+def research_model():
+    from app.agents.research_role_agent import configured_research_role_model
+    return configured_research_role_model()
+
+
+def research_response(raw, model):
+    from app.agents.council_admission import evaluate
+    from app.agents.research_role_agent import ResearchRoleAgent
+    return {"contract_version": "research-role-response-v1", "admission": evaluate(raw),
+            "result": ResearchRoleAgent(model).run(raw)}
+
+
 async def council_http(request, require_auth, configured_token):
     require_auth(request.headers.get("authorization"))
     if not development_enabled():
@@ -48,7 +60,9 @@ async def council_http(request, require_auth, configured_token):
         value = decode(bytes(body))
         if not isinstance(value, dict):
             raise ValueError()
-        if value.get("mode") in ("admission-v2", "loaded-v2"):
+        if value.get("mode") in ("admission-v2", "loaded-v2", "research-v2"):
+            if value["mode"] == "research-v2" and os.getenv("RESEARCH_ROLE_HTTP_DEV_ENABLED") != "true":
+                raise HTTPException(status_code=404, detail="Research role development unavailable")
             from app.agents.council_admission import parse_request, evaluate
             parse_request(bytes(body))
             if not _slot.acquire(blocking=False):
@@ -56,6 +70,11 @@ async def council_http(request, require_auth, configured_token):
             try:
                 if value["mode"] == "admission-v2":
                     result = await run_in_threadpool(evaluate, bytes(body))
+                elif value["mode"] == "research-v2":
+                    model = research_model()
+                    if model is None:
+                        raise HTTPException(status_code=503, detail="Research role development model is not configured")
+                    result = await run_in_threadpool(research_response, bytes(body), model)
                 else:
                     model = loaded_model()
                     if model is None:

@@ -1,6 +1,6 @@
-# Bounded Company/Catalyst/Daily role runner — 23 November 2026
+# Bounded Company/Catalyst/Daily role runner — 24 November 2026
 
-This adds a tool-calling research-role protocol and dedicated-development NVIDIA hook after the deterministic role views. The runner is implemented and tested with fictional models and mocked provider transports. **No live NVIDIA trial has run; there is no production activation or UI model-analysis endpoint.**
+This adds a tool-calling research-role protocol and dedicated-development NVIDIA hook after the deterministic role views. The runner is implemented and tested with fictional models and mocked provider transports. **No live NVIDIA trial has run. An authenticated manual development UI integration is implemented behind separate opt-ins; production activation remains disabled.**
 
 ## What the runner does
 
@@ -53,8 +53,20 @@ Live requires one explicit bundled case and at most six provider attempts for th
 
 ## Integration and pending acceptance
 
-The browser still uses the deterministic read-only tabs from [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md). Model-selected results are CLI/development-probe only; no new API mode or UI live-model action is wired in. The regular production build continues to omit the council/role preview.
+The deterministic read-only tabs from [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md) remain the model-free baseline. A separate **Run model-selected research roles** action now uses `research-v2` through the existing private council relay. It requires loaded source inspection and explicit conditional validation first. The action reuses the frozen source packet; a feed refresh does not silently replace it. Changing the symbol/horizon or starting a new review clears results, and late replies are discarded. One in-flight action, the existing five-attempt session cap and no automatic retries remain enforced.
 
-Pending: dedicated NVIDIA development setup; real one-case protocol trial; independently reviewed selection/grounding labels, holdouts and deterministic-baseline comparison; independent source/document inspection; authenticated manual UI integration after provider acceptance; portfolio-wide daily summaries; separate future production review. An offline fixture completing the protocol does not establish model usefulness or future-winner correctness.
+Additional opt-ins, empty/off by default:
+
+- Build: `VITE_RESEARCH_ROLE_DEV_ENABLED=true`, inside the already development/QA-only council parent. Local fictional QA builds explicitly use `VITE_QA_MODE=true`; do not publish QA builds.
+- Both private Node relay and Python backend: `RESEARCH_ROLE_HTTP_DEV_ENABLED=true`, in addition to existing nonproduction council and private authentication configuration.
+- Actual inference still requires the existing dedicated live/multi-model flags, candidate profile and dedicated development secret. The UI/server switches alone cannot configure a provider. Production/Vercel remains rejected.
+
+The flat request `{mode: "research-v2", packet, sources}` preserves original bytes for the Python SHA-256 digest. The response is a strict `research-role-response-v1` containing rechecked admission and a bounded `research-role-agent-v1` result. Both Node and browser verify request identity/digest, exact policy/false-authority flags, role order, selected codes, scoped eligible citations, actual inspection trace and counters. Extra prose, uninspected citations, unknown fields and forged complete states are rejected. Trace inspection IDs/families are now explicit; the contract is still only in this undeployed draft.
+
+The separate results panel shows fixed review questions, original cited values, workflow completion versus input readiness, missing roles, and bounded counters. Incomplete runs never appear complete. Simulated runs are labeled and show zero provider requests. UI token usage/cost is unreported; CLI probe receipts concern separate trials. The regular production build continues to omit the entire council/role preview.
+
+QA exercises browser → actual authenticated Node relay → actual Python runner with a fictional model factory and isolated fake access tokens. It makes no live inference, acquires no new source and reads no real provider configuration. Cross-language fixtures cover eight complete cases plus failed, partial and unconfigured responses. HTTP tests cover access, opt-ins, production, body limits, shared concurrency and byte-preserving request binding.
+
+Pending: dedicated NVIDIA development setup; real one-case protocol trial; independently reviewed selection/grounding labels, holdouts and deterministic-baseline comparison; independent source/document inspection; real-provider acceptance of the opt-in UI integration; portfolio-wide daily summaries; separate future production review. An offline fixture completing the protocol does not establish model usefulness or future-winner correctness.
 
 This extends draft PR #189, not the deployed release. Production remains PR #188 at79fddf79a452c2a385b596fced604397781316eb. No production DB, polling, agent activation or Telegram send is part of this work.

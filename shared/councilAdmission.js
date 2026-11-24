@@ -10,7 +10,7 @@ const QUALITY=['SIMULATED_OR_UNKNOWN_SOURCE','REPORTED_BASIS_MISSING','TIME_PROV
 const FAMILIES=['market','financial','catalyst','risk'];
 const AUTHORITY=['source_authenticity_verified','forecast_validity_established','grants_decision_eligibility','changes_allocation','sends_messages'];
 export function councilAdmissionPayload(v) {
-  if(!exact(v,['mode','packet','sources'])||!['admission-v2','loaded-v2'].includes(v.mode)||!councilPayload({mode:'loaded',packet:v.packet})||!exact(v.sources,['sec','catalyst']))return null;
+  if(!exact(v,['mode','packet','sources'])||!['admission-v2','loaded-v2','research-v2'].includes(v.mode)||!councilPayload({mode:'loaded',packet:v.packet})||!exact(v.sources,['sec','catalyst']))return null;
   const sec=v.sources.sec;
   if(sec!==null&&(!secCouncilReceipt(sec)||sec.symbol!==v.packet.symbol||sec.observations.some(o=>!v.packet.evidence.some(e=>equal(e,o.evidence)))||(sec.issues.some(c=>['ISSUER_MISMATCH','INVALID_SOURCE','SOURCE_LIMIT'].includes(c))&&(sec.status!=='unavailable'||sec.observations.length))))return null;
   const c=v.sources.catalyst;
