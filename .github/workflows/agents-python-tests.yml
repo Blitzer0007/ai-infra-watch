@@ -15,6 +15,7 @@ on:
       - "aitracker-upload/tests/eval/**"
       - "aitracker-upload/data/research/council-benchmark.fictional.json"
       - "aitracker-upload/data/research/research-role-response.fictional.json"
+      - "aitracker-upload/data/research/research-role-priorities.fictional.json"
       - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
@@ -38,6 +39,7 @@ on:
       - "aitracker-upload/tests/eval/**"
       - "aitracker-upload/data/research/council-benchmark.fictional.json"
       - "aitracker-upload/data/research/research-role-response.fictional.json"
+      - "aitracker-upload/data/research/research-role-priorities.fictional.json"
       - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
@@ -125,3 +127,13 @@ jobs:
           name: research-role-agent-probe
           path: /tmp/research-role-agent-probe.md
 
+      - name: Generate offline research priority comparison
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python aitracker-upload/scripts/research_role_benchmark.py --format markdown > /tmp/research-role-priority-comparison.md
+
+      - name: Upload fictional research priority comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-role-priority-comparison
+          path: /tmp/research-role-priority-comparison.md

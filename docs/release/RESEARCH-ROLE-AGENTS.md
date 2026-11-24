@@ -51,6 +51,10 @@ PYTHONPATH=aitracker-upload python aitracker-upload/scripts/research_role_probe.
 
 Live requires one explicit bundled case and at most six provider attempts for the entire command. There is no automatic dataset sweep. Do not paste keys in chat or copy production/shared credentials; the dedicated development key is currently absent. Model availability/free quota, real latency/cost, selection quality and financial usefulness remain unmeasured.
 
+## Priority evaluation
+
+[Research-role priority comparison](RESEARCH-ROLE-EVALUATION.md) adds hash-bound authored fictional targets, an output-bounded no-model baseline, actual protocol-fixture controls and a one-case live evaluation hook reusing this probe. Offline fixtures demonstrate omissions despite protocol completion; these are not actual NVIDIA outcomes or independent financial acceptance.
+
 ## Integration and pending acceptance
 
 The deterministic read-only tabs from [RESEARCH-ROLE-REVIEW.md](RESEARCH-ROLE-REVIEW.md) remain the model-free baseline. A separate **Run model-selected research roles** action now uses `research-v2` through the existing private council relay. It requires loaded source inspection and explicit conditional validation first. The action reuses the frozen source packet; a feed refresh does not silently replace it. Changing the symbol/horizon or starting a new review clears results, and late replies are discarded. One in-flight action, the existing five-attempt session cap and no automatic retries remain enforced.

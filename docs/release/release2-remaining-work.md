@@ -16,11 +16,13 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 
 [Bounded role runner](RESEARCH-ROLE-AGENTS.md) now implements model-selected inspection/coverage and cited review-code priorities for Company/Catalyst/Daily Review. Offline fixtures and mocked NVIDIA routing are tested; the development probe can run one explicit live fictional case after dedicated credential setup. Authenticated manual UI integration is implemented and tested through the actual private relay with a fictional model. Real provider acceptance, independent document inspection and usefulness/holdout evidence remain pending.
 
+[Research-role priority comparison](RESEARCH-ROLE-EVALUATION.md) now measures omissions against authored fictional targets with a similarly bounded no-model baseline. All eight fictional protocol runs complete but miss a target; this is a fixture limitation, not a live NVIDIA result. Targets are hash-bound and kept outside prompts; independent review/holdouts remain pending.
+
 ## Pending acceptance and implementations
 
 | Area | Remaining work |
 | --- | --- |
-| NVIDIA/JEV model evaluation | Dedicated NVIDIA development secret; account availability/free-quota/cost/latency checks; independently reviewed grounding/usefulness cases and holdouts; actual comparison with deterministic baselines. TypeSafe remains a separate manual counts-only assessment. |
+| NVIDIA/JEV model evaluation | Authored offline priority-coverage comparison implemented. Dedicated NVIDIA development secret; account availability/free-quota/cost/latency checks; independently reviewed grounding/usefulness cases and holdouts; actual live comparison with deterministic baselines. TypeSafe remains a separate manual counts-only assessment. |
 | Research roles | Deterministic UI views and bounded tool-calling development runner implemented in draft189. Authenticated manual development UI integration implemented with fictional end-to-end tests; live provider acceptance, independent source/document inspection, portfolio-wide daily summaries and meaningful evaluation remain pending. Bull/Bear/Judge remains manual development research. |
 | Accounting and return charts | Broker precision/timezone, complete original account/cashflow history, corporate actions and reconciled source evidence. Do not round shares or assume a timezone to restore charts. |
 | Market/financial sources | Reduce Yahoo dependence; correctly adjusted historical alternatives, issuer/security-class verification, source contact/access and retained financial lineage. Code adapters do not prove coverage. |
