@@ -10,17 +10,17 @@ async function configured(fn){
   const prior=Object.fromEntries(names.map(k=>[k,process.env[k]])),before=globalThis.fetch;
   try{
     for(const k of ['VERCEL','NODE_ENV','VERCEL_ENV'])delete process.env[k];
-    Object.assign(process.env,{AIW_ACCESS_TOKEN:'fictional-role-session',AI_INFRA_AGENT_TOKEN:'fictional-role-backend',AI_INFRA_AGENT_URL:'http://127.0.0.1:9123',COUNCIL_DEV_ENABLED:'true',RESEARCH_ROLE_HTTP_DEV_ENABLED:'true'});
+    Object.assign(process.env,{AIW_ACCESS_TOKEN:'fake-role-session',AI_INFRA_AGENT_TOKEN:'fake-role-backend',AI_INFRA_AGENT_URL:'http://127.0.0.1:9123',COUNCIL_DEV_ENABLED:'true',RESEARCH_ROLE_HTTP_DEV_ENABLED:'true'});
     await fn();
   }finally{globalThis.fetch=before;for(const k of names){if(prior[k]===undefined)delete process.env[k];else process.env[k]=prior[k];}}
 }
-const request=()=>({method:'POST',headers:{authorization:'Bearer fictional-role-session','x-forwarded-for':`203.0.113.${++sequence}`},query:{task:'council'},body:{...structuredClone(inputs.cases[0].request),mode:'research-v2'}});
+const request=()=>({method:'POST',headers:{authorization:'Bearer fake-role-session','x-forwarded-for':`203.0.113.${++sequence}`},query:{task:'council'},body:{...structuredClone(inputs.cases[0].request),mode:'research-v2'}});
 async function call(req=request()){
   const out={status:null,body:null};const res={setHeader(){},status(n){out.status=n;return this;},json(value){out.body=value;return this;}};
   await handler(req,res);return out;
 }
 test('private research mode uses only the configured loopback and strict Python envelope',()=>configured(async()=>{
-  let calls=0;globalThis.fetch=async(url,opts)=>{calls++;assert.equal(String(url),'http://127.0.0.1:9123/api/agent-python?task=council');assert.equal(opts.redirect,'error');assert.equal(opts.headers.Authorization,'Bearer fictional-role-backend');assert.equal(JSON.parse(opts.body).mode,'research-v2');return new Response(JSON.stringify(fixture.response));};
+  let calls=0;globalThis.fetch=async(url,opts)=>{calls++;assert.equal(String(url),'http://127.0.0.1:9123/api/agent-python?task=council');assert.equal(opts.redirect,'error');assert.equal(opts.headers.Authorization,'Bearer fake-role-backend');assert.equal(JSON.parse(opts.body).mode,'research-v2');return new Response(JSON.stringify(fixture.response));};
   const out=await call();assert.equal(out.status,200);assert.deepEqual(out.body,fixture.response);assert.equal(calls,1);
 }));
 test('auth production opt-in and target guards prevent all upstream work',()=>configured(async()=>{
