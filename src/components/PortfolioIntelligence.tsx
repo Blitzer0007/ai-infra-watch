@@ -5,6 +5,7 @@ import { Activity, BarChart3, FileText, Globe2, Network, Search, ShieldAlert, Tr
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Cell } from 'recharts';
 import { buildIntelligence, buildMoneyRotation, MONEY_ROTATION_SYMBOLS, type RotationHorizon } from '../utils/intelligence';
 import { loadPortfolioHistoryBatch } from '../utils/portfolioHistoryBatch';
+import {marketHistoryPacket,type MarketHistoryPacket} from '../utils/marketHistoryPacket';
 import { buildPositionAnalyses, mapStoredPortfolioHoldings, type PositionAnalysis } from '../utils/portfolioPositions';
 import { fetchPortfolioHoldings, fetchPortfolioTransactions, type PortfolioTransaction, type StoredPortfolioHolding } from '../utils/portfolioApi';
 import PortfolioManager from './PortfolioManager';
@@ -44,7 +45,7 @@ type Price = {
   cached?: boolean;
 };
 type PortfolioHistoryPoint = { date: string; price: number };
-type PortfolioHistoryState = { loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
+type PortfolioHistoryState = { ready: boolean; loading: boolean; histories: Record<string, PortfolioHistoryPoint[]>; error: string };
 type HistoricalPriceState = {
   loading: boolean;
   high52w: number | null;
@@ -54,6 +55,7 @@ type HistoricalPriceState = {
   error: string;
 };
 type SelectedChartState = {
+  packet?: MarketHistoryPacket;
   loading: boolean;
   points: PortfolioHistoryPoint[];
   range: '5D' | '1M' | '3M' | '6M' | '1Y' | 'MAX';
@@ -114,7 +116,7 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   const [portfolioTransactions, setPortfolioTransactions] = useState<PortfolioTransaction[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState('');
-  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ loading: false, histories: {}, error: '' });
+  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({ ready:false, loading: false, histories: {}, error: '' });
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => localStorage.getItem('aiw_portfolio_currency') === 'INR' ? 'INR' : 'USD');
   const [usdInr, setUsdInr] = useState<number | null>(null);
   const [historicalPrice, setHistoricalPrice] = useState<HistoricalPriceState>({
@@ -137,30 +139,29 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
   useEffect(() => { localStorage.setItem('aiw_portfolio_currency', currency); let cancelled = false; if(currency !== 'INR' || !['holdings','performance'].includes(tab))return; fetch('/api/quote?symbol=INR=X', { cache: 'default' }).then(response => response.json()).then(data => { const rate = Number(data?.price); if (!cancelled && Number.isFinite(rate) && rate > 0) setUsdInr(rate); }).catch(() => {}); return () => { cancelled = true; }; }, [currency,tab]);
   const formatPortfolioMoney = (usd: number | null | undefined) => { if (usd == null || !Number.isFinite(usd)) return '—'; if (currency === 'INR' && usdInr) return '₹' + (usd * usdInr).toLocaleString('en-IN', { maximumFractionDigits: 2 }); return usd!==0&&Math.abs(usd)<.005?usd.toExponential(4)+' USD':'$' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 }); };
 
-  const historyCacheRef = useRef(new Map<string, { points: PortfolioHistoryPoint[]; fetchedAt: number }>());
-  const historyRequestRef = useRef(new Map<string, Promise<PortfolioHistoryPoint[]>>());
+  const historyCacheRef = useRef(new Map<string, { packet: MarketHistoryPacket; fetchedAt: number }>());
+  const historyRequestRef = useRef(new Map<string, Promise<MarketHistoryPacket>>());
 
-  const fetchHistoryCached = async (symbol: string, range: '1y' | 'max' = '1y', ttlMs = 60000): Promise<PortfolioHistoryPoint[]> => {
+  const fetchHistoryPacketCached = async (symbol: string, range: '1y' | 'max' = '1y', ttlMs = 60000): Promise<MarketHistoryPacket> => {
     const key = symbol.toUpperCase() + ':' + range;
     const cached = historyCacheRef.current.get(key);
-    if (cached && Date.now() - cached.fetchedAt < ttlMs) return cached.points;
+    if (cached && Date.now() >= cached.fetchedAt && Date.now() - cached.fetchedAt < ttlMs) return cached.packet;
     const inFlight = historyRequestRef.current.get(key);
     if (inFlight) return inFlight;
     const request = fetch('/api/company-scale?action=history&symbol=' + encodeURIComponent(symbol) + '&range=' + range, { cache: 'no-store' })
       .then(async response => {
         const body = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(body?.points)) throw new Error(body?.error || (symbol + ': historical data unavailable'));
-        const points = body.points
-          .filter((point: any) => point && typeof point.date === 'string' && Number.isFinite(Number(point.price)))
-          .map((point: any) => ({ date: point.date, price: Number(point.price) }))
-          .sort((a: PortfolioHistoryPoint, b: PortfolioHistoryPoint) => a.date.localeCompare(b.date));
-        historyCacheRef.current.set(key, { points, fetchedAt: Date.now() });
-        return points;
+        if (!response.ok) throw new Error('Price history could not be loaded. Check Data Health or reopen this view to retry.');
+        const packet = marketHistoryPacket(symbol,body,new Date().toISOString());
+        historyCacheRef.current.set(key, { packet, fetchedAt: Date.parse(packet.loadedAt) });
+        return packet;
       })
       .finally(() => historyRequestRef.current.delete(key));
     historyRequestRef.current.set(key, request);
     return request;
   };
+
+  const fetchHistoryCached = async (symbol:string, range:'1y'|'max'='1y', ttlMs=60000) => (await fetchHistoryPacketCached(symbol,range,ttlMs)).points;
 
   const changeTab = (nextTab: PortfolioTab) => {
     if (nextTab === tab) return;
@@ -411,11 +412,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
     let cancelled = false;
     if(!['performance','rotation','evidence'].includes(tab) && !(tab==='overview'&&viewMode==='detailed')) return;
     const symbols = [...new Set([...(tab === 'rotation' ? MONEY_ROTATION_SYMBOLS : []), ...holdings.map(item => item.symbol), 'SPY', 'QQQ', 'SOXX'])];
-    if (!symbols.length) { setPortfolioHistory({ loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
-    setPortfolioHistory({ loading: true, histories: {}, error: '' });
+    if (!symbols.length) { setPortfolioHistory({ ready:true, loading: false, histories: {}, error: '' }); return () => { cancelled = true; }; }
+    setPortfolioHistory({ ready:false, loading: true, histories: {}, error: '' });
     loadPortfolioHistoryBatch(symbols, symbol => fetchHistoryCached(symbol, '1y'), () => cancelled).then(({histories, failures}) => {
       if (cancelled) return;
-      setPortfolioHistory({ loading: false, histories, error: failures.length ? 'History unavailable for ' + failures.slice(0, 3).join(', ') + '. Review provider diagnostics.' : '' });
+      setPortfolioHistory({ ready:true, loading: false, histories, error: failures.length ? 'History unavailable for ' + failures.slice(0, 3).join(', ') + '. Review provider diagnostics.' : '' });
     });
     return () => { cancelled = true; };
   }, [holdings.map(item => item.symbol).join(','), tab, viewMode]);
@@ -472,25 +473,34 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
 
   useEffect(() => {
     let cancelled = false;
-    if(!(tab==='overview'&&viewMode==='detailed') && !(tab==='holdings'&&detailSymbol&&selected===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
-    if (!selected) {
+    if(!(tab==='overview'&&viewMode==='detailed') && tab!=='performance' && !(tab==='holdings'&&detailSymbol&&selected===detailSymbol&&holdings.some(row=>row.symbol===detailSymbol)))return;
+    if (!selected || !holdings.some(row=>row.symbol===selected)) {
       setSelectedChart({ loading: false, points: [], range: chartRange, error: '', retrievedAt: null });
       return () => { cancelled = true; };
     }
+    if(tab==='performance'&&(!portfolioHistory.ready||portfolioHistory.loading)){
+      setSelectedChart({loading:true,points:[],range:chartRange,error:'',retrievedAt:null});
+      return ()=>{cancelled=true;};
+    }
+    if(tab==='performance'&&chartRange!=='MAX'&&!portfolioHistory.histories[selected]){
+      setSelectedChart({loading:false,points:[],range:chartRange,error:'No usable holding price history returned. Check Data Health or reopen this view to retry.',retrievedAt:null});
+      return ()=>{cancelled=true;};
+    }
     setSelectedChart({ loading: true, points: [], range: chartRange, error: '', retrievedAt: null });
-    fetchHistoryCached(selected, chartRange === 'MAX' ? 'max' : '1y')
-      .then(points => {
+    fetchHistoryPacketCached(selected, chartRange === 'MAX' ? 'max' : '1y')
+      .then(packet => {
+        const points = packet.points;
         if (cancelled) return;
         const days: Record<SelectedChartState['range'], number> = { '5D': 7, '1M': 31, '3M': 93, '6M': 186, '1Y': 366, 'MAX': 10000 };
         const cutoff = Date.now() - days[chartRange] * 86400000;
         const filtered = chartRange === 'MAX' ? points : points.filter(point => new Date(point.date + 'T00:00:00Z').getTime() >= cutoff);
-        setSelectedChart({ loading: false, points: filtered, range: chartRange, error: '', retrievedAt: new Date().toISOString() });
+        setSelectedChart({ loading: false, points: filtered, range: chartRange, error: '', retrievedAt: packet.loadedAt, packet });
       })
       .catch(error => {
         if (!cancelled) setSelectedChart({ loading: false, points: [], range: chartRange, error: error instanceof Error ? error.message : 'Live price history unavailable', retrievedAt: null });
       });
     return () => { cancelled = true; };
-  }, [selected, chartRange, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|')]);
+  }, [selected, chartRange, tab, detailSymbol, viewMode, holdings.map(row=>row.symbol).join('|'), portfolioHistory.ready, portfolioHistory.loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -943,6 +953,11 @@ export default function PortfolioIntelligence({ livePrices = {}, contracts = [],
                   <p>The history route supports Yahoo, Finnhub and Alpha Vantage in sequence. Provider access and source coverage must be verified separately; adding a web-search agent cannot reconcile account records.</p>
                   <button type="button" onClick={() => changeTab('holdings')} className="rounded-lg border border-white/15 px-3 py-2">Review individual holding charts</button>
                 </section>
+                {tab==='performance'&&selectedAnalysis&&holdings.some(row=>row.symbol===selected)&&<div className="mt-4 space-y-3" data-testid="performance-market-history">
+                  <label className="block text-sm">Holding price chart<select aria-label="Holding price chart" value={selected} onChange={event=>setSelected(event.target.value)} className="ml-3 rounded border border-white/15 bg-black/10 p-2">{holdings.map(row=><option key={row.id} value={row.symbol}>{row.symbol}</option>)}</select></label>
+                  <p className="text-xs text-white/55">Closing prices can be viewed while account reconciliation is pending. This chart does not calculate portfolio returns or trading profit.</p>
+                  <SelectedHoldingChart h={selectedAnalysis} chart={selectedChart} chartRange={chartRange} onChartRangeChange={setChartRange}/>
+                </div>}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
                   <Info label="Portfolio stress" value={weightedStress.score == null ? '—' : weightedStress.score + '/100'} />
                   <Info label="Largest holding" value={topConcentration ? topConcentration.symbol + ' ' + (topConcentration.weight * 100).toFixed(1) + '%' : '—'} />
@@ -1756,15 +1771,23 @@ function PortfolioPeerImpactSummary({comparisons}:{comparisons:Array<PeerCounter
 }
 
 function SelectedHoldingChart({h, chart, chartRange, onChartRangeChange}:{h:PositionAnalysis;chart:SelectedChartState;chartRange:SelectedChartState['range'];onChartRangeChange:(range:SelectedChartState['range'])=>void}) {
-  const priceText = h.livePrice == null ? '—' : h.livePrice.toFixed(2);
-  return <section className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
+  if(chart.packet&&(chart.packet.symbol!==h.symbol||chart.range!==chartRange))chart={loading:true,points:[],range:chartRange,error:'',retrievedAt:null};
+  const priceText = formatPrice(h.livePrice);
+  return <section data-testid="holding-price-chart" className="rounded-2xl border border-cyan-400/15 bg-[#15181E]/70 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Selected holding / live market view</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
-      <div className="text-right text-[8px] font-mono text-white/30">{h.liveStale ? 'QUOTE NEEDS REFRESH' : 'LIVE QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
+      <div><div className="text-[9px] font-mono uppercase tracking-[.2em] text-cyan-300">Holding closing-price history</div><div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><h2 className="text-xl font-black">{h.symbol}</h2><span className="text-[10px] text-white/40">{h.name}</span><span className="font-mono font-bold">{priceText}</span><span className={(h.dailyChangePct ?? 0) >= 0 ? 'text-[10px] font-mono text-emerald-300' : 'text-[10px] font-mono text-rose-300'}>{h.dailyChangePct == null ? 'quote pending' : (h.dailyChangePct >= 0 ? '+' : '') + h.dailyChangePct.toFixed(2) + '% today'}</span></div></div>
+      <div className="text-right text-[8px] font-mono text-white/30">{h.livePrice==null?'QUOTE UNAVAILABLE':h.liveStale ? 'QUOTE NEEDS REFRESH' : 'CURRENT QUOTE'} · {h.liveRetrievedAt ? new Date(h.liveRetrievedAt).toLocaleTimeString() : 'timestamp unavailable'}</div>
     </div>
     <div className="flex flex-wrap gap-1 mt-3">{(['5D','1M','3M','6M','1Y','MAX'] as const).map(range => <button type="button" key={range} onClick={() => onChartRangeChange(range)} aria-pressed={chartRange === range} className={chartRange === range ? 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-cyan-300/30 bg-cyan-300/10 text-cyan-200' : 'px-2.5 py-1.5 rounded-lg border text-[9px] font-mono border-white/10 text-white/45 hover:text-white'}>{range}</button>)}</div>
-    <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[Number(value).toFixed(2),'Price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
-    <div className="mt-2 flex flex-wrap justify-between gap-2 text-[8px] font-mono text-white/25"><span>{chart.points.length ? chart.points[0].date + ' → ' + chart.points.at(-1)?.date : 'No chart dates'}</span><span>{chart.retrievedAt ? 'History retrieved ' + new Date(chart.retrievedAt).toLocaleTimeString() : 'History timestamp unavailable'}</span></div>
+    {chart.packet&&!chart.loading&&!chart.error&&<div data-testid="holding-history-source" className="mt-3 space-y-1 text-xs text-white/55">
+      <p>History provider: {chart.packet.provider||'not reported'} · Currency: {chart.packet.currency||'not reported'} · Latest returned close: {chart.packet.points.at(-1)?.date}.</p>
+      <p>Closing prices as returned; adjusted returns and complete source coverage are unverified.</p>
+      {chart.packet.stale===true&&<p role="status" className="text-amber-200">The provider returned stale cached history. These prices are not current.</p>}
+      {chart.packet.stale===null&&<p>Provider freshness was not reported.</p>}
+      {!!chart.packet.excludedPoints&&<p>{chart.packet.excludedPoints} invalid or repeated points omitted from this display.</p>}
+    </div>}
+    <div className="h-64 mt-3">{chart.loading ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">Loading price history…</div> : chart.error ? <div className="h-full flex items-center justify-center text-[9px] font-mono text-amber-300/70">{chart.error}</div> : chart.points.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart.points}><CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/><XAxis dataKey="date" tick={{fontSize:9}} tickLine={false} axisLine={false} minTickGap={28}/><YAxis domain={['auto','auto']} tickFormatter={formatPrice} tick={{fontSize:9}} tickLine={false} axisLine={false} width={48}/><Tooltip contentStyle={{background:'#15181E',border:'1px solid rgba(255,255,255,.1)',fontSize:10}} formatter={(value:number)=>[formatPrice(value),'Closing price']}/><Line type="monotone" dataKey="price" strokeWidth={2} dot={false} isAnimationActive={false}/></LineChart></ResponsiveContainer> : <div className="h-full flex items-center justify-center text-[9px] font-mono text-white/30">No sufficient historical price data for this range.</div>}</div>
+    <div className="mt-2 flex flex-wrap justify-between gap-2 text-[8px] font-mono text-white/25"><span>{chart.points.length ? chart.points[0].date + ' → ' + chart.points.at(-1)?.date : 'No chart dates'}</span><span>{chart.retrievedAt ? 'Loaded in this browser ' + new Date(chart.retrievedAt).toLocaleTimeString() : 'History timestamp unavailable'}</span></div>
   </section>;
 }
 

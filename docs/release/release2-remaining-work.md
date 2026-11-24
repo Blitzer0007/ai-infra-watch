@@ -18,6 +18,8 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 
 [Research-role priority comparison](RESEARCH-ROLE-EVALUATION.md) now measures omissions against authored fictional targets with a similarly bounded no-model baseline. All eight fictional protocol runs complete but miss a target; this is a fixture limitation, not a live NVIDIA result. Targets are hash-bound and kept outside prompts; independent review/holdouts remain pending.
 
+[Portfolio price-history recovery](PORTFOLIO-PRICE-HISTORY-RECOVERY.md) now exposes an existing holding closing-price chart directly on Performance while accounting is unresolved. The display reuses bounded history requests and retains provider/currency/stale/load metadata; malformed/conflicting bars are withheld. This does not restore account returns, certify source coverage or fix genuine provider outages.
+
 ## Pending acceptance and implementations
 
 | Area | Remaining work |
