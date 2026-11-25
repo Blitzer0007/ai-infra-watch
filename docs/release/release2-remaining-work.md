@@ -1,4 +1,4 @@
-# Current remaining-work register — 24 November 2026
+# Current remaining-work register — 25 November 2026
 
 This replaces the historical 14–15 November register available in the preserved original worktree. Its percentage estimates and milestone deployment counts are obsolete; no new overall completion percentage has been established.
 
@@ -19,6 +19,8 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 [Research-role priority comparison](RESEARCH-ROLE-EVALUATION.md) now measures omissions against authored fictional targets with a similarly bounded no-model baseline. All eight fictional protocol runs complete but miss a target; this is a fixture limitation, not a live NVIDIA result. Targets are hash-bound and kept outside prompts; independent review/holdouts remain pending.
 
 [Portfolio price-history recovery](PORTFOLIO-PRICE-HISTORY-RECOVERY.md) now exposes an existing holding closing-price chart directly on Performance while accounting is unresolved. The display reuses bounded history requests and retains provider/currency/stale/load metadata; malformed/conflicting bars are withheld. This does not restore account returns, certify source coverage or fix genuine provider outages.
+
+[History fallback recovery](HISTORY-FALLBACK-RECOVERY.md) now prevents wholly unusable primary packets from suppressing configured fallback providers, retains partial-display/omission metadata, and keeps adjusted-use checks/Data Health conservative. Mocked provider and browser tests pass; real provider access/plan coverage and production outage rates remain unverified.
 
 ## Pending acceptance and implementations
 

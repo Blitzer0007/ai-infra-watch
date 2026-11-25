@@ -6,6 +6,29 @@ from playwright.sync_api import expect
 from test_ui import mock_local_apis
 
 
+def test_history_omissions_explain_retained_coverage_without_promoting_adjusted_use(page):
+    mock_local_apis(page)
+    page.route('**/api/market?route=market-data-health*',lambda route:route.fulfill(json={
+        'ok':True,'rows':[{'symbol':'FICT','quote':{'available':False},'history':{
+            'available':True,'provider':'yahoo','adjustedCoveragePct':100,'adjustedPointCount':2,'pointCount':2,
+            'adjustedCloseAvailable':False,'discardedPointCount':1,'duplicateDateCount':1,'invalidAdjustedPointCount':0}}]}))
+    writes=[];page.on('request',lambda r:writes.append(r.url) if r.method not in ('GET','HEAD','OPTIONS') else None)
+    page.goto('/health')
+    row=page.get_by_test_id('market-sample-row')
+    expect(row.get_by_test_id('sample-history-normalization')).to_contain_text('1 unusable, 1 repeated')
+    expect(row).to_contain_text('Adjusted-history use remains withheld')
+    expect(row).to_contain_text('percentage counts retained rows only')
+    panel=page.get_by_label('Source diagnostics',exact=True);panel.locator('summary').click()
+    panel.get_by_role('button',name='Prepare source diagnostics',exact=True).click()
+    report=json.loads(panel.get_by_role('textbox',name='Source diagnostics preview',exact=True).input_value())
+    assert report['rows'][0]['history']['discardedPointCount']==1
+    assert report['rows'][0]['history']['duplicateDateCount']==1
+    assert report['rows'][0]['history']['adjustedCloseAvailable'] is False
+    page.set_viewport_size({'width':360,'height':1000})
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    assert writes==[]
+
+
 @pytest.mark.parametrize("width,clipboard_ok", [(360, True), (1440, False)])
 def test_source_diagnostic_preview_is_redacted_local_and_has_manual_copy_fallback(page, width, clipboard_ok):
     mock_local_apis(page)
