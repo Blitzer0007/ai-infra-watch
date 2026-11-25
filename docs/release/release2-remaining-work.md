@@ -22,6 +22,8 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 
 [History fallback recovery](HISTORY-FALLBACK-RECOVERY.md) now prevents wholly unusable primary packets from suppressing configured fallback providers, retains partial-display/omission metadata, and keeps adjusted-use checks/Data Health conservative. Mocked provider and browser tests pass; real provider access/plan coverage and production outage rates remain unverified.
 
+[Shared market reads](MARKET-REQUEST-SHARING.md) now deduplicate identical pending internal quote/history loads within a warm Node process, preserving symbol/range separation, explicit refresh and failure recovery. This reduces redundant chains in tests; it is not a distributed quota or proof of provider availability.
+
 ## Pending acceptance and implementations
 
 | Area | Remaining work |

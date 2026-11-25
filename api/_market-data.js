@@ -13,7 +13,19 @@ const YAHOO_SYMBOL = {
 };
 
 const memoryCache = new Map();
+const inFlight = new Map();
 const CACHE_MS = 60000;
+
+/** Per-process identical reads only; not an account-wide provider quota. */
+function shareRequest(key,load) {
+  const existing=inFlight.get(key);
+  if(existing)return existing;
+  const pending=Promise.resolve().then(load).finally(()=>{
+    if(inFlight.get(key)===pending)inFlight.delete(key);
+  });
+  inFlight.set(key,pending);
+  return pending;
+}
 
 function normalizedSymbol(symbol) {
   return String(symbol || '').trim().toUpperCase();
@@ -101,6 +113,10 @@ export async function quote(symbol, { forceRefresh = false } = {}) {
   if (!forceRefresh && cacheEntry && Date.now() - cacheEntry.at < CACHE_MS) {
     return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
   }
+  return shareRequest(key,()=>loadQuote(symbol,key));
+}
+
+async function loadQuote(symbol,key) {
 
   const providers = [
     ['yahoo', yahooQuote],
@@ -250,6 +266,10 @@ export async function history(symbol, range = '2y') {
   if (cacheEntry && Date.now() - cacheEntry.at < 300000) {
     return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
   }
+  return shareRequest(key,()=>loadHistory(symbol,range,key));
+}
+
+async function loadHistory(symbol,range,key) {
 
   const providers = [
     ['yahoo', yahooHistory],

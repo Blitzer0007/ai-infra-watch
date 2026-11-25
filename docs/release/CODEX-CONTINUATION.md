@@ -1,4 +1,24 @@
-# Current continuation: historical-data fallback recovery — 25 November 2026
+# Current continuation: shared in-flight market reads — 25 November 2026
+
+Read [MARKET-REQUEST-SHARING.md](MARKET-REQUEST-SHARING.md), [HISTORY-FALLBACK-RECOVERY.md](HISTORY-FALLBACK-RECOVERY.md) and [release2-remaining-work.md](release2-remaining-work.md).
+
+- Continue existing draft PR189, feature/nvidia-council-evaluation, Cloud /workspace/ai-infra-watch-model-evals. Preserve all worktrees/changes. Prior358f7ed passed all eight applicable workflows; this router increment needs fresh exact-head CI. Final SHA/run/artifact evidence belongs in the PR description and /workspace/ai-infra-watch-release-evidence/PR189-CONTINUATION.md.
+- Confirmed code issue: simultaneous uncached identical internal quote/history reads each started their own provider chain. Added per-warm-process pending-request sharing in api/_market-data.js. Existing kind/normalized-symbol/range cache keys retained; different symbols/ranges and quote/history stay separate. No account/portfolio records enter the pending map, only existing market data.
+- Cache checks run before sharing, so forced quote refresh bypasses cached data and normal cached reads remain available during a refresh. Concurrent actual refresh loads can share. Pending entries clear on success/failure; later requests can recover after a rejected chain. Existing provider order/attempt/time rules, cache TTLs, validation, stale flags and history-quality metadata remain unchanged. No retries, background refresh, polling or new endpoint/provider/credential.
+- This is per-process identical-read deduplication, not distributed/global rate limiting or an account/provider quota. Other serverless instances and the separate public quote controller remain outside this map. No production rate-limit reduction or quota balance is claimed.
+- Six new mocked transport tests in server/services/marketDataSingleFlight.test.js cover quote/history sharing, normalized keys, symbol/range/kind isolation, explicit refresh versus cache, failed-chain cleanup and recovery, and stale cached quality. Combined14 targeted router/normalization cases passed. Full local1,183 Node tests and TypeScript also passed. Staged-file security and exact-head CI evidence is recorded after completion. Tests use stripped environment/fake credentials; no real provider request.
+- UI/response fields unchanged; no local browser rerun is needed for this backend-only increment. Required current-head CI still runs the existing full mocked UI and production-bundle checks. Previous358f7ed checks are historical and cannot substitute for current-head CI.
+- Prior chart/fallback/health and bounded manual research/evaluation work preserved. Actual provider access/entitlements, authentic adjusted/issuer/session/source evidence, full broker/cash-flow/corporate-action records and precision/timezone, independent financial/model/forecast holdouts, portfolio-wide Daily Review and Event Risk Radar remain pending. Dedicated NVIDIA development key was absent at last name-only check; no real inference/usefulness result. No overall completion percentage.
+- Production/main stays188 at79fddf79a452c2a385b596fced604397781316eb / prior verified READY dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo. PR188-only release exception consumed. PR189 stays draft/unmerged/undeployed. No production secret retrieval, DB modifications, deployments, live provider calls/polling, AI activation or Telegram sends. Preserve source/accounting/authority gates.
+- Next: finish local regression/staged-file scan, commit/push, verify exact-head CI/artifacts, update PR/Cloud Markdown. Then use safe actual provider/source diagnostics and original broker evidence before enabling account returns. Do not infer global quota protection from this local request map or reuse release exceptions.
+
+Resume:
+
+> Continue draft189 on feature/nvidia-council-evaluation in /workspace/ai-infra-watch-model-evals. Read this checkpoint, MARKET-REQUEST-SHARING.md and remaining-work register. Verify current-head CI in PR/Cloud handoff;358f7ed is historical after this change. Router now shares identical pending reads within a warm process while preserving cache/refresh/failure/source-quality behavior; no global quotas or live-provider availability are proven. Preserve all work and production188. No merge/deploy/production secrets/DB changes/polling/Telegram or consumed188 exception. Keep a full Markdown continuation for ChatGPT.
+
+---
+
+# Historical continuation: historical-data fallback recovery — 25 November 2026
 
 Read [HISTORY-FALLBACK-RECOVERY.md](HISTORY-FALLBACK-RECOVERY.md), [PORTFOLIO-PRICE-HISTORY-RECOVERY.md](PORTFOLIO-PRICE-HISTORY-RECOVERY.md) and [release2-remaining-work.md](release2-remaining-work.md).
 
