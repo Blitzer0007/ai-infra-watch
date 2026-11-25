@@ -1,4 +1,23 @@
-# Current continuation: shared in-flight market reads — 25 November 2026
+# Current continuation: PR #189 release-readiness review — 25 November 2026
+
+Read [PR189-RELEASE-READINESS.md](PR189-RELEASE-READINESS.md), [release2-remaining-work.md](release2-remaining-work.md), then [MARKET-REQUEST-SHARING.md](MARKET-REQUEST-SHARING.md).
+
+- Existing draft [PR #189](https://github.com/Blitzer0007/ai-infra-watch/pull/189), branch `feature/nvidia-council-evaluation`, Cloud `/workspace/ai-infra-watch-model-evals`. Preserve every worktree/change. This checkpoint changes documentation only: readiness/release/rollback notes, this continuation and the remaining-work register. No application, workflow, guard or production configuration changed.
+- Application revision `2fd456db1182f08e0b7162be93d631856821ce02` passed all eight applicable workflows, freshly rechecked in this review. Evidence includes 1,183 local Node tests, TypeScript, 14 targeted router tests, full mocked UI, production-bundle access/exclusion/no-passive-write checks, disposable PostgreSQL and offline research artifacts. Unchanged local runtime suites were not repeated for the documentation pass. Final documentation-head SHA/checks belong in the PR description and Cloud handoff; do not relabel application-head evidence as documentation-head evidence.
+- Fresh metadata confirms main `79fddf79a452c2a385b596fced604397781316eb` (PR188), `protected:false`. Public `ai-infra-watch-theta.vercel.app` resolves to READY production `dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo`, immutable `ai-infra-watch-chfnzrgj8-green-2888.vercel.app`, matching main in `githubCommitSha`. Project `prj_5G5PtOgnVCxyPjTqXII4oXPrS4XD` / ai-infra-watch, team `team_TfbzU4SMDZD8lIgCHKsJNa6v`. This is the proposed rollback; reverify before any future release. Runtime financial/provider health was not recertified.
+- Release blocker: manual production workflow still supplies PR188, and the one-time automatic handoff pins PR188, its old parent and PR187 rollback. Existing unprotected-main exception does not cover PR189. Prior release-specific approvals are consumed. Do not dispatch the old workflow, broaden guards or substitute parameters to bypass them.
+- Production-environment reviewer/main restrictions are unknown: connector endpoint unsupported; read-only CLI request forbidden. Main is confirmed unprotected. Standard protection controls need verification, or a concrete tightly pinned PR189-only exception needs implementation/tests and a new explicit owner decision. This pass only documents those alternatives; no release-path implementation or new approval request occurred.
+- The candidate spans market/chart repairs plus disabled development research/evaluation. All development AI flags/authority remain off in production. A future production build still needs QA-off/private frontend access checks, staged identity and exact HTML/JS/CSS checks, exact-main CI, same-build promotion and verified rollback. Details and prerequisites are in the readiness report.
+- Genuine provider access/entitlements and adjusted/issuer/session/source evidence, global budgets, complete broker/cash-flow/corporate-action history and precision/timezone, independent financial/model/forecast labels/holdouts, portfolio-wide Daily Review and Event Risk Radar live acceptance remain pending. No new model availability, usefulness or overall completion percentage is claimed.
+- Next: finish documentation scan/whitespace, commit/push this coherent checkpoint and record actual exact-head CI/artifacts in the PR and `/workspace/ai-infra-watch-release-evidence/PR189-CONTINUATION.md` (also mirrored to `CODEX-CONTINUATION.md` there). Then prepare the chosen release-control path before seeking a release decision. No merge/deploy/production secrets/DB changes/live calls/polling/AI activation/Telegram sends are authorized by this checkpoint.
+
+Resume:
+
+> Continue draft189 on feature/nvidia-council-evaluation in /workspace/ai-infra-watch-model-evals. Read PR189-RELEASE-READINESS.md, this checkpoint and remaining-work register. Verify final source/head CI in the PR/Cloud handoff. Application2fd456d is verified; documentation may advance the head. Main/production remains188 at79fddf79 / READY dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo. Release blocked: unprotected main, environment settings unverified and consumed188 workflow/handoff. Prepare concrete release controls/tests before a new release decision; do not reuse the old exception. Preserve all work and source/accounting/authority gates. No merge/deploy/production secrets/DB changes/polling/Telegram. Keep a complete Markdown handoff for ChatGPT.
+
+---
+
+# Historical continuation: shared in-flight market reads — 25 November 2026
 
 Read [MARKET-REQUEST-SHARING.md](MARKET-REQUEST-SHARING.md), [HISTORY-FALLBACK-RECOVERY.md](HISTORY-FALLBACK-RECOVERY.md) and [release2-remaining-work.md](release2-remaining-work.md).
 

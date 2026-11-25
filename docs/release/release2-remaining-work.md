@@ -24,6 +24,8 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 
 [Shared market reads](MARKET-REQUEST-SHARING.md) now deduplicate identical pending internal quote/history loads within a warm Node process, preserving symbol/range separation, explicit refresh and failure recovery. This reduces redundant chains in tests; it is not a distributed quota or proof of provider availability.
 
+[PR #189 release-readiness review](PR189-RELEASE-READINESS.md) records the verified application revision, current production identity and rollback, combined release scope, exact-commit evidence, staged verification sequence and unresolved release controls. Review is complete; deployment is blocked. No release workflow or production setting was changed.
+
 ## Pending acceptance and implementations
 
 | Area | Remaining work |
@@ -34,6 +36,6 @@ Released scope includes persistent light/dark switching, grouped accounting/rule
 | Market/financial sources | Reduce Yahoo dependence; correctly adjusted historical alternatives, issuer/security-class verification, source contact/access and retained financial lineage. Code adapters do not prove coverage. |
 | Forecast validation | Authentic outcomes, point-in-time membership, holdouts and horizon-specific validation. Counts or model confidence do not establish forecast validity. |
 | Event Risk Radar | Authorized acquisition/account verification for public sources including @aravind, source evaluation and delivery-policy checks before live polling. |
-| Production controls | Main protection and production-environment reviewer/main restrictions remain deferred. PR #188-only exception is consumed; later release decisions need their own concrete review. |
+| Production controls | Main is confirmed unprotected; production-environment reviewer/main restrictions could not be verified (unsupported connector endpoint; CLI read forbidden). Manual workflow and automatic handoff remain pinned to consumed PR188. Verify standard protection controls, or prepare/test a concrete PR189-only exception before a new owner release decision. Recheck exact-main CI, QA-off/private access, stage/assets and verified PR188 rollback. See the readiness review. |
 
 Preserve all old worktrees and draft PRs; do not merge duplicate release branches. No new deployment, live polling, production database modification or Telegram send is authorized by this development checkpoint. Read [CODEX-CONTINUATION.md](CODEX-CONTINUATION.md) before continuing.
