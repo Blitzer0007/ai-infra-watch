@@ -24,6 +24,19 @@ on:
         description: "Reviewed full 40-character main commit SHA; must match dispatch and current main"
         type: string
         required: true
+      confirm_pr189_unprotected_main_exception:
+        description: "PR189 only, after new explicit owner approval; keep the old PR188 exception NO"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+        required: true
+        default: "NO"
+      reviewed_pr189_head_sha:
+        description: "For PR189 only: full source head SHA from the owner's review; must equal the merged PR head"
+        type: string
+        required: false
+        default: ""
       rollback_deployment:
         description: "Previously verified known-good production deployment ID (dpl_...)"
         type: string
@@ -54,6 +67,10 @@ jobs:
       EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
       AIW_RELEASE_PR: "188"
       AIW_MAIN_PROTECTION_WAIVER: ${{ inputs.confirm_milestone5_unprotected_main_exception }}
+      AIW_PR189_PROTECTION_WAIVER: ${{ inputs.confirm_pr189_unprotected_main_exception }}
+      AIW_REVIEWED_PR_HEAD_SHA: ${{ inputs.reviewed_pr189_head_sha }}
+      AIW_CONFIRM_PRODUCTION_DEPLOY: ${{ inputs.confirm_production_deploy }}
+      AIW_RUN_LIVE_CHECKS: ${{ inputs.run_live_checks }}
       ROLLBACK_DEPLOYMENT: ${{ inputs.rollback_deployment }}
       # Official stable vercel@58.4.4 release/package reviewed; Node >=18 supports this runner.
       VERCEL_CLI_VERSION: "58.4.4"
@@ -128,6 +145,8 @@ jobs:
       - name: Build Vercel deployment
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VITE_QA_MODE: ""
+          VITE_RESEARCH_ROLE_DEV_ENABLED: ""
         run: vercel build --prod
 
       - name: Recheck main and CI before staging

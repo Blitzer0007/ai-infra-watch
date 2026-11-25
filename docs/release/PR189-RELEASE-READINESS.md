@@ -2,6 +2,8 @@
 
 **Result: application candidate verified; production release blocked pending release controls and authorization.** This document is preparation only. No merge, workflow dispatch, staging, promotion, configuration change or rollback was performed.
 
+**Subsequent preparation:** [manual PR189 controls](PR189-MANUAL-RELEASE-CONTROLS.md) now implement a separate default-denied manual path with explicit reviewed-source input, pinned ancestry/rollback, eight-workflow CI admission and duplicate/rerun rejection. The findings below describe the original `2105d9f` review baseline; implementation gap #4 is addressed by that preparation, not activated. The old PR188 path/handoff are deliberately preserved. Owner decision, unresolved protection settings and future exact-main/staged verification remain outstanding. Final source/CI evidence is recorded separately in the PR and Cloud handoff.
+
 ## Candidate and observed baseline
 
 | Item | Verified value |
