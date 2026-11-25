@@ -5,6 +5,29 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_pr189_is_manual_default_denied_and_cannot_repurpose_the_old_handoff():
+    workflow = yaml.safe_load((ROOT / '.github/workflows/vercel-production-deploy.yml').read_text())
+    inputs = workflow[True]['workflow_dispatch']['inputs']
+    assert set(workflow[True]) == {'workflow_dispatch'}
+    for name in ('confirm_production_deploy', 'confirm_pr189_unprotected_main_exception'):
+        assert inputs[name]['default'] == 'NO'
+        assert inputs[name]['options'] == ['NO', 'YES']
+    assert inputs['reviewed_pr189_head_sha']['default'] == ''
+    assert inputs['run_live_checks']['default'] is False
+    job = workflow['jobs']['deploy']
+    assert job['env']['AIW_PR189_PROTECTION_WAIVER'] == '${{ inputs.confirm_pr189_unprotected_main_exception }}'
+    assert job['env']['AIW_REVIEWED_PR_HEAD_SHA'] == '${{ inputs.reviewed_pr189_head_sha }}'
+    assert job['env']['AIW_CONFIRM_PRODUCTION_DEPLOY'] == '${{ inputs.confirm_production_deploy }}'
+    assert job['env']['AIW_RUN_LIVE_CHECKS'] == '${{ inputs.run_live_checks }}'
+    assert job['env']['AIW_RELEASE_PR'] == '188'  # historical path is separate
+    build = next(step for step in job['steps'] if step['name'] == 'Build Vercel deployment')
+    assert build['env']['VITE_QA_MODE'] == ''
+    assert build['env']['VITE_RESEARCH_ROLE_DEV_ENABLED'] == ''
+    dispatcher = (ROOT / 'scripts/dispatch-milestone5-release.mjs').read_text()
+    assert 'export const M5_HANDOFF_PR = 188;' in dispatcher
+    assert 'confirm_pr189_unprotected_main_exception' not in dispatcher
+
+
 def test_production_deploy_requires_explicit_opt_in():
     workflow = (ROOT / ".github" / "workflows" / "vercel-production-deploy.yml").read_text()
     assert "workflow_run:" not in workflow

@@ -70,6 +70,7 @@ jobs:
       - name: Verify TypeScript, unit and production build without weakening the separate npm advisory gate
         env:
           VITE_QA_MODE: "true"
+          VITE_RESEARCH_ROLE_DEV_ENABLED: "true"
         run: |
           npm run lint
           npm run test:unit
@@ -98,12 +99,15 @@ jobs:
       - name: Verify production frontend has no passive persistence against local mocked APIs
         env:
           VITE_QA_MODE: ""
+          # Even an enabled research flag must not bypass the production parent guard.
+          VITE_RESEARCH_ROLE_DEV_ENABLED: "true"
           NODE_ENV: production
           QA_BASE_URL: http://127.0.0.1:3000
+          QA_LOGIN_BASE_URL: http://127.0.0.1:3000
           QA_UI_MOCKS: "true"
         run: |
           npm run build
-          python -m pytest -q qa/test_production_build_safety.py
+          python -m pytest -q qa/test_production_build_safety.py qa/test_portfolio_council_ui.py::test_production_build_omits_council
 
   safety:
     name: Offline CI safety regression tests

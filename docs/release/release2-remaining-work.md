@@ -1,0 +1,43 @@
+# Current remaining-work register — 25 November 2026
+
+This replaces the historical 14–15 November register available in the preserved original worktree. Its percentage estimates and milestone deployment counts are obsolete; no new overall completion percentage has been established.
+
+## Released and verified
+
+[PR #188](https://github.com/Blitzer0007/ai-infra-watch/pull/188) is merged and deployed: main `79fddf79a452c2a385b596fced604397781316eb`, READY `dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo`, [production](https://ai-infra-watch-theta.vercel.app). Seven exact-main workflows, staged identity/access/assets/rollback checks, promotion and public HTML/JS/CSS checks passed.
+
+Released scope includes persistent light/dark switching, grouped accounting/rule diagnoses, private-session/JEV/access fixes, bounded history loading, removal of passive writes, local redacted diagnostics and explicit SEC dossier/Opportunities financial reviews. This establishes code-release verification, not completeness of financial-source/accounting/forecast evidence.
+
+## Current development
+
+[NVIDIA council comparison](NVIDIA-COUNCIL-EVALUATION.md) adds eight fictional calibration scenarios, labels outside model prompts, a numeric-selection baseline, protocol-control comparison, role selection/citation/abstention scoring and an explicit single-case live hook with redacted telemetry. Dedicated development credentials are absent; actual live evaluation remains unrun. Exact-head CI status is recorded in the draft PR/Cloud handoff.
+
+[Company/Catalyst/Daily Review baseline views](RESEARCH-ROLE-REVIEW.md) organize conditionally admitted loaded inputs into cited observations and fixed review questions in the development UI. They use no LLM or additional provider request and are not autonomous AI agents. A separate opt-in manual model action is implemented; actual provider acceptance, document inspection and independent usefulness evaluation remain pending.
+
+[Bounded role runner](RESEARCH-ROLE-AGENTS.md) now implements model-selected inspection/coverage and cited review-code priorities for Company/Catalyst/Daily Review. Offline fixtures and mocked NVIDIA routing are tested; the development probe can run one explicit live fictional case after dedicated credential setup. Authenticated manual UI integration is implemented and tested through the actual private relay with a fictional model. Real provider acceptance, independent document inspection and usefulness/holdout evidence remain pending.
+
+[Research-role priority comparison](RESEARCH-ROLE-EVALUATION.md) now measures omissions against authored fictional targets with a similarly bounded no-model baseline. All eight fictional protocol runs complete but miss a target; this is a fixture limitation, not a live NVIDIA result. Targets are hash-bound and kept outside prompts; independent review/holdouts remain pending.
+
+[Portfolio price-history recovery](PORTFOLIO-PRICE-HISTORY-RECOVERY.md) now exposes an existing holding closing-price chart directly on Performance while accounting is unresolved. The display reuses bounded history requests and retains provider/currency/stale/load metadata; malformed/conflicting bars are withheld. This does not restore account returns, certify source coverage or fix genuine provider outages.
+
+[History fallback recovery](HISTORY-FALLBACK-RECOVERY.md) now prevents wholly unusable primary packets from suppressing configured fallback providers, retains partial-display/omission metadata, and keeps adjusted-use checks/Data Health conservative. Mocked provider and browser tests pass; real provider access/plan coverage and production outage rates remain unverified.
+
+[Shared market reads](MARKET-REQUEST-SHARING.md) now deduplicate identical pending internal quote/history loads within a warm Node process, preserving symbol/range separation, explicit refresh and failure recovery. This reduces redundant chains in tests; it is not a distributed quota or proof of provider availability.
+
+[PR #189 release-readiness review](PR189-RELEASE-READINESS.md) records the verified application revision, current production identity and rollback, combined release scope, exact-commit evidence, staged verification sequence and unresolved release controls. Review is complete; deployment is blocked. No release workflow or production setting was changed.
+
+[Manual PR189 release controls](PR189-MANUAL-RELEASE-CONTROLS.md) subsequently prepare a separate default-NO manual path, reviewed-source/regular-merge/rollback pins, all-eight exact-main CI admission and duplicate/rerun protection. The old PR188 automatic handoff is unchanged and cannot release PR189. This is preparation only; owner decision and actual release checks remain pending.
+
+## Pending acceptance and implementations
+
+| Area | Remaining work |
+| --- | --- |
+| NVIDIA/JEV model evaluation | Authored offline priority-coverage comparison implemented. Dedicated NVIDIA development secret; account availability/free-quota/cost/latency checks; independently reviewed grounding/usefulness cases and holdouts; actual live comparison with deterministic baselines. TypeSafe remains a separate manual counts-only assessment. |
+| Research roles | Deterministic UI views and bounded tool-calling development runner implemented in draft189. Authenticated manual development UI integration implemented with fictional end-to-end tests; live provider acceptance, independent source/document inspection, portfolio-wide daily summaries and meaningful evaluation remain pending. Bull/Bear/Judge remains manual development research. |
+| Accounting and return charts | Broker precision/timezone, complete original account/cashflow history, corporate actions and reconciled source evidence. Do not round shares or assume a timezone to restore charts. |
+| Market/financial sources | Reduce Yahoo dependence; correctly adjusted historical alternatives, issuer/security-class verification, source contact/access and retained financial lineage. Code adapters do not prove coverage. |
+| Forecast validation | Authentic outcomes, point-in-time membership, holdouts and horizon-specific validation. Counts or model confidence do not establish forecast validity. |
+| Event Risk Radar | Authorized acquisition/account verification for public sources including @aravind, source evaluation and delivery-policy checks before live polling. |
+| Production controls | Main is confirmed unprotected; production-environment reviewer/main restrictions remain unverified (unsupported connector endpoint; CLI read forbidden at the earlier review). Separate default-denied PR189 manual controls are prepared/tested; old PR188 automatic handoff is unchanged. Verify standard protection controls, or obtain a new explicit owner decision for the final reviewed PR189 head before its one-time exception. Actual exact-main CI, QA-off/private access, staging/assets/promotion and reverified PR188 rollback remain release steps. See manual controls and readiness review. |
+
+Preserve all old worktrees and draft PRs; do not merge duplicate release branches. No new deployment, live polling, production database modification or Telegram send is authorized by this development checkpoint. Read [CODEX-CONTINUATION.md](CODEX-CONTINUATION.md) before continuing.

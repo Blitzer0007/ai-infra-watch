@@ -73,7 +73,8 @@ export function buildSourceDiagnosticSnapshot(input: {
           metadata: { dailyMove: flag(metadata.dailyMove), currency: flag(metadata.currency), marketTime: flag(metadata.marketTime), session: flag(metadata.session) },
         },
         history: { ...providerDiagnostic(h), reportedAgeDays: count(h.ageDays), pointCount: count(h.pointCount),
-          adjustedPointCount: count(h.adjustedPointCount), adjustedCloseAvailable: flag(h.adjustedCloseAvailable) },
+          adjustedPointCount: count(h.adjustedPointCount), adjustedCloseAvailable: flag(h.adjustedCloseAvailable),
+          discardedPointCount:count(h.discardedPointCount),duplicateDateCount:count(h.duplicateDateCount),invalidAdjustedPointCount:count(h.invalidAdjustedPointCount) },
       };
     }),
     limitations: 'Reported ages and admission states belong to the loaded sample. Copying does not refresh them or verify source accuracy, public quotes or accounting.',

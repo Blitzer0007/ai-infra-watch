@@ -22,7 +22,7 @@ def council_gateway(tmp_path_factory):
     # Reuse across cases makes success depend on finishing fewer than 12 calls/min.
     log=tmp_path_factory.mktemp('council-loopback')/'backend.log'
     sock=socket.socket();sock.bind(('127.0.0.1',0));sock.listen(128);port=sock.getsockname()[1]
-    env={'PATH':os.environ.get('PATH',''),'PYTHONPATH':str(ROOT/'aitracker-upload'),'COUNCIL_DEV_ENABLED':'true','COUNCIL_JEV_DEV_ENABLED':'true','AI_INFRA_AGENT_TOKEN':'fictional-council-backend','EVAL_STUB':'true','LLM_PROVIDER':'stub'}
+    env={'PATH':os.environ.get('PATH',''),'PYTHONPATH':str(ROOT/'aitracker-upload'),'COUNCIL_DEV_ENABLED':'true','COUNCIL_JEV_DEV_ENABLED':'true','RESEARCH_ROLE_HTTP_DEV_ENABLED':'true','AI_INFRA_AGENT_TOKEN':'fictional-council-backend','EVAL_STUB':'true','LLM_PROVIDER':'stub'}
     with log.open('w') as output:
         backend=subprocess.Popen([sys.executable,'-m','uvicorn','council_backend:app','--app-dir',str(ROOT/'qa'),'--fd',str(sock.fileno()),'--no-access-log'],env=env,pass_fds=(sock.fileno(),),stdout=output,stderr=output)
         gateway=None
@@ -36,7 +36,7 @@ def council_gateway(tmp_path_factory):
                     time.sleep(.1)
                 else:raise AssertionError('Council backend not ready')
             with socket.socket() as reserve:reserve.bind(('127.0.0.1',0));frontend_port=reserve.getsockname()[1]
-            gateway_env={**env,'AIW_ACCESS_TOKEN':'fictional-council-session','AI_INFRA_AGENT_URL':f'http://127.0.0.1:{port}','VITE_QA_MODE':'true'}
+            gateway_env={**env,'AIW_ACCESS_TOKEN':'fictional-council-session','AI_INFRA_AGENT_URL':f'http://127.0.0.1:{port}','VITE_QA_MODE':'true','RESEARCH_ROLE_HTTP_DEV_ENABLED':'true'}
             gateway_env['PORT']=str(frontend_port)
             gateway=subprocess.Popen(['node',str(ROOT/'scripts/serve-static.mjs')],cwd=ROOT,env=gateway_env,stdout=output,stderr=output)
             address=f'http://127.0.0.1:{frontend_port}';assert is_loopback_url(address)
@@ -169,6 +169,9 @@ def test_production_build_omits_council(page):
     fictional_portfolio(page);page.add_init_script('sessionStorage.setItem("aiw_access_token_v1","fictional-council-session")')
     page.goto(address+'/jev-lab');page.wait_for_load_state('networkidle')
     expect(page.get_by_test_id('portfolio-council')).to_have_count(0)
+    expect(page.get_by_test_id('research-role-review')).to_have_count(0)
+    expect(page.get_by_test_id('research-agent-result')).to_have_count(0)
+    expect(page.get_by_role('button',name='Run model-selected research roles',exact=True)).to_have_count(0)
 
 def test_source_receipt_retains_filing_days_and_formulas_and_freezes_model_snapshot_across_feed_refresh(page,council_gateway):
     source=json.loads((ROOT/'qa/fixtures/council-source-receipt.fictional.json').read_text())
@@ -242,18 +245,42 @@ def test_model_free_admission_and_v2_model_run_bind_the_same_frozen_inputs(page,
     expect(report).to_contain_text('Conditionally usable for research');expect(report).to_contain_text('neither endpoint is the actual publication time')
     assert len(calls)==1 and calls[0].post_data_json['mode']=='admission-v2'
     assert panel.get_by_test_id('council-result').count()==0
+    roles=panel.get_by_test_id('research-role-review')
+    expect(roles).to_contain_text('Deterministic baseline · no model calls')
+    expect(roles.get_by_role('tab',name='Company',exact=True)).to_have_attribute('aria-selected','true')
+    expect(roles).to_contain_text('Review the negative cash-flow observation')
+    roles.locator('summary').click();expect(roles).to_contain_text('-5 USD')
+    roles.get_by_role('tab',name='Company',exact=True).focus();page.keyboard.press('ArrowRight')
+    expect(roles.get_by_role('tab',name='Catalyst',exact=True)).to_be_focused()
+    expect(roles.get_by_role('tabpanel')).to_contain_text('Event timing and confirmation')
+    page.keyboard.press('End')
+    expect(roles.get_by_role('tab',name='Daily review',exact=True)).to_be_focused()
+    expect(roles.get_by_role('tabpanel')).to_contain_text('not a portfolio or whole-day assessment')
+    assert not roles.locator('details').evaluate('(element)=>element.open'), 'New role starts with citations collapsed'
+    page.locator(':focus').evaluate('(element)=>element.blur()')
+    assert len(calls)==1, 'Changing deterministic role tabs must make no API or model call'
     ARTIFACTS.mkdir(parents=True,exist_ok=True)
     for width in [360,768,1440]:
         page.set_viewport_size({'width':width,'height':1000});assert report.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         report.screenshot(path=str(ARTIFACTS/f'portfolio-council-admission-fictional-{width}.png'))
+        assert roles.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
+        roles.screenshot(path=str(ARTIFACTS/f'research-roles-fictional-{width}.png'))
+    light_background=roles.evaluate('(element)=>getComputedStyle(element).backgroundColor')
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('html')).to_have_attribute('data-aiw-theme','dark')
+    assert roles.evaluate('(element)=>getComputedStyle(element).backgroundColor')!=light_background
+    roles.screenshot(path=str(ARTIFACTS/'research-roles-fictional-dark-1440.png'))
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('html')).to_have_attribute('data-aiw-theme','light')
+    assert len(calls)==1, 'Theme changes must not repeat research validation'
     panel.get_by_role('button',name='Analyze loaded evidence',exact=True).click()
     expect(panel.get_by_test_id('council-result')).to_contain_text('No decision eligibility was granted')
     assert len(calls)==2 and calls[1].post_data_json['mode']=='loaded-v2'
     assert calls[0].post_data_json['packet']==calls[1].post_data_json['packet']
     assert calls[0].post_data_json['sources']==calls[1].post_data_json['sources']
     panel.get_by_role('combobox',name='Council research horizon',exact=True).select_option('6')
-    expect(report).to_have_count(0);assert len(calls)==2 and errors==[]
+    expect(report).to_have_count(0);expect(roles).to_have_count(0);assert len(calls)==2 and errors==[]
 
 def test_same_day_filing_cannot_gain_a_fabricated_precise_publication_time(page,council_gateway):
     page.clock.set_fixed_time(datetime(2026,11,9,12,0,tzinfo=timezone.utc))
@@ -265,5 +292,108 @@ def test_same_day_filing_cannot_gain_a_fabricated_precise_publication_time(page,
     panel.get_by_role('button',name='Validate research inputs',exact=True).click()
     report=panel.get_by_test_id('council-admission');expect(report).to_contain_text('PUBLICATION WINDOW UNCLOSED')
     expect(report).to_contain_text('needs data')
+    roles=panel.get_by_test_id('research-role-review')
+    expect(roles.get_by_role('tabpanel')).to_contain_text('Company · Needs data')
+    roles.locator('summary').click()
+    expect(roles).to_contain_text('No conditionally usable observations for this role')
+    expect(roles).not_to_contain_text('Review the negative cash-flow observation')
     assert len(calls)==1 and all(o['evidence']['published_at'] is None for o in calls[0].post_data_json['sources']['sec']['observations'])
     assert panel.get_by_test_id('council-result').count()==0 and errors==[]
+
+def prepare_research_agent(page,address):
+    page.clock.set_fixed_time(datetime(2026,11,9,12,0,tzinfo=timezone.utc))
+    source=json.loads((ROOT/'qa/fixtures/council-source-receipt.fictional.json').read_text())
+    panel,calls,errors=setup(page,address,source,'2026-11-09T11:59:00Z')
+    button=panel.get_by_role('button',name='Run model-selected research roles',exact=True)
+    expect(button).to_be_disabled()
+    panel.get_by_role('button',name='Inspect loaded sources',exact=True).click()
+    expect(button).to_be_disabled();assert calls==[]
+    panel.get_by_role('button',name='Validate research inputs',exact=True).click()
+    expect(panel.get_by_test_id('research-role-review')).to_be_visible()
+    expect(button).to_be_enabled()
+    assert len(calls)==1 and calls[0].post_data_json['mode']=='admission-v2'
+    return panel,button,calls,errors
+
+def test_manual_research_agents_actual_private_transport_frozen_inputs_and_themes(page,council_gateway):
+    panel,button,calls,errors=prepare_research_agent(page,council_gateway)
+    # Refresh unrelated live state after inspection; the manual run must retain its snapshot.
+    page.route('**/api/live-data*',lambda route:route.fulfill(json={'stockPrices':{'MSFT':{'symbol':'MSFT','price':200}},'news':[],'contracts':[],'congressTrades':[],'macroRisks':[]}))
+    page.get_by_role('button',name='REFRESH FEED',exact=True).click()
+    expect(page.get_by_role('button',name='REFRESH FEED',exact=True)).to_be_enabled()
+    button.dblclick()
+    result=panel.get_by_test_id('research-agent-result')
+    expect(result).to_contain_text('MSFT · Simulated role workflow')
+    expect(result).to_contain_text('Workflow complete')
+    expect(result).to_contain_text('Fictional model simulation · zero provider requests')
+    expect(result).to_contain_text('No decision eligibility')
+    expect(button).to_be_disabled()
+    assert len(calls)==2 and calls[1].post_data_json['mode']=='research-v2'
+    for field in ['packet','sources']:assert calls[0].post_data_json[field]==calls[1].post_data_json[field]
+    assert next(e for e in calls[1].post_data_json['packet']['evidence'] if e['metric']=='price')['value']==100
+    result.get_by_text('Cited inputs (4)',exact=True).first.click()
+    expect(result).to_contain_text('-5 USD')
+    result.get_by_text('Run limits and trace',exact=True).click()
+    expect(result).to_contain_text('Model calls: 6/6 · Loaded tools: 3/3 · Provider requests: 0')
+    page.locator(':focus').evaluate('(element)=>element.blur()')
+    ARTIFACTS.mkdir(parents=True,exist_ok=True)
+    for width in [360,768,1440]:
+        page.set_viewport_size({'width':width,'height':2200})
+        assert result.evaluate('(e)=>e.scrollWidth<=e.clientWidth')
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        result.screenshot(path=str(ARTIFACTS/f'research-agent-fictional-{width}.png'))
+    light=result.evaluate('(e)=>getComputedStyle(e).backgroundColor')
+    page.get_by_role('switch',name='Dark theme',exact=True).click()
+    expect(page.locator('html')).to_have_attribute('data-aiw-theme','dark')
+    assert result.evaluate('(e)=>getComputedStyle(e).backgroundColor')!=light
+    result.screenshot(path=str(ARTIFACTS/'research-agent-fictional-dark-1440.png'))
+    assert len(calls)==2 and errors==[]
+    panel.get_by_role('combobox',name='Council research horizon',exact=True).select_option('6')
+    expect(result).to_have_count(0);expect(button).to_be_disabled()
+    assert len(calls)==2
+
+def test_late_research_reply_is_discarded_after_horizon_changes(page,council_gateway):
+    panel,button,calls,errors=prepare_research_agent(page,council_gateway)
+    def late(route):
+        response=route.fetch()
+        panel.get_by_role('combobox',name='Council research horizon',exact=True).select_option('6')
+        route.fulfill(response=response)
+    page.route('**/api/agent-ask?task=council',late)
+    button.click()
+    expect(panel.get_by_role('combobox',name='Council research horizon',exact=True)).to_have_value('6')
+    expect(panel.get_by_test_id('research-agent-result')).to_have_count(0)
+    expect(panel.get_by_test_id('research-role-review')).to_have_count(0)
+    expect(button).to_be_disabled()
+    assert len(calls)==2 and errors==[]
+
+@pytest.mark.parametrize('outcome',['partial','failed','tampered','network'])
+def test_research_agents_incomplete_and_invalid_results_never_claim_completion_or_retry(page,council_gateway,outcome):
+    panel,button,calls,errors=prepare_research_agent(page,council_gateway)
+    def replace(route):
+        if outcome=='network':
+            route.fulfill(status=503,json={'error':'fictional-private-upstream'});return
+        response=route.fetch();value=response.json();result=value['result']
+        if outcome=='tampered':result['roles']['company']['summary']='Guaranteed financial winner'
+        else:
+            result['roles']={'company':result['roles']['company']}
+            result['trace']=result['trace'][:2]
+            result['usage']['tool_calls']=1;result['usage']['model_calls']=3
+            result['status']=outcome
+            result['termination_reason']='tool-budget' if outcome=='partial' else 'model-or-contract-error'
+        route.fulfill(response=response,json=value)
+    page.route('**/api/agent-ask?task=council',replace)
+    button.click();result=panel.get_by_test_id('research-agent-result')
+    if outcome in ['partial','failed']:
+        expect(result).to_contain_text('Review stopped')
+        expect(result).to_contain_text('No automatic retry occurred')
+        expect(result).not_to_contain_text('Workflow complete')
+        expect(result.get_by_text('No validated selection returned.',exact=True)).to_have_count(2)
+        expect(button).to_be_disabled()
+        panel.get_by_role('button',name='Start a new review',exact=True).click()
+        expect(result).to_have_count(0);expect(button).to_be_disabled()
+    else:
+        expect(panel.get_by_role('alert')).to_contain_text('No automatic retry occurred')
+        expect(result).to_have_count(0)
+        expect(panel).not_to_contain_text('Guaranteed financial winner')
+        expect(panel).not_to_contain_text('fictional-private-upstream')
+        expect(button).to_be_enabled()
+    assert len(calls)==2 and errors==[]

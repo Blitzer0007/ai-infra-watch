@@ -886,4 +886,10 @@ body { background: var(--aiw-palette-f5f7fb); }
 .aiw-dark-workspace .aiw-skip-link { background: #477be3; color: #fff; }
 .aiw-dark-workspace button:is(.bg-black,.bg-blue-500,.bg-blue-600) [class*="text-white"] { color: #fff; }
 .aiw-dark-workspace .aiw-holding-dialog { background: #141e2c; }
+
+/* Bounded research-role views use semantic surfaces in both workspace themes. */
+.aiw-research-roles { background: var(--aiw-card); color: var(--aiw-ink); border-color: var(--aiw-outline); }
+.aiw-research-roles [role="tab"] { color: var(--aiw-ink); border-color: var(--aiw-outline); background: transparent; }
+.aiw-research-roles [role="tab"][aria-selected="true"] { color: var(--aiw-focus); background: var(--aiw-palette-edf2ff); border-color: var(--aiw-focus); }
+.aiw-research-roles details { background: var(--aiw-palette-f4f7fb); border-color: var(--aiw-outline); }
 .aiw-theme-switch { white-space: nowrap; }

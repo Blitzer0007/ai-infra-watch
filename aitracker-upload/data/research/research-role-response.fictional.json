@@ -1,0 +1,2350 @@
+{
+  "contract_version": "research-role-response-fixtures-v1",
+  "fictional_only": true,
+  "cases": [
+    {
+      "case_id": "growth-with-cash-burn",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:growth-with-cash-burn",
+          "request_sha256": "bec3865e1dc88d00fd070317ca2b426943010ad35cdcc18f913933d5cd85ddc5",
+          "status": "conditional",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity",
+              "calendar:event-days"
+            ],
+            "issues": [],
+            "missing_families": [],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:growth-with-cash-burn",
+          "request_sha256": "bec3865e1dc88d00fd070317ca2b426943010ad35cdcc18f913933d5cd85ddc5",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "conditional",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_NEGATIVE_CASH_FLOW",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "conditional",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13529,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "profitable-growth-flat-market",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:profitable-growth-flat-market",
+          "request_sha256": "286e5c2df29d450fb490a1818f48a116ec421e882984e182d339f5c6f0b696d2",
+          "status": "conditional",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity",
+              "calendar:event-days"
+            ],
+            "issues": [],
+            "missing_families": [],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:profitable-growth-flat-market",
+          "request_sha256": "286e5c2df29d450fb490a1818f48a116ec421e882984e182d339f5c6f0b696d2",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "conditional",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_CASH_FLOW_CONTEXT",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "conditional",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13524,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "contracting-cash-burn",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:contracting-cash-burn",
+          "request_sha256": "81193f86e2023fe84d7db888992ff61e0cffdcd8baf7f46647a83e169b236579",
+          "status": "conditional",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity",
+              "calendar:event-days"
+            ],
+            "issues": [],
+            "missing_families": [],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:contracting-cash-burn",
+          "request_sha256": "81193f86e2023fe84d7db888992ff61e0cffdcd8baf7f46647a83e169b236579",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "conditional",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_NEGATIVE_CASH_FLOW",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "conditional",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13531,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "zero-cash-flow",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:zero-cash-flow",
+          "request_sha256": "bf3774edadcb60041865508102c29d9fc18c74e46721be437d3bdfa15d276551",
+          "status": "conditional",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity",
+              "calendar:event-days"
+            ],
+            "issues": [],
+            "missing_families": [],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:zero-cash-flow",
+          "request_sha256": "bf3774edadcb60041865508102c29d9fc18c74e46721be437d3bdfa15d276551",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "conditional",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_ZERO_CASH_FLOW",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "conditional",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13512,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "stale-market",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:stale-market",
+          "request_sha256": "d6708e4bfafa2245d27a7b51bb238e095864d3df912c89d780628d9c3866e9d4",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": false,
+              "reason_codes": [
+                "SOURCE_STALE_OR_FUTURE"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": false,
+              "reason_codes": [
+                "SOURCE_STALE_OR_FUTURE"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity",
+              "calendar:event-days"
+            ],
+            "issues": [
+              {
+                "evidence_id": "loaded:price",
+                "codes": [
+                  "SOURCE_STALE_OR_FUTURE"
+                ]
+              },
+              {
+                "evidence_id": "loaded:daily_change_pct",
+                "codes": [
+                  "SOURCE_STALE_OR_FUTURE"
+                ]
+              }
+            ],
+            "missing_families": [
+              "market"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:stale-market",
+          "request_sha256": "d6708e4bfafa2245d27a7b51bb238e095864d3df912c89d780628d9c3866e9d4",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_NEGATIVE_CASH_FLOW",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS",
+                "REFRESH_MARKET_EVIDENCE"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13591,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "missing-filing-lineage",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:missing-filing-lineage",
+          "request_sha256": "9ecbb605381265065909bdf00e1551a66ebccb09bdf5d0beec9854b89370db6f",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "LINEAGE_MISSING"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "LINEAGE_MISSING"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "LINEAGE_MISSING"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": false,
+              "reason_codes": [
+                "LINEAGE_MISSING"
+              ],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "calendar:event-days"
+            ],
+            "issues": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:operating_margin_pct",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:liabilities_equity",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "financial",
+              "risk"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:missing-filing-lineage",
+          "request_sha256": "9ecbb605381265065909bdf00e1551a66ebccb09bdf5d0beec9854b89370db6f",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "FINANCIAL_INPUTS_MISSING",
+                "RISK_INPUTS_MISSING"
+              ],
+              "evidence_ids": []
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS",
+                "FILL_FINANCIAL_COVERAGE"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13442,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "same-day-filing-uncertainty",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:same-day-filing-uncertainty",
+          "request_sha256": "fdd776e8be32b174ceb72c62db0e6969f9b36ef6f51feeb54dfb17a41935bb54",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "PUBLICATION_WINDOW_UNCLOSED"
+              ],
+              "publication_window": {
+                "earliest": "2026-11-08T10:00:00+00:00",
+                "latest_exclusive": "2026-11-10T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "PUBLICATION_WINDOW_UNCLOSED"
+              ],
+              "publication_window": {
+                "earliest": "2026-11-08T10:00:00+00:00",
+                "latest_exclusive": "2026-11-10T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": false,
+              "reason_codes": [
+                "PUBLICATION_WINDOW_UNCLOSED"
+              ],
+              "publication_window": {
+                "earliest": "2026-11-08T10:00:00+00:00",
+                "latest_exclusive": "2026-11-10T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": false,
+              "reason_codes": [
+                "PUBLICATION_WINDOW_UNCLOSED"
+              ],
+              "publication_window": {
+                "earliest": "2026-11-08T10:00:00+00:00",
+                "latest_exclusive": "2026-11-10T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "calendar:event-days"
+            ],
+            "issues": [
+              {
+                "evidence_id": "sec:revenue_growth_pct",
+                "codes": [
+                  "TIME_PROVENANCE_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:operating_margin_pct",
+                "codes": [
+                  "TIME_PROVENANCE_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:free_cash_flow_usd",
+                "codes": [
+                  "TIME_PROVENANCE_MISSING"
+                ]
+              },
+              {
+                "evidence_id": "sec:liabilities_equity",
+                "codes": [
+                  "TIME_PROVENANCE_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "financial",
+              "risk"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:same-day-filing-uncertainty",
+          "request_sha256": "fdd776e8be32b174ceb72c62db0e6969f9b36ef6f51feeb54dfb17a41935bb54",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "FINANCIAL_INPUTS_MISSING",
+                "RISK_INPUTS_MISSING"
+              ],
+              "evidence_ids": []
+            },
+            "catalyst": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "REVIEW_EVENT_TIMING"
+              ],
+              "evidence_ids": [
+                "calendar:event-days"
+              ]
+            },
+            "daily": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS",
+                "FILL_FINANCIAL_COVERAGE"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13490,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "unconfirmed-catalyst",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": false,
+              "reason_codes": [
+                "EVENT_UNCONFIRMED"
+              ],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity"
+            ],
+            "issues": [
+              {
+                "evidence_id": "calendar:event-days",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "catalyst"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "complete",
+          "termination_reason": "completed",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {
+            "company": {
+              "input_status": "conditional",
+              "review_codes": [
+                "VERIFY_ORIGINAL_FILINGS",
+                "REVIEW_NEGATIVE_CASH_FLOW",
+                "REVIEW_GROWTH_CONTEXT"
+              ],
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ]
+            },
+            "catalyst": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "VERIFY_EVENT_SOURCE",
+                "EVENT_CONFIRMATION_REQUIRED"
+              ],
+              "evidence_ids": []
+            },
+            "daily": {
+              "input_status": "needs-data",
+              "review_codes": [
+                "CHECK_SOURCE_AUTHENTICITY",
+                "RECORD_REVIEW_QUESTIONS",
+                "FILL_CATALYST_COVERAGE"
+              ],
+              "evidence_ids": []
+            }
+          },
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            },
+            {
+              "role": "company",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "calendar:event-days"
+              ],
+              "families": []
+            },
+            {
+              "role": "catalyst",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            },
+            {
+              "role": "daily",
+              "action": "coverage",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": [
+                "market",
+                "financial",
+                "catalyst",
+                "risk"
+              ]
+            },
+            {
+              "role": "daily",
+              "action": "review",
+              "status": "ok",
+              "evidence_ids": [],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 6,
+            "tool_calls": 3,
+            "prompt_chars": 13600,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    }
+  ],
+  "failures": [
+    {
+      "case_id": "unconfirmed-catalyst",
+      "kind": "failed",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": false,
+              "reason_codes": [
+                "EVENT_UNCONFIRMED"
+              ],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity"
+            ],
+            "issues": [
+              {
+                "evidence_id": "calendar:event-days",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "catalyst"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "failed",
+          "termination_reason": "model-or-contract-error",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {},
+          "trace": [],
+          "usage": {
+            "model_calls": 1,
+            "tool_calls": 0,
+            "prompt_chars": 1682,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "unconfirmed-catalyst",
+      "kind": "partial",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": false,
+              "reason_codes": [
+                "EVENT_UNCONFIRMED"
+              ],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity"
+            ],
+            "issues": [
+              {
+                "evidence_id": "calendar:event-days",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "catalyst"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "fixture",
+          "status": "partial",
+          "termination_reason": "tool-budget",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {},
+          "trace": [
+            {
+              "role": "company",
+              "action": "inspect",
+              "status": "ok",
+              "evidence_ids": [
+                "sec:revenue_growth_pct",
+                "sec:operating_margin_pct",
+                "sec:free_cash_flow_usd",
+                "sec:liabilities_equity"
+              ],
+              "families": []
+            }
+          ],
+          "usage": {
+            "model_calls": 2,
+            "tool_calls": 1,
+            "prompt_chars": 5428,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    },
+    {
+      "case_id": "unconfirmed-catalyst",
+      "kind": "unavailable",
+      "response": {
+        "contract_version": "research-role-response-v1",
+        "admission": {
+          "contract_version": "council-admission-v1",
+          "rule_version": "family-provenance-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "status": "needs-data",
+          "records": [
+            {
+              "evidence_id": "loaded:price",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "kind": "quote",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": null
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "kind": "sec-duration",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "kind": "sec-instant",
+              "eligible": true,
+              "reason_codes": [],
+              "publication_window": {
+                "earliest": "2026-02-19T10:00:00+00:00",
+                "latest_exclusive": "2026-02-21T12:00:00+00:00",
+                "precision": "date-only",
+                "offset_policy": "utc-minus12-plus14"
+              }
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "kind": "catalyst-countdown",
+              "eligible": false,
+              "reason_codes": [
+                "EVENT_UNCONFIRMED"
+              ],
+              "publication_window": null
+            }
+          ],
+          "quality": {
+            "usable_ids": [
+              "loaded:price",
+              "loaded:daily_change_pct",
+              "sec:revenue_growth_pct",
+              "sec:operating_margin_pct",
+              "sec:free_cash_flow_usd",
+              "sec:liabilities_equity"
+            ],
+            "issues": [
+              {
+                "evidence_id": "calendar:event-days",
+                "codes": [
+                  "REPORTED_BASIS_MISSING"
+                ]
+              }
+            ],
+            "missing_families": [
+              "catalyst"
+            ],
+            "conflicting_ids": []
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        },
+        "result": {
+          "contract_version": "research-role-agent-v1",
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "request_sha256": "ba5158d8e40a56515cd3fcecfab8f1b71f8d9f07fa27f028ac317892c79f5d58",
+          "symbol": "FICT",
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "horizon_months": 3,
+          "scope": "single-symbol-frozen-snapshot",
+          "mode": "unconfigured",
+          "status": "unavailable",
+          "termination_reason": "model-not-configured",
+          "input_status": "needs-data",
+          "selection_is_exhaustive": false,
+          "roles": {},
+          "trace": [],
+          "usage": {
+            "model_calls": 0,
+            "tool_calls": 0,
+            "prompt_chars": 0,
+            "provider_requests": 0
+          },
+          "policy": {
+            "max_model_calls": 6,
+            "max_tool_calls": 3,
+            "max_seconds": 40,
+            "max_prompt_chars": 60000,
+            "output_token_limit_per_call": 600,
+            "max_review_codes_per_role": 3,
+            "max_citations_per_role": 4
+          },
+          "source_authenticity_verified": false,
+          "forecast_validity_established": false,
+          "grants_decision_eligibility": false,
+          "changes_allocation": false,
+          "sends_messages": false
+        }
+      }
+    }
+  ]
+}

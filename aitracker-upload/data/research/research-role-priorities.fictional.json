@@ -1,0 +1,151 @@
+{
+  "contract_version": "research-role-priorities-v1",
+  "fictional_only": true,
+  "label_scope": "Authored fictional review-question priorities; not source truth, financial usefulness or returns.",
+  "independent_review_completed": false,
+  "holdout_validation_completed": false,
+  "cases": [
+    {
+      "case_id": "growth-with-cash-burn",
+      "request_sha256": "2fc7018f1aba77b5eb0f09df2beba04fa9e807ed288fb2a8646f5106ff2a6ae8",
+      "roles": {
+        "company": [
+          "REVIEW_NEGATIVE_CASH_FLOW",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "profitable-growth-flat-market",
+      "request_sha256": "1d7dccc9cde5c777a403106ce712f6e4d5a2e76a5da9bc1a69badf2981dbbc3e",
+      "roles": {
+        "company": [
+          "REVIEW_CASH_FLOW_CONTEXT",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "contracting-cash-burn",
+      "request_sha256": "964b8ae2f001feea6a21e098d141a6a5bd8fc9e925b988ac4ca88fdbffc961fd",
+      "roles": {
+        "company": [
+          "REVIEW_NEGATIVE_CASH_FLOW",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "zero-cash-flow",
+      "request_sha256": "d5d4097e7293de42a68f77ab3119650cf8afc83653f7bbce2b14db8b04540061",
+      "roles": {
+        "company": [
+          "REVIEW_ZERO_CASH_FLOW",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "stale-market",
+      "request_sha256": "b90fcf8d81fa62b0d563895ad490bf7444a93ff5d56ccf9e9a94a87b6a3d3775",
+      "roles": {
+        "company": [
+          "REVIEW_NEGATIVE_CASH_FLOW",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "REFRESH_MARKET_EVIDENCE",
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "missing-filing-lineage",
+      "request_sha256": "b93dea73dc39525a6d97a6592d2a5507e02330d9c222e45470e0c40e9c500fdc",
+      "roles": {
+        "company": [
+          "FINANCIAL_INPUTS_MISSING",
+          "RISK_INPUTS_MISSING",
+          "VERIFY_ORIGINAL_FILINGS"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "FILL_FINANCIAL_COVERAGE",
+          "FILL_RISK_COVERAGE",
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "same-day-filing-uncertainty",
+      "request_sha256": "9c6483d7f03356aedbf5ca2f9f9116a5305208734a6a17a45fa6393a69ffc748",
+      "roles": {
+        "company": [
+          "FINANCIAL_INPUTS_MISSING",
+          "RISK_INPUTS_MISSING",
+          "VERIFY_ORIGINAL_FILINGS"
+        ],
+        "catalyst": [
+          "REVIEW_EVENT_TIMING"
+        ],
+        "daily": [
+          "FILL_FINANCIAL_COVERAGE",
+          "FILL_RISK_COVERAGE",
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    },
+    {
+      "case_id": "unconfirmed-catalyst",
+      "request_sha256": "2b4e82476e3141327225ef1fc4652fd72540bc3f1fd6f319438c42550d92b54b",
+      "roles": {
+        "company": [
+          "REVIEW_NEGATIVE_CASH_FLOW",
+          "REVIEW_GROWTH_CONTEXT",
+          "REVIEW_LEVERAGE_CONTEXT"
+        ],
+        "catalyst": [
+          "EVENT_CONFIRMATION_REQUIRED"
+        ],
+        "daily": [
+          "FILL_CATALYST_COVERAGE",
+          "CHECK_SOURCE_AUTHENTICITY"
+        ]
+      }
+    }
+  ]
+}

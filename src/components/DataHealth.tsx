@@ -287,6 +287,9 @@ export default function DataHealth({ evidenceAvailability, timestamp, isLoading,
                 Quote checks: {quote.valuationAdmission?.eligible === true ? 'Passed for conditional valuation' : quote.valuationAdmission?.eligible === false ? 'Withheld' : 'Unknown'}
                 {Array.isArray(quote.valuationAdmission?.reasons) && <ul className="mt-1 space-y-1">{quote.valuationAdmission.reasons.map((reason: string, index: number) => <li key={index}>{reason}</li>)}</ul>}
               </div>
+              {(history.discardedPointCount>0||history.duplicateDateCount>0||history.invalidAdjustedPointCount>0)&&<p data-testid="sample-history-normalization" className="mt-2 text-xs text-amber-200">
+                History validation: {Number.isSafeInteger(history.discardedPointCount)?history.discardedPointCount:0} unusable, {Number.isSafeInteger(history.duplicateDateCount)?history.duplicateDateCount:0} repeated, {Number.isSafeInteger(history.invalidAdjustedPointCount)?history.invalidAdjustedPointCount:0} invalid adjusted observations. Adjusted-history use remains withheld; the percentage counts retained rows only.
+              </p>}
               {(quote.providerAttempts?.length > 1 || history.providerAttempts?.length > 1) ? (
                 <div className="mt-2 text-[7px] font-mono text-white/25">
                   Attempts: {[...(quote.providerAttempts || []), ...(history.providerAttempts || [])].map((item: any) => item.provider + ':' + item.status + (item.errorCode ? '(' + item.errorCode + ')' : '')).join(' · ')}

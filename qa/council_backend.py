@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from app.agents import council_http
 from app.agents.portfolio_council import FictionalCouncilModel
+from app.agents.research_role_agent import FictionalResearchRoleModel
 from app.jev import council
 from app.jev.client import JevEvaluation,JevAnswer
 
@@ -27,4 +28,5 @@ class MockJev:
 real_assess=council.assess_council_summary
 council.assess_council_summary=lambda state,run_id:real_assess(state,run_id,client=MockJev())
 council_http.loaded_model=lambda:MockNvidia()
+council_http.research_model=lambda:FictionalResearchRoleModel()
 app=module.app

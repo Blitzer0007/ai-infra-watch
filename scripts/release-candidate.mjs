@@ -49,6 +49,78 @@ const RESEARCH_REPAIRS_PARENT = '978ccefac76e36fa24e4b35cab2f1a08cbaca899';
 const RESEARCH_REPAIRS_BRANCH = 'feature/read-only-health-snapshot';
 export const M5_PROTECTION_EXCEPTION = 'MILESTONE5_PR176_ONE_TIME';
 
+// Prepared, manual-only PR189 path. This is not owner approval or activation.
+// A later explicit decision must identify the final reviewed PR head; accepting
+// that full SHA as an input avoids a self-referential commit pin in this file.
+export const PR189_RELEASE = Object.freeze({
+  number: 189,
+  branch: 'feature/nvidia-council-evaluation',
+  parent: '79fddf79a452c2a385b596fced604397781316eb',
+  rollback: 'dpl_FaRKWW7JLPdHykMszmzk7oPA9mJo',
+});
+export const PR189_PROTECTION_EXCEPTION = 'PR189_MANUAL_ONE_TIME';
+const FULL_SHA = /^[a-f0-9]{40}$/;
+const RUN_ID = /^[1-9][0-9]{0,14}$/;
+
+export function verifyPR189Exception({ expectedSha, reviewedHeadSha, waiver, pr, commit }) {
+  if (waiver !== PR189_PROTECTION_EXCEPTION ||
+      !FULL_SHA.test(expectedSha || '') || !FULL_SHA.test(reviewedHeadSha || '') ||
+      pr?.number !== PR189_RELEASE.number || pr?.merged !== true || pr?.state !== 'closed' ||
+      pr?.base?.ref !== 'main' || pr?.base?.repo?.full_name !== RELEASE_REPOSITORY ||
+      pr?.head?.ref !== PR189_RELEASE.branch || pr?.head?.repo?.full_name !== RELEASE_REPOSITORY ||
+      pr?.head?.sha !== reviewedHeadSha || pr?.merge_commit_sha !== expectedSha ||
+      commit?.sha !== expectedSha || !Array.isArray(commit.parents) || commit.parents.length !== 2 ||
+      commit.parents[0]?.sha !== PR189_RELEASE.parent || commit.parents[1]?.sha !== reviewedHeadSha) {
+    throw Error('PR189 exception requires its exact reviewed head and direct two-parent merge.');
+  }
+  return true;
+}
+
+function requirePR189ManualInputs(env) {
+  if (env.GITHUB_REPOSITORY !== RELEASE_REPOSITORY || env.GITHUB_REF !== 'refs/heads/main' ||
+      env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.AIW_CONFIRM_PRODUCTION_DEPLOY !== 'YES' ||
+      env.AIW_MAIN_PROTECTION_WAIVER !== 'NO' || env.AIW_RUN_LIVE_CHECKS !== 'false' ||
+      !FULL_SHA.test(env.EXPECTED_MAIN_SHA || '') || env.GITHUB_SHA !== env.EXPECTED_MAIN_SHA ||
+      !FULL_SHA.test(env.AIW_REVIEWED_PR_HEAD_SHA || '') ||
+      !RUN_ID.test(env.GITHUB_RUN_ID || '') || env.GITHUB_RUN_ATTEMPT !== '1' ||
+      env.ROLLBACK_DEPLOYMENT !== PR189_RELEASE.rollback) {
+    throw Error('PR189 requires a separate manual confirmation, reviewed head, pinned rollback and live checks off; old exceptions cannot be combined.');
+  }
+}
+
+async function rejectDuplicatePR189Release(env, token, fetcher) {
+  // Rechecks may see this workflow's own run; another dispatch of the same
+  // main commit must never stage/promote concurrently or silently retry it.
+  const seen = new Set();
+  let ownRunSeen = false;
+  for (let page = 1; page <= 10; page++) {
+    const url = 'https://api.github.com/repos/' + RELEASE_REPOSITORY +
+      '/actions/workflows/vercel-production-deploy.yml/runs?head_sha=' + env.EXPECTED_MAIN_SHA +
+      '&event=workflow_dispatch&per_page=100&page=' + page;
+    const body = await jsonGet(url, token, fetcher);
+    if (!Array.isArray(body?.workflow_runs) || !Number.isSafeInteger(body.total_count) || body.total_count < 0) {
+      throw Error('PR189 dispatch evidence is malformed.');
+    }
+    for (const run of body.workflow_runs) {
+      if (!Number.isSafeInteger(run?.id) || run.id <= 0 || run.head_sha !== env.EXPECTED_MAIN_SHA ||
+          run.event !== 'workflow_dispatch' || run.head_branch !== 'main' ||
+          run.path !== '.github/workflows/vercel-production-deploy.yml') {
+        throw Error('PR189 dispatch evidence has an unexpected identity.');
+      }
+      if (seen.has(run.id)) throw Error('PR189 dispatch evidence repeats a run.');
+      seen.add(run.id);
+      if (String(run.id) !== env.GITHUB_RUN_ID) throw Error('PR189 already has another release dispatch; review it before any further release attempt.');
+      ownRunSeen = true;
+    }
+    if (seen.size > body.total_count) throw Error('PR189 dispatch evidence has inconsistent counts.');
+    if (seen.size === body.total_count) {
+      if (!ownRunSeen) throw Error('PR189 current release dispatch is missing from evidence.');
+      return;
+    }
+    if (body.workflow_runs.length !== 100 || page === 10) throw Error('PR189 dispatch evidence is incomplete.');
+  }
+}
+
 export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
   const expected = pr?.number === RESEARCH_REPAIRS_PR
     ? { parent: RESEARCH_REPAIRS_PARENT, branch: RESEARCH_REPAIRS_BRANCH }
@@ -85,13 +157,16 @@ export function verifyMilestone5Exception({ expectedSha, waiver, pr, commit }) {
 }
 
 export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, currentMainSha, mainProtected, runs,
-  waiver = null, waiverPr = null, waiverCommit = null }) {
+  waiver = null, waiverPr = null, waiverCommit = null, reviewedHeadSha = null }) {
   if (repository !== RELEASE_REPOSITORY || ref !== 'refs/heads/main') throw Error('Release requires the intended repository and main branch.');
   if (!/^[a-f0-9]{40}$/.test(expectedSha || '') || dispatchSha !== expectedSha || currentMainSha !== expectedSha) {
     throw Error('Reviewed candidate, dispatch commit and current main must match.');
   }
-  if (mainProtected !== true) {
-    if (mainProtected !== false) throw Error('Main branch protection state is unknown.');
+  if (mainProtected !== true && mainProtected !== false) throw Error('Main branch protection state is unknown.');
+  if (waiver === PR189_PROTECTION_EXCEPTION) {
+    // Pin this candidate even if protection is added after preparation.
+    verifyPR189Exception({ expectedSha, reviewedHeadSha, waiver, pr: waiverPr, commit: waiverCommit });
+  } else if (mainProtected !== true) {
     verifyMilestone5Exception({ expectedSha, waiver, pr: waiverPr, commit: waiverCommit });
   }
   if (!Array.isArray(runs)) throw Error('CI evidence is unavailable.');
@@ -104,19 +179,23 @@ export function verifyCandidate({ repository, ref, dispatchSha, expectedSha, cur
     const prior = latest.get(file);
     if (!prior || run.id > prior.id) latest.set(file, run);
   }
-  for (const file of REQUIRED) if (!latest.has(file)) throw Error('Required main-commit CI evidence is missing: ' + file);
+  const required = waiver === PR189_PROTECTION_EXCEPTION ? CHECKS : REQUIRED;
+  for (const file of required) if (!latest.has(file)) throw Error('Required main-commit CI evidence is missing: ' + file);
   for (const [file, run] of latest) {
     if (run.status !== 'completed' || run.conclusion !== 'success') throw Error('CI is not successful: ' + file);
   }
   return [...latest.values()].map(run => run.id);
 }
 
-export function verifyVercelTarget(project, deployment, { team, projectId, expectedSha = null }) {
+export function verifyVercelTarget(project, deployment, { team, projectId, expectedSha = null,
+  expectedId = null, rollbackSha = null }) {
   if (project?.id !== projectId || project?.accountId !== team || deployment?.projectId !== projectId ||
       deployment?.target !== 'production' || deployment?.readyState !== 'READY' || !/^dpl_[A-Za-z0-9]+$/.test(deployment?.id || '')) {
     throw Error('Vercel project or production deployment identity/state does not match.');
   }
   if (expectedSha && deployment?.meta?.aiwReleaseCommit !== expectedSha) throw Error('Staged deployment commit does not match.');
+  if (expectedId && deployment.id !== expectedId) throw Error('Rollback deployment ID does not match.');
+  if (rollbackSha && deployment?.meta?.githubCommitSha !== rollbackSha) throw Error('Rollback source commit does not match.');
   return deployment.id;
 }
 
@@ -142,6 +221,8 @@ export async function jsonGet(url, token, fetcher = fetch) {
 }
 
 export async function checkCandidate(env, fetcher = fetch) {
+  const pr189 = env.AIW_PR189_PROTECTION_WAIVER === 'YES';
+  if (pr189) requirePR189ManualInputs(env);
   const repo = RELEASE_REPOSITORY;
   const base = 'https://api.github.com/repos/' + repo;
   const main = await jsonGet(base + '/branches/main', env.GH_TOKEN, fetcher);
@@ -160,8 +241,12 @@ export async function checkCandidate(env, fetcher = fetch) {
   // can meet this exception. Every candidate
   // must match its pinned direct main parent; never a generic bypass.
   let waiverPr = null, waiverCommit = null;
-  const waiver = env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
-  if (main?.protected === false && waiver) {
+  const waiver = pr189 ? PR189_PROTECTION_EXCEPTION
+    : env.AIW_MAIN_PROTECTION_WAIVER === 'YES' ? M5_PROTECTION_EXCEPTION : null;
+  if (pr189) {
+    waiverPr = await jsonGet(base + '/pulls/' + PR189_RELEASE.number, env.GH_TOKEN, fetcher);
+    waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
+  } else if (main?.protected === false && waiver) {
     const prNumber = env.AIW_RELEASE_PR === '188' ? RESEARCH_REPAIRS_PR
       : env.AIW_RELEASE_PR === '187' ? LIGHT_QUOTES_PR
       : env.AIW_RELEASE_PR === '180' ? DATA_REPAIR_PR
@@ -175,9 +260,11 @@ export async function checkCandidate(env, fetcher = fetch) {
     if (waiverPr?.number !== prNumber) throw Error('Release PR identity does not match the requested candidate.');
     waiverCommit = await jsonGet(base + '/commits/' + encodeURIComponent(env.EXPECTED_MAIN_SHA || ''), env.GH_TOKEN, fetcher);
   }
-  return verifyCandidate({ repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF, dispatchSha: env.GITHUB_SHA,
+  const ids = verifyCandidate({ repository: env.GITHUB_REPOSITORY, ref: env.GITHUB_REF, dispatchSha: env.GITHUB_SHA,
     expectedSha: env.EXPECTED_MAIN_SHA, currentMainSha: main?.commit?.sha, mainProtected: main?.protected, runs,
-    waiver, waiverPr, waiverCommit });
+    waiver, waiverPr, waiverCommit, reviewedHeadSha: env.AIW_REVIEWED_PR_HEAD_SHA });
+  if (pr189) await rejectDuplicatePR189Release(env, env.GH_TOKEN, fetcher);
+  return ids;
 }
 
 async function main() {
@@ -194,7 +281,10 @@ async function main() {
     const query = '?teamId=' + team;
     const project = await jsonGet('https://api.vercel.com/v9/projects/' + projectId + query, token);
     const deployment = await jsonGet('https://api.vercel.com/v13/deployments/' + encodeURIComponent(staged ? new URL(value).hostname : value) + query, token);
-    verifyVercelTarget(project, deployment, { team, projectId, expectedSha: staged ? process.env.EXPECTED_MAIN_SHA : null });
+    const pr189Rollback = !staged && process.env.AIW_PR189_PROTECTION_WAIVER === 'YES';
+    verifyVercelTarget(project, deployment, { team, projectId, expectedSha: staged ? process.env.EXPECTED_MAIN_SHA : null,
+      expectedId: pr189Rollback ? PR189_RELEASE.rollback : null,
+      rollbackSha: pr189Rollback ? PR189_RELEASE.parent : null });
     console.log((staged ? 'Staged' : 'Rollback') + ' production deployment identity verified.');
   } else throw Error('Unknown release check.');
 }

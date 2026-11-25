@@ -1,0 +1,2666 @@
+{
+  "contract_version": "council-benchmark-fixtures-v1",
+  "fictional_only": true,
+  "label_scope": "Conditional declared-input admission and numeric-sign argument selection; not source truth or future returns.",
+  "cases": [
+    {
+      "case_id": "growth-with-cash-burn",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:growth-with-cash-burn",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 10,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": -5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ]
+        },
+        "judge_must_abstain": false
+      }
+    },
+    {
+      "case_id": "profitable-growth-flat-market",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:profitable-growth-flat-market",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": 5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 0.5,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 20,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": 5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 0.5,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ]
+        },
+        "judge_must_abstain": false
+      }
+    },
+    {
+      "case_id": "contracting-cash-burn",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:contracting-cash-burn",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": -20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": -10,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 80,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": -20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": -8,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 80,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": -10,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 10,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": -5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ]
+        },
+        "judge_must_abstain": false
+      }
+    },
+    {
+      "case_id": "zero-cash-flow",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:zero-cash-flow",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": 0,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": 0,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ]
+        },
+        "judge_must_abstain": false
+      }
+    },
+    {
+      "case_id": "stale-market",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:stale-market",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:00:00Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:00:00Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 10,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": -5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "market"
+        ],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ]
+        },
+        "judge_must_abstain": true
+      }
+    },
+    {
+      "case_id": "missing-filing-lineage",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:missing-filing-lineage",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": null,
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "financial",
+          "risk"
+        ],
+        "claims": {
+          "bull": [],
+          "bear": []
+        },
+        "judge_must_abstain": true
+      }
+    },
+    {
+      "case_id": "same-day-filing-uncertainty",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:same-day-filing-uncertainty",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 10,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": -5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-11-09",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "confirmed",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "calendar:event-days"
+        ],
+        "missing_families": [
+          "financial",
+          "risk"
+        ],
+        "claims": {
+          "bull": [],
+          "bear": []
+        },
+        "judge_must_abstain": true
+      }
+    },
+    {
+      "case_id": "unconfirmed-catalyst",
+      "request": {
+        "mode": "loaded-v2",
+        "packet": {
+          "run_id": "benchmark:unconfirmed-catalyst",
+          "symbol": "FICT",
+          "horizon_months": 3,
+          "assessed_at": "2026-11-09T12:00:00.000Z",
+          "evidence": [
+            {
+              "evidence_id": "loaded:price",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "price",
+              "value": 100,
+              "unit": "USD",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "loaded:daily_change_pct",
+              "symbol": "FICT",
+              "family": "market",
+              "metric": "daily_change_pct",
+              "value": 0,
+              "unit": "percent",
+              "source_id": "yahoo",
+              "observed_at": "2026-11-09T11:59:00.000001Z",
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "reported",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "revenue_growth_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "operating_margin_pct",
+              "value": 20,
+              "unit": "percent",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "symbol": "FICT",
+              "family": "financial",
+              "metric": "free_cash_flow_usd",
+              "value": -5,
+              "unit": "USD",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "symbol": "FICT",
+              "family": "risk",
+              "metric": "liabilities_equity",
+              "value": 2,
+              "unit": "ratio",
+              "source_id": "sec-edgar-companyfacts",
+              "observed_at": null,
+              "published_at": null,
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "unknown",
+              "period_start": null,
+              "period_end": "2025-12-31",
+              "simulated": false
+            },
+            {
+              "evidence_id": "calendar:event-days",
+              "symbol": "FICT",
+              "family": "catalyst",
+              "metric": "event_days_until",
+              "value": 3.000000011574074,
+              "unit": "days",
+              "source_id": "loaded-calendar",
+              "observed_at": null,
+              "published_at": "2026-11-01T12:00:00Z",
+              "retrieved_at": "2026-11-09T12:00:00.000Z",
+              "basis": "estimate",
+              "period_start": null,
+              "period_end": null,
+              "simulated": false
+            }
+          ]
+        },
+        "sources": {
+          "sec": {
+            "contract_version": "council-sec-v1",
+            "symbol": "FICT",
+            "cik": "0000000001",
+            "retrieved_at": "2026-11-09T12:00:00.000Z",
+            "status": "partial",
+            "observations": [
+              {
+                "method": "revenue-growth-yoy",
+                "inputs": [
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2024-01-01",
+                    "period_end": "2024-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 100,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:revenue_growth_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "revenue_growth_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-margin",
+                "inputs": [
+                  {
+                    "tag": "OperatingIncomeLoss",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 24,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "Revenues",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 120,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:operating_margin_pct",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "operating_margin_pct",
+                  "value": 20,
+                  "unit": "percent",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "operating-cash-flow-less-capex",
+                "inputs": [
+                  {
+                    "tag": "NetCashProvidedByUsedInOperatingActivities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 10,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 15,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:free_cash_flow_usd",
+                  "symbol": "FICT",
+                  "family": "financial",
+                  "metric": "free_cash_flow_usd",
+                  "value": -5,
+                  "unit": "USD",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": "2025-01-01",
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              },
+              {
+                "method": "liabilities-to-equity",
+                "inputs": [
+                  {
+                    "tag": "Liabilities",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 60,
+                    "unit": "USD"
+                  },
+                  {
+                    "tag": "StockholdersEquity",
+                    "accession": "0000000001-26-000001",
+                    "form": "10-K",
+                    "period_start": null,
+                    "period_end": "2025-12-31",
+                    "filed_on": "2026-02-20",
+                    "value": 30,
+                    "unit": "USD"
+                  }
+                ],
+                "evidence": {
+                  "evidence_id": "sec:liabilities_equity",
+                  "symbol": "FICT",
+                  "family": "risk",
+                  "metric": "liabilities_equity",
+                  "value": 2,
+                  "unit": "ratio",
+                  "source_id": "sec-edgar-companyfacts",
+                  "observed_at": null,
+                  "published_at": null,
+                  "retrieved_at": "2026-11-09T12:00:00.000Z",
+                  "basis": "unknown",
+                  "period_start": null,
+                  "period_end": "2025-12-31",
+                  "simulated": false
+                }
+              }
+            ],
+            "issues": [
+              "DATE_ONLY_PUBLICATION"
+            ],
+            "source_authenticity_verified": false
+          },
+          "catalyst": {
+            "evidence_id": "calendar:event-days",
+            "event_at": "2026-11-12T12:00:00.001Z",
+            "confirmation": "estimated",
+            "confirmation_basis": "issuer",
+            "published_at": "2026-11-01T12:00:00Z",
+            "retrieved_at": "2026-11-09T12:00:00.000Z"
+          }
+        }
+      },
+      "expected": {
+        "usable_ids": [
+          "loaded:price",
+          "loaded:daily_change_pct",
+          "sec:revenue_growth_pct",
+          "sec:operating_margin_pct",
+          "sec:free_cash_flow_usd",
+          "sec:liabilities_equity"
+        ],
+        "missing_families": [
+          "catalyst"
+        ],
+        "claims": {
+          "bull": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "challenge"
+            }
+          ],
+          "bear": [
+            {
+              "evidence_id": "sec:revenue_growth_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:operating_margin_pct",
+              "stance": "challenge"
+            },
+            {
+              "evidence_id": "sec:free_cash_flow_usd",
+              "stance": "support"
+            },
+            {
+              "evidence_id": "sec:liabilities_equity",
+              "stance": "support"
+            }
+          ]
+        },
+        "judge_must_abstain": true
+      }
+    }
+  ]
+}

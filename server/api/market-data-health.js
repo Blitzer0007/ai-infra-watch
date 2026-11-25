@@ -2,6 +2,7 @@ import { evaluateDeclaredQuote } from '../../shared/quoteAdmission.js';
 import { quoteFailureReason } from '../utils/quoteFailureReasons.js';
 import { requireAccess } from '../../api/_access-auth.js';
 import { history as routedHistory, quote as routedQuote, classifyProviderError } from '../../api/_market-data.js';
+import {positiveMarketNumber,validMarketDate,completeHistoryQuality} from '../services/historyNormalization.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -97,22 +98,22 @@ export function summarizeMarketQuote(data, nowMs = Date.now(), symbol = null) {
 
 export function summarizeMarketHistory(data, nowMs = Date.now()) {
   const points = Array.isArray(data?.points) ? data.points : [];
-  const rawPoints = points.filter(point => Number.isFinite(Number(point?.price)) && Number(point.price) > 0);
+  const rawPoints = points.filter(point => positiveMarketNumber(point?.price));
   const adjustedPoints = rawPoints.filter(point =>
-    point?.adjusted === true && Number.isFinite(Number(point?.adjustedPrice)) && Number(point.adjustedPrice) > 0
+    point?.adjusted === true && positiveMarketNumber(point?.adjustedPrice)
   );
-  const invalidDateCount = rawPoints.filter(point => !/^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) ||
-    !Number.isFinite(Date.parse(String(point?.date || '') + 'T00:00:00.000Z'))).length;
+  const invalidDateCount = rawPoints.filter(point => !validMarketDate(point?.date)).length;
   const datedPoints = rawPoints
-    .filter(point => /^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) &&
-      Number.isFinite(Date.parse(String(point.date) + 'T00:00:00.000Z')))
+    .filter(point => validMarketDate(point?.date))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const firstDate = datedPoints[0]?.date || null;
   const lastDate = datedPoints.at(-1)?.date || null;
   const currentDate = new Date(nowMs).toISOString().slice(0, 10);
   const futureDateDetected = Boolean(lastDate && lastDate > currentDate);
   const adjustedCoveragePct = rawPoints.length ? Math.round((adjustedPoints.length / rawPoints.length) * 100) : 0;
-  const adjustedCloseAvailable = rawPoints.length > 0 && adjustedPoints.length === rawPoints.length && invalidDateCount === 0;
+  const reportedCount=key=>Number.isSafeInteger(data?.historyQuality?.[key])&&data.historyQuality[key]>=0?data.historyQuality[key]:null;
+  const duplicateDateCount=datedPoints.length-new Set(datedPoints.map(point=>point.date)).size+(reportedCount('duplicatePointCount')??0);
+  const adjustedCloseAvailable = rawPoints.length > 0 && rawPoints.length===points.length && adjustedPoints.length === rawPoints.length && invalidDateCount === 0 && !futureDateDetected && duplicateDateCount===0 && completeHistoryQuality(data);
   return {
     available: rawPoints.length > 0 && datedPoints.length > 0,
     provider: data?.provider || 'unknown',
@@ -130,6 +131,10 @@ export function summarizeMarketHistory(data, nowMs = Date.now()) {
     adjustedCloseAvailable,
     adjustedCoverageStatus: adjustedCloseAvailable ? 'complete' : adjustedPoints.length > 0 ? 'partial' : rawPoints.length > 0 ? 'missing' : 'unavailable',
     invalidDateCount,
+    invalidPriceCount:points.length-rawPoints.length,
+    duplicateDateCount,
+    discardedPointCount:reportedCount('discardedPointCount'),
+    invalidAdjustedPointCount:reportedCount('invalidAdjustedPointCount'),
     futureDateDetected,
     currency: data?.currency || null,
     providerAttempts: Array.isArray(data?.providerAttempts) ? data.providerAttempts.map(item => ({

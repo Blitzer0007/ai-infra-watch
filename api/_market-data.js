@@ -1,4 +1,5 @@
 import { normalizeYahooQuote, normalizeFinnhubQuote, normalizeAlphaQuote } from '../server/services/quoteNormalization.js';
+import {normalizeMarketHistory,positiveMarketNumber,validMarketDate,completeHistoryQuality,marketDateFromSeconds} from '../server/services/historyNormalization.js';
 const YAHOO_SYMBOL = {
   DRAM: 'DRAM',
   SOXL: 'SOXL',
@@ -12,7 +13,19 @@ const YAHOO_SYMBOL = {
 };
 
 const memoryCache = new Map();
+const inFlight = new Map();
 const CACHE_MS = 60000;
+
+/** Per-process identical reads only; not an account-wide provider quota. */
+function shareRequest(key,load) {
+  const existing=inFlight.get(key);
+  if(existing)return existing;
+  const pending=Promise.resolve().then(load).finally(()=>{
+    if(inFlight.get(key)===pending)inFlight.delete(key);
+  });
+  inFlight.set(key,pending);
+  return pending;
+}
 
 function normalizedSymbol(symbol) {
   return String(symbol || '').trim().toUpperCase();
@@ -100,6 +113,10 @@ export async function quote(symbol, { forceRefresh = false } = {}) {
   if (!forceRefresh && cacheEntry && Date.now() - cacheEntry.at < CACHE_MS) {
     return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
   }
+  return shareRequest(key,()=>loadQuote(symbol,key));
+}
+
+async function loadQuote(symbol,key) {
 
   const providers = [
     ['yahoo', yahooQuote],
@@ -150,11 +167,11 @@ async function yahooHistory(symbol, range) {
   const closes = result.indicators?.quote?.[0]?.close || [];
   const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose || [];
   const points = ts.map((t, i) => ({
-    date: new Date(t * 1000).toISOString().slice(0,10),
+    date: marketDateFromSeconds(t),
     price: closes[i],
     adjustedPrice: Number.isFinite(adjustedCloses[i]) ? adjustedCloses[i] : null,
     adjusted: Number.isFinite(adjustedCloses[i]),
-  })).filter(p => Number.isFinite(p.price));
+  }));
   if (!points.length) throw new Error('No Yahoo history points');
   return { points, currency: typeof result.meta?.currency === 'string' && result.meta.currency.trim() ? result.meta.currency : null, exchange: result.meta?.exchangeName || null };
 }
@@ -174,11 +191,11 @@ async function finnhubHistory(symbol, range) {
   );
   if (j?.s !== 'ok' || !Array.isArray(j?.c)) throw new Error('Finnhub history unavailable');
   const points = j.c.map((price, i) => ({
-    date: new Date(j.t[i] * 1000).toISOString().slice(0,10),
+    date: marketDateFromSeconds(j.t?.[i]),
     price,
     adjustedPrice: null,
     adjusted: false,
-  })).filter(p => Number.isFinite(p.price));
+  }));
   if (!points.length) throw new Error('No Finnhub history points');
   return { points, currency: null, exchange: null };
 }
@@ -196,8 +213,7 @@ async function alphaHistory(symbol, range) {
   const cutoff = Date.now() - rangeDays(range) * 86400000;
   const points = Object.entries(series)
     .filter(([date]) => new Date(date).getTime() >= cutoff)
-    .map(([date, row]) => ({ date, price: Number(row?.['4. close']), adjustedPrice: null, adjusted: false }))
-    .filter(p => Number.isFinite(p.price))
+    .map(([date, row]) => ({ date, price: typeof row?.['4. close']==='string'&&/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(row['4. close']) ? Number(row['4. close']) : typeof row?.['4. close']==='number' ? row['4. close'] : NaN, adjustedPrice: null, adjusted: false }))
     .sort((a,b) => a.date.localeCompare(b.date));
   if (!points.length) throw new Error('No Alpha Vantage history points');
   return { points, currency: null, exchange: null };
@@ -218,11 +234,10 @@ export function requireAdjustedHistory(data) {
     throw new Error('Adjusted history unavailable: no historical points were returned.');
   }
   const invalid = points.find(point =>
-    !/^\d{4}-\d{2}-\d{2}$/.test(String(point?.date || '')) ||
-    !(Number(point?.price) > 0) ||
-    !(Number(point?.adjusted === true ? point?.adjustedPrice : NaN) > 0)
+    !validMarketDate(point?.date) || !positiveMarketNumber(point?.price) ||
+    point?.adjusted!==true || !positiveMarketNumber(point?.adjustedPrice)
   );
-  if (invalid) {
+  if (invalid || !completeHistoryQuality(data)) {
     throw new Error('Adjusted history unavailable: provider did not supply a complete split/dividend-adjusted close series.');
   }
   const ordered = [...points].sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -251,6 +266,10 @@ export async function history(symbol, range = '2y') {
   if (cacheEntry && Date.now() - cacheEntry.at < 300000) {
     return { ...cacheEntry.data, cached: true, cacheAgeMs: Date.now() - cacheEntry.at };
   }
+  return shareRequest(key,()=>loadHistory(symbol,range,key));
+}
+
+async function loadHistory(symbol,range,key) {
 
   const providers = [
     ['yahoo', yahooHistory],
@@ -260,7 +279,7 @@ export async function history(symbol, range = '2y') {
   const errors = [];
   for (const [name, fn] of providers) {
     try {
-      const data = await fn(symbol, range);
+      const data = normalizeMarketHistory(await fn(symbol, range));
       const providerAttempts = [...errors, { provider: name, status: 'ok' }];
       return remember(key, {
         ...data,

@@ -11,6 +11,12 @@ on:
       - "api/live-data.js"
       - "aitracker-upload/app/rag/**"
       - "aitracker-upload/app/agents/**"
+      - "aitracker-upload/app/eval/**"
+      - "aitracker-upload/tests/eval/**"
+      - "aitracker-upload/data/research/council-benchmark.fictional.json"
+      - "aitracker-upload/data/research/research-role-response.fictional.json"
+      - "aitracker-upload/data/research/research-role-priorities.fictional.json"
+      - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
       - "aitracker-upload/app/llm/**"
@@ -29,6 +35,12 @@ on:
       - "aitracker-upload/mcp_servers/**"
       - "aitracker-upload/app/rag/**"
       - "aitracker-upload/app/agents/**"
+      - "aitracker-upload/app/eval/**"
+      - "aitracker-upload/tests/eval/**"
+      - "aitracker-upload/data/research/council-benchmark.fictional.json"
+      - "aitracker-upload/data/research/research-role-response.fictional.json"
+      - "aitracker-upload/data/research/research-role-priorities.fictional.json"
+      - "aitracker-upload/data/research/research-role-review.fictional.json"
       - "aitracker-upload/app/mcp_client/**"
       - "aitracker-upload/app/config/**"
       - "aitracker-upload/app/llm/**"
@@ -72,7 +84,7 @@ jobs:
         env:
           PYTHONPATH: aitracker-upload
           EVAL_STUB: "true"
-        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py
+        run: python -m pytest -q aitracker-upload/tests/agents/test_autonomous.py aitracker-upload/tests/agents/test_debate.py aitracker-upload/tests/agents/test_jev_client.py aitracker-upload/tests/agents/test_evidence_quality.py aitracker-upload/tests/agents/test_source_quality.py aitracker-upload/tests/agents/test_portfolio_council.py aitracker-upload/tests/agents/test_council_admission.py aitracker-upload/tests/agents/test_council_role_models.py aitracker-upload/tests/agents/test_research_role_review.py aitracker-upload/tests/agents/test_research_role_agent.py aitracker-upload/tests/agents/test_research_role_http.py
 
       - name: Run MCP contract tests
         env:
@@ -93,3 +105,35 @@ jobs:
           EVAL_STUB: "true"
         run: python -m pytest -q aitracker-upload/tests/eval
 
+      - name: Generate offline council comparison
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python aitracker-upload/scripts/council_model_benchmark.py --format markdown > /tmp/council-offline-comparison.md
+
+      - name: Upload fictional council comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: council-offline-comparison
+          path: /tmp/council-offline-comparison.md
+
+      - name: Generate offline research role agent probe
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python aitracker-upload/scripts/research_role_probe.py --format markdown > /tmp/research-role-agent-probe.md
+
+      - name: Upload fictional research role agent probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-role-agent-probe
+          path: /tmp/research-role-agent-probe.md
+
+      - name: Generate offline research priority comparison
+        env:
+          PYTHONPATH: aitracker-upload
+        run: python aitracker-upload/scripts/research_role_benchmark.py --format markdown > /tmp/research-role-priority-comparison.md
+
+      - name: Upload fictional research priority comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-role-priority-comparison
+          path: /tmp/research-role-priority-comparison.md
